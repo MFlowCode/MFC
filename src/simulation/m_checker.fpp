@@ -29,7 +29,7 @@ contains
         bub_fac = 0
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
-#if !(defined(_OPENACC) && defined(__PGI))
+#if !(defined(MFC_OpenACC) && defined(__PGI))
         if (cu_mpi) then
             call s_mpi_abort('Unsupported value of cu_mpi. Exiting ...')
         end if
@@ -79,7 +79,7 @@ contains
                 call s_mpi_abort('The 5-equation bubbly flow model requires bubble_model = 2 (Keller--Miksis)')
             elseif (nb < 1) then
                 call s_mpi_abort('The Ensemble-Averaged Bubble Model requires nb >= 1')
-            elseif (bubble_model == 3 .and. (polytropic .neqv. .true.)) then
+            elseif (bubble_model == 3 .and. (polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 call s_mpi_abort('RP bubbles require polytropic compression')
             elseif (cyl_coord) then 
                 call s_mpi_abort('Bubble models untested in cylindrical coordinates')
@@ -179,6 +179,9 @@ contains
         elseif (weno_order /= 5 .and. mp_weno) then
             call s_mpi_abort('Unsupported combination of values of '// &
                 'weno_order and mp_weno. Exiting ...')
+        elseif (model_eqns == 1 .and. weno_avg) then
+            call s_mpi_abort('Unsupported combination of values of '// &
+                'model_eqns and weno_avg. Exiting ...')        
         elseif (riemann_solver < 1 .or. riemann_solver > 3) then
             call s_mpi_abort('Unsupported value of riemann_solver. Exiting ...')
         elseif (all(wave_speeds /= (/dflt_int, 1, 2/))) then
@@ -363,6 +366,17 @@ contains
                         'and fluid_pp('//trim(iStr)//')%'// &
                         'Re('//trim(jStr)//'). Exiting ...')
                 end if
+
+                if (weno_order == 1 &
+                    .and. &
+                    (weno_avg .neqv. .true.)    &
+                    .and. &
+                    fluid_pp(i)%Re(j) /= dflt_real ) then
+                    call s_mpi_abort('Unsupported combination '// &
+                        'of values of weno_order, '// &
+                        'weno_avg and fluid_pp('//trim(iStr)//')%'// &
+                        'Re('//trim(jStr)//'). Exiting ...')
+                    end if
 
             end do
 

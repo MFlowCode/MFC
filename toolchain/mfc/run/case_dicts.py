@@ -39,8 +39,16 @@ for p_id in range(1, 10+1):
     for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0"]:
+                      "pi_inf", "r0", "v0", "p0", "m0", "hcid"]:
         PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
+
+    PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")
+
+    for attribute in ["translate", "scale", "rotate"]:
+        for j in range(1, 4):
+            PRE_PROCESS.append(f"patch_icpp({p_id})%model%{attribute}({j})")
+
+    PRE_PROCESS.append(f"patch_icpp({p_id})%model%spc")
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -115,7 +123,7 @@ POST_PROCESS = COMMON + [
     'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
-    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
+    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
     'qm_wrt'
 ]
 

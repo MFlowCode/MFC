@@ -231,7 +231,7 @@ else
     cmake_patch=$(echo $cmake_verstr | tr '.' '\n' | sed -n 3p)
     cmake_version="$(printf %05d%05d%05d $cmake_major $cmake_minor $cmake_patch)"
 
-    MFC_CMAKE_MIN_VERSTR=$(cat CMakeLists.txt | head -n 1 | sed 's/[^0-9,.]*//g')
+    MFC_CMAKE_MIN_VERSTR=$(cat CMakeLists.txt | grep cmake_minimum_required | head -n 1 | sed 's/[^0-9,.]*//g')
     MFC_CMAKE_MIN_MAJOR=$(echo $MFC_CMAKE_MIN_VERSTR | tr '.' '\n' | head -n 1)
     MFC_CMAKE_MIN_MINOR=$(echo $MFC_CMAKE_MIN_VERSTR | tr '.' '\n' | head -n 2 | tail -n 1)
     MFC_CMAKE_MIN_PATCH=0
@@ -380,6 +380,8 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     fi
 
     ok "Created a$MAGENTA Python$COLOR_RESET virtual environment (venv)."
+
+    rm "$(pwd)/build/requirements.txt" > /dev/null 2>&1 || true
 fi
 
 

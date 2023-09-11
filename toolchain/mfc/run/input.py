@@ -16,6 +16,9 @@ class MFCInputFile:
     case_dirpath: str
     case_dict:    dict
     
+    def __get_ndims(self) -> int:
+        return 1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)
+    
     def __is_ic_analytical(self, key: str, val: str) -> bool:
         if common.is_number(val) or not isinstance(val, str):
             return False
@@ -47,7 +50,6 @@ class MFCInputFile:
                     dict_str += f"{key} = {val}\n"
                 else:
                     dict_str += f"{key} = '{val}'\n"
-
                 continue
             else:
                 ignored.append(key)
@@ -86,21 +88,12 @@ class MFCInputFile:
         cons.print(f"Generating [magenta]pre_process/include/case.fpp[/magenta].")
         cons.indent()
         
-        DIMS = {
-            1: {'ptypes': [1, 15, 16],                     'sf_idx': 'i, 0, 0'},
-            2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18], 'sf_idx': 'i, j, 0'},
-            3: {'ptypes': [8,  9, 10, 11, 12, 13, 14, 19], 'sf_idx': 'i, j, k'}
-        }
-        
-        def get_patchtype_ndims(ptype: int) -> int:
-            for ndim, info in DIMS.items():
-                if ptype in info['ptypes']:
-                    return ndim
-            
-            raise common.MFCException(f"Patch of type {ptype} cannot be analytically defined.")
-        
-        PTYPES = DIMS[1]['ptypes'] + DIMS[2]['ptypes'] + DIMS[3]['ptypes']        
-        
+        DATA = {
+            1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
+            2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
+            3: {'ptypes': [8,  9, 10, 11, 12, 13, 14, 19, 21], 'sf_idx': 'i, j, k'}
+        }[self.__get_ndims()]
+                
         patches = {}
 
         for key, val in self.case_dict.items():            
@@ -119,7 +112,7 @@ class MFCInputFile:
         for pid, items in patches.items():
             ptype = self.case_dict[f"patch_icpp({pid})%geometry"]
             
-            if ptype not in PTYPES:
+            if ptype not in DATA['ptypes']:
                 raise common.MFCException(f"Patch #{pid} of type {ptype} cannot be analytically defined.")
             
             def rhs_replace(match):
@@ -146,10 +139,9 @@ class MFCInputFile:
                     if idx != 0:
                         qpvf_idx_offset = f" + {idx}"
                 
-                ndims  = get_patchtype_ndims(ptype)
-                sf_idx = DIMS[ndims]['sf_idx']
+                sf_idx = DATA['sf_idx']
                 
-                cons.print(f"[yellow]INFO:[/yellow] {ndims}D Analytical Patch #{pid}: Code generation for [magenta]{varname}[/magenta]...")
+                cons.print(f"[yellow]INFO:[/yellow] {self.__get_ndims()}D Analytical Patch #{pid}: Code generation for [magenta]{varname}[/magenta]...")
                 
                 lhs = f"q_prim_vf({qpvf_idx_var}{qpvf_idx_offset})%sf({sf_idx})"
                 rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
@@ -196,9 +188,9 @@ class MFCInputFile:
             bubble_model = int(self.case_dict.get("bubble_model", "-100"))
 
             if bubble_model == 2:
-                nterms = 12
+                nterms = 32
             elif bubble_model == 3:
-                nterms = 6
+                nterms = 7
 
             content = content + f"""
 #:set weno_order = {int(self.case_dict["weno_order"])}
@@ -221,16 +213,20 @@ class MFCInputFile:
         pass
 
     # Generate case.fpp & [target_name].inp
-    def generate(self, target_name: str) -> None:
-        self.__generate_inp(target_name)
+    def generate(self, target_name: str, bOnlyFPPs = False) -> None:
+        if not bOnlyFPPs:
+            self.__generate_inp(target_name)
         
         cons.print()
-        
+       
+        def _default():
+            cons.print(f"No additional input file generation needed for [bold magenta]{target_name}[/bold magenta].")
+
         {
             "pre_process"  : self.__generate_pre_fpp,
             "simulation"   : self.__generate_sim_fpp,
-            "post_process" : self.__generate_post_fpp
-        }[target_name]()
+            "post_process" : self.__generate_post_fpp,
+        }.get(target_name, _default)()
         
 
 # Load the input file

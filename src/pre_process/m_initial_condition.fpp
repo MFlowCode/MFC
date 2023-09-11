@@ -28,8 +28,8 @@ module m_initial_condition
 
     use m_assign_variables
 
-    use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
-    ! complex general matrix
+     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
+     ! complex general matrix
 
     ! ==========================================================================
     ! ==========================================================================
@@ -69,6 +69,16 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
+        if(qbmm .and. .not. polytropic) then
+        !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
+            allocate(pb%sf(0:m, &
+                  0:n, &
+                  0:p, 1:nnode, 1:nb))
+
+            allocate(mv%sf(0:m, &
+                  0:n, &
+                  0:p, 1:nnode, 1:nb))
+        end if
         ! Setting default values for conservative and primitive variables so
         ! that in the case that the initial condition is wrongly laid out on
         ! the grid the simulation component will catch the problem on start-
@@ -109,6 +119,10 @@ contains
 
             do i = 1, num_patches
 
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
+
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
                     call s_sphere(i, patch_id_fp, q_prim_vf)
@@ -141,6 +155,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 19) then
                     call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
 
+                    ! 3D STL patch
+                elseif (patch_icpp(i)%geometry == 21) then
+                    call s_model(i, patch_id_fp, q_prim_vf)
+ 
                 end if
 
             end do
@@ -151,6 +169,10 @@ contains
         elseif (n > 0) then
 
             do i = 1, num_patches
+
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
 
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
@@ -186,8 +208,12 @@ contains
 
                     ! TaylorGreen vortex patch
                 elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)    
+                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
 
+                    ! STL patch
+                elseif (patch_icpp(i)%geometry == 21) then
+                    call s_model(i, patch_id_fp, q_prim_vf)
+ 
                 end if
 
             end do
@@ -198,6 +224,10 @@ contains
         else
 
             do i = 1, num_patches
+
+                if (proc_rank == 0) then
+                    print*, 'Processing patch', i
+                end if
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
@@ -224,6 +254,13 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
+
+        if(qbmm .and. .not. polytropic) then
+            !Initialize pb and mv
+            call s_initialize_mv(q_cons_vf, mv%sf)
+            call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
+        end if
+
 
     end subroutine s_generate_initial_condition ! --------------------------
 

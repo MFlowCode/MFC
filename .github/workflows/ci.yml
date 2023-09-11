@@ -15,7 +15,7 @@ on:
   pull_request:
 
   workflow_dispatch:
-
+    
 jobs:
   github:
     name: Github
@@ -24,7 +24,10 @@ jobs:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi', 'no-mpi']
         debug: ['debug', 'no-debug']
-        intel: [false]
+        intel: [true, false]
+        exclude:
+          - intel: true
+            os:    macos
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
@@ -50,8 +53,10 @@ jobs:
 
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false
-        run:  sudo apt install tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-
+        run: |
+           sudo apt update -y
+           sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+     
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
         run: |
@@ -70,12 +75,20 @@ jobs:
           echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
           echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+          echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
       - name: Build
-        run:  /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }}
+        run:  |
+          if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
+          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
 
       - name: Test
-        run:  /bin/bash mfc.sh test -j $(nproc) $(if [ "${{ matrix.mpi }}" == "mpi" ]; then echo "--test-all"; fi)
+        run:  |
+          if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
+          /bin/bash mfc.sh test -j $(nproc) $OPT1 $OPT2
+        env:
+          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          OPT2: ${{ matrix.debug == 'debug' && '-% 75' || '' }}
 
   docker:
     name:    Github | Docker

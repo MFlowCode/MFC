@@ -21,7 +21,7 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
-#ifdef _OPENACC
+#ifdef MFC_OpenACC
     use openacc
 #endif
 
@@ -999,7 +999,7 @@ contains
                                                          + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
                                                       *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                            abs(vR_max - vR_rs_vf(j, k, l, i)))
-                        ! END: Right Monotonicity Preserving Bound =========================
+                         ! END: Right Monotonicity Preserving Bound =========================
                     end do
                 end do
             end do

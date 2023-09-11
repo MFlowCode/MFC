@@ -22,6 +22,7 @@ option(MFC_OpenACC       "Build with OpenACC"  OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"   OFF)
 option(MFC_SIMULATION    "Build simulation"    OFF)
 option(MFC_POST_PROCESS  "Build post_process"  OFF)
+option(MFC_SYSCHECK      "Build syscheck"      OFF)
 option(MFC_DOCUMENTATION "Build documentation" OFF)
 option(MFC_ALL           "Build everything"    OFF)
 
@@ -74,12 +75,10 @@ find_program(FYPP_EXE fypp REQUIRED)
 
 
 # Miscellaneous Configuration:
-# *  Enable C-Preprocessor for Fortran files
 # *  Explicitly link to -ldl (or system equivalent)
 # *  Request that FIND_LIBRARY searches <prefix>/lib/ and <prefix>/lib64/
 # *  Let FindXXX use custom scripts from toolchain/cmake/.
 
-set(CMAKE_Fortran_PREPROCESS ON)
 link_libraries("${CMAKE_DL_LIBS}")
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
@@ -96,7 +95,8 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
-            -fcheck=all     -fbacktrace
+            -fcheck=all,no-array-temps 
+            -fbacktrace
             -fimplicit-none
         )
     endif()
@@ -142,7 +142,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
     
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -Og -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+        add_compile_options(-C -g -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
     endif()
 endif()
 
@@ -222,25 +222,36 @@ endif()
 # and generate documentation. Instead, we can simply include the list of .f90
 # files that will eventually be used to compile <target>.
 
-macro(HANDLE_SOURCES target)
+macro(HANDLE_SOURCES target useCommon)
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
     # Gather src/[<target>,common]/*.f90
     file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90")
-    file(GLOB    common_F90s CONFIGURE_DEPENDS    "${common_DIR}/*.f90")
-    set(${target}_SRCs ${${target}_F90s} ${common_F90s})
+    set(${target}_SRCs ${${target}_F90s})
+    if (${useCommon})
+        file(GLOB common_F90s CONFIGURE_DEPENDS "${common_DIR}/*.f90")
+        list(APPEND ${target}_SRCs ${common_F90s})
+    endif()
 
     # src/[<target>,common]/*.fpp -> src/<target>/autogen/*.f90
     file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
-    file(GLOB    common_FPPs CONFIGURE_DEPENDS    "${common_DIR}/*.fpp")
+    if (${useCommon})
+        file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
+        list(APPEND ${target}_FPPs ${common_FPPs})
+    endif()
 
     # Locate src/[<target>,common]/include/*.fpp
-    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
-    file(GLOB    common_incs CONFIGURE_DEPENDS    "${common_DIR}/include/*.fpp")
+    if (EXISTS "${${target}_DIR}/include")
+        file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
+    endif()
+    if (${useCommon})
+        file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fpp")
+        list(APPEND ${target}_incs ${common_incs})
+    endif()
 
     file(MAKE_DIRECTORY "${${target}_DIR}/autogen")
-    foreach(fpp ${${target}_FPPs} ${common_FPPs})
+    foreach(fpp ${${target}_FPPs})
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${${target}_DIR}/autogen/${fpp_filename}.f90")
 
@@ -255,7 +266,7 @@ macro(HANDLE_SOURCES target)
                                  --line-numbering
                                  --no-folding
                                  "${fpp}" "${f90}"
-            DEPENDS  "${fpp};${${target}_incs};${common_incs}"
+            DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
             VERBATIM
         )
@@ -265,9 +276,10 @@ macro(HANDLE_SOURCES target)
 endmacro()
 
 
-HANDLE_SOURCES(pre_process)
-HANDLE_SOURCES(simulation)
-HANDLE_SOURCES(post_process)
+HANDLE_SOURCES(pre_process ON)
+HANDLE_SOURCES(simulation ON)
+HANDLE_SOURCES(post_process ON)
+HANDLE_SOURCES(syscheck OFF)
 
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
@@ -289,6 +301,18 @@ function(MFC_SETUP_TARGET)
     cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+
+    set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
+
+    target_include_directories(${ARGS_TARGET} PRIVATE 
+        "${CMAKE_SOURCE_DIR}/src/common"
+        "${CMAKE_SOURCE_DIR}/src/common/include"
+        "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
+    
+    if (EXISTS "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
+        target_include_directories(${ARGS_TARGET} PRIVATE
+            "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
+    endif()
 
     string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
     target_compile_definitions(
@@ -332,6 +356,7 @@ function(MFC_SETUP_TARGET)
         endif()
 
         target_link_libraries(${ARGS_TARGET} PRIVATE OpenACC::OpenACC_Fortran)
+        target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_OpenACC)
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             # FIXME: This should work with other cards than gfx90a ones.
@@ -395,6 +420,11 @@ if (MFC_POST_PROCESS)
     target_compile_options(post_process PRIVATE -O0)
 endif()
 
+if (MFC_SYSCHECK)
+    MFC_SETUP_TARGET(TARGET  syscheck
+                     SOURCES "${syscheck_SRCs}"
+                     MPI OpenACC)
+endif()
 
 if (MFC_DOCUMENTATION)
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a

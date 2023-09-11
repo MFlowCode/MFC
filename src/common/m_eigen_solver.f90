@@ -11,10 +11,10 @@ module m_eigen_solver
     implicit none
 
     private; public :: cg,cbal,corth,comqr2,csroot,cdiv,pythag
-	
+    
 contains
 
-	subroutine cg(nm,nl,ar,ai,wr,wi,zr,zi,fv1,fv2,fv3,ierr)
+    subroutine cg(nm,nl,ar,ai,wr,wi,zr,zi,fv1,fv2,fv3,ierr)
 !     this subroutine calls the recommended sequence of
 !     subroutines from the eigensystem subroutine package (eispack)
 !     to find the eigenvalues and eigenvectors (if desired)
@@ -50,22 +50,22 @@ contains
 !
 !     this version dated august 1983.
 !
-!     ------------------------------------------------------------------	
-		integer nm,nl,is1,is2,ierr
-		real(kind(0d0)), dimension(nm,nl) :: ar,ai,zr,zi
-		real(kind(0d0)), dimension(nl) :: wr,wi,fv1,fv2,fv3
+!     ------------------------------------------------------------------    
+        integer nm,nl,is1,is2,ierr
+        real(kind(0d0)), dimension(nm,nl) :: ar,ai,zr,zi
+        real(kind(0d0)), dimension(nl) :: wr,wi,fv1,fv2,fv3
 
-		if (nl .le. nm) go to 10
-		ierr = 10*nl
-		go to 50
+        if (nl .le. nm) go to 10
+        ierr = 10*nl
+        go to 50
 
-10		call cbal(nm,nl,ar,ai,is1,is2,fv1)
-		call corth(nm,nl,is1,is2,ar,ai,fv2,fv3)
-		call comqr2(nm,nl,is1,is2,fv2,fv3,ar,ai,wr,wi,zr,zi,ierr)
-		if (ierr .ne. 0) go to 50
-		call cbabk2(nm,nl,is1,is2,fv1,nl,zr,zi)
+10      call cbal(nm,nl,ar,ai,is1,is2,fv1)
+        call corth(nm,nl,is1,is2,ar,ai,fv2,fv3)
+        call comqr2(nm,nl,is1,is2,fv2,fv3,ar,ai,wr,wi,zr,zi,ierr)
+        if (ierr .ne. 0) go to 50
+        call cbabk2(nm,nl,is1,is2,fv1,nl,zr,zi)
 
-50	return
+50  return
     end subroutine cg
 
     subroutine cbal(nm,nl,ar,ai,low,igh,scale)
@@ -125,49 +125,49 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-		integer i,j,k,l,ml,nl,jj,nm,igh,low,iexc
-		real(kind(0d0)), dimension(nm,nl) :: ar,ai
-		real(kind(0d0)), dimension(nl) :: scale
-		real(kind(0d0)) :: c,f,g,r,s,b2,radix
-		logical noconv
+        integer i,j,k,l,ml,nl,jj,nm,igh,low,iexc
+        real(kind(0d0)), dimension(nm,nl) :: ar,ai
+        real(kind(0d0)), dimension(nl) :: scale
+        real(kind(0d0)) :: c,f,g,r,s,b2,radix
+        logical noconv
 
-		radix = 16.0d0
+        radix = 16.0d0
 
-		b2 = radix * radix
-		k = 1
-		l = nl
-		go to 100
+        b2 = radix * radix
+        k = 1
+        l = nl
+        go to 100
 !     .......... in-line procedure for row and
 !                column exchange ..........
-20  	scale(ml) = j
-		if (j .eq. ml) go to 50
+20      scale(ml) = j
+        if (j .eq. ml) go to 50
 
-		do 30 i = 1, l
-			f = ar(i,j)
-			ar(i,j) = ar(i,ml)
-			ar(i,ml) = f
-			f = ai(i,j)
-			ai(i,j) = ai(i,ml)
-			ai(i,ml) = f
-30  	continue
+        do 30 i = 1, l
+            f = ar(i,j)
+            ar(i,j) = ar(i,ml)
+            ar(i,ml) = f
+            f = ai(i,j)
+            ai(i,j) = ai(i,ml)
+            ai(i,ml) = f
+30      continue
 
-		do 40 i = k, nl
-			f = ar(j,i)
-			ar(j,i) = ar(ml,i)
-			ar(ml,i) = f
-			f = ai(j,i)
-			ai(j,i) = ai(ml,i)
-			ai(ml,i) = f
-40  	continue
+        do 40 i = k, nl
+            f = ar(j,i)
+            ar(j,i) = ar(ml,i)
+            ar(ml,i) = f
+            f = ai(j,i)
+            ai(j,i) = ai(ml,i)
+            ai(ml,i) = f
+40      continue
 
-50  	go to (80,130), iexc
+50      go to (80,130), iexc
 !     .......... search for rows isolating an eigenvalue
 !                and push them down ..........
-80  	if (l .eq. 1) go to 280
-			l = l - 1
+80      if (l .eq. 1) go to 280
+            l = l - 1
 !     .......... for j=l step -1 until 1 do -- ..........
-100 	do 120 jj = 1, l
-			j = l + 1 - jj
+100     do 120 jj = 1, l
+            j = l + 1 - jj
 
         do 110 i = 1, l
             if (i .eq. j) go to 110
@@ -177,14 +177,14 @@ contains
         ml = l
         iexc = 1
         go to 20
-120 	continue
+120     continue
 
-		go to 140
+        go to 140
 !     .......... search for columns isolating an eigenvalue
 !                and push them left ..........
-130 	k = k + 1
+130     k = k + 1
 
-140 	do 170 j = k, l
+140     do 170 j = k, l
 
         do 150 i = k, l
            if (i .eq. j) go to 150
@@ -194,17 +194,17 @@ contains
         ml = k
         iexc = 2
         go to 20
-170 	continue
+170     continue
 !     .......... now balance the submatrix in rows k to l ..........
-		do 180 i = k, l
-		scale(i) = 1.0d0
-180		continue
+        do 180 i = k, l
+        scale(i) = 1.0d0
+180     continue
 !     .......... iterative loop for norm reduction ..........
-190 	noconv = .false.
+190     noconv = .false.
 
-		do 270 i = k, l
-			c = 0.0d0
-			r = 0.0d0
+        do 270 i = k, l
+            c = 0.0d0
+            r = 0.0d0
 
         do 200 j = k, l
             if (j .eq. i) go to 200
@@ -241,15 +241,15 @@ contains
            ai(j,i) = ai(j,i) * f
 260     continue
 
-270 	continue
+270     continue
 
-		if (noconv) go to 190
+        if (noconv) go to 190
 
-280 	low = k
-		igh = l
-	return
+280     low = k
+        igh = l
+    return
     end subroutine cbal
-	
+    
     subroutine corth(nm,nl,low,igh,ar,ai,ortr,orti)
 !     this subroutine is a translation of a complex analogue of
 !     the algol procedure orthes, num. math. 12, 349-368(1968)
@@ -295,27 +295,27 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-		integer i,j,ml,nl,ii,jj,la,mp,nm,igh,kp1,low
-		real(kind(0d0)),dimension(nm,nl) :: ar,ai
-		real(kind(0d0)),dimension(igh) :: ortr,orti
-		real(kind(0d0)) :: f,g,h,fi,fr,scale,c
+        integer i,j,ml,nl,ii,jj,la,mp,nm,igh,kp1,low
+        real(kind(0d0)),dimension(nm,nl) :: ar,ai
+        real(kind(0d0)),dimension(igh) :: ortr,orti
+        real(kind(0d0)) :: f,g,h,fi,fr,scale,c
 
-		integer mll
-		mll = 6
-		
-		la = igh - 1
-		kp1 = low + 1
-		if (la .lt. kp1) go to 200
+        integer mll
+        mll = 6
+        
+        la = igh - 1
+        kp1 = low + 1
+        if (la .lt. kp1) go to 200
 
-		do 180 ml = kp1, la
-			h = 0.0d0
-			ortr(ml) = 0.0d0
-			orti(ml) = 0.0d0
-			scale = 0.0d0
+        do 180 ml = kp1, la
+            h = 0.0d0
+            ortr(ml) = 0.0d0
+            orti(ml) = 0.0d0
+            scale = 0.0d0
 !     .......... scale column (algol tol then not needed) ..........
         do 90 i = ml, igh
         scale = scale + dabs(ar(i,ml-1)) + dabs(ai(i,ml-1))
-90		continue
+90      continue
         if (scale .eq. 0d0) go to 180
         mp = ml + igh
 !     .......... for i=igh step -1 until ml do -- ..........
@@ -327,7 +327,7 @@ contains
 100     continue
 !
         g = dsqrt(h)
-		call pythag(ortr(ml),orti(ml),f)
+        call pythag(ortr(ml),orti(ml),f)
         if (f .eq. 0d0) go to 103
         h = h + f * g
         g = g / f
@@ -386,7 +386,7 @@ contains
 !
 200 return
     end subroutine corth
-	
+    
     subroutine comqr2(nm,nl,low,igh,ortr,orti,hr,hi,wr,wi,zr,zi,ierr)
 !  MESHED overflow control WITH vectors of isolated roots (10/19/89 BSG)
 !  MESHED overflow control WITH triangular multiply (10/30/89 BSG)
@@ -460,32 +460,32 @@ contains
 !     this version dated october 1989.
 !
 !     ------------------------------------------------------------------
-		integer i,j,k,l,ml,nl,en,ii,jj,ll,nm,nn,igh,ip1,&
+        integer i,j,k,l,ml,nl,en,ii,jj,ll,nm,nn,igh,ip1,&
               itn,its,low,lp1,enm1,iend,ierr
-		real(kind(0d0)),dimension(nm,nl) :: hr,hi,zr,zi
-		real(kind(0d0)),dimension(nl) :: wr,wi
-		real(kind(0d0)),dimension(igh) :: ortr,orti
-		real(kind(0d0)) :: si,sr,ti,tr,xi,xr,yi,yr,zzi,zzr,&
-						norm,tst1,tst2,c,d
+        real(kind(0d0)),dimension(nm,nl) :: hr,hi,zr,zi
+        real(kind(0d0)),dimension(nl) :: wr,wi
+        real(kind(0d0)),dimension(igh) :: ortr,orti
+        real(kind(0d0)) :: si,sr,ti,tr,xi,xr,yi,yr,zzi,zzr,&
+                        norm,tst1,tst2,c,d
 !
-		ierr = 0
+        ierr = 0
 !     .......... initialize eigenvector matrix ..........
-		do 101 j = 1, nl
+        do 101 j = 1, nl
 !
         do 100 i = 1, nl
             zr(i,j) = 0.0d0
             zi(i,j) = 0.0d0
-100   	continue
+100     continue
         zr(j,j) = 1.0d0
-101 	continue
+101     continue
 !     .......... form the matrix of accumulated transformations
 !                from the information left by corth ..........
-		iend = igh - low - 1
-		if (iend .lt. 0) go to 180
-		if (iend .eq. 0) go to 150
-		if (iend .gt. 0) go to 105
+        iend = igh - low - 1
+        if (iend .lt. 0) go to 180
+        if (iend .eq. 0) go to 150
+        if (iend .gt. 0) go to 105
 !     .......... for i=igh-1 step -1 until low+1 do -- ..........
-105 	do 140 ii = 1, iend
+105     do 140 ii = 1, iend
         i = igh - ii
         if (dabs(ortr(i)) .eq. 0d0 .and. dabs(orti(i)) .eq. 0d0) go to 140
         if (dabs(hr(i,i-1)) .eq. 0d0 .and. dabs(hi(i,i-1)) .eq. 0d0) go to 140
@@ -496,7 +496,7 @@ contains
         do 110 k = ip1, igh
             ortr(k) = hr(k,i-1)
             orti(k) = hi(k,i-1)
-110   	continue
+110     continue
 !
         do 130 j = i, igh
             sr = 0.0d0
@@ -556,64 +556,64 @@ contains
         wi(i) = hi(i,i)
 200     continue
 !
-		en = igh
-		tr = 0.0d0
-		ti = 0.0d0
-		itn = 30*nl
+        en = igh
+        tr = 0.0d0
+        ti = 0.0d0
+        itn = 30*nl
 !     .......... search for next eigenvalue ..........
-220 	if (en .lt. low) go to 680
-		its = 0
-		enm1 = en - 1
+220     if (en .lt. low) go to 680
+        its = 0
+        enm1 = en - 1
 !     .......... look for single small sub-diagonal element
 !                for l=en step -1 until low do -- ..........
-240 	do 260 ll = low, en
+240     do 260 ll = low, en
         l = en + low - ll
         if (l .eq. low) go to 300
         tst1 = dabs(hr(l-1,l-1)) + dabs(hi(l-1,l-1)) &
              + dabs(hr(l,l)) + dabs(hi(l,l))
         tst2 = tst1 + dabs(hr(l,l-1))
         if (tst2 .eq. tst1) go to 300
-260 	continue
+260     continue
 !     .......... form shift ..........
-300 	if (l .eq. en) go to 660
-		if (itn .eq. 0) go to 1000
-		if (its .eq. 10 .or. its .eq. 20) go to 320
-		sr = hr(en,en)
-		si = hi(en,en)
-		xr = hr(enm1,en) * hr(en,enm1)
-		xi = hi(enm1,en) * hr(en,enm1)
-		if (xr .eq. 0.0d0 .and. xi .eq. 0.0d0) go to 340
-		yr = (hr(enm1,enm1) - sr) / 2.0d0
-		yi = (hi(enm1,enm1) - si) / 2.0d0
-		call csroot(yr**2-yi**2+xr,2.0d0*yr*yi+xi,zzr,zzi)
-		if (yr * zzr + yi * zzi .ge. 0.0d0) go to 310
-		zzr = -zzr
-		zzi = -zzi
-310 	call cdiv(xr,xi,yr+zzr,yi+zzi,xr,xi)
-		sr = sr - xr
-		si = si - xi
-		go to 340
+300     if (l .eq. en) go to 660
+        if (itn .eq. 0) go to 1000
+        if (its .eq. 10 .or. its .eq. 20) go to 320
+        sr = hr(en,en)
+        si = hi(en,en)
+        xr = hr(enm1,en) * hr(en,enm1)
+        xi = hi(enm1,en) * hr(en,enm1)
+        if (xr .eq. 0.0d0 .and. xi .eq. 0.0d0) go to 340
+        yr = (hr(enm1,enm1) - sr) / 2.0d0
+        yi = (hi(enm1,enm1) - si) / 2.0d0
+        call csroot(yr**2-yi**2+xr,2.0d0*yr*yi+xi,zzr,zzi)
+        if (yr * zzr + yi * zzi .ge. 0.0d0) go to 310
+        zzr = -zzr
+        zzi = -zzi
+310     call cdiv(xr,xi,yr+zzr,yi+zzi,xr,xi)
+        sr = sr - xr
+        si = si - xi
+        go to 340
 !     .......... form exceptional shift ..........
-320 	sr = dabs(hr(en,enm1)) + dabs(hr(enm1,en-2))
-		si = 0.0d0
+320     sr = dabs(hr(en,enm1)) + dabs(hr(enm1,en-2))
+        si = 0.0d0
 !
-340 	do 360 i = low, en
+340     do 360 i = low, en
         hr(i,i) = hr(i,i) - sr
         hi(i,i) = hi(i,i) - si
-360 	continue
+360     continue
 !
-		tr = tr + sr
-		ti = ti + si
-		its = its + 1
-		itn = itn - 1
+        tr = tr + sr
+        ti = ti + si
+        its = its + 1
+        itn = itn - 1
 !     .......... reduce to triangle (rows) ..........
-		lp1 = l + 1
+        lp1 = l + 1
 !
-		do 500 i = lp1, en
+        do 500 i = lp1, en
         sr = hr(i,i-1)
         hr(i,i-1) = 0.0d0
-		call pythag(hr(i-1,i-1),hi(i-1,i-1),c)
-		call pythag(c,sr,norm)
+        call pythag(hr(i-1,i-1),hi(i-1,i-1),c)
+        call pythag(c,sr,norm)
         xr = hr(i-1,i-1) / norm
         wr(i-1) = xr
         xi = hi(i-1,i-1) / norm
@@ -633,26 +633,26 @@ contains
             hi(i,j) = xr * zzi + xi * zzr - hi(i,i-1) * yi
 490     continue
 !
-500 	continue
+500     continue
 !
-		si = hi(en,en)
-		if (dabs(si) .eq. 0d0) go to 540
-		call pythag(hr(en,en),si,norm)
-		sr = hr(en,en) / norm
-		si = si / norm
-		hr(en,en) = norm
-		hi(en,en) = 0.0d0
-		if (en .eq. nl) go to 540
-		ip1 = en + 1
+        si = hi(en,en)
+        if (dabs(si) .eq. 0d0) go to 540
+        call pythag(hr(en,en),si,norm)
+        sr = hr(en,en) / norm
+        si = si / norm
+        hr(en,en) = norm
+        hi(en,en) = 0.0d0
+        if (en .eq. nl) go to 540
+        ip1 = en + 1
 !
-		do 520 j = ip1, nl
+        do 520 j = ip1, nl
         yr = hr(en,j)
         yi = hi(en,j)
         hr(en,j) = sr * yr + si * yi
         hi(en,j) = sr * yi - si * yr
-520 	continue
+520     continue
 !     .......... inverse operation (columns) ..........
-540 	do 600 j = lp1, en
+540     do 600 j = lp1, en
         xr = wr(j-1)
         xi = wi(j-1)
 !
@@ -680,7 +680,7 @@ contains
             zi(i,j) = xr * zzi - xi * zzr - hi(j,j-1) * yi
 590     continue
 
-600 	continue
+600     continue
 !
         if (dabs(si) .eq. 0d0) go to 240
 !
@@ -689,37 +689,37 @@ contains
         yi = hi(i,en)
         hr(i,en) = sr * yr - si * yi
         hi(i,en) = sr * yi + si * yr
-630 	continue
+630     continue
 !
-		do 640 i = low, igh
+        do 640 i = low, igh
         yr = zr(i,en)
         yi = zi(i,en)
         zr(i,en) = sr * yr - si * yi
         zi(i,en) = sr * yi + si * yr
-640 	continue
+640     continue
 !
-		go to 240
+        go to 240
 !     .......... a root found ..........
-660 	hr(en,en) = hr(en,en) + tr
-		wr(en) = hr(en,en)
-		hi(en,en) = hi(en,en) + ti
-		wi(en) = hi(en,en)
-		en = enm1
-		go to 220
+660     hr(en,en) = hr(en,en) + tr
+        wr(en) = hr(en,en)
+        hi(en,en) = hi(en,en) + ti
+        wi(en) = hi(en,en)
+        en = enm1
+        go to 220
 !     .......... all roots found.  backsubstitute to find
 !                vectors of upper triangular form ..........
-680 	norm = 0.0d0
+680     norm = 0.0d0
 !
-		do i = 1, nl
+        do i = 1, nl
         do j = i, nl
             tr = dabs(hr(i,j)) + dabs(hi(i,j))
             if (tr .gt. norm) norm = tr
-		end do
-		end do
+        end do
+        end do
 !
-		if (nl .eq. 1 .or. norm .eq. 0d0) go to 1001
+        if (nl .eq. 1 .or. norm .eq. 0d0) go to 1001
 !     .......... for en=nl step -1 until 2 do -- ..........
-		do 800 nn = 2, nl
+        do 800 nn = 2, nl
         en = nl + 2 - nn
         xr = wr(en)
         xi = wi(en)
@@ -759,12 +759,12 @@ contains
                hi(j,en) = hi(j,en)/tr
 770         continue
 !
-780	    continue
+780     continue
 !
-800		continue
+800     continue
 !     .......... end backsubstitution ..........
 !     .......... vectors of isolated roots ..........
-		do  840 i = 1, nl
+        do  840 i = 1, nl
         if (i .ge. low .and. i .le. igh) go to 840
 !
         do 820 j = I, nl
@@ -772,11 +772,11 @@ contains
             zi(i,j) = hi(i,j)
 820     continue
 !
-840 	continue
+840     continue
 !     .......... multiply by transformation matrix to give
 !                vectors of original full matrix.
 !                for j=nl step -1 until low do -- ..........
-		do jj = low, nl
+        do jj = low, nl
         j = nl + low - jj
         ml = min0(j,igh)
 !
@@ -791,17 +791,17 @@ contains
 !
             zr(i,j) = zzr
             zi(i,j) = zzi
-		end do
-		end do
+        end do
+        end do
 !
-		go to 1001
+        go to 1001
 !     .......... set error -- all eigenvalues have not
 !                converged after 30*nl iterations ..........
-1000 	ierr = en
-1001 	return
+1000    ierr = en
+1001    return
     end subroutine comqr2
 
-	subroutine cbabk2(nm,nl,low,igh,scale,ml,zr,zi)
+    subroutine cbabk2(nm,nl,low,igh,scale,ml,zr,zi)
 !     this subroutine is a translation of the algol procedure
 !     cbabk2, which is a complex version of balbak,
 !     num. math. 13, 293-304(1969) by parlett and reinsch.
@@ -882,54 +882,54 @@ contains
 140 continue
 !
 200 return
-	end subroutine cbabk2
-	  
+    end subroutine cbabk2
+      
     subroutine csroot(xr,xi,yr,yi)
-		real(kind(0d0)) :: xr,xi,yr,yi
+        real(kind(0d0)) :: xr,xi,yr,yi
 !
 !     (yr,yi) = complex dsqrt(xr,xi) 
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
 !
-		real(kind(0d0)) :: s,tr,ti,c
-		tr = xr
-		ti = xi
-		call pythag(tr,ti,c)
-		s = dsqrt(0.5d0*(c + dabs(tr)))
-		if (tr .ge. 0.0d0) yr = s
-		if (ti .lt. 0.0d0) s = -s
-		if (tr .le. 0.0d0) yi = s
-		if (tr .lt. 0.0d0) yr = 0.5d0*(ti/yi)
-		if (tr .gt. 0.0d0) yi = 0.5d0*(ti/yr)
-		return
+        real(kind(0d0)) :: s,tr,ti,c
+        tr = xr
+        ti = xi
+        call pythag(tr,ti,c)
+        s = dsqrt(0.5d0*(c + dabs(tr)))
+        if (tr .ge. 0.0d0) yr = s
+        if (ti .lt. 0.0d0) s = -s
+        if (tr .le. 0.0d0) yi = s
+        if (tr .lt. 0.0d0) yr = 0.5d0*(ti/yi)
+        if (tr .gt. 0.0d0) yi = 0.5d0*(ti/yr)
+        return
     end subroutine csroot
-	  
-	subroutine cdiv(ar,ai,br,bi,cr,ci)
-		real(kind(0d0)) :: ar,ai,br,bi,cr,ci
+      
+    subroutine cdiv(ar,ai,br,bi,cr,ci)
+        real(kind(0d0)) :: ar,ai,br,bi,cr,ci
 !
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
-		real(kind(0d0)) :: s,ars,ais,brs,bis
-		s = dabs(br) + dabs(bi)
-		ars = ar/s
-		ais = ai/s
-		brs = br/s
-		bis = bi/s
-		s = brs**2 + bis**2
-		cr = (ars*brs + ais*bis)/s
-		ci = (ais*brs - ars*bis)/s
-		return
+        real(kind(0d0)) :: s,ars,ais,brs,bis
+        s = dabs(br) + dabs(bi)
+        ars = ar/s
+        ais = ai/s
+        brs = br/s
+        bis = bi/s
+        s = brs**2 + bis**2
+        cr = (ars*brs + ais*bis)/s
+        ci = (ais*brs - ars*bis)/s
+        return
     end subroutine cdiv
 
-	subroutine pythag(a,b,c)
-		real(kind(0d0)) :: a,b,c
+    subroutine pythag(a,b,c)
+        real(kind(0d0)) :: a,b,c
 !
 !     finds dsqrt(a**2+b**2) without overflow or destructive underflow
 !
-		real(kind(0d0)) :: p,r,s,t,u
-		p = dmax1(dabs(a),dabs(b))
-		if (p .eq. 0.0d0) go to 20
-		r = (dmin1(dabs(a),dabs(b))/p)**2
-10 		continue
+        real(kind(0d0)) :: p,r,s,t,u
+        p = dmax1(dabs(a),dabs(b))
+        if (p .eq. 0.0d0) go to 20
+        r = (dmin1(dabs(a),dabs(b))/p)**2
+10      continue
         t = 4.0d0 + r
         if (t .eq. 4.0d0) go to 20
         s = r/t
@@ -937,8 +937,8 @@ contains
         p = u*p
         r = (s/u)**2 * r
         go to 10
-20 		c = p
-		return
+20      c = p
+        return
     end subroutine pythag
 
 end module m_eigen_solver

@@ -49,7 +49,7 @@ module m_data_output
         !! @param t_step Current time step
         subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
-            import :: scalar_field, sys_size
+            import :: scalar_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
@@ -412,7 +412,14 @@ contains
                 call s_mpi_abort('ICFL is NaN. Exiting ...')
             elseif (icfl_max_glb > 1d0) then
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')           
+            end if
+
+            if (vcfl_max_glb /= vcfl_max_glb) then
+                call s_mpi_abort('VCFL is NaN. Exiting ...')
+            elseif (vcfl_max_glb > 1d0) then
+                print *, 'vcfl', vcfl_max_glb
+                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')           
             end if
         end if
 
@@ -428,6 +435,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+
         integer, intent(IN) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -441,7 +449,7 @@ contains
 
         character(LEN=15) :: FMT
 
-        integer :: i, j, k, l, ii !< Generic loop iterators
+        integer :: i, j, k, l, ii , r!< Generic loop iterators
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
@@ -505,6 +513,34 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb
+                do r = 1, nnode
+                    write (file_path, '(A,I0,A)') trim(t_step_dir)//'/pb', &
+                        sys_size + (i-1)*nnode + r, '.dat'
+
+                    open (2, FILE=trim(file_path), &
+                          FORM='unformatted', &
+                          STATUS='new')
+
+                    write (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                end do
+            end do
+
+            do i = 1, nb
+                do r = 1, nnode
+                    write (file_path, '(A,I0,A)') trim(t_step_dir)//'/mv', &
+                        sys_size + (i-1)*nnode + r, '.dat'
+
+                    open (2, FILE=trim(file_path), &
+                          FORM='unformatted', &
+                          STATUS='new')
+
+                    write (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                end do
+            end do
+        end if
+
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
         pi_inf = fluid_pp(1)%pi_inf
@@ -528,6 +564,10 @@ contains
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
+            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1d0)
+            if(qbmm) then
+                q_prim_vf(bubxb)%sf = 1d0
+            end if
         end if
 
         !1D
@@ -561,6 +601,31 @@ contains
                 end do
                 close (2)
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            write (2, FMT) x_cb(j), pb_ts(1)%sf(j, 0, 0, r, i)
+                        end do
+                        close (2)
+                    end do
+                end do
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            write (2, FMT) x_cb(j), mv_ts(1)%sf(j, 0, 0, r, i)
+                        end do
+                        close (2)
+                    end do
+                end do
+            end if
         end if
 
         if (precision == 1) then
@@ -582,6 +647,35 @@ contains
                 end do
                 close (2)
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            do k = 0, n
+                                write (2, FMT) x_cb(j), y_cb(k), pb_ts(1)%sf(j, k, 0, r, i)
+                            end do
+                        end do
+                        close (2)
+                    end do
+                end do
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            do k = 0, n
+                                write (2, FMT) x_cb(j), y_cb(k), mv_ts(1)%sf(j, k, 0, r, i)
+                            end do
+                        end do
+                        close (2)
+                    end do
+                end do
+            end if
 
             if (prim_vars_wrt) then
                 do i = 1, sys_size
@@ -629,6 +723,39 @@ contains
                 end do
                 close (2)
             end do
+
+            if(qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            do k = 0, n
+                                do l = 0, p
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb_ts(1)%sf(j, k, l, r, i)
+                                end do
+                            end do
+                        end do
+                        close (2)
+                    end do
+                end do
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+
+                        open (2, FILE=trim(file_path))
+                        do j = 0, m
+                            do k = 0, n
+                                do l = 0, p
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv_ts(1)%sf(j, k, l, r, i)
+                                end do
+                            end do
+                        end do
+                        close (2)
+                    end do
+                end do
+            end if
 
             if (prim_vars_wrt) then
                 do i = 1, sys_size
@@ -691,6 +818,7 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Initialize MPI data I/O
+
         call s_initialize_mpi_data(q_cons_vf)
 
         ! Open the file to write all flow variables
@@ -728,6 +856,20 @@ contains
                 call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                         MPI_DOUBLE_PRECISION, status, ierr)
             end do
+            !Write pb and mv for non-polytropic qbmm
+             if(qbmm .and. .not. polytropic) then
+                do i = sys_size + 1, sys_size + 2*nb*nnode
+                    var_MOK = int(i, MPI_OFFSET_KIND)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                           'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                end do
+            end if           
         else
             do i = 1, sys_size !TODO: check if correct (sys_size
                 var_MOK = int(i, MPI_OFFSET_KIND)
@@ -855,21 +997,35 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
-                                                        rho, gamma, pi_inf, &
-                                                        Re, G, fluid_pp(:)%G)
+                    if(hypoelasticity) then
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                                                            rho, gamma, pi_inf, &
+                                                            Re, G, fluid_pp(:)%G)
+                    else
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                                                            rho, gamma, pi_inf)
+                    end if
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    call s_compute_pressure( &
-                        q_cons_vf(1)%sf(j - 2, k, l), &
-                        q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                        0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
-                        q_cons_vf(1)%sf(j - 2, k, l), &
-                        pi_inf, gamma, pres, rho, &
-                        q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                        q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    if(hypoelasticity) then
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            pi_inf, gamma, rho, pres, &
+                            q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
+                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    else
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            pi_inf, gamma, rho, pres)
+                    end if
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
@@ -898,7 +1054,6 @@ contains
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
-
                         if (qbmm) then
                             M00 = q_cons_vf(bub_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
                             M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub

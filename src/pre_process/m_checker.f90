@@ -26,6 +26,14 @@ contains
         logical :: dir_check !<
             !! Logical variable used to test the existence of folders
 
+#ifndef MFC_MPI
+        if (parallel_io .eqv. .true.) then
+            print '(A)', 'MFC built with --no-mpi requires parallel_io=F. ' // &
+                'Exiting ...'
+            call s_mpi_abort()
+        end if
+#endif
+
         bub_fac = 0
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
         ! Startup checks for bubbles and bubble variables
