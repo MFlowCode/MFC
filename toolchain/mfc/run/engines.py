@@ -44,10 +44,13 @@ class Engine:
         raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
     def get_binpath(self, target: str) -> str:
-        return os.sep.join([build.get_install_dirpath(), "bin", target])
+        # <root>/install/<slug>/bin/<target>
+        prefix = build.get_install_dirpath(build.get_target(target))
+        return os.sep.join([prefix, "bin", target])
 
 
-def _interactive_working_worker(cmd, q):
+def _interactive_working_worker(cmd: typing.List[str], q: multiprocessing.Queue):
+    """ Runs a command and puts the result in a queue. """
     cmd = [ str(_) for _ in cmd ]
     cons.print(f"$ {' '.join(cmd)}")
     result = subprocess.run(
@@ -99,39 +102,44 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
                 args=(
-                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(), "bin", "syscheck"])],
+                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(build.SYSCHECK), "bin", "syscheck"])],
                     q,
                 ))
 
             p.start()
             p.join(work_timeout)
 
-            try:
-                result = q.get(block=False)
-                self.bKnowWorks = result.returncode == 0
-            except queue.Empty as e:
-                self.bKnowWorks = False
-
-            if p.is_alive() or not self.bKnowWorks:
-                if p.is_alive():
-                    raise common.MFCException("""\
+            if p.is_alive():
+                raise common.MFCException("""\
 The [bold magenta]Interactive Engine[/bold magenta] appears to hang.
 This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system
 using the <-b,--binary> option. For example:
- * ./mfc.sh run <myfile.py> -b mpirun
- * ./mfc.sh run <myfile.py> -b srun
+* ./mfc.sh run <myfile.py> -b mpirun
+* ./mfc.sh run <myfile.py> -b srun
 """)
-                else:
-                    raise common.MFCException(f"""\
+
+            result = q.get(block=False)
+            self.bKnowWorks = result.returncode == 0
+
+            if not self.bKnowWorks:
+                error_txt = f"""\
 MFC's [bold magenta]syscheck[/bold magenta] (system check) failed to run successfully.
 Please review the output bellow and ensure that your system is configured correctly:
 
+"""
+
+                if result is not None:
+                    error_txt += f"""\
 STDOUT:
 {result.stdout}
 
 STDERR:
 {result.stderr}
-""")
+"""
+                else:
+                    error_txt += f"Evaluation timed out after {work_timeout}s."
+
+                raise common.MFCException(error_txt)
 
             cons.print()
             cons.unindent()
