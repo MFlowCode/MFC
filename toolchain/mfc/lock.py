@@ -1,6 +1,6 @@
 import os, dataclasses
 
-from .        import build, state, common
+from .        import state, common
 from .state   import MFCConfig
 from .printer import cons
 
@@ -68,8 +68,3 @@ def switch(to: MFCConfig):
     data.config = to
     state.gCFG  = to
     write()
-
-    for target_name in build.get_mfc_target_names() + build.get_required_target_names():
-        dirpath = build.get_build_dirpath(build.get_target(target_name))
-        cons.print(f"[bold red]Removing {os.path.relpath(dirpath)}[/bold red]")
-        common.delete_directory(dirpath)

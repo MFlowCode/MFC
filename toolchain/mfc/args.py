@@ -74,15 +74,16 @@ started, run ./mfc.sh build -h.""",
 
     # === TEST ===
     add_common_arguments(test, "t")
-    test.add_argument("-l", "--list",        action="store_true", help="List all available tests.")
-    test.add_argument("-f", "--from",        default=TEST_CASES[0].get_uuid(), type=str, help="First test UUID to run.")
-    test.add_argument("-t", "--to",          default=TEST_CASES[-1].get_uuid(), type=str, help="Last test UUID to run.")
-    test.add_argument("-o", "--only",        nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",      choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
-    test.add_argument("-r", "--relentless",  action="store_true", default=False, help="Run all tests, even if multiple fail.")
-    test.add_argument("-a", "--test-all",    action="store_true", default=False, help="Run the Post Process Tests too.")
-    test.add_argument("-g", "--gpus",        type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
-    test.add_argument("-%", "--percent",     type=int, default=100, help="Percentage of tests to run.")
+    test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
+    test.add_argument("-f", "--from",         default=TEST_CASES[0].get_uuid(), type=str, help="First test UUID to run.")
+    test.add_argument("-t", "--to",           default=TEST_CASES[-1].get_uuid(), type=str, help="Last test UUID to run.")
+    test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
+    test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
+    test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
+    test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
+    test.add_argument("-g", "--gpus",         type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
+    test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
+    test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
 
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     
