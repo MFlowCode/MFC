@@ -141,7 +141,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
-            & 'Re_inv','poly_sigma', 'bc_x%vel1b', 'bc_x%vel2b', 'bc_x%vel3b' ]
+            & 'Re_inv','poly_sigma' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

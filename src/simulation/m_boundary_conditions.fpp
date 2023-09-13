@@ -173,12 +173,12 @@ module m_boundary_conditions
                 end do
     
                 if(qbmm .and. .not. polytropic) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(-j, k, l, q, i) = &
                                            pb(0, k, l, q, i)
                                         mv(-j, k, l, q, i) = &
@@ -207,10 +207,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(m + j, k, l, q, i) = &
                                             pb(m, k, l, q, i)
                                         mv(m + j, k, l, q, i) = &
@@ -244,10 +244,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, -j, k, q, i) = &
                                             pb(l, 0, k, q, i)
                                         mv(l, -j, k, q, i) = &
@@ -276,10 +276,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, n + j, k, q, i) = &
                                             pb(l, n , k, q, i)
                                         mv(l, n + j, k, q, i) = &
@@ -313,10 +313,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, -j, q, i) = &
                                             pb(k, l, 0, q, i)
                                         mv(k, l, -j, q, i) = &
@@ -345,10 +345,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, p+j, q, i) = &
                                             pb(k, l, p, q, i)
                                         mv(k, l, p+j, q, i) = &
@@ -404,10 +404,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(-j, k, l, q, i) = &
                                             pb(j - 1, k, l, q, i)
                                         mv(-j, k, l, q, i) = &
@@ -448,10 +448,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(m + j, k, l, q, i) = &
                                             pb(m - (j - 1), k, l, q, i)
                                         mv(m + j, k, l, q, i) = &
@@ -495,10 +495,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, -j, k, q, i) = &
                                             pb(l, j - 1, k, q, i)
                                         mv(l, -j, k, q, i) = &
@@ -537,10 +537,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, n + j, k, q, i) = &
                                             pb(l, n - (j-1), k, q, i)
                                         mv(l, n + j, k, q, i) = &
@@ -584,10 +584,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, -j, q, i) = &
                                             pb(k, l, j-1, q, i)
                                         mv(k, l, -j, q, i) = &
@@ -626,10 +626,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, p + j, q, i) = &
                                             pb(k, l, p - (j-1), q, i)
                                         mv(k, l, p + j, q, i) = &   
@@ -675,10 +675,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(-j, k, l, q, i) = &
                                             pb(m - (j - 1), k, l, q, i)
                                         mv(-j, k, l, q, i) = &
@@ -707,10 +707,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(m + j, k, l, q, i) = &
                                             pb(j - 1, k, l, q, i)
                                         mv(m + j, k, l, q, i) = &
@@ -744,10 +744,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, -j, k, q, i) = &
                                             pb(l, n - (j-1), k, q, i)
                                         mv(l, -j, k, q, i) = &
@@ -776,10 +776,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, n + j, k, q, i) = &
                                             pb(l, (j-1), k, q, i)
                                         mv(l, n + j, k, q, i) = &
@@ -813,10 +813,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, -j, q, i) = &
                                             pb(k, l, p - (j-1), q, i)
                                         mv(k, l, -j, q, i) = &
@@ -845,10 +845,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, p + j, q, i) = &
                                             pb(k, l, j-1, q, i)
                                         mv(k, l, p + j, q, i) = &
@@ -922,10 +922,10 @@ module m_boundary_conditions
         if(qbmm .and. .not. polytropic) then
             !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            do q = 1, nnode
+                do q = 1, nnode
+                    do k = 0, p
+                        do j = 1, buff_size
+                            do l = -buff_size, m + buff_size
                                 pb(l, -j, k, q, i) = &
                                     pb(l, j-1, k - ((p+1)/2), q, i)
                                 mv(l, -j, k, q, i) = &
@@ -971,10 +971,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(-j, k, l, q, i) = &
                                            pb(0, k, l, q, i)
                                         mv(-j, k, l, q, i) = &
@@ -1008,10 +1008,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(m + j, k, l, q, i) = &
                                             pb(m, k, l, q, i)
                                         mv(m + j, k, l, q, i) = &
@@ -1050,10 +1050,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, -j, k, q, i) = &
                                             pb(l, 0, k, q, i)
                                         mv(l, -j, k, q, i) = &
@@ -1087,10 +1087,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, n + j, k, q, i) = &
                                             pb(l, n , k, q, i)
                                         mv(l, n + j, k, q, i) = &
@@ -1129,10 +1129,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, -j, q, i) = &
                                             pb(k, l, 0, q, i)
                                         mv(k, l, -j, q, i) = &
@@ -1166,10 +1166,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, p+j, q, i) = &
                                             pb(k, l, p, q, i)
                                         mv(k, l, p+j, q, i) = &
@@ -1220,10 +1220,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(-j, k, l, q, i) = &
                                            pb(0, k, l, q, i)
                                         mv(-j, k, l, q, i) = &
@@ -1257,10 +1257,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 1, buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 1, buff_size
                                         pb(m + j, k, l, q, i) = &
                                             pb(m, k, l, q, i)
                                         mv(m + j, k, l, q, i) = &
@@ -1299,10 +1299,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, -j, k, q, i) = &
                                             pb(l, 0, k, q, i)
                                         mv(l, -j, k, q, i) = &
@@ -1336,10 +1336,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do k = 0, p
-                            do j = 1, buff_size
-                                do l = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do k = 0, p
+                                do j = 1, buff_size
+                                    do l = -buff_size, m + buff_size
                                         pb(l, n + j, k, q, i) = &
                                             pb(l, n , k, q, i)
                                         mv(l, n + j, k, q, i) = &
@@ -1378,10 +1378,10 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
                                         pb(k, l, -j, q, i) = &
                                             pb(k, l, 0, q, i)
                                         mv(k, l, -j, q, i) = &
@@ -1415,11 +1415,11 @@ module m_boundary_conditions
                 if(qbmm .and. .not. polytropic) then
                     !$acc parallel loop collapse(5) gang vector default(present)
                     do i = 1, nb
-                        do j = 1, buff_size
-                            do l = -buff_size, n + buff_size
-                                do k = -buff_size, m + buff_size
-                                    do q = 1, nnode
-                                        pb(k, l, p+j, q, i) = &
+                        do q = 1, nnode
+                            do j = 1, buff_size
+                                do l = -buff_size, n + buff_size
+                                    do k = -buff_size, m + buff_size
+                                        pb(k, l, p+ j, q, i) = &
                                             pb(k, l, p, q, i)
                                         mv(k, l, p+j, q, i) = &
                                             mv(k, l, p, q, i)
