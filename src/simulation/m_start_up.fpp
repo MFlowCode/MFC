@@ -79,7 +79,8 @@ module m_start_up
                          s_initialize_internal_energy_equations, &
                          s_initialize_modules, s_initialize_gpu_vars, &
                          s_initialize_mpi_domain, s_finalize_modules, &
-                         s_perform_time_step, s_save_data
+                         s_perform_time_step, s_save_data, &
+                         s_save_performance_metrics
 
     abstract interface ! ===================================================
 
@@ -838,59 +839,67 @@ contains
         end if
 
         ! Time-stepping loop controls
+        if ((mytime + dt) >= finaltime) dt = finaltime - mytime 
+        t_step = t_step + 1
 
-        if (t_step == t_step_stop) then
-
-            call s_mpi_barrier()
-
-            if (num_procs > 1) then
-                call mpi_bcast_time_step_values(proc_time, time_avg)
-
-                call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
-            end if
-
-            if (proc_rank == 0) then
-                time_final = 0d0
-                io_time_final = 0d0
-                if (num_procs == 1) then
-                    time_final = time_avg
-                    io_time_final = io_time_avg
-                    print *, "Final Time", time_final
-                else
-                    time_final = maxval(proc_time)
-                    io_time_final = maxval(io_proc_time)
-                    print *, "Final Time", time_final
-                end if
-                inquire (FILE='time_data.dat', EXIST=file_exists)
-                if (file_exists) then
-                    open (1, file='time_data.dat', position='append', status='old')
-                    write (1, *) num_procs, time_final
-                    close (1)
-                else
-                    open (1, file='time_data.dat', status='new')
-                    write (1, *) num_procs, time_final
-                    close (1)
-                end if
-
-                inquire (FILE='io_time_data.dat', EXIST=file_exists)
-                if (file_exists) then
-                    open (1, file='io_time_data.dat', position='append', status='old')
-                    write (1, *) num_procs, io_time_final
-                    close (1)
-                else
-                    open (1, file='io_time_data.dat', status='new')
-                    write (1, *) num_procs, io_time_final
-                    close (1)
-                end if
-
-            end if
-
-            
-        else
-            if ((mytime + dt) >= finaltime) dt = finaltime - mytime 
-            t_step = t_step + 1
-        end if
     end subroutine s_perform_time_step
+
+    subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+
+        integer, intent(INOUT) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
+        real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
+        real(kind(0d0)),  dimension(:), intent(INOUT) :: proc_time
+        real(kind(0d0)),  dimension(:), intent(INOUT) :: io_proc_time
+        logical, intent(INOUT) :: file_exists
+        real(kind(0d0)), intent(INOUT) :: start, finish
+        integer, intent(INOUT) :: nt
+
+        call s_mpi_barrier()
+
+        if (num_procs > 1) then
+            call mpi_bcast_time_step_values(proc_time, time_avg)
+
+            call mpi_bcast_time_step_values(io_proc_time, io_time_avg)
+        end if
+
+        if (proc_rank == 0) then
+            time_final = 0d0
+            io_time_final = 0d0
+            if (num_procs == 1) then
+                time_final = time_avg
+                io_time_final = io_time_avg
+                print *, "Final Time", time_final
+            else
+                time_final = maxval(proc_time)
+                io_time_final = maxval(io_proc_time)
+                print *, "Final Time", time_final
+            end if
+            inquire (FILE='time_data.dat', EXIST=file_exists)
+            if (file_exists) then
+                open (1, file='time_data.dat', position='append', status='old')
+                write (1, *) num_procs, time_final
+                close (1)
+            else
+                open (1, file='time_data.dat', status='new')
+                write (1, *) num_procs, time_final
+                close (1)
+            end if
+
+            inquire (FILE='io_time_data.dat', EXIST=file_exists)
+            if (file_exists) then
+                open (1, file='io_time_data.dat', position='append', status='old')
+                write (1, *) num_procs, io_time_final
+                close (1)
+            else
+                open (1, file='io_time_data.dat', status='new')
+                write (1, *) num_procs, io_time_final
+                close (1)
+            end if
+
+        end if
+
+    end subroutine s_save_performance_metrics
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         real(kind(0d0)), intent(INOUT) ::  start, finish, io_time_avg
@@ -930,6 +939,7 @@ contains
                 io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
             end if
         end if
+
     end subroutine s_save_data    
 
     subroutine s_initialize_modules()
