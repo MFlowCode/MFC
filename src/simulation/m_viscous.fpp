@@ -1436,7 +1436,7 @@ module m_viscous
             end do
         end if
         if (n > 0) then
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
     !$acc parallel loop collapse(2) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = ix%beg, ix%end

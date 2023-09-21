@@ -71,7 +71,7 @@ def generate_cases() -> typing.List[TestCase]:
     stack, cases = CaseGeneratorStack(), []
 
     def alter_bcs(dimInfo, dimParams):
-        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3 ]:
+        for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
             cases.append(create_case(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_weno(dimInfo, dimParams):
@@ -190,7 +190,7 @@ def generate_cases() -> typing.List[TestCase]:
 
     def alter_3d(dimInfo, dimParams):
         stack.push(f"Cylindrical", {
-            'bc_y%beg': -13, 'bc_z%beg': -1, 'bc_z%end': -1, 'cyl_coord': 'T', 'x_domain%beg': 0.E+00, 
+            'bc_y%beg': -14, 'bc_z%beg': -1, 'bc_z%end': -1, 'cyl_coord': 'T', 'x_domain%beg': 0.E+00, 
             'x_domain%end': 5.E+00, 'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00, 'z_domain%beg': 0.E+00,
             'z_domain%end' : 2.0*3.141592653589793E+00, 'm': 29, 'n': 29, 'p': 29,
             'patch_icpp(1)%geometry': 10, 'patch_icpp(1)%x_centroid' : 0.5, 'patch_icpp(1)%y_centroid' : 0.E+00,

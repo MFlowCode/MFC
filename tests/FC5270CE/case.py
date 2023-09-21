@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 #
-# tests/09623DE3/case.py:
-# 3D -> Cylindrical -> Viscous -> weno_Re_flux -> weno_avg
+# tests/FC5270CE/case.py:
+# 2D -> bc=-14
 
 import json
 import argparse
 
 parser = argparse.ArgumentParser(
-    prog="tests/09623DE3/case.py",
-    description="tests/09623DE3/case.py: 3D -> Cylindrical -> Viscous -> weno_Re_flux -> weno_avg",
+    prog="tests/FC5270CE/case.py",
+    description="tests/FC5270CE/case.py: 2D -> bc=-14",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
  
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
@@ -19,17 +19,17 @@ ARGS["dict"] = json.loads(ARGS["dict"])
 
 case = {
     "run_time_info": "T",
-    "m": 29,
-    "n": 29,
-    "p": 29,
-    "dt": 1e-11,
+    "m": 49,
+    "n": 39,
+    "p": 0,
+    "dt": 0.0005,
     "t_step_start": 0,
     "t_step_stop": 50,
     "t_step_save": 50,
     "num_patches": 3,
     "model_eqns": 2,
     "alt_soundspeed": "F",
-    "num_fluids": 2,
+    "num_fluids": 1,
     "adv_alphan": "T",
     "mpp_lim": "F",
     "mixture_err": "F",
@@ -47,14 +47,14 @@ case = {
     "prim_vars_wrt": "F",
     "parallel_io": "F",
     "patch_icpp(1)%pres": 1.0,
-    "patch_icpp(1)%alpha_rho(1)": 0.81,
-    "patch_icpp(1)%alpha(1)": 0.9,
+    "patch_icpp(1)%alpha_rho(1)": 1.0,
+    "patch_icpp(1)%alpha(1)": 1.0,
     "patch_icpp(2)%pres": 0.5,
-    "patch_icpp(2)%alpha_rho(1)": 0.25,
-    "patch_icpp(2)%alpha(1)": 0.5,
+    "patch_icpp(2)%alpha_rho(1)": 0.5,
+    "patch_icpp(2)%alpha(1)": 1.0,
     "patch_icpp(3)%pres": 0.1,
-    "patch_icpp(3)%alpha_rho(1)": 0.08,
-    "patch_icpp(3)%alpha(1)": 0.2,
+    "patch_icpp(3)%alpha_rho(1)": 0.125,
+    "patch_icpp(3)%alpha(1)": 1.0,
     "fluid_pp(1)%gamma": 2.5000000000000004,
     "fluid_pp(1)%pi_inf": 0.0,
     "bubbles": "F",
@@ -91,65 +91,34 @@ case = {
     "Mono(1)%pulse": 1,
     "cu_mpi": "F",
     "x_domain%beg": 0.0,
-    "x_domain%end": 5.0,
+    "x_domain%end": 1.0,
     "y_domain%beg": 0.0,
     "y_domain%end": 1.0,
-    "z_domain%beg": 0.0,
-    "z_domain%end": 6.283185307179586,
-    "bc_x%beg": -3,
-    "bc_x%end": -3,
+    "bc_x%beg": -14,
+    "bc_x%end": -14,
     "bc_y%beg": -14,
-    "bc_y%end": -3,
-    "bc_z%beg": -1,
-    "bc_z%end": -1,
-    "patch_icpp(1)%geometry": 10,
-    "patch_icpp(1)%z_centroid": 0.0,
-    "patch_icpp(1)%length_z": -1000000.0,
-    "patch_icpp(2)%z_centroid": 0.0,
-    "patch_icpp(2)%length_z": -1000000.0,
-    "patch_icpp(3)%z_centroid": 0.0,
-    "patch_icpp(3)%length_z": -1000000.0,
-    "patch_icpp(1)%y_centroid": 0.0,
-    "patch_icpp(1)%length_y": -1000000.0,
+    "bc_y%end": -14,
+    "patch_icpp(1)%geometry": 3,
+    "patch_icpp(1)%y_centroid": 0.05,
+    "patch_icpp(1)%length_y": 0.1,
+    "patch_icpp(2)%y_centroid": 0.45,
+    "patch_icpp(2)%length_y": 0.7,
+    "patch_icpp(3)%y_centroid": 0.9,
+    "patch_icpp(3)%length_y": 0.2,
     "patch_icpp(1)%x_centroid": 0.5,
-    "patch_icpp(1)%length_x": 1.0,
+    "patch_icpp(1)%length_x": 1,
     "patch_icpp(1)%vel(1)": 0.0,
     "patch_icpp(1)%vel(2)": 0.0,
-    "patch_icpp(1)%vel(3)": 0.0,
-    "patch_icpp(2)%geometry": 10,
-    "patch_icpp(2)%y_centroid": 0.0,
-    "patch_icpp(2)%length_y": -1000000.0,
-    "patch_icpp(2)%x_centroid": 2.5,
-    "patch_icpp(2)%length_x": 3.0,
+    "patch_icpp(2)%geometry": 3,
+    "patch_icpp(2)%x_centroid": 0.5,
+    "patch_icpp(2)%length_x": 1,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(3)%geometry": 10,
-    "patch_icpp(3)%y_centroid": 0.0,
-    "patch_icpp(3)%length_y": -1000000.0,
-    "patch_icpp(3)%x_centroid": 4.5,
-    "patch_icpp(3)%length_x": 1.0,
+    "patch_icpp(3)%geometry": 3,
+    "patch_icpp(3)%x_centroid": 0.5,
+    "patch_icpp(3)%length_x": 1,
     "patch_icpp(3)%vel(1)": 0.0,
-    "patch_icpp(3)%vel(2)": 0.0,
-    "patch_icpp(3)%vel(3)": 0.0,
-    "cyl_coord": "T",
-    "patch_icpp(1)%radius": 1.0,
-    "patch_icpp(2)%radius": 1.0,
-    "patch_icpp(3)%radius": 1.0,
-    "fluid_pp(2)%gamma": 2.5,
-    "fluid_pp(2)%pi_inf": 0.0,
-    "patch_icpp(1)%alpha_rho(2)": 0.19,
-    "patch_icpp(1)%alpha(2)": 0.1,
-    "patch_icpp(2)%alpha_rho(2)": 0.25,
-    "patch_icpp(2)%alpha(2)": 0.5,
-    "patch_icpp(3)%alpha_rho(2)": 0.0225,
-    "patch_icpp(3)%alpha(2)": 0.8,
-    "fluid_pp(1)%Re(1)": 0.0001,
-    "fluid_pp(1)%Re(2)": 0.0001,
-    "fluid_pp(2)%Re(1)": 0.0001,
-    "fluid_pp(2)%Re(2)": 0.0001,
-    "weno_Re_flux": "T",
-    "weno_avg": "T"
+    "patch_icpp(3)%vel(2)": 0.0
 }
 mods = {}
 
@@ -167,8 +136,6 @@ if "post_process" in ARGS["dict"]["targets"]:
         
     if case['p'] != 0:
         mods['fd_order']  = 1
-        mods['omega_wrt(1)'] = 'T'
-        mods['omega_wrt(2)'] = 'T'
-        mods['omega_wrt(3)'] = 'T'
+        mods['omega_wrt'] = 'T'
 
 print(json.dumps({**case, **mods}))

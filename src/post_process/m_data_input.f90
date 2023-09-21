@@ -458,14 +458,14 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(0)
                 end do
 
                 ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2 .or. bc_y%beg == -13) then
+            elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(i - 1)
@@ -734,7 +734,7 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
 
                 do j = 1, buff_size
                     do i = 1, sys_size
@@ -743,7 +743,7 @@ contains
                 end do
 
                 ! Axis BC at the beginning
-            elseif (bc_y%beg == -13) then
+            elseif (bc_y%beg == -14) then
 
                 do j = 1, buff_size
                     do k = 0, p
