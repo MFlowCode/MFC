@@ -393,8 +393,25 @@ def generate_cases() -> typing.List[TestCase]:
                         'patch_icpp(3)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(3)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 )
                     })
 
+                if ndims == 1:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   596.15, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0
+                    })
+                elif ndims == 2:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                        'patch_icpp(1)%vel(2)':   596.15, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0
+                    })
+                elif ndims == 3:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                        'patch_icpp(1)%vel(2)':   0.0, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0,
+                        'patch_icpp(1)%vel(3)':   596.15, 'patch_icpp(2)%vel(3)': 0.0, 'patch_icpp(3)%vel(3)': 0.0
+                    })
+
                 cases.append(create_case(stack, '', {}))
 
+                stack.pop()
                 stack.pop()
 
                 if num_fluids == 3:
