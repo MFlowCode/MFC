@@ -395,18 +395,18 @@ def generate_cases() -> typing.List[TestCase]:
 
                 if ndims == 1:
                     stack.push("", {
-                        'patch_icpp(1)%vel(1)':   596.15, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0
+                        'patch_icpp(1)%vel(1)':   606.15, 'patch_icpp(2)%vel(1)': 10.0, 'patch_icpp(3)%vel(1)': 10.0
                     })
                 elif ndims == 2:
                     stack.push("", {
                         'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
-                        'patch_icpp(1)%vel(2)':   596.15, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0
+                        'patch_icpp(1)%vel(2)':   606.15, 'patch_icpp(2)%vel(2)': 10.0, 'patch_icpp(3)%vel(2)': 10.0
                     })
                 elif ndims == 3:
                     stack.push("", {
                         'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
                         'patch_icpp(1)%vel(2)':   0.0, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0,
-                        'patch_icpp(1)%vel(3)':   596.15, 'patch_icpp(2)%vel(3)': 0.0, 'patch_icpp(3)%vel(3)': 0.0
+                        'patch_icpp(1)%vel(3)':   606.15, 'patch_icpp(2)%vel(3)': 10.0, 'patch_icpp(3)%vel(3)': 10.0
                     })
 
                 cases.append(create_case(stack, '', {}))
