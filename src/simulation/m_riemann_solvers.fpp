@@ -2145,6 +2145,7 @@ contains
                         end subroutine runsub
                     endif    
                 endif
+            endif
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
