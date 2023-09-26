@@ -684,7 +684,6 @@ contains
                     end do
                 end do
             end if
-
         #:endfor
 
         if (any(Re_size > 0)) then
@@ -2139,8 +2138,9 @@ contains
                                 end do
                             end do
                         end do
-                    endif            
-            end if
+                    endif    
+                endif        
+            endif
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
