@@ -1416,13 +1416,13 @@ contains
                     end do
                 
                 elseif(model_eqns == 2) then
-                    #IFDEF BUBBLES
+                    C..#IFDEF BUBBLES
                         !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
                         !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
-                    #ELSE
+                    C..#ELSE
                         !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
                         !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms)
-                    #ENDIF
+                    C..#ENDIF
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2137,7 +2137,8 @@ contains
                                 flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
                             end do
                         end do
-                    end do                    
+                    end do       
+                    !$acc end parallel loop             
                 endif    
             endif
         #:endfor
