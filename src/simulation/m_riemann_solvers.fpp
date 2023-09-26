@@ -2135,17 +2135,16 @@ contains
                                                                     s_P*(xi_R*(dir_flg(idx1)*s_S + &
                                                                                 (1d0 - dir_flg(idx1))* &
                                                                                 vel_R(idx1)) - vel_R(idx1))))
+                                                endif
+                                            #:endif
                                         endif
-                
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
                                     end do
                                 end do
                             end do
                         end subroutine runsub
                     endif    
-                endif        
-            endif
-        endif
+                endif
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
