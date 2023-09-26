@@ -850,7 +850,6 @@ contains
             norm_dir, ix, iy, iz)
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-
             if (norm_dir == ${NORM_DIR}$) then
                 if (model_eqns == 3) then
                     !ME3
@@ -930,7 +929,7 @@ contains
                                     do i = 1, 2
                                         Re_L(i) = dflt_real
 
-                                        if (Re_size(i) > 0) Re_L(i) = 0d0
+                                        if (Re_size(i) > 0) Re_L(i) = 0d0 endif
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
@@ -946,7 +945,7 @@ contains
                                     do i = 1, 2
                                         Re_R(i) = dflt_real
 
-                                        if (Re_size(i) > 0) Re_R(i) = 0d0
+                                        if (Re_size(i) > 0) Re_R(i) = 0d0 endif
 
                                         !$acc loop seq
                                         do q = 1, Re_size(i)
@@ -2008,6 +2007,8 @@ contains
                                                                 s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
                                                                             (1d0 - dir_flg(dir_idx(1)))* &
                                                                             vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                            endif
+                                        #:endif
                                     else
                                         xi_L = (s_L - vel_L(idx1))/(s_L - s_S)
                                         xi_R = (s_R - vel_R(idx1))/(s_R - s_S)
