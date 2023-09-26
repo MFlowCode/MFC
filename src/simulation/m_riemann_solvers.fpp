@@ -1531,7 +1531,7 @@ contains
                                                 do i = 1, 2
                                                     Re_L(i) = dflt_real
                         
-                                                    if (Re_size(i) > 0) Re_L(i) = 0d0
+                                                    if (Re_size(i) > 0) Re_L(i) = 0d0 end if
                         
                                                     !$acc loop seq
                                                     do q = 1, Re_size(i)
@@ -1547,7 +1547,7 @@ contains
                                                 do i = 1, 2
                                                     Re_R(i) = dflt_real
                         
-                                                    if (Re_size(i) > 0) Re_R(i) = 0d0
+                                                    if (Re_size(i) > 0) Re_R(i) = 0d0 end if
                         
                                                     !$acc loop seq
                                                     do q = 1, Re_size(i)
@@ -1651,7 +1651,7 @@ contains
                         
                         
                         
-                                             if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                            if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
                                                 ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
                                             else
                                                 ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
@@ -2140,7 +2140,7 @@ contains
                         end do
                     endif    
                 endif        
-            #:endif
+            endif
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
