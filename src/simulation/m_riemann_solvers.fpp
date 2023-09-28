@@ -1953,7 +1953,7 @@ contains
                                     end if
                                 endif
                     
-                                #:if(NORM_DIR == 2)
+                                #:if (NORM_DIR == 2)
                                     if(cyl_coord) then
                                         !$acc loop seq
                                         do i = 1, E_idx
@@ -1994,7 +1994,7 @@ contains
                                         end do
                                     endif
                                 #:endif
-                                #:if(NORM_DIR == 3)
+                                #:if (NORM_DIR == 3)
                                     if(grid_geometry == 3) then
                                         !$acc loop seq
                                         do i = 1, sys_size
