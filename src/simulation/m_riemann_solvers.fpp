@@ -1421,7 +1421,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                if(.not.bubbles) then idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+                                if(.not.bubbles) idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
                     
                                 !! MAIN DIFFERENCE BETWEEN BUBBLES AND NO BUBBLES IS DIR_IDX(1) VS IDX1
                     
@@ -1460,7 +1460,7 @@ contains
                                         !$acc loop seq
                                         integer:count_to = 0
                     
-                                        if(.not.mpp_lim) then count_to = 1
+                                        if(.not.mpp_lim) count_to = 1
                     
                                         do i = 1, num_fluids - count_to
                                             rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
