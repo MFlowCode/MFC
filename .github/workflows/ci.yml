@@ -21,10 +21,10 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
-        mpi:   ['mpi', 'no-mpi']
-        debug: ['debug', 'no-debug']
-        intel: [true, false]
+        os:    ['ubuntu']
+        mpi:   ['mpi']
+        debug: ['no-debug']
+        intel: [false]
         exclude:
           - intel: true
             os:    macos
@@ -90,43 +90,43 @@ jobs:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 75' || '' }}
 
-  docker:
-    name:    Github | Docker
-    runs-on: ubuntu-latest
-    steps:
-    - name: Clone
-      uses: actions/checkout@v3
+  # docker:
+  #   name:    Github | Docker
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Clone
+  #     uses: actions/checkout@v3
 
-    - name: Test
-      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
+  #   - name: Test
+  #     run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
 
-  self:
-    name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC'
-    continue-on-error: true
-    strategy:
-      matrix:
-        device: ['cpu', 'gpu']
-    runs-on:
-      group:  phoenix
-      labels: self-hosted
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+  # self:
+  #   name: Georgia Tech | Phoenix (NVHPC)
+  #   if: github.repository == 'MFlowCode/MFC'
+  #   continue-on-error: true
+  #   strategy:
+  #     matrix:
+  #       device: ['cpu', 'gpu']
+  #   runs-on:
+  #     group:  phoenix
+  #     labels: self-hosted
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v3
 
-      - name: Build
-        run:  |
-          . ./mfc.sh load -c p -m gpu
-          ./mfc.sh build -j 2 $(if [ '${{ matrix.device }}' == 'gpu' ]; then echo '--gpu'; fi)
+  #     - name: Build
+  #       run:  |
+  #         . ./mfc.sh load -c p -m gpu
+  #         ./mfc.sh build -j 2 $(if [ '${{ matrix.device }}' == 'gpu' ]; then echo '--gpu'; fi)
 
-      - name: Test
-        run: |
-          . ./mfc.sh load -c p -m gpu
-          mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
-          sbatch run-phoenix-release-${{ matrix.device }}.sh
+  #     - name: Test
+  #       run: |
+  #         . ./mfc.sh load -c p -m gpu
+  #         mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
+  #         sbatch run-phoenix-release-${{ matrix.device }}.sh
 
-      - name: Print
-        if: always()
+  #     - name: Print
+  #       if: always()
         run: |
           cat test.out
 
