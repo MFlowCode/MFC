@@ -1458,7 +1458,7 @@ contains
                                 if(bubbles) then
                                     if (mpp_lim .and. (num_fluids > 2)) then
                                         !$acc loop seq
-                                        integer:count_to = 0
+                                        integer :: count_to = 0
                     
                                         if(.not.mpp_lim) count_to = 1
                     
