@@ -1535,11 +1535,10 @@ contains
                                 H_R = (E_R + pres_R)/rho_R
                                 if (avg_state == 2) then
 
-!$acc loop seq
+                                    !$acc loop seq
                                     do i = 1, nb
                                         R0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, rs(i))
                                         R0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, rs(i))
-
                                         V0_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, vs(i))
                                         V0_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, vs(i))
                                         if (.not. polytropic) then
@@ -1548,19 +1547,41 @@ contains
                                         end if
                                     end do
 
-                                    nbub_L_denom = 0d0
-                                    nbub_R_denom = 0d0
+                                    if ((R0_L(1) /= R0_L(1)) .or. (R0_R(1) /= R0_R(1))) then
+                                        write(*,*) j,k,l,i
+                                        write(*,*) (qL_prim_rs${XYZ}$_vf(j, k, l, i),i=1,sys_size)
+                                        write(*,*) (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i),i=1,sys_size)
+                                        write(*,*) R0_L,qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)
+                                        write(*,*) R0_R,qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)
+                                        call s_mpi_abort('R0 is NaN')
+                                    end if
 
+                                    if (adv_n .and. alter_alpha) then
+                                        nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, n_idx)
+                                        nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, n_idx)
+                                    else
+                                        nbub_L_denom = 0d0
+                                        nbub_R_denom = 0d0
+
+                                        !$acc loop seq
+                                        do i = 1, nb
+                                            nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
+                                            nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
+                                        end do
+
+                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
+                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                    end if
+
+                                    if ((nbub_L /= nbub_L) .or. (nbub_R /= nbub_R)) then
+                                        write(*,*) j,k,l,i
+                                        write(*,*) (qL_prim_rs${XYZ}$_vf(j, k, l, i),i=1,sys_size)
+                                        write(*,*) (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i),i=1,sys_size)
+                                        write(*,*) R0_L,qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids),nbub_L_denom
+                                        write(*,*) R0_R,qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids),nbub_R_denom
+                                        call s_mpi_abort('nbub is NaN')
+                                    end if
                                     !$acc loop seq
-                                    do i = 1, nb
-                                        nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
-                                        nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
-                                    end do
-
-                                    nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                    nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
-
-!$acc loop seq
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
@@ -1787,6 +1808,14 @@ contains
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
+                                if (adv_n) then
+                                    flux_rs${XYZ}$_vf(j, k, l, n_idx) = &
+                                        xi_M*nbub_L &
+                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*nbub_R &
+                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                end if
+
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
@@ -1888,19 +1917,19 @@ contains
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+                    qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                      qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                    qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+                    qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
@@ -3915,8 +3944,12 @@ contains
             do l = is3%beg, is3%end
                 do j = is1%beg, is1%end
                     do k = is2%beg, is2%end
-                        flux_src_vf(advxb)%sf(k, j, l) = &
-                            flux_src_rsy_vf(j, k, l, advxb)
+                        ! if (bubbles) then
+                        !     flux_src_vf(advxb)%sf(k, j, l) = 0d0
+                        ! else 
+                            flux_src_vf(advxb)%sf(k, j, l) = &
+                                flux_src_rsy_vf(j, k, l, advxb)
+                        ! end if
                     end do
                 end do
             end do
@@ -3969,8 +4002,12 @@ contains
             do j = is1%beg, is1%end
                 do k = is2%beg, is2%end
                     do l = is3%beg, is3%end
-                        flux_src_vf(advxb)%sf(l, k, j) = &
-                            flux_src_rsz_vf(j, k, l, advxb)
+                        ! if (bubbles) then
+                        !     flux_src_vf(advxb)%sf(l, k, j) = 0d0
+                        ! else
+                            flux_src_vf(advxb)%sf(l, k, j) = &
+                                flux_src_rsz_vf(j, k, l, advxb)
+                        ! end if
                     end do
                 end do
             end do
@@ -4006,8 +4043,12 @@ contains
             do l = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = is1%beg, is1%end
-                        flux_src_vf(advxb)%sf(j, k, l) = &
-                            flux_src_rsx_vf(j, k, l, advxb)
+                        ! if (bubbles) then
+                        !     flux_src_vf(advxb)%sf(j, k, l) = 0d0
+                        ! else
+                            flux_src_vf(advxb)%sf(j, k, l) = &
+                                flux_src_rsx_vf(j, k, l, advxb)
+                        ! end if
                     end do
                 end do
             end do

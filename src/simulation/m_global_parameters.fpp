@@ -158,6 +158,7 @@ module m_global_parameters
     type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
     integer :: E_idx                     !< Index of energy equation
+    integer :: n_idx                     !< Index of number density
     type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -250,6 +251,8 @@ module m_global_parameters
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
+    logical :: adv_n        !< Solve the number density equation
+    logical :: alter_alpha  !< Recompute alpha from number density
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -265,6 +268,9 @@ module m_global_parameters
     real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
     real(kind(0d0)) :: uratio   !< 
     real(kind(0d0)) :: rratio   !< 
+
+    real(kind(0d0)) :: n_tot
+    real(kind(0d0)) :: n_partial
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
@@ -402,6 +408,9 @@ contains
 
         R0_type = dflt_int
 
+        adv_n = .false.
+        alter_alpha = .false.
+        
         ! User inputs for qbmm for simulation code
         qbmm = .false.
 
@@ -550,6 +559,11 @@ contains
                     ! print*, 'alf idx', alf_idx
                     ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
+                    if (adv_n) then
+                        n_idx = bub_idx%end + 1
+                        sys_size = n_idx
+                    end if
+                    
                     @:ALLOCATE(weight(nb), R0(nb), V0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))

@@ -224,6 +224,7 @@ program p_main
     ! Time-stepping Loop =======================================================
     print *, proc_rank,num_procs
     do
+
         if (proc_rank == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &
                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
@@ -255,7 +256,6 @@ program p_main
         end if
 
         ! Time-stepping loop controls
-
         if (t_step == t_step_stop) then
 
             call s_mpi_barrier()

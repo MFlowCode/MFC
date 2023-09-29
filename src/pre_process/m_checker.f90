@@ -71,6 +71,19 @@ contains
 
         end if
 
+        if (adv_n) then
+            if (bubbles .neqv. .true.) then
+                call s_mpi_abort('adv_n requires bubbles = true.'// &
+                    'Exiting ...')
+            else if (num_fluids > 1) then
+                call s_mpi_abort('adv_n requires num_fluids = 1. '// &
+                    'Exiting ...')
+            else if (qbmm .eqv. .true.) then
+                call s_mpi_abort('adv_n cannot be used with qbmm.'// &
+                    'Exiting ...')
+            end if
+        end if
+        
         if (qbmm .and. dist_type == dflt_int) then
             call s_mpi_abort('Dist type must be set if using QBMM. Exiting ...')
         else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then

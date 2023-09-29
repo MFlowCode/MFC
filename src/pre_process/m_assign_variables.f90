@@ -237,6 +237,7 @@ contains
         real(kind(0d0)) :: orig_gamma
         real(kind(0d0)) :: orig_pi_inf
         real(kind(0d0)) :: muR, muV
+        real(kind(0d0)) :: R3bar
 
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(kind(0d0)) :: pres   !< pressure
@@ -346,6 +347,18 @@ contains
                     end if
                 end if
             end do
+
+            if (adv_n) then
+                R3bar = 0d0
+                do i = 1, nb
+                    if(polytropic) then
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    else
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    end if
+                end do
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+            end if 
         end if
   
         ! Density and the specific heat ratio and liquid stiffness functions
@@ -416,6 +429,18 @@ contains
                     end if
                 end if
             end do
+
+            if (adv_n) then
+                R3bar = 0d0
+                do i = 1, nb
+                    if(polytropic) then
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    else
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    end if
+                end do
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+            end if 
         end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
@@ -540,6 +565,18 @@ contains
 
                 end if
             end do
+
+            if (adv_n) then
+                R3bar = 0d0
+                do i = 1, nb
+                    if(polytropic) then
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    else
+                        R3bar = R3bar + weight(i) * (q_prim_vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                    end if
+                end do
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+            end if 
         end if
 
         if (mpp_lim .and. bubbles) then

@@ -703,7 +703,7 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-                    
+        
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -775,7 +775,16 @@ contains
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
                 end if
-                                    
+
+                if (adv_n) then
+                    iv%beg = n_idx; iv%end = n_idx
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+                end if
+                                                    
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
@@ -901,7 +910,7 @@ contains
                         end do
                     end do
                 end do
-    
+
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -1015,7 +1024,7 @@ contains
                                                  q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)                    
                         end if
                     end if
-                end if    
+                end if                          
 
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
@@ -1060,6 +1069,21 @@ contains
                         end do
                     end do
                 end if
+
+                ! j = alf_idx; k = 289; l = 155; q = 0;
+                ! write(101,*)    1d0/dx(k)*(flux_n(1)%vf(j)%sf(k - 1, l, q) - flux_n(1)%vf(j)%sf(k, l, q)), &
+                !                 1d0/dx(k)*q_cons_qp%vf(j)%sf(k, l, q)*(flux_src_n(1)%vf(j)%sf(k, l, q) - flux_src_n(1)%vf(j)%sf(k - 1, l, q)), &
+                !                 0
+    
+                ! j = bubxb; k = 289; l = 155; q = 0;
+                ! write(102,*)    1d0/dx(k)*(flux_n(1)%vf(j)%sf(k - 1, l, q) - flux_n(1)%vf(j)%sf(k, l, q)), &
+                !                 0, &
+                !                 0
+    
+                ! j = bubxe; k = 289; l = 155; q = 0;
+                ! write(103,*) 1d0/dx(k)*(flux_n(1)%vf(j)%sf(k - 1, l, q) - flux_n(1)%vf(j)%sf(k, l, q)), &
+                !                 0, &
+                !                 0
     
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
@@ -1087,7 +1111,8 @@ contains
                     end do
                 end do
                 ! Applying source terms to the RHS of the advection equations
-    
+                
+
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -1181,6 +1206,7 @@ contains
                     end if
                 end if
 
+
                 if (bubbles .and. (.not. qbmm)) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
@@ -1201,6 +1227,7 @@ contains
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
                 end if
+
 
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
@@ -1377,6 +1404,21 @@ contains
                     end if
                 end if
     
+                ! j = alf_idx; q = 289; k = 155; l = 0;
+                ! write(201,*)    1d0/dy(k)*(flux_n(2)%vf(j)%sf(q, k - 1, l) - flux_n(2)%vf(j)%sf(q, k, l)), &
+                !                 1d0/dy(k)*q_cons_qp%vf(j)%sf(q, k, l)*(flux_src_n(2)%vf(j)%sf(q, k, l) - flux_src_n(2)%vf(j)%sf(q, k - 1, l)), &
+                !                 bub_adv_src(q, k, l)
+    
+                ! j = bubxb; q = 289; k = 155; l = 0;
+                ! write(202,*)    1d0/dy(k)*(flux_n(2)%vf(j)%sf(q, k - 1, l) - flux_n(2)%vf(j)%sf(q, k, l)), &
+                !                 0, &
+                !                 bub_r_src(q, k, l, 1)
+    
+                ! j = bubxe; q = 289; k = 155; l = 0;
+                ! write(203,*)    1d0/dy(k)*(flux_n(2)%vf(j)%sf(q, k - 1, l) - flux_n(2)%vf(j)%sf(q, k, l)), &
+                !                 0, &
+                !                 bub_v_src(q, k, l, 1)
+
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================
 
@@ -1673,6 +1715,12 @@ contains
 
         end do
         ! END: Dimensional Splitting Loop =================================
+
+        ! q = 289; k = 155; l = 0;
+        ! write(79,*) t_step, (rhs_vf(j)%sf(q, k, l),j=1,sys_size) &
+        !                 , bub_adv_src(q, k, l) &
+        !                 , bub_r_src(q, k, l, 1) &
+        !                 , bub_v_src(q, k, l, 1)
 
         if (run_time_info .or. probe_wrt) then
 

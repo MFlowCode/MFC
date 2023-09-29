@@ -529,6 +529,17 @@ program p_main
                     varname(:) = ' '
                 end do
             end if
+
+            ! number density
+            if (adv_n) then
+                q_sf = q_cons_vf(n_idx)%sf( &
+                       -offset_x%beg:m + offset_x%end, &
+                       -offset_y%beg:n + offset_y%end, &
+                       -offset_z%beg:p + offset_z%end)
+                write (varname, '(A)') 'n'
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+                varname(:) = ' '
+            end if
         end if
 
         ! Closing the formatted database file

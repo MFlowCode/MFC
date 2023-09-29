@@ -28,6 +28,7 @@ module m_time_steppers
     use m_fftw
 
     use m_nvtx
+
     ! ==========================================================================
 
     implicit none
@@ -133,6 +134,12 @@ contains
             end do
         end if
 
+        if (adv_n) then
+            @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                            iy_t%beg:iy_t%end, &
+                            iz_t%beg:iz_t%end))
+        end if
+
         if (hypoelasticity) then
 
             do i = stress_idx%beg, stress_idx%end
@@ -173,6 +180,9 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp  !<
 
         ! Stage 1 of 1 =====================================================
 
@@ -199,22 +209,6 @@ contains
         end if
 
         if (t_step == t_step_stop) return
-        ! j = 0; k = 2; l = 0
-        ! write(62,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
-        ! j = 0; k = 9; l = 0
-        ! write(69,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -229,45 +223,49 @@ contains
             end do
         end do
 
-        ! j = 0; k = 2; l = 0
-        ! write(62,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
-        ! write(62,*) rhs_vf(contxb)%sf(j, k, l), &
-        !             rhs_vf(momxb)%sf(j, k, l), &
-        !             rhs_vf(momxe)%sf(j, k, l), &
-        !             rhs_vf(E_idx)%sf(j, k, l), &
-        !             rhs_vf(alf_idx)%sf(j, k, l), &
-        !             rhs_vf(rs(1))%sf(j, k, l), &
-        !             rhs_vf(vs(1))%sf(j, k, l)
-        ! j = 0; k = 9; l = 0
-        ! write(69,*) q_cons_ts(1)%vf(contxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxb)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(momxe)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(E_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(alf_idx)%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(rs(1))%sf(j, k, l), &
-        !             q_cons_ts(1)%vf(vs(1))%sf(j, k, l)
-        ! write(69,*) rhs_vf(contxb)%sf(j, k, l), &
-        !             rhs_vf(momxb)%sf(j, k, l), &
-        !             rhs_vf(momxe)%sf(j, k, l), &
-        !             rhs_vf(E_idx)%sf(j, k, l), &
-        !             rhs_vf(alf_idx)%sf(j, k, l), &
-        !             rhs_vf(rs(1))%sf(j, k, l), &
-        !             rhs_vf(vs(1))%sf(j, k, l)
-        ! error stop
-        !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
-        !print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)
-        !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
-        !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
-
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        
+        if (adv_n .and. alter_alpha) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        do i = 1, nb
+                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            end do
+        end if
+
+        ! Check
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
+
+        j = 1; k = 0; l = 0;
+        if (mod(t_step - t_step_start, t_step_save) == 0) then
+            write(98,*) t_step,(q_cons_ts(1)%vf(i)%sf(j, k, l),i=1,sys_size),&
+                        DSQRT((4*pi*q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)**3d0)/(3*q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)))
+            write(99,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),&
+                        DSQRT((4*pi*q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)**3d0)/(3*q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)))
+        end if
 
         call nvtxEndRange
 
@@ -292,6 +290,7 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -327,6 +326,29 @@ contains
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+
+        if (adv_n .and. alter_alpha) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            enddo
+        end if
+
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
@@ -351,6 +373,28 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        if (adv_n .and. alter_alpha) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        do i = 1, nb
+                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            end do
+        end if
+
         call nvtxEndRange
 
         call cpu_time(finish)
@@ -374,15 +418,18 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp  !<
+        real(kind(0d0)) :: tmp
+        integer :: ierr
 
         ! Stage 1 of 3 =====================================================
 
         call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
-
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
-!        call s_compute_rhs_full(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -411,12 +458,51 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, '1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            enddo
+        end if
+
+        ! Check
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
+
+        if (proc_rank == 83) then
+            j = 20; k = 35; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            j = 21; k = 35; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        end if
+
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
-
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
-!        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -436,11 +522,51 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, '2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            enddo
+        end if
+
+        ! Check
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
+
+        if (proc_rank == 83) then
+            j = 20; k = 35; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            j = 21; k = 35; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        end if
+
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
-!        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -459,6 +585,61 @@ contains
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, '3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            end do
+        end if
+        
+        ! Check
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
+
+        if (proc_rank == 83) then
+            j = 20; k = 35; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            j = 21; k = 35; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        end if
+
+        ! number density
+        n_partial = 0d0
+        !$acc parallel loop collapse(2) gang vector default(present)
+        do k = 0, n
+            do j = 0, m
+                n_partial = n_partial + q_prim_vf(n_idx)%sf(j, k, 0)
+            end do
+        end do
+
+        call mpi_reduce(n_partial,n_tot,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        if (proc_rank == 0) write(44,*) t_step, n_tot
 
         call nvtxEndRange
 

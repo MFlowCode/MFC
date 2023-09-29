@@ -233,8 +233,11 @@ contains
                             ! Keller-Miksis bubbles
                             Cpinf = myP/uratio**2
                             Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/1d0)/uratio ! Need to confirm 
+                            c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
                             rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
+                            if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                                write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l)
+                            end if
                             rddot = rddot*uratio**2/rratio
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
@@ -463,11 +466,11 @@ contains
         real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
         real(kind(0d0)) :: f_cpbw_KM, Re_inv_tmp
 
-        if (abs(fV) .gt. 1) then
-            Re_inv_tmp = Re_inv/(1+1000*(abs(fV)-1)**2)
-        else
-            Re_inv_tmp = Re_inv
-        end if
+        ! if (abs(fV) .gt. 1) then
+        !     Re_inv_tmp = Re_inv/(1+1000*(abs(fV)-1)**2)
+        ! else
+        !     Re_inv_tmp = Re_inv
+        ! end if
 
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
@@ -478,7 +481,7 @@ contains
         end if
 
         if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv_tmp*fV/fR
+        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
@@ -499,11 +502,11 @@ contains
         real(kind(0d0)) :: tmp1, tmp2, cdot_star
         real(kind(0d0)) :: f_rddot_KM, Re_inv_tmp
 
-        if (abs(fV) .gt. 1) then
-            Re_inv_tmp = Re_inv/(1+1000*(abs(fV)-1)**2)
-        else
-            Re_inv_tmp = Re_inv
-        end if
+        ! if (abs(fV) .gt. 1) then
+        !     Re_inv_tmp = Re_inv/(1+1000*(abs(fV)-1)**2)
+        ! else
+        !     Re_inv_tmp = Re_inv
+        ! end if
 
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
@@ -514,7 +517,7 @@ contains
         end if
 
         if (Web /= dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
-        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4d0*Re_inv_tmp*((fV/fR)**2d0)
+        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
 
         tmp1 = fV/fC
         tmp2 = 1.5d0*(fV**2d0)*(tmp1/3d0 - 1d0) + &
@@ -524,7 +527,7 @@ contains
         if (Re_inv == dflt_real) then
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
         else
-            f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv_tmp/(fRho*fC))
+            f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv/(fRho*fC))
         end if
 
     end function f_rddot_KM

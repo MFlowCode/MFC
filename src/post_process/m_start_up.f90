@@ -55,7 +55,7 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma
+            polydisperse, poly_sigma, adv_n, alter_alpha
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
