@@ -414,6 +414,13 @@ contains
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')           
             end if
+
+            if (vcfl_max_glb /= vcfl_max_glb) then
+                call s_mpi_abort('VCFL is NaN. Exiting ...')
+            elseif (vcfl_max_glb > 1d0) then
+                print *, 'vcfl', vcfl_max_glb
+                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')           
+            end if
         end if
 
         call s_mpi_barrier()

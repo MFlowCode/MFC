@@ -98,7 +98,7 @@ case = {
     "z_domain%end": 6.283185307179586,
     "bc_x%beg": -3,
     "bc_x%end": -3,
-    "bc_y%beg": -13,
+    "bc_y%beg": -14,
     "bc_y%end": -3,
     "bc_z%beg": -1,
     "bc_z%end": -1,
@@ -167,6 +167,8 @@ if "post_process" in ARGS["dict"]["targets"]:
         
     if case['p'] != 0:
         mods['fd_order']  = 1
-        mods['omega_wrt'] = 'T'
+        mods['omega_wrt(1)'] = 'T'
+        mods['omega_wrt(2)'] = 'T'
+        mods['omega_wrt(3)'] = 'T'
 
 print(json.dumps({**case, **mods}))
