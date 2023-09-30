@@ -244,12 +244,9 @@ contains
 
         hypoelasticity = .false.
 
-        bc_x%beg = dflt_int
-        bc_x%end = dflt_int
-        bc_y%beg = dflt_int
-        bc_y%end = dflt_int
-        bc_z%beg = dflt_int
-        bc_z%end = dflt_int
+        bc_x%beg = dflt_int; bc_x%end = dflt_int
+        bc_y%beg = dflt_int; bc_y%end = dflt_int
+        bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         parallel_io = .false.
         precision = 2

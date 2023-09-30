@@ -131,7 +131,6 @@ module m_global_parameters
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
-    type(int_bounds_info) :: bc_x_glb, bc_y_glb, bc_z_glb
     !> @}
 
     logical :: parallel_io !< Format of the data files
@@ -718,6 +717,8 @@ contains
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
+            
+            !$acc update device(Re_size)
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
@@ -770,8 +771,8 @@ contains
             ! cell-boundary values or otherwise, the unaltered left and right,
             ! WENO-reconstructed, cell-boundary values
         wa_flg = 0d0; IF(weno_avg) wa_flg = 1d0
+        !$acc update device(wa_flg)
 
-!$acc update device(Re_size)
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
