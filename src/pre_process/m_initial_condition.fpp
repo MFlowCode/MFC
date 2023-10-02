@@ -21,6 +21,10 @@ module m_initial_condition
 
     use m_global_parameters     ! Global parameters for the code
 
+    use m_mpi_proxy              !< Message passing interface (MPI) module proxy
+
+    use m_helper
+
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
@@ -28,8 +32,8 @@ module m_initial_condition
 
     use m_assign_variables
 
-     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
-     ! complex general matrix
+    use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
+    ! complex general matrix
 
     ! ==========================================================================
     ! ==========================================================================
@@ -106,6 +110,8 @@ contains
     subroutine s_generate_initial_condition() ! ----------------------------
 
         integer :: i  !< Generic loop operator
+
+        character(len=10) :: iStr
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -190,9 +196,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_ellipse(i, patch_id_fp, q_prim_vf)
 
-                    ! Isentropic vortex patch
+                    ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
-                    call s_isentropic_vortex(i, patch_id_fp, q_prim_vf)
+                    call s_mpi_abort('This used to be the isentropic vortex patch, '// &
+                        'which no longer exists. See Examples. Exiting ...')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
