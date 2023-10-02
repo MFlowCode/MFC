@@ -560,7 +560,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `[x,y]_length`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
-| 6    | Vortex 		    | 2     | N      | Isentropic flow disturbance. Requires `[x,y]_centroid` and `radius`. |
+| 6    | N/A 		    | 2     | N      | No longer exists. Empty. |
 | 7    | 2D analytical 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `[x,y,z]_length`. |
