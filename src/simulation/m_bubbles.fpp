@@ -77,7 +77,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         type(scalar_field), intent(IN) :: divu
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub 
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub
         integer, intent(IN) :: t_step, id
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: bub_adv_src
@@ -220,6 +220,33 @@ contains
                             pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
                         end if
 
+                        ! if (bubble_model == 1) then
+                        !     ! Gilmore bubbles
+                        !     Cpinf = myP - pref
+                        !     Cpbw = f_cpbw(R0(q), myR, myV, pb)
+                        !     myH = f_H(Cpbw, Cpinf, n_tait, B_tait)
+                        !     c_gas = f_cgas(Cpinf, n_tait, B_tait, myH)
+                        !     Cpinf_dot = f_cpinfdot(myRho, myP, alf, n_tait, B_tait, bub_adv_src(j, k, l), divu%sf(j, k, l))
+                        !     myHdot = f_Hdot(Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, myR, myV, R0(q), pbdot)
+                        !     rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
+                        ! else if (bubble_model == 2) then
+                        !     ! Keller-Miksis bubbles
+                        !     Cpinf = myP/uratio**2
+                        !     Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
+                        !     c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
+                        !     rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
+                        !     if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                        !         write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l)
+                        !     end if
+                        !     rddot = rddot*uratio**2/rratio
+                        ! else if (bubble_model == 3) then
+                        !     ! Rayleigh-Plesset bubbles
+                        !     Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                        !     rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
+                        ! end if
+
+                        ! bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+
                         if (bubble_model == 1) then
                             ! Gilmore bubbles
                             Cpinf = myP - pref
@@ -229,23 +256,59 @@ contains
                             Cpinf_dot = f_cpinfdot(myRho, myP, alf, n_tait, B_tait, bub_adv_src(j, k, l), divu%sf(j, k, l))
                             myHdot = f_Hdot(Cpbw, Cpinf, Cpinf_dot, n_tait, B_tait, myR, myV, R0(q), pbdot)
                             rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
+
                         else if (bubble_model == 2) then
                             ! Keller-Miksis bubbles
-                            Cpinf = myP/uratio**2
-                            Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
-                            rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
-                            if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
-                                write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l)
+                            if ((n_adap_dt .gt. 1) .and. (myV/uratio < -5 .or. myR/rratio < 0.5)) then
+                                Cpinf = myP/uratio**2
+                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
+                                myR = myR/rratio
+                                myV = myV/uratio
+                                do i = 1,n_adap_dt
+                                    Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                    rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
+                                    myR = myR + (dt*(uratio/rratio)/n_adap_dt)*myV
+                                    myV = myV + (dt*(uratio/rratio)/n_adap_dt)*rddot
+                                end do
+                                ! write(*,*) dt, (uratio/rratio), dt*(uratio/rratio)/100
+                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
+
+                                if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                                    write(23,*) t_step,Cpinf,Cpbw,myR,myV,c_liquid,rddot,nbub(j, k, l),1
+                                end if
+                                
+                                ! if (proc_rank == 0 .and. j == 0) then
+                                !     write(90,*) t_step, proc_rank, j, k, l, myR, myV, rddot
+                                ! end if
+
+                                myR = myR*rratio
+                                myV = myV*uratio
+                                rddot = rddot*uratio**2/rratio
+
+                                bub_r_src(j, k, l, q) = nbub(j, k, l)*(myR - q_prim_vf(rs(q))%sf(j, k, l))/dt
+                                bub_v_src(j, k, l, q) = nbub(j, k, l)*(myV - q_prim_vf(vs(q))%sf(j, k, l))/dt
+                            else
+                                Cpinf = myP/uratio**2
+                                Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
+                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
+                                rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
+
+                                if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                                    write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l),0
+                                end if
+
+                                rddot = rddot*uratio**2/rratio
+                                bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
                             end if
-                            rddot = rddot*uratio**2/rratio
+
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
                         end if
 
-                        bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+                        ! bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
 
                         if (alf < 1.d-11) then
                             bub_adv_src(j, k, l) = 0d0

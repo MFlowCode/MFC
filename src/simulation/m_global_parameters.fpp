@@ -253,6 +253,7 @@ module m_global_parameters
     logical :: polydisperse !< Polydisperse bubbles
     logical :: adv_n        !< Solve the number density equation
     logical :: alter_alpha  !< Recompute alpha from number density
+    integer :: n_adap_dt    !< Number of iterations for adaptive time stepping
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -410,7 +411,8 @@ contains
 
         adv_n = .false.
         alter_alpha = .false.
-        
+        n_adap_dt = 1
+
         ! User inputs for qbmm for simulation code
         qbmm = .false.
 
