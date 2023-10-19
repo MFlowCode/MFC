@@ -51,7 +51,9 @@ contains
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_check_ellipse_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 6) then
-                    call s_check_isentropic_vortex_patch_geometry(i)
+                    call s_mpi_abort('Unimplemented choice of geometry 6'// &
+                        ' (formerly "Vortex") of active patch '//trim(iStr)// &
+                        ' detected. Exiting ...')
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_check_2D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 8) then
@@ -269,32 +271,6 @@ contains
         end if
 
     end subroutine s_check_ellipse_patch_geometry ! ------------------------
-
-    !>  This subroutine verifies that the geometric parameters of
-        !!      the isentropic vortex patch have been entered by the user
-        !!      consistently.
-        !!  @param patch_id Patch identifier
-    subroutine s_check_isentropic_vortex_patch_geometry(patch_id) ! --------
-
-        integer, intent(IN) :: patch_id
-        call s_int_to_str(patch_id, iStr)
-
-        ! Constraints on the isentropic vortex patch geometric parameters
-        if (n == 0 .or. p > 0 .or. model_eqns == 2 &
-            .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
-            .or. &
-            patch_icpp(patch_id)%epsilon <= 0d0 &
-            .or. &
-            patch_icpp(patch_id)%beta <= 0d0) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-            'geometric parameters of isentropic '// &
-            'vortex patch '//trim(iStr)//'. Exiting ...')
-
-        end if
-
-    end subroutine s_check_isentropic_vortex_patch_geometry ! --------------
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the Taylor Green vortex patch have been entered by the user

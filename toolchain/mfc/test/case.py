@@ -78,7 +78,6 @@ BASE_CFG = {
     'sigV'                          : 0.1,
     'rhoRV'                         : 0.0,
 
-
     'Monopole'                      : 'F',
     'num_mono'                      : 1,
     'Mono(1)%loc(1)'                : 0.5,
@@ -100,8 +99,8 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, targets: typing.List[str], gpu: int) -> subprocess.CompletedProcess:
-        gpu_select        = f"CUDA_VISIBLE_DEVICES={gpu}"
+    def run(self, targets: typing.List[str], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
+        gpu_select        = f"CUDA_VISIBLE_DEVICES={','.join([str(_) for _ in gpus])}"
         filepath          = f'"{self.get_dirpath()}/case.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
