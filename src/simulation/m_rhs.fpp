@@ -661,6 +661,10 @@ contains
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
                         q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                        if (isnan(q_cons_vf(i)%sf(j, k, l))) then
+                            write(*,*) 'q_cons_vf in the beginning of rhs module',proc_rank,j,k,l,i,q_cons_vf(i)%sf(j,k,l)
+                            error stop
+                        end if
                     end do
                 end do
             end do
@@ -703,7 +707,20 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-        
+
+        do j = 1, sys_size
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        if (isnan(q_prim_qp%vf(j)%sf(k,l,q))) then
+                            write(*,*) 'q_prim_qp after s_convert',proc_rank,j,k,l,q,q_cons_qp%vf(j)%sf(k,l,q),q_prim_qp%vf(j)%sf(k,l,q)
+                            error stop
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -827,6 +844,19 @@ contains
 
             ! Computing Riemann Solver Flux and Source Flux =================
 
+            do j = 1, sys_size
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            if (isnan(q_prim_qp%vf(j)%sf(k,l,q))) then
+                                write(*,*) 'q_prim_qp before riemann',proc_rank,id,j,k,l,q,q_cons_qp%vf(j)%sf(k,l,q),q_prim_qp%vf(j)%sf(k,l,q)
+                                error stop
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -849,7 +879,32 @@ contains
                     do l = 0, n
                         do k = 0, m
                             if (isnan(flux_n(id)%vf(j)%sf(k,l,q))) then
-                                write(*,*) 'after riemann',id,j,k,l,q,flux_n(id)%vf(j)%sf(k,l,q)
+                                write(*,*) 'after riemann',proc_rank,id,j,k,l,q,flux_n(id)%vf(j)%sf(k,l,q)
+
+                                print *, k-5,l,q, (q_prim_qp%vf(i)%sf(k-5,l,q),i=1,sys_size)
+                                print *, k-4,l,q, (q_prim_qp%vf(i)%sf(k-4,l,q),i=1,sys_size)
+                                print *, k-3,l,q, (q_prim_qp%vf(i)%sf(k-3,l,q),i=1,sys_size)
+                                print *, k-2,l,q, (q_prim_qp%vf(i)%sf(k-2,l,q),i=1,sys_size)
+                                print *, k-1,l,q, (q_prim_qp%vf(i)%sf(k-1,l,q),i=1,sys_size)
+                                print *, k-0,l,q, (q_prim_qp%vf(i)%sf(k-0,l,q),i=1,sys_size)
+                                print *, k+1,l,q, (q_prim_qp%vf(i)%sf(k+1,l,q),i=1,sys_size)
+                                print *, k+2,l,q, (q_prim_qp%vf(i)%sf(k+2,l,q),i=1,sys_size)
+                                print *, k+3,l,q, (q_prim_qp%vf(i)%sf(k+3,l,q),i=1,sys_size)
+                                print *, k+4,l,q, (q_prim_qp%vf(i)%sf(k+4,l,q),i=1,sys_size)
+                                print *, k+5,l,q, (q_prim_qp%vf(i)%sf(k+5,l,q),i=1,sys_size)
+                                print *, "   "
+                                print *, k,l-5,q, (q_prim_qp%vf(i)%sf(k,l-5,q),i=1,sys_size)
+                                print *, k,l-4,q, (q_prim_qp%vf(i)%sf(k,l-4,q),i=1,sys_size)
+                                print *, k,l-3,q, (q_prim_qp%vf(i)%sf(k,l-3,q),i=1,sys_size)
+                                print *, k,l-2,q, (q_prim_qp%vf(i)%sf(k,l-2,q),i=1,sys_size)
+                                print *, k,l-1,q, (q_prim_qp%vf(i)%sf(k,l-1,q),i=1,sys_size)
+                                print *, k,l-0,q, (q_prim_qp%vf(i)%sf(k,l-0,q),i=1,sys_size)
+                                print *, k,l+1,q, (q_prim_qp%vf(i)%sf(k,l+1,q),i=1,sys_size)
+                                print *, k,l+2,q, (q_prim_qp%vf(i)%sf(k,l+2,q),i=1,sys_size)
+                                print *, k,l+3,q, (q_prim_qp%vf(i)%sf(k,l+3,q),i=1,sys_size)
+                                print *, k,l+4,q, (q_prim_qp%vf(i)%sf(k,l+4,q),i=1,sys_size)
+                                print *, k,l+5,q, (q_prim_qp%vf(i)%sf(k,l+5,q),i=1,sys_size)
+                                
                                 error stop
                             end if
                         end do

@@ -1548,7 +1548,7 @@ contains
                                     end do
 
                                     if ((R0_L(1) /= R0_L(1)) .or. (R0_R(1) /= R0_R(1))) then
-                                        write(*,*) j,k,l,i
+                                        write(*,*) proc_rank, j, k, l
                                         write(*,*) (qL_prim_rs${XYZ}$_vf(j, k, l, i),i=1,sys_size)
                                         write(*,*) (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i),i=1,sys_size)
                                         write(*,*) R0_L,qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)
@@ -1574,7 +1574,7 @@ contains
                                     end if
 
                                     if ((nbub_L /= nbub_L) .or. (nbub_R /= nbub_R)) then
-                                        write(*,*) j,k,l,i
+                                        write(*,*) proc_rank, j, k, l
                                         write(*,*) (qL_prim_rs${XYZ}$_vf(j, k, l, i),i=1,sys_size)
                                         write(*,*) (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i),i=1,sys_size)
                                         write(*,*) R0_L,qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids),nbub_L_denom
@@ -1660,6 +1660,11 @@ contains
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
                                     vel_L_rms, c_L)
 
+                                if (isnan(c_L)) then
+                                    print *, "c_L is NaN", pres_L, rho_L, alpha_L, c_L, R0_L, nbub_L, (4/3)*pi*R0_L(1)**3*nbub_L
+                                    print *, "c_L is NaN", pres_R, rho_R, alpha_R, c_R, R0_R, nbub_R, (4/3)*pi*R0_R(1)**3*nbub_R
+                                end if
+
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                     vel_R_rms, c_R)
 
@@ -1729,6 +1734,14 @@ contains
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
                                         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+
+                                    if (isnan(flux_rs${XYZ}$_vf(j, k, l, i))) then
+                                        print *, "cont_flux", j, k, l, i
+                                        print *, xi_M, qL_prim_rs${XYZ}$_vf(j, k, l, i), vel_L(dir_idx(1)), s_M, xi_L
+                                        print *, xi_P, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i), vel_R(dir_idx(1)), s_P, xi_R
+                                        print *, vel_L(dir_idx(1)), s_L, s_S, c_L 
+                                        print *, vel_R(dir_idx(1)), s_R, s_S, c_R
+                                    end if
                                 end do
 
                                 if (bubbles .and. (num_fluids > 1)) then

@@ -254,6 +254,7 @@ module m_global_parameters
     logical :: adv_n        !< Solve the number density equation
     logical :: alter_alpha  !< Recompute alpha from number density
     integer :: n_adap_dt    !< Number of iterations for adaptive time stepping
+    integer, allocatable, dimension(:, :, :) :: q_adap_dt !< Indicator of adaptive time stepping
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -277,7 +278,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, q_adap_dt, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -778,6 +779,7 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
 
             @:ALLOCATE(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(q_adap_dt(0:m, 0:n, 0:p))
         end if
 
         if (probe_wrt) then

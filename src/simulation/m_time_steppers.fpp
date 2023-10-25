@@ -184,6 +184,8 @@ contains
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp  !<
 
+        q_adap_dt = 0
+        
         ! Stage 1 of 1 =====================================================
 
         call cpu_time(start)
@@ -261,10 +263,8 @@ contains
 
         j = 1; k = 0; l = 0;
         if (mod(t_step - t_step_start, t_step_save) == 0) then
-            write(98,*) t_step,(q_cons_ts(1)%vf(i)%sf(j, k, l),i=1,sys_size),&
-                        DSQRT((4*pi*q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)**3d0)/(3*q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)))
-            write(99,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),&
-                        DSQRT((4*pi*q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)**3d0)/(3*q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)))
+            write(98,*) t_step,(q_cons_ts(1)%vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+            write(99,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
         end if
 
         call nvtxEndRange
@@ -424,6 +424,8 @@ contains
         real(kind(0d0)) :: tmp
         integer :: ierr
 
+        q_adap_dt = 0
+        
         ! Stage 1 of 3 =====================================================
 
         call cpu_time(start)
@@ -467,8 +469,17 @@ contains
                         !$acc loop seq
                         do i = 1, nb
                             if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, '1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
                                 error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
                             end if
                             if(polytropic) then
                                 nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
@@ -477,6 +488,13 @@ contains
                             end if
                         end do
                         q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(2)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(2)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(2)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
                     end do
                 end do
             enddo
@@ -492,11 +510,18 @@ contains
         gm_alpha_qp%vf, &
         ix, iy, iz)
 
-        if (proc_rank == 83) then
-            j = 20; k = 35; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-            j = 21; k = 35; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        if (proc_rank == 32) then
+            j = 15; k = 23; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 5; k = 22; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        end if
+
+        if (n == 0) then
+            j = 1; k = 0; l = 0;
+            if (mod(t_step - t_step_start, t_step_save) == 0) then
+                write(22,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+            end if
         end if
 
         ! ==================================================================
@@ -531,8 +556,17 @@ contains
                         !$acc loop seq
                         do i = 1, nb
                             if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, '2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
                                 error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
                             end if
                             if(polytropic) then
                                 nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
@@ -541,6 +575,13 @@ contains
                             end if
                         end do
                         q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(2)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(2)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(2)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
                     end do
                 end do
             enddo
@@ -556,11 +597,25 @@ contains
         gm_alpha_qp%vf, &
         ix, iy, iz)
 
-        if (proc_rank == 83) then
-            j = 20; k = 35; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-            j = 21; k = 35; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        ! if (proc_rank == 83) then
+        !     j = 20; k = 35; l = 0;
+        !     write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        !     j = 21; k = 35; l = 0;
+        !     write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        ! end if
+
+        if (proc_rank == 32) then
+            j = 15; k = 23; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 5; k = 22; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        end if
+
+        if (n == 0) then
+            j = 1; k = 0; l = 0;
+            if (mod(t_step - t_step_start, t_step_save) == 0) then
+                write(22,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+            end if
         end if
 
         ! ==================================================================
@@ -595,8 +650,17 @@ contains
                         !$acc loop seq
                         do i = 1, nb
                             if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, '3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
                                 error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
                             end if
                             if(polytropic) then
                                 nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
@@ -605,6 +669,13 @@ contains
                             end if
                         end do
                         q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(1)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(1)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
                     end do
                 end do
             end do
@@ -620,26 +691,47 @@ contains
         gm_alpha_qp%vf, &
         ix, iy, iz)
 
-        if (proc_rank == 83) then
-            j = 20; k = 35; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-            write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-            j = 21; k = 35; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-            write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        ! if (proc_rank == 83) then
+        !     j = 20; k = 35; l = 0;
+        !     write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        !     write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        !     j = 21; k = 35; l = 0;
+        !     write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        !     write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+        ! end if
+
+        if (proc_rank == 32) then
+            j = 15; k = 23; l = 0;
+            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 5; k = 22; l = 0;
+            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 8; k = 22; l = 0;
+            write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 12; k = 23; l = 0;
+            write(33,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        end if
+
+        if (n == 0) then
+            j = 1; k = 0; l = 0;
+            if (mod(t_step - t_step_start, t_step_save) == 0) then
+                write(22,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+                write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+            end if
         end if
 
         ! number density
-        n_partial = 0d0
+        ! n_partial = 0d0
         !$acc parallel loop collapse(2) gang vector default(present)
-        do k = 0, n
-            do j = 0, m
-                n_partial = n_partial + q_prim_vf(n_idx)%sf(j, k, 0)
-            end do
-        end do
+        ! do k = 0, n
+        !     do j = 0, m
+        !         n_partial = n_partial + q_prim_vf(n_idx)%sf(j, k, 0)
+        !     end do
+        ! end do
 
-        call mpi_reduce(n_partial,n_tot,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-        if (proc_rank == 0) write(44,*) t_step, n_tot
+        ! call mpi_reduce(n_partial,n_tot,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        ! if (proc_rank == 0) write(44,*) t_step, n_tot
 
         call nvtxEndRange
 

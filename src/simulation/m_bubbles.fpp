@@ -157,6 +157,11 @@ contains
                     do q = 1, nb
                         bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                     end do
+
+                    if (isnan(bub_r_src(j, k, l, 1))) then
+                        print *, q_prim_vf(rs(q))%sf(j, k, l), q_prim_vf(vs(q))%sf(j, k, l)
+                    end if
+
                 end do
             end do
         end do
@@ -265,19 +270,28 @@ contains
                                 myR = myR/rratio
                                 myV = myV/uratio
                                 do i = 1,n_adap_dt
+                                    ! print *, i, myR, myV, R0(q), c_liquid
                                     Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                                     rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
                                     myR = myR + (dt*(uratio/rratio)/n_adap_dt)*myV
                                     myV = myV + (dt*(uratio/rratio)/n_adap_dt)*rddot
+                                    if (myR < 0) then
+                                        print *, "myR < 0 in bubbles adaptive loop", myR
+                                        error stop "myR < 0"
+                                    end if 
+                                    if (isnan(myR) .or. isnan(myV)) then
+                                        print *, "myR/myV is NaN in bubbles adaptive loop"
+                                        error stop "NaN"
+                                    end if
                                 end do
                                 ! write(*,*) dt, (uratio/rratio), dt*(uratio/rratio)/100
                                 Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                                 rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
-
-                                if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
-                                    write(23,*) t_step,Cpinf,Cpbw,myR,myV,c_liquid,rddot,nbub(j, k, l),1
-                                end if
                                 
+                                ! if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                                !     write(23,*) t_step,Cpinf,Cpbw,myR,myV,c_liquid,rddot,nbub(j, k, l),1
+                                ! end if
+                                                                
                                 ! if (proc_rank == 0 .and. j == 0) then
                                 !     write(90,*) t_step, proc_rank, j, k, l, myR, myV, rddot
                                 ! end if
@@ -288,15 +302,18 @@ contains
 
                                 bub_r_src(j, k, l, q) = nbub(j, k, l)*(myR - q_prim_vf(rs(q))%sf(j, k, l))/dt
                                 bub_v_src(j, k, l, q) = nbub(j, k, l)*(myV - q_prim_vf(vs(q))%sf(j, k, l))/dt
+
+                                q_adap_dt(j, k, l) = q_adap_dt(j, k, l) + 1
+
                             else
                                 Cpinf = myP/uratio**2
                                 Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
                                 c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
                                 rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
 
-                                if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
-                                    write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l),0
-                                end if
+                                ! if (proc_rank == 83 .and. j == 20 .and. k == 35 .and. l == 0) then
+                                !     write(23,*) t_step,Cpinf,Cpbw,myR/rratio,myV/uratio,c_liquid,rddot,nbub(j, k, l),0
+                                ! end if
 
                                 rddot = rddot*uratio**2/rratio
                                 bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
@@ -318,6 +335,10 @@ contains
                                 bub_p_src(j, k, l, q) = 0d0
                                 bub_m_src(j, k, l, q) = 0d0
                             end if
+                        end if
+
+                        if (isnan(bub_r_src(j, k, l, 1))) then
+                            print *, "bub_r_src is NaN"
                         end if
                     end do
                 end do

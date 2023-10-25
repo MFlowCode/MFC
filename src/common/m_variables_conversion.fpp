@@ -801,7 +801,11 @@ contains
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, pres)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
-
+                    if (isnan(pres)) then
+                        write(*,*) 'pres after s_compute_pressure',proc_rank,j,k,l,qK_cons_vf(E_idx)%sf(j,k,l),qK_cons_vf(alf_idx)%sf(j,k,l)
+                        error stop
+                    end if
+                    
                     if (bubbles) then
                         !$acc loop seq
                         do i = 1, nb
