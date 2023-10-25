@@ -1,14 +1,24 @@
 #!/bin/bash
-#SBATCH -Jshb-test-jobs                         # Job name
-#SBATCH --account=gts-sbryngelson3               # charge account
-#SBATCH -N1                                     # Number of nodes and cores per node required
-#SBATCH --gres=gpu:V100:2
-#SBATCH -t 02:00:00                              # Duration of the job (Ex: 15 mins)
-#SBATCH -q embers                               # QOS Name
-#SBATCH -otest.out                               # Combined output and error messages file
-#SBATCH -W                                      # Do not exit until the submitted job terminates.
+#SBATCH -Jshb-test-jobs            # Job name
+#SBATCH --account=gts-sbryngelson3 # charge account
+#SBATCH -N1                        # Number of nodes and cores per node required
+#SBATCH -CV100-16GB
+#SBATCH -G2
+#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -q embers                  # QOS Name
+#SBATCH -otest.out                 # Combined output and error messages file
+#SBATCH -W                         # Do not exit until the submitted job terminates.
 
-cd $SLURM_SUBMIT_DIR                            # Change to working directory
-echo $(pwd)
-. ./mfc.sh load -c p -m g
-./mfc.sh test -j 1 -b mpirun -a --gpu
+cd "$SLURM_SUBMIT_DIR"
+echo "Running in $(pwd):"
+
+set -x
+
+. ./mfc.sh load -c p -m GPU
+
+gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
+gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
+
+./mfc.sh test -a -b mpirun -j $(nproc) \
+              --gpu -g $gpu_ids
+

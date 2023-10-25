@@ -1136,7 +1136,7 @@ module m_viscous
                                 end do
                             end do
                         end do
-                    end do
+                    end do        
                 elseif (norm_dir == 3) then
 !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
@@ -1164,7 +1164,6 @@ module m_viscous
                 end if
             end if
         end if
-
         ! ==================================================================
 
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
@@ -1220,13 +1219,12 @@ module m_viscous
                     do j = ix%beg + 1, ix%end - 1
 !$acc loop seq
                         do i = iv%beg, iv%end
-
-                            dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dL(j) &
-                                *( &
-                                vR_vf(i)%sf(j, k, l) &
-                                - vL_vf(i)%sf(j, k, l) &
-                                )
+                            dv_ds_vf(i)%sf(j,k,l) = &
+                                        1d0/((1d0+wa_flg)*dL(j)) &
+                                       *( wa_flg*vL_vf(i)%sf(j+1,k,l) &
+                                        +        vR_vf(i)%sf( j ,k,l) &
+                                        -        vL_vf(i)%sf( j ,k,l) &
+                                        - wa_flg*vR_vf(i)%sf(j-1,k,l) )
                         end do
                     end do
                 end do
@@ -1250,12 +1248,12 @@ module m_viscous
                     do j = ix%beg, ix%end
 !$acc loop seq
                         do i = iv%beg, iv%end
-                            dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dL(k) &
-                                *( &
-                                vR_vf(i)%sf(j, k, l) &
-                                - vL_vf(i)%sf(j, k, l) &
-                                )
+                            dv_ds_vf(i)%sf(j,k,l) = &
+                                             1d0/((1d0+wa_flg)*dL(k)) &
+                                       *( wa_flg*vL_vf(i)%sf(j,k+1,l) &
+                                        +        vR_vf(i)%sf(j, k ,l) &
+                                        -        vL_vf(i)%sf(j, k ,l) &
+                                        - wa_flg*vR_vf(i)%sf(j,k-1,l) )
                         end do
                     end do
                 end do
@@ -1278,12 +1276,12 @@ module m_viscous
                     do j = ix%beg, ix%end
 !$acc loop seq
                         do i = iv%beg, iv%end
-                            dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/dL(l) &
-                                *( &
-                                vR_vf(i)%sf(j, k, l) &
-                                - vL_vf(i)%sf(j, k, l) &
-                                )
+                            dv_ds_vf(i)%sf(j,k,l) = &
+                                             1d0/((1d0+wa_flg)*dL(l)) &
+                                       *( wa_flg*vL_vf(i)%sf(j,k,l+1) &
+                                        +        vR_vf(i)%sf(j,k, l ) &
+                                        -        vL_vf(i)%sf(j,k, l ) &
+                                        - wa_flg*vR_vf(i)%sf(j,k,l-1) )
                         end do
                     end do
                 end do
@@ -1438,7 +1436,7 @@ module m_viscous
             end do
         end if
         if (n > 0) then
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
     !$acc parallel loop collapse(2) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = ix%beg, ix%end

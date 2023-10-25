@@ -1,30 +1,34 @@
 import re, typing
 
+from ..build   import MFCTarget, get_target, build_targets
 from ..printer import cons
 from ..state   import ARG
+from ..common  import MFCException, isspace
 
 from .  import engines, input
-from .. import common,  build
 
 
 def validate_job_options() -> None:
+    if not ARG("mpi") and any({ARG("nodes") > 1, ARG("tasks_per_node") > 1}):
+        raise MFCException("RUN: Cannot run on more than one rank with --no-mpi.")
+
     if ARG("nodes") <= 0:
-        raise common.MFCException("RUN: At least one node must be requested.")
+        raise MFCException("RUN: At least one node must be requested.")
 
     if ARG("tasks_per_node") <= 0:
-        raise common.MFCException("RUN: At least one task per node must be requested.")
+        raise MFCException("RUN: At least one task per node must be requested.")
 
-    if not common.isspace(ARG("email")):
+    if not isspace(ARG("email")):
         # https://stackoverflow.com/questions/8022530/how-to-check-for-valid-email-address
         if not re.match(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?", ARG("email")):
-            raise common.MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
+            raise MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
 
-def run_targets(targets: typing.List[str]):    
+def run_targets(targets: typing.List[MFCTarget]):    
     cons.print("[bold]Run[/bold]")
     cons.indent()
 
-    if len(ARG("targets")) == 0:
+    if len(targets) == 0:
         cons.print(f"> No target selected.")
         return
 
@@ -45,18 +49,30 @@ Engine        (-e)  {ARG('engine')}
 
     validate_job_options()
 
-    cons.print("Generating input files...")
-    for name in ARG("targets"):
-        input_file.generate(name)
+    for target in targets:
+        cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
+        cons.indent()
+        cons.print()
+        input_file.generate(target)
+        cons.print()
+        cons.unindent()
 
-    build.build_targets(targets)
+    build_targets(targets)
+    engine.run(targets)
 
-    engine.run(ARG("targets"))
-    
 
-def run_target(target: str):
+def run_target(target: MFCTarget):
     run_targets([target])
 
 
 def run() -> None:
-    run_targets(ARG("targets"))
+    run_targets([ get_target(_) for _ in ARG("targets")])
+
+
+def run_targets_with(targets: typing.List[MFCTarget]):
+    pass
+
+
+def run_target_with(target: MFCTarget):
+    run_targets_with([target])
+

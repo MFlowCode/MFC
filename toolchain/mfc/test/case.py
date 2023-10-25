@@ -1,4 +1,4 @@
-import os, typing, hashlib, binascii, subprocess, dataclasses
+import os, glob, typing, hashlib, binascii, subprocess, itertools, dataclasses
 
 from ..      import case, common
 from ..state import ARG
@@ -78,7 +78,6 @@ BASE_CFG = {
     'sigV'                          : 0.1,
     'rhoRV'                         : 0.0,
 
-
     'Monopole'                      : 'F',
     'num_mono'                      : 1,
     'Mono(1)%loc(1)'                : 0.5,
@@ -100,18 +99,19 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, filename: str, targets: typing.List[str]) -> subprocess.CompletedProcess:
-        filepath          = f'"{self.get_dirpath()}/{filename}.py"'
+    def run(self, targets: typing.List[str], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
+        gpu_select        = f"CUDA_VISIBLE_DEVICES={','.join([str(_) for _ in gpus])}"
+        filepath          = f'"{self.get_dirpath()}/case.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
         binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
         case_optimization =  "--case-optimization" if ARG("case_optimization")  else "--no-build"
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
-                
+        
         command: str = f'''\
-            {mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
-            {jobs} -t {' '.join(targets)} 2>&1\
+            {gpu_select} {mfc_script} run {filepath} {tasks} {binary_option} \
+            {case_optimization} {jobs} -t {' '.join(targets)} 2>&1\
             '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
@@ -124,20 +124,75 @@ class TestCase(case.Case):
     def get_dirpath(self):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
-    def create_directory(self, filename: str):
+    def delete_output(self):
         dirpath = self.get_dirpath()
 
-        content = f"""\
-#!/usr/bin/env python3
+        exts = ["*.inp", "*.1", "*.dat", "*.inf"]
+        for f in list(itertools.chain.from_iterable(glob.glob(os.path.join(dirpath, ext)) for ext in exts)):
+            common.delete_file(f)
 
-import json
+        common.delete_directory(os.path.join(dirpath, "D"))
+        common.delete_directory(os.path.join(dirpath, "p_all"))
+        common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
+        common.delete_directory(os.path.join(dirpath, "restart_data"))
 
-print(json.dumps({self.gen_json_dict_str()}))
-"""
+        for f in ["pre_process", "simulation", "post_process"]:
+            common.delete_file(os.path.join(dirpath, f"{f}.txt"))
+
+    def create_directory(self):
+        dirpath = self.get_dirpath()
 
         common.create_directory(dirpath)
 
-        common.file_write(f"{dirpath}/{filename}.py", content)
+        common.file_write(f"{dirpath}/case.py", f"""\
+#!/usr/bin/env python3
+#
+# tests/{self.get_uuid()}/case.py:
+# {self.trace}
+
+import json
+import argparse
+
+parser = argparse.ArgumentParser(
+    prog="tests/{self.get_uuid()}/case.py",
+    description="tests/{self.get_uuid()}/case.py: {self.trace}",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+ 
+parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+
+ARGS = vars(parser.parse_args())
+
+ARGS["dict"] = json.loads(ARGS["dict"])
+
+case = {self.gen_json_dict_str()}
+mods = {{}}
+
+if "post_process" in ARGS["dict"]["targets"]:
+    mods = {{
+        'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
+        'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
+        'rho_wrt'      : 'T', 'mom_wrt(1)'      : 'T',
+        'vel_wrt(1)'   : 'T', 'E_wrt'           : 'T',
+        'pres_wrt'     : 'T', 'alpha_wrt(1)'    : 'T',
+        'gamma_wrt'    : 'T', 'heat_ratio_wrt'  : 'T',
+        'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
+        'c_wrt'        : 'T',
+    }}
+        
+    if case['p'] != 0:
+        mods['fd_order']  = 1
+        mods['omega_wrt(1)'] = 'T'
+        mods['omega_wrt(2)'] = 'T'
+        mods['omega_wrt(3)'] = 'T'
+
+print(json.dumps({{**case, **mods}}))
+""")
+
+        common.file_write(f"{dirpath}/README.md", f"""\
+# tests/{self.get_uuid()}
+
+{self.trace}: [case.py](case.py).
+""")
 
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"

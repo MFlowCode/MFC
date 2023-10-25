@@ -73,16 +73,34 @@ contains
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i
+        integer :: i, j, q, k, l
 
         do i = 1, sys_size
-#ifdef MPI_SIMULATION
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf
-#else
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
-#endif
         end do
 
+        !Additional variables pb and mv for non-polytropic qbmm
+#ifdef MFC_PRE_PROCESS 
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb
+                do j = 1, nnode
+                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i) 
+                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i) 
+                end do
+            end do                  
+        end if
+#endif
+
+#ifdef MFC_SIMULATION 
+        if(qbmm .and. .not. polytropic) then
+            do i = 1, nb
+                do j = 1, nnode
+                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
+                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
+                end do
+            end do                  
+        end if
+#endif
         ! Define global(g) and local(l) sizes for flow variables
         sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
         if (n > 0) then
@@ -98,6 +116,17 @@ contains
                                           MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
+
+#ifndef MFC_POST_PROCESS
+        if(qbmm .and. .not. polytropic) then
+            do i = sys_size + 1, sys_size + 2*nb*4
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+
+            end do
+        end if
+#endif
 
 #endif
 

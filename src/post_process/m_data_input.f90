@@ -405,15 +405,15 @@ contains
 
             call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'x')
 
-            do i = 1, offset_x%beg
-                x_cb(-1 - i) = x_cb(-i) - dx(-i)
-            end do
-
-            do i = 1, buff_size
-                x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
-            end do
-
         end if
+
+        do i = 1, offset_x%beg
+            x_cb(-1 - i) = x_cb(-i) - dx(-i)
+        end do
+
+        do i = 1, buff_size
+            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
+        end do
 
         ! Ghost-cell extrapolation BC at the end
         if (bc_x%end <= -3) then
@@ -441,15 +441,15 @@ contains
 
             call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'x')
 
-            do i = 1, offset_x%end
-                x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-            end do
-
-            do i = 1, buff_size
-                x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
-            end do
-
         end if
+
+        do i = 1, offset_x%end
+            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
+        end do
+
+        do i = 1, buff_size
+            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
+        end do
 
         ! END: Populating Buffer Regions in the x-direction ================
 
@@ -458,14 +458,14 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(0)
                 end do
 
                 ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2 .or. bc_y%beg == -13) then
+            elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
 
                 do i = 1, buff_size
                     dy(-i) = dy(i - 1)
@@ -483,15 +483,15 @@ contains
 
                 call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'y')
 
-                do i = 1, offset_y%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
-                end do
-
             end if
+
+            do i = 1, offset_y%beg
+                y_cb(-1 - i) = y_cb(-i) - dy(-i)
+            end do
+
+            do i = 1, buff_size
+                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
+            end do
 
             ! Ghost-cell extrapolation BC at the end
             if (bc_y%end <= -3) then
@@ -519,15 +519,15 @@ contains
 
                 call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'y')
 
-                do i = 1, offset_y%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
-                end do
-
             end if
+
+            do i = 1, offset_y%end
+                y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
+            end do
+
+            do i = 1, buff_size
+                y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
+            end do
 
             ! END: Populating Buffer Regions in the y-direction ================
 
@@ -561,15 +561,15 @@ contains
 
                     call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'z')
 
-                    do i = 1, offset_z%beg
-                        z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                    end do
-
-                    do i = 1, buff_size
-                        z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
-                    end do
-
                 end if
+
+                do i = 1, offset_z%beg
+                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
+                end do
+
+                do i = 1, buff_size
+                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
+                end do
 
                 ! Ghost-cell extrapolation BC at the end
                 if (bc_z%end <= -3) then
@@ -597,15 +597,15 @@ contains
 
                     call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'z')
 
-                    do i = 1, offset_z%end
-                        z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                    end do
-
-                    do i = 1, buff_size
-                        z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
-                    end do
-
                 end if
+
+                do i = 1, offset_z%end
+                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
+                end do
+
+                do i = 1, buff_size
+                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
+                end do
 
             end if
 
@@ -734,7 +734,7 @@ contains
         if (n > 0) then
 
             ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
+            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
 
                 do j = 1, buff_size
                     do i = 1, sys_size
@@ -743,7 +743,7 @@ contains
                 end do
 
                 ! Axis BC at the beginning
-            elseif (bc_y%beg == -13) then
+            elseif (bc_y%beg == -14) then
 
                 do j = 1, buff_size
                     do k = 0, p

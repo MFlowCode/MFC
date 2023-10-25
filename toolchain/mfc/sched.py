@@ -21,8 +21,10 @@ class WorkerThread(threading.Thread):
 
 @dataclasses.dataclass
 class WorkerThreadHolder:
-    thread: threading.Thread
-    ppn:    int
+    thread:  threading.Thread
+    ppn:     int
+    load:    float
+    devices: typing.Set[int]
 
 
 @dataclasses.dataclass
@@ -30,12 +32,14 @@ class Task:
     ppn:  int
     func: typing.Callable
     args: typing.List[typing.Any]
+    load: float
 
 
-def sched(tasks: typing.List[Task], nThreads: int):
+def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int]) -> None:
     nAvailable: int = nThreads
     threads:    typing.List[WorkerThreadHolder] = []
 
+    sched.LOAD = { id: 0.0 for id in devices }
 
     def join_first_dead_thread(progress, complete_tracker) -> None:
         nonlocal threads, nAvailable
@@ -46,6 +50,9 @@ def sched(tasks: typing.List[Task], nThreads: int):
                     raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
+                for device in threadHolder.devices:
+                    sched.LOAD[device] -= threadHolder.load / threadHolder.ppn
+
                 progress.advance(complete_tracker)
 
                 del threads[threadID]
@@ -75,11 +82,18 @@ def sched(tasks: typing.List[Task], nThreads: int):
             # Launch Thread
             progress.advance(queue_tracker)
 
-            thread = WorkerThread(target=task.func, args=tuple(task.args))
+            # Use the least loaded devices
+            devices = set()
+            for _ in range(task.ppn):
+                device = min(sched.LOAD.items(), key=lambda x: x[1])[0]
+                sched.LOAD[device] += task.load / task.ppn
+            
+            nAvailable -= task.ppn
+
+            thread = WorkerThread(target=task.func, args=tuple(task.args) + (devices,))
             thread.start()
 
-            threads.append(WorkerThreadHolder(thread, task.ppn))
-            nAvailable -= task.ppn
+            threads.append(WorkerThreadHolder(thread, task.ppn, task.load, devices))
 
 
         # Wait for the lasts tests to complete
@@ -89,3 +103,5 @@ def sched(tasks: typing.List[Task], nThreads: int):
 
             # Do not overwhelm this core with this loop
             time.sleep(0.05)
+
+sched.LOAD = {}

@@ -104,12 +104,11 @@ contains
     subroutine s_initialize_cbc_module() ! ---------------------------------
 
         integer :: i
+        logical :: is_cbc
 
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+        call s_any_cbc_boundaries(is_cbc)
+
+        if (is_cbc .eqv. .false.) return
 
         if (n == 0) then
             is2%beg = 0
@@ -248,7 +247,7 @@ contains
 
 
         ! Allocating/Computing CBC Coefficients in x-direction =============
-        if (all((/bc_x%beg, bc_x%end/) <= -5)) then
+        if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             allocate (fd_coef_x(0:buff_size, -1:1))
 
@@ -259,7 +258,7 @@ contains
             call s_compute_cbc_coefficients(1, -1)
             call s_compute_cbc_coefficients(1, 1)
 
-        elseif (bc_x%beg <= -5) then
+        elseif (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
 
             allocate (fd_coef_x(0:buff_size, -1:-1))
 
@@ -269,7 +268,7 @@ contains
 
             call s_compute_cbc_coefficients(1, -1)
 
-        elseif (bc_x%end <= -5) then
+        elseif (bc_x%end <= -5 .and. bc_x%end >= -13) then
 
             allocate (fd_coef_x(0:buff_size, 1:1))
 
@@ -285,7 +284,7 @@ contains
         ! Allocating/Computing CBC Coefficients in y-direction =============
         if (n > 0) then
 
-            if (all((/bc_y%beg, bc_y%end/) <= -5)) then
+            if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13)) then
 
                 allocate (fd_coef_y(0:buff_size, -1:1))
 
@@ -296,7 +295,7 @@ contains
                 call s_compute_cbc_coefficients(2, -1)
                 call s_compute_cbc_coefficients(2, 1)
 
-            elseif (bc_y%beg <= -5) then
+            elseif (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
 
                 allocate (fd_coef_y(0:buff_size, -1:-1))
 
@@ -306,7 +305,7 @@ contains
 
                 call s_compute_cbc_coefficients(2, -1)
 
-            elseif (bc_y%end <= -5) then
+            elseif (bc_y%end <= -5 .and. bc_y%end >= -13) then
 
                 allocate (fd_coef_y(0:buff_size, 1:1))
 
@@ -324,7 +323,7 @@ contains
         ! Allocating/Computing CBC Coefficients in z-direction =============
         if (p > 0) then
 
-            if (all((/bc_z%beg, bc_z%end/) <= -5)) then
+            if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13)) then
 
                 allocate (fd_coef_z(0:buff_size, -1:1))
 
@@ -335,7 +334,7 @@ contains
                 call s_compute_cbc_coefficients(3, -1)
                 call s_compute_cbc_coefficients(3, 1)
 
-            elseif (bc_z%beg <= -5) then
+            elseif (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
 
                 allocate (fd_coef_z(0:buff_size, -1:-1))
 
@@ -345,7 +344,7 @@ contains
 
                 call s_compute_cbc_coefficients(3, -1)
 
-            elseif (bc_z%end <= -5) then
+            elseif (bc_z%end <= -5 .and. bc_z%end >= -13) then
 
                 allocate (fd_coef_z(0:buff_size, 1:1))
 
@@ -638,7 +637,6 @@ contains
         if (cbc_dir == ${CBC_DIR}$) then
 
             ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
-
             if (weno_order == 3) then
 
                 call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
@@ -720,7 +718,6 @@ contains
 
             end if
             ! ==================================================================
-
 
             ! FD2 or FD4 of RHS at j = 0 =======================================
             !$acc parallel loop collapse(2) gang vector default(present) private(alpha_rho, vel, adv, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt,L, lambda)
@@ -953,7 +950,6 @@ contains
 
                 end do
             end do
-
         end if
         #:endfor
 
@@ -1089,6 +1085,7 @@ contains
             end if
 
 
+
             ! END: Reshaping Inputted Data in x-direction ======================
 
             ! Reshaping Inputted Data in y-direction ===========================
@@ -1163,7 +1160,7 @@ contains
                         end do
                     end do
                 end do
-            end if           
+            end if                
 
 
             ! END: Reshaping Inputted Data in y-direction ======================
@@ -1241,6 +1238,7 @@ contains
                     end do
                 end do                
             end if
+
 
         end if
         ! END: Reshaping Inputted Data in z-direction ======================
@@ -1443,14 +1441,29 @@ contains
 
     end subroutine s_finalize_cbc ! ----------------------------------------
 
+    ! Detext if the problem has any characteristic boundary conditions
+    subroutine s_any_cbc_boundaries(toggle)
+
+        logical, intent(inout) :: toggle
+
+        toggle = .false.
+
+        #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
+        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
+            toggle = .true.
+        end if
+        #:endfor
+
+    end subroutine
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module() ! -----------------------------------
 
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+        logical :: is_cbc
+
+        call s_any_cbc_boundaries(is_cbc)
+
+        if (is_cbc .eqv. .false.) return
 
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)
@@ -1478,19 +1491,20 @@ contains
         deallocate (ds)
 
         ! Deallocating CBC Coefficients in x-direction =====================
-        if (any((/bc_x%beg, bc_x%end/) <= -5)) then
+        if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
             deallocate (fd_coef_x); if (weno_order > 1) deallocate (pi_coef_x)
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in y-direction =====================
-        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5)) then
+        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. & 
+            any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             deallocate (fd_coef_y); if (weno_order > 1) deallocate (pi_coef_y)
         end if
         ! ==================================================================
 
         ! Deallocating CBC Coefficients in z-direction =====================
-        if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5)) then
+        if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
             deallocate (fd_coef_z); if (weno_order > 1) deallocate (pi_coef_z)
         end if
         ! ==================================================================

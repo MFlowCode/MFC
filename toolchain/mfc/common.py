@@ -12,18 +12,16 @@ MFC_DEV_FILEPATH  = abspath(f"{MFC_ROOTDIR}/toolchain/mfc.dev.yaml")
 MFC_USER_FILEPATH = abspath(f"{MFC_ROOTDIR}/defaults.yaml")
 MFC_LOCK_FILEPATH = abspath(f"{MFC_SUBDIR}/lock.yaml")
 
-MFC_LOGO = f"""\
-     ___            ___          ___
-    /__/\          /  /\        /  /\\
-   |  |::\        /  /:/_      /  /:/
-   |  |:|:\      /  /:/ /\    /  /:/
- __|__|:|\:\    /  /:/ /:/   /  /:/  ___
-/__/::::| \:\  /__/:/ /:/   /__/:/  /  /\\
-\  \:\~~\__\/  \  \:\/:/    \  \:\ /  /:/
- \  \:\         \  \::/      \  \:\  /:/
-  \  \:\         \  \:\       \  \:\/:/
-   \  \:\         \  \:\       \  \::/
-    \__\/          \__\/        \__\/
+MFC_LOGO = f"""
+     .=++*:          -+*+=.
+    :+   -*-        ==   =* .
+  :*+      ==      ++    .+-
+ :*##-.....:*+   .#%+++=--+=:::.
+ -=-++-======#=--**+++==+*++=::-:.
+.:++=----------====+*= ==..:%.....
+ .:-=++++===--==+=-+=   +.  :=
+ +#=::::::::=%=. -+:    =+   *:
+.*=-=*=..    :=+*+:      -...--
 """
 
 
@@ -31,18 +29,21 @@ class MFCException(Exception):
     pass
 
 
-def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None) -> int:
+def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, env: dict = None) -> int:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
+
+    if env is None:
+        env = os.environ.copy()
 
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
-    
+
     cons.print(f"$ {' '.join(cmd)}")
     
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
 
-    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr)
+    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr, env=env)
 
     if r.returncode != 0:
         on_error()
@@ -207,4 +208,15 @@ def get_loaded_modules() -> typing.List[str]:
     return [ l for l in subprocess.getoutput("module -t list").splitlines() if ' ' not in l ]
 
 
-
+def is_number(x: str) -> bool:
+    if x is None:
+        return False
+    
+    if isinstance(x, int) or isinstance(x, float):
+        return True
+    
+    try:
+        float(x)
+        return True
+    except ValueError:
+        return False

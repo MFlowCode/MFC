@@ -45,6 +45,7 @@ module m_rhs
     
     use m_nvtx
     
+    use m_boundary_conditions
     ! ==========================================================================
 
     implicit none
@@ -178,7 +179,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_rhs_module() ! ---------------------------------
 
-        integer :: i, j, k, l, d !< Generic loop iterators
+        integer :: i, j, k, l, id !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -276,7 +277,7 @@ contains
         if (mpp_lim .and. bubbles) then
             @:ALLOCATE(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n =====
+        ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
         @:ALLOCATE(qL_rsx_vf(ix%beg:ix%end, &
                                  iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
@@ -308,6 +309,7 @@ contains
                                      iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
+
         ! Allocation of dq_prim_ds_qp ======================================
 
         if (any(Re_size > 0)) then
@@ -447,6 +449,7 @@ contains
                 end if
             end if
         end if
+
         ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
@@ -540,11 +543,12 @@ contains
                     flux_src_n(i)%vf(l)%sf => &
                         flux_src_n(1)%vf(l)%sf
 
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf, flux_src_n(i)%vf(l)%sf)
+                    !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
                 end do
 
             end if
         end do
+
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
@@ -572,6 +576,7 @@ contains
 !$acc update device(Res, Re_idx, Re_size)
         end if
 
+
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
         if (riemann_solver == 1) then
@@ -579,7 +584,6 @@ contains
         elseif (riemann_solver == 2) then
             s_riemann_solver => s_hllc_riemann_solver
         end if
-
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -595,13 +599,14 @@ contains
         end if
 
 
-!$acc parallel loop collapse(5) gang vector default(present)
-        do i = 1, sys_size
-            do l = startz, p - startz
-                do k = starty, n - starty
-                    do j = startx, m - startx
-                        do d = 1, num_dims
-                            flux_gsrc_n(d)%vf(i)%sf(j, k, l) = 0d0;
+
+!$acc parallel loop collapse(4) gang vector default(present)
+        do id = 1, num_dims
+            do i = 1, sys_size
+                do l = startz, p - startz
+                    do k = starty, n - starty
+                        do j = startx, m - startx
+                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0d0
                         end do
                     end do
                 end do
@@ -614,11 +619,13 @@ contains
 
     end subroutine s_initialize_rhs_module ! -------------------------------
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, t_step) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb, rhs_mv
         integer, intent(IN) :: t_step
         
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
@@ -629,9 +636,8 @@ contains
                            Cpbw, Cpinf, Cpinf_dot, &
                            myH, myHdot, rddot, alf_gas
 
-        real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
-
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
+        real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
@@ -641,7 +647,7 @@ contains
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
-        integer :: i, j, k, l, r, q, ii, id !< Generic loop iterators
+        integer :: i, j, k, l,  q, ii, id !< Generic loop iterators
         integer :: term_index
 
         ! Configuring Coordinate Direction Indexes =========================
@@ -666,11 +672,9 @@ contains
             end do
         end do
 
-
         call nvtxStartRange("RHS-MPI")
-        call s_populate_conservative_variables_buffers()
+        call s_populate_conservative_variables_buffers(Q_CONS_QP%VF, pb, mv)
         call nvtxEndRange
-
         
         ! ==================================================================
 
@@ -704,13 +708,13 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-
-
         
         if (t_step == t_step_stop) return
         ! ==================================================================
 
-        if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub)
+
+
 
         call nvtxStartRange("Viscous")
         if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -736,7 +740,7 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
-
+            
             if (all(Re_size == 0)) then
                     iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
@@ -865,17 +869,14 @@ contains
             end if
 
             call nvtxStartRange("RHS_Flux_Add")
-
-            
             if (id == 1) then
-                
-                if (bc_x%beg <= -5) then
+
+                if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-
-                if (bc_x%end <= -5) then
+                if (bc_x%end <= -5 .and. bc_x%end >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -892,6 +893,54 @@ contains
                         end do
                     end do
                 end do
+
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
+                if(qbmm .and. (.not. polytropic) ) then
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                        nR_dot = flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                        nR2_dot = flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 )* &
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+
+                                        if(R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
+                                        
+                                        if(q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+                                        end if                                         
+
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
                 if (riemann_solver == 1) then
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -983,10 +1032,11 @@ contains
                                             rhs_vf(j + 5)%sf(i, q, l) + mom_3d(0, 2, k)%sf(i, q, l)
                                         j = j + 6
                                     end do
+
                                 end do
                             end do
                         end do
-                    else
+                   else
 !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
@@ -1001,6 +1051,7 @@ contains
                         end do
 
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+
                         if (id == ndirs) then                        
                             call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                                  q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
@@ -1056,12 +1107,12 @@ contains
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
 
-                if (bc_y%beg <= -5 .and. bc_y%beg /= -13) then
+                if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_y%end <= -5) then
+                if (bc_y%end <= -5 .and. bc_y%end >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -1079,6 +1130,54 @@ contains
                         end do
                     end do
                 end do
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
+                if(qbmm .and. (.not. polytropic) ) then
+                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                        nR_dot = flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                        nR2_dot = flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 )* &
+                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+
+                                        if(R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
+                                        
+                                        if(q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+                                        end if 
+
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+
                 ! Applying source terms to the RHS of the advection equations
 
                 if (riemann_solver == 1) then
@@ -1260,7 +1359,7 @@ contains
                 end if
 
                 if (any(Re_size > 0)) then
-                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
+                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
                                                                  dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
@@ -1323,7 +1422,7 @@ contains
                     ! Applying the geometrical viscous Riemann source fluxes calculated as average
                     ! of values at cell boundaries
                     if (cyl_coord) then
-                        if ((bc_y%beg == -2) .or. (bc_y%beg == -13)) then
+                        if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
 
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do l = 0, p
@@ -1378,12 +1477,12 @@ contains
 
                 ! Applying the Riemann fluxes
 
-                if (bc_z%beg <= -5) then
+                if (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_z%end <= -5) then
+                if (bc_z%end <= -5 .and. bc_z%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -1403,6 +1502,51 @@ contains
                             end do
                         end do
                     end do
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
+                    if(qbmm .and. (.not. polytropic)) then
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                        do i = 1, nb
+                            do q = 1, nnode
+                                do l = 0, p
+                                    do k = 0, n
+                                        do j = 0, m
+                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            nb_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l))
+                                            nR_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l))
+                                            nR2_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l))
+
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 )* &
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+                                            if(R2 - R**2d0 > 0d0) then
+                                                var = R2 - R**2d0
+                                            else
+                                                var = verysmall
+                                            end if
+                                            
+                                            if(q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+                                            end if 
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if                    
 
                     if (riemann_solver == 1) then
                         do j = advxb, advxe
@@ -1496,6 +1640,53 @@ contains
                             end do
                         end do
                     end do
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
+                    if(qbmm .and. (.not. polytropic) ) then
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                        do i = 1, nb
+                            do q = 1, nnode
+                                do l = 0, p
+                                    do k = 0, n
+                                        do j = 0, m
+                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+
+                                            nb_dot = flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
+                                            nR_dot = flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
+                                            nR2_dot = flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 )* &
+                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+
+                                            if(R2 - R**2d0 > 0d0) then
+                                                var = R2 - R**2d0
+                                            else
+                                                var = verysmall
+                                            end if
+                                            
+                                            if(q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
+                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+                                            end if 
+
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if
 
                     if (riemann_solver == 1) then
                         !$acc parallel loop collapse(4) gang vector default(present)
@@ -1660,14 +1851,12 @@ contains
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
 
-
             if (hypoelasticity) then
 
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
 
             end if
             call nvtxEndRange
-
         end do
         ! END: Dimensional Splitting Loop =================================
 
@@ -1949,432 +2138,6 @@ contains
         end do
 
     end subroutine s_pressure_relaxation_procedure ! -----------------------
-
-
-    !>  The purpose of this procedure is to populate the buffers
-        !!      of the conservative variables, depending on the selected
-        !!      boundary conditions.
-    subroutine s_populate_conservative_variables_buffers() ! ---------------
-
-        integer :: i, j, k, l, r !< Generic loop iterators
-
-        ! Population of Buffers in x-direction =============================
-
-        if (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            q_cons_qp%vf(i)%sf(-j, k, l) = &
-                                q_cons_qp%vf(i)%sf(0, k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_x%beg == -2) then     ! Symmetry BC at beginning
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 1, buff_size
-                        !$acc loop seq
-                        do i = 1, contxe
-                            q_cons_qp%vf(i)%sf(-j, k, l) = &
-                                q_cons_qp%vf(i)%sf(j - 1, k, l)
-                        end do
-
-                        q_cons_qp%vf(momxb)%sf(-j, k, l) = &
-                            - q_cons_qp%vf(momxb)%sf(j - 1, k, l)
-
-                        !$acc loop seq
-                        do i = momxb + 1, sys_size
-                            q_cons_qp%vf(i)%sf(-j, k, l) = &
-                                q_cons_qp%vf(i)%sf(j - 1, k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_x%beg == -1) then     ! Periodic BC at beginning
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            q_cons_qp%vf(i)%sf(-j, k, l) = &
-                                q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 1, -1)
-
-        end if
-
-        if (bc_x%end <= -3) then         ! Ghost-cell extrap. BC at end
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            q_cons_qp%vf(i)%sf(m + j, k, l) = &
-                                q_cons_qp%vf(i)%sf(m, k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_x%end == -2) then     ! Symmetry BC at end
-
-            !$acc parallel loop collapse(3) default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 1, buff_size
-
-                        !$acc loop seq
-                        do i = 1, contxe
-                            q_cons_qp%vf(i)%sf(m + j, k, l) = &
-                                q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
-                        end do
-
-                        q_cons_qp%vf(momxb)%sf(m + j, k, l) = &
-                            -q_cons_qp%vf(momxb)%sf(m - (j - 1), k, l)
-
-                        !$acc loop seq
-                        do i = momxb + 1, sys_size
-                            q_cons_qp%vf(i)%sf(m + j, k, l) = &
-                                q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
-                        end do
-
-                    end do
-                end do
-            end do
-
-        elseif (bc_x%end == -1) then     ! Periodic BC at end
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            q_cons_qp%vf(i)%sf(m + j, k, l) = &
-                                q_cons_qp%vf(i)%sf(j - 1, k, l)
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 1, 1)
-
-        end if
-
-        ! END: Population of Buffers in x-direction ========================
-
-        ! Population of Buffers in y-direction =============================
-
-        if (n == 0) then
-
-            return
-
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -13) then     ! Ghost-cell extrap. BC at beginning
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                q_cons_qp%vf(i)%sf(l, 0, k)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_y%beg == -13) then    ! Axis BC at beginning
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 0, p
-                do j = 1, buff_size
-                    do l = -buff_size, m + buff_size
-                        if (z_cc(k) < pi) then
-                            !$acc loop seq
-                            do i = 1, momxb
-                                q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                    q_cons_qp%vf(i)%sf(l, j - 1, k + ((p + 1)/2))
-                            end do
-
-                            q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
-                                -q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k + ((p + 1)/2))
-
-                            q_cons_qp%vf(momxe)%sf(l, -j, k) = &
-                                -q_cons_qp%vf(momxe)%sf(l, j - 1, k + ((p + 1)/2))
-
-                            !$acc loop seq
-                            do i = E_idx, sys_size
-                                q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                    q_cons_qp%vf(i)%sf(l, j - 1, k + ((p + 1)/2))
-                            end do
-                        else
-                            !$acc loop seq
-                            do i = 1, momxb
-                                q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                    q_cons_qp%vf(i)%sf(l, j - 1, k - ((p + 1)/2))
-                            end do
-
-                            q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
-                                -q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k - ((p + 1)/2))
-
-                            q_cons_qp%vf(momxe)%sf(l, -j, k) = &
-                                -q_cons_qp%vf(momxe)%sf(l, j - 1, k - ((p + 1)/2))
-
-                            !$acc loop seq
-                            do i = E_idx, sys_size
-                                q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                    q_cons_qp%vf(i)%sf(l, j - 1, k - ((p + 1)/2))
-                            end do
-                        end if
-                    end do
-                end do
-            end do
-
-        elseif (bc_y%beg == -2) then     ! Symmetry BC at beginning
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 0, p
-                do j = 1, buff_size
-                    do l = -buff_size, m + buff_size
-                        !$acc loop seq
-                        do i = 1, momxb
-                            q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                q_cons_qp%vf(i)%sf(l, j - 1, k)
-                        end do
-
-                        q_cons_qp%vf(momxb + 1)%sf(l, -j, k) = &
-                            - q_cons_qp%vf(momxb + 1)%sf(l, j - 1, k)
-
-                        !$acc loop seq
-                        do i = momxb + 2, sys_size
-                            q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                q_cons_qp%vf(i)%sf(l, j - 1, k)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_y%beg == -1) then     ! Periodic BC at beginning
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(l, -j, k) = &
-                                q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 2, -1)
-
-        end if
-
-        if (bc_y%end <= -3) then         ! Ghost-cell extrap. BC at end
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(l, n + j, k) = &
-                                q_cons_qp%vf(i)%sf(l, n, k)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_y%end == -2) then     ! Symmetry BC at end
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do k = 0, p
-                do j = 1, buff_size
-                    do l = -buff_size, m + buff_size
-                        !$acc loop seq
-                        do i = 1, momxb
-                            q_cons_qp%vf(i)%sf(l, n + j, k) = &
-                                q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
-                        end do
-
-                        q_cons_qp%vf(momxb + 1)%sf(l, n + j, k) = &
-                            -q_cons_qp%vf(momxb + 1)%sf(l, n - (j - 1), k)
-
-                        !$acc loop seq
-                        do i = momxb + 2, sys_size
-                            q_cons_qp%vf(i)%sf(l, n + j, k) = &
-                                q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_y%end == -1) then     ! Periodic BC at end
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(l, n + j, k) = &
-                                q_cons_qp%vf(i)%sf(l, j - 1, k)
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 2, 1)
-
-        end if
-
-        ! END: Population of Buffers in y-direction ========================
-
-        ! Population of Buffers in z-direction =============================
-
-        if (p == 0) then
-
-            return
-
-        elseif (bc_z%beg <= -3) then     ! Ghost-cell extrap. BC at beginning
-
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(k, l, -j) = &
-                                q_cons_qp%vf(i)%sf(k, l, 0)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_z%beg == -2) then     ! Symmetry BC at beginning
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do j = 1, buff_size
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        !$acc loop seq
-                        do i = 1, momxb + 1
-                            q_cons_qp%vf(i)%sf(k, l, -j) = &
-                                q_cons_qp%vf(i)%sf(k, l, j - 1)
-                        end do
-
-                        q_cons_qp%vf(momxe)%sf(k, l, -j) = &
-                            -q_cons_qp%vf(momxe)%sf(k, l, j - 1)
-
-                        !$acc loop seq
-                        do i = E_idx, sys_size
-                            q_cons_qp%vf(i)%sf(k, l, -j) = &
-                                q_cons_qp%vf(i)%sf(k, l, j - 1)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_z%beg == -1) then     ! Periodic BC at beginning
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(k, l, -j) = &
-                                q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at beginning
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 3, -1)
-
-        end if
-
-        if (bc_z%end <= -3) then         ! Ghost-cell extrap. BC at end
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(k, l, p + j) = &
-                                q_cons_qp%vf(i)%sf(k, l, p)
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_z%end == -2) then     ! Symmetry BC at end
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do j = 1, buff_size
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        !$acc loop seq
-                        do i = 1, momxb + 1
-                            q_cons_qp%vf(i)%sf(k, l, p + j) = &
-                                q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
-                        end do
-
-                        q_cons_qp%vf(momxe)%sf(k, l, p + j) = &
-                            -q_cons_qp%vf(momxe)%sf(k, l, p - (j - 1))
-
-                        !$acc loop seq
-                        do i = E_idx, sys_size
-                            q_cons_qp%vf(i)%sf(k, l, p + j) = &
-                                q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (bc_z%end == -1) then     ! Periodic BC at end
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            q_cons_qp%vf(i)%sf(k, l, p + j) = &
-                                q_cons_qp%vf(i)%sf(k, l, j - 1)
-                        end do
-                    end do
-                end do
-            end do
-
-        else                            ! Processor BC at end
-
-            call s_mpi_sendrecv_conservative_variables_buffers( &
-                q_cons_qp%vf, 3, 1)
-
-        end if
-
-        ! END: Population of Buffers in z-direction ========================
-
-    end subroutine s_populate_conservative_variables_buffers ! -------------
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
