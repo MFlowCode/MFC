@@ -464,7 +464,7 @@ fi
 
 
 # Activate the Python venv
-source "$(pwd)/build/venv/bin/activate"
+#source "$(pwd)/build/venv/bin/activate"
 ok "(venv) Entered the$MAGENTA Python$COLOR_RESET virtual environment."
 
 
@@ -498,7 +498,7 @@ code=$?
 
 # Deactivate the Python virtualenv in case the user "source"'d this script
 log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
-deactivate
+#deactivate
 
 
 # Exit proper exit code

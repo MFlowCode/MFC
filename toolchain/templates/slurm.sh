@@ -30,8 +30,8 @@
 #SBATCH --nodes={nodes}
 #SBATCH --ntasks-per-node={tasks_per_node}
 #SBATCH --cpus-per-task=1
-#SBATCH --gpu-bind=verbose,closest
-#SBATCH --gpus=v100-16:{(1 if gpu else 0)*tasks_per_node*nodes}
+#>SBATCH --gpu-bind=verbose,closest
+#>SBATCH --gpus=v100-16:{(1 if gpu else 0)*tasks_per_node*nodes}
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
 #SBATCH --output="{name}.out"
