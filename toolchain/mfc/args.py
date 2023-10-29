@@ -66,7 +66,7 @@ started, run ./mfc.sh build -h.""",
                 p.add_argument(f"--no-{target.name}", action="store_true", help=f"Do not build the {target.name} dependency. Use the system's instead.")
 
         if "g" not in mask:
-            p.add_argument("-g", "--gpus", nargs="+", type=int, default=[0], help="(GPU) List of GPU #s to use.")
+            p.add_argument("-g", "--gpus", nargs="+", type=int, default=None, help="(Optional GPU override) List of GPU #s to use (environment default if unspecified).")
 
     # === BUILD ===
     add_common_arguments(build, "g")

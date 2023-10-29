@@ -105,8 +105,6 @@ def test():
     cons.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
     cons.print()
     
-    _handle_case.GPU_LOAD = { id: 0 for id in ARG("gpus") }
-
     # Select the correct number of threads to use to launch test CASES
     # We can't use ARG("jobs") when the --case-optimization option is set
     # because running a test case may cause it to rebuild, and thus
