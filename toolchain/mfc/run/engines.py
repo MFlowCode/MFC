@@ -147,14 +147,16 @@ STDERR:
 
             if not ARG("dry_run"):
                 start_time = time.monotonic()
+                
+                env = os.environ.copy()
+                if ARG('gpus') is not None:
+                    env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
+
                 system(
                     self.get_exec_cmd(target), cwd=self.input.case_dirpath, 
-                    env={
-                        **os.environ.copy(),
-                        'CUDA_VISIBLE_DEVICES': ','.join([str(_) for _ in ARG('gpus')])
-                    }
+                    env=env
                 )
-                end_time   = time.monotonic()
+                end_time = time.monotonic()
                 cons.print(no_indent=True)
 
                 cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
@@ -307,11 +309,11 @@ exit $code
         cons.print("> Writing batch file...")
         file_write(filepath, content)
 
-    def __execute_batch_file(self, system: queues.QueueSystem):
+    def __execute_batch_file(self, queue: queues.QueueSystem):
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        cmd = system.gen_submit_cmd(self.__get_batch_filename())
+        cmd = queue.gen_submit_cmd(self.__get_batch_filename())
 
         if system(cmd, cwd=self.__get_batch_dirpath()) != 0:
             raise MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath()}. Please check the file for errors.")
