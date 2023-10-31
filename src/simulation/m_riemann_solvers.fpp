@@ -899,7 +899,7 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
-        #:for NORM_DIR, XYZ in [(1, 'x')]
+        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y')]
 
             if (norm_dir == ${NORM_DIR}$) then
                 if (model_eqns == 3) then
@@ -2083,7 +2083,7 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = 1
+                                    idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
@@ -2126,6 +2126,7 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     !idxi = 1
+                                    idxi = dir_idx(i)
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
                                         xi_M*(vel_L(idxi) + &
                                               dir_flg(idxi)* &
@@ -2262,6 +2263,8 @@ contains
             !$acc update device(Res, Re_idx, Re_size)
         end if
 
+        !$acc enter data copyin(is1, is2, is3, isx, isy, isz)
+
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -2281,6 +2284,8 @@ contains
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
+
+        
 
         @:ALLOCATE_GLOBAL(flux_rsx_vf(is1%beg:is1%end, &
                                is2%beg:is2%end, &
@@ -2424,7 +2429,9 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)      
         end if
 
-        !$acc enter data copyin(is1, is2, is3)
+        !$acc update device(is1, is2, is3)
+
+        
 
         if (hypoelasticity) then
             if (norm_dir == 1) then
@@ -2437,7 +2444,7 @@ contains
         end if
 
         isx = ix; isy = iy; isz = iz
-        !$acc enter data copyin(isx, isy, isz) ! for stuff in the same module
+        !$acc update device(isx, isy, isz) ! for stuff in the same module
         !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
 
         ! Population of Buffers in x-direction =============================

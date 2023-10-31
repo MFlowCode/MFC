@@ -1145,7 +1145,7 @@ contains
                         end do
                     end do
                 end if
-#if 0
+
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
@@ -1467,6 +1467,7 @@ contains
                     end if
                 end if
 
+#if 0
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================
 
