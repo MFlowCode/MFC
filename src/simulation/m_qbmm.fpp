@@ -25,7 +25,7 @@ module m_qbmm
     implicit none
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
 !$acc declare link(momrhs)
 #else
@@ -40,7 +40,7 @@ module m_qbmm
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
 !$acc declare link(bubrs, bubmoms)

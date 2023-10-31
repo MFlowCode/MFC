@@ -156,7 +156,7 @@ module m_riemann_solvers
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
     !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
@@ -176,7 +176,7 @@ module m_riemann_solvers
     !! through the chosen Riemann problem solver by using the left and right
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsz_vf)
@@ -192,7 +192,7 @@ module m_riemann_solvers
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsz_vf)
@@ -204,7 +204,7 @@ module m_riemann_solvers
     !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsz_vf)
@@ -216,7 +216,7 @@ module m_riemann_solvers
     !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsz_vf)
@@ -246,7 +246,7 @@ module m_riemann_solvers
 
     !$acc declare create(is1, is2, is3, isx, isy, isz)
  
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
     !$acc declare link(Gs)
 #else
@@ -254,7 +254,7 @@ module m_riemann_solvers
     !$acc declare create(Gs)
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
     !$acc declare link(Res)
 #else
@@ -2083,7 +2083,7 @@ contains
                                 ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    !idxi = 1
+                                    idxi = 1
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
@@ -2437,8 +2437,8 @@ contains
         end if
 
         isx = ix; isy = iy; isz = iz
-        !$acc enter data copyin(isx, isy, isz)
-        !$acc update device(dir_idx, dir_flg,  dir_idx_tau)
+        !$acc enter data copyin(isx, isy, isz) ! for stuff in the same module
+        !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then

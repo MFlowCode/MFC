@@ -59,7 +59,7 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), x_cb, y_cb, z_cb)
 #else
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
@@ -68,7 +68,7 @@ module m_global_parameters
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), x_cc, y_cc, z_cc)
 #else
     real(kind(0d0)), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
@@ -77,7 +77,7 @@ module m_global_parameters
 
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), dx, dy, dz)
 #else
     real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
@@ -86,7 +86,7 @@ module m_global_parameters
 
     real(kind(0d0)) :: dt !< Size of the time-step
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
 !$acc declare link(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz)
 !$acc declare create(m, n, p, dt)
 #else
@@ -191,13 +191,13 @@ module m_global_parameters
     !! numbers, will be non-negligible.
     !> @{
     integer, dimension(2) :: Re_size
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), Re_idx)
 #else
     integer, allocatable, dimension(:, :) :: Re_idx
 #endif
     !> @}
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
 !$acc declare create(Re_size)
 !$acc declare link(Re_idx)
 #else
@@ -270,7 +270,7 @@ module m_global_parameters
     real(kind(0d0)) :: Ca       !< Cavitation number
     real(kind(0d0)) :: Web      !< Weber number
     real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), weight)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), R0)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), V0)
@@ -285,7 +285,7 @@ module m_global_parameters
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ptil)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
@@ -305,7 +305,7 @@ module m_global_parameters
 !$acc declare link(weight, R0, V0, ptil)
 !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma)
 
-#if _CRAYFTN
+#if CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:, :, :), mom_3d)
 #else
@@ -319,7 +319,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
-#if _CRAYFTN
+#if CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 #else
@@ -352,7 +352,7 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs

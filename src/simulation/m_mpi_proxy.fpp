@@ -26,7 +26,7 @@ module m_mpi_proxy
 
     implicit none
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)   
     private :: q_cons_buff_recv, q_cons_buff_send

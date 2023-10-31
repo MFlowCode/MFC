@@ -21,7 +21,7 @@ module m_monopole
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
     !$acc declare link(pulse, support)
 

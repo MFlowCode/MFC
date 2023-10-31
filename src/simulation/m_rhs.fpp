@@ -59,7 +59,7 @@ module m_rhs
     !! This variable contains the WENO-reconstructed values of the cell-average
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(q_cons_qp)
 #endif
 
@@ -67,7 +67,7 @@ module m_rhs
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(q_prim_qp)
 #endif
 
@@ -86,7 +86,7 @@ module m_rhs
     !! cell-average of the first-order spatial derivatives may be found in the
     !! variables dq_prim_ds_qp, where s = x, y or z.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
     !$acc declare link(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
@@ -102,13 +102,13 @@ module m_rhs
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
     !! quadrature points. gm_alpha_qp is calculated from individual first-order
     !! spatial derivatives located in dq_prim_ds_qp.
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(gm_alpha_qp)
 #endif
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaL_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaR_n)
     !$acc declare link(gm_alphaL_n, gm_alphaR_n)
@@ -122,7 +122,7 @@ module m_rhs
     !! source). These are computed by applying the chosen Riemann problem solver
     !! .on the left and right cell-boundary values of the primitive variables
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_src_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_gsrc_n)
@@ -136,7 +136,7 @@ module m_rhs
 
     !> @name Additional field for capillary source terms
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
     !$acc declare link(tau_Re_vf)
 #else
@@ -144,7 +144,7 @@ module m_rhs
 #endif
     !> @}
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), qL_prim, qR_prim)
     !$acc declare link(qL_prim, qR_prim)
 #else
@@ -152,7 +152,7 @@ module m_rhs
 #endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(iv)
 #endif
 
@@ -160,18 +160,18 @@ module m_rhs
     !> @{
     type(int_bounds_info) :: ix, iy, iz
     !> @}
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(ix, iy, iz)
 #endif
     type(int_bounds_info) :: is1, is2, is3
 
     type(int_bounds_info) :: ixt, iyt, izt
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(ixt, iyt, izt)
 #endif
     !> @name Bubble dynamic source terms
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), bub_adv_src)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), bub_r_src, bub_v_src, bub_p_src, bub_m_src)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), bub_mom_src)
@@ -183,12 +183,12 @@ module m_rhs
 #endif
     type(scalar_field) :: divu !< matrix for div(u)
     !> @}
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(divu)
 #endif
     !> @name Monopole source terms
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mono_mass_src, mono_e_src)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
 !$acc declare link(mono_mass_src, mono_e_src, mono_mom_src)
@@ -202,7 +202,7 @@ module m_rhs
     !> @{
     type(scalar_field) :: alf_sum
     !> @}
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(alf_sum)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), blkmod1, blkmod2, alpha1, alpha2, Kterm)
@@ -218,7 +218,7 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gamma_min, pres_inf)
 !$acc declare link(gamma_min, pres_inf)
 #else
@@ -226,14 +226,14 @@ module m_rhs
 #endif
 
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
     !$acc declare link(Res)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), nbub)
     !$acc declare link(nbub)
 #else
@@ -241,9 +241,9 @@ module m_rhs
     !$acc declare create(nbub)
 #endif
 
-#ifndef _CRAYFTN
+#ifndef CRAY_ACC_WAR
 !$acc declare create(q_cons_qp,q_prim_qp,  &
-!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
+!$acc   dqL_prim_dx_n,dqL_prim_dy_n, &
 !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
 !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
 !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &

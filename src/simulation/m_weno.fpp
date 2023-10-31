@@ -40,7 +40,7 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
         @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
     !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
 #else
@@ -56,7 +56,7 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_z)
@@ -89,7 +89,7 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_z)
@@ -118,7 +118,7 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
@@ -135,23 +135,23 @@ module m_weno
     ! END: WENO Coefficients ===================================================
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(v_size)
 #endif
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
     !> @}
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc declare create(is1_weno, is2_weno, is3_weno)
 #endif
-#ifndef _CRAYFTN
+#ifndef CRAY_ACC_WAR
 !$acc declare create( &
 !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
 !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
 !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
 !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                v_size, is1, is2, is3, test)
+!$acc                v_size, is1_weno, is2_weno, is3_weno, test)
 #endif
 contains
 
@@ -708,6 +708,11 @@ contains
                                         print *, "WENO OUTPUT"
                                         print *, vL_rs_vf_x(j, k, l, i)
                                         print *, vR_rs_vf_x(j, k, l, i)
+                                        ! without these prints, dvd is getting optimized out
+                                        ! yuck!
+                                        print *, dvd(1)
+                                        print *, dvd(0)
+                                        print *, dvd(-1)
                                  end if
                                 poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &

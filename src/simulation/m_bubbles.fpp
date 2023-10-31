@@ -25,7 +25,7 @@ module m_bubbles
     real(kind(0.d0)) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
     !$acc declare create(chi_vw, k_mw, rho_mw)
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
 #else
     integer, allocatable, dimension(:) :: rs, vs, ms, ps

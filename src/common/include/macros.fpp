@@ -23,7 +23,7 @@
 
 #:def ALLOCATE_GLOBAL(*args)
     @:LOG({'@:ALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     allocate(${', '.join(('p_' + arg.strip() for arg in args))}$)
     #:for arg in args
         ${re.sub('\(.*\)','',arg)}$ => ${ 'p_' + re.sub('\(.*\)','',arg.strip()) }$
@@ -39,7 +39,7 @@
 
 #:def DEALLOCATE_GLOBAL(*args)
     @:LOG({'@:DEALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     !$acc exit data delete(${', '.join(('p_' + arg.strip() for arg in args))}$) &
     !$acc& detach(${', '.join(args)}$)
     #:for arg in args
@@ -54,8 +54,12 @@
 #:enddef DEALLOCATE_GLOBAL
 
 #:def CRAY_DECLARE_GLOBAL(intype, dim, *args)
+#ifdef CRAY_ACC_WAR
     ${intype}$, ${dim}$, allocatable, target :: ${', '.join(('p_' + arg.strip() for arg in args))}$
     ${intype}$, ${dim}$, pointer :: ${', '.join(args)}$
+#else
+    ${intype}$, ${dim}$, allocatable :: ${', '.join(args)}$
+#endif
 #:enddef CRAY_DECLARE_GLOBAL
 
 #:def ACC_SETUP_VFs(*args)

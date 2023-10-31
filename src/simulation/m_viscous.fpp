@@ -26,7 +26,7 @@ module m_viscous
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
  !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)   
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous

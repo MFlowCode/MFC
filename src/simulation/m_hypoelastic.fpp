@@ -21,7 +21,7 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, &
             s_compute_hypoelastic_rhs
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
     !$acc declare link(Gs)
 

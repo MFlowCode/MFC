@@ -32,7 +32,7 @@ module m_time_steppers
 
     implicit none
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
     !! Cell-average conservative variables at each time-stage (TS)
 

@@ -76,12 +76,12 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-
+    !!$acc declare create(ixb, ixe, iyb, iye, izb, ize)
     real(kind(0d0)) :: temp
 
     !! In simulation, gammas and pi_infs is already declared in m_global_variables
 #ifndef MFC_SIMULATION
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs)
     public :: gammas, pi_infs
     !$acc declare link(gammas, pi_infs)
@@ -92,7 +92,7 @@ module m_variables_conversion
 
 #endif
 
-#ifdef _CRAYFTN
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
     @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
@@ -597,8 +597,8 @@ contains
             end if
        end if
 #endif
-#ifndef _CRAYFTN
-        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
+#ifndef CRAY_ACC_WAR
+        !!$acc update device(ixb, ixe, iyb, iye, izb, ize)
 #endif
         @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
         @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
@@ -1104,10 +1104,16 @@ contains
                     end do
 
 
-
+                    if(j == 1) then
+                        print *, "cbc debug"
+                        print *, E_K
+                        print *, pres_K
+                        print *, vel_K(dir_idx(1))
+                    endif
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
-
+                    ! comment out above and it will run to completion
+                    
                     ! have been using == 2
                     if (riemann_solver == 1) then
 !$acc loop seq
