@@ -1,5 +1,5 @@
 import typing, dataclasses
-
+import os
 from ..      import common
 from ..state import ARG
 
@@ -48,7 +48,11 @@ class SRUN(MPIBinary):
         super().__init__("SLURM's SRUN", "srun")
 
     def gen_params(self) -> typing.List[str]:
-        params = ['--ntasks-per-node', ARG("tasks_per_node")]
+        host = os.popen('hostname').read()
+        if "frontier" in host:
+            params = ['-n', ARG("tasks_per_node")]
+        else:
+            params = ['--ntasks-per-node', ARG("tasks_per_node")]
 
         if ARG("nodes") != 1:
             params += ['-N', ARG("nodes")]
