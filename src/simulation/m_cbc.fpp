@@ -414,7 +414,7 @@ contains
         end if
         ! ==================================================================
 
-        !$acc enter data copyin(fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z)
+        !$acc update device(fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z)
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -422,20 +422,20 @@ contains
         bcxb = bc_x%beg
         bcxe = bc_x%end
 
-        !$acc enter data copyin(bcxb, bcxe)
+        !$acc update device(bcxb, bcxe)
 
         if (n > 0) then
             bcyb = bc_y%beg
             bcye = bc_y%end
 
-            !$acc enter data copyin(bcyb, bcye)
+            !$acc update device(bcyb, bcye)
         end if
 
         if (p > 0) then
             bczb = bc_z%beg
             bcze = bc_z%end
 
-            !$acc enter data copyin(bczb, bcze)
+            !$acc update device(bczb, bcze)
         end if
 
     end subroutine s_initialize_cbc_module ! -------------------------------
@@ -607,7 +607,7 @@ contains
 
         end if
 
-        !$acc enter data copyin(ds)
+        !$acc update device(ds)
 
         ! ==================================================================
 
@@ -724,6 +724,7 @@ contains
                         end do
                     end do
                 end do
+
                 ! ==================================================================
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
@@ -775,6 +776,7 @@ contains
                     end do
                 end do
             end if
+
             ! ==================================================================
 
 
@@ -1066,8 +1068,8 @@ contains
         end if
 
         dj = max(0, cbc_loc)
-        !$acc enter data copyin(is1, is2, is3)
-        !$acc update device( dir_idx, dir_flg,dj)
+        !$acc update device(is1, is2, is3, dj)
+        !$acc update device( dir_idx, dir_flg)
 
         ! Reshaping Inputted Data in x-direction ===========================
         if (cbc_dir == 1) then
@@ -1327,7 +1329,7 @@ contains
 
         ! Determining the indicial shift based on CBC location
         dj = max(0, cbc_loc)
-        !$acc enter data copyin(dj)
+        !$acc update device(dj)
 
         ! Reshaping Outputted Data in x-direction ==========================
         if (cbc_dir == 1) then
