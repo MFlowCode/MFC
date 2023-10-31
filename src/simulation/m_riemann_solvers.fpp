@@ -264,6 +264,8 @@ module m_riemann_solvers
 
 contains
 
+    @:s_compute_speed_of_sound()
+
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
@@ -3915,7 +3917,7 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
 
-    @:s_compute_speed_of_sound()
+    
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver

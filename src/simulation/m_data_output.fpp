@@ -99,6 +99,8 @@ module m_data_output
 
 contains
 
+    @:s_compute_speed_of_sound()
+
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
         !!      basic header information relevant to current simulation.
@@ -1343,7 +1345,7 @@ contains
 
     end subroutine s_write_probe_files ! -----------------------------------
 
-    @:s_compute_speed_of_sound()
+    
 
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
