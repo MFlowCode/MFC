@@ -356,17 +356,21 @@ contains
         call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
-
-        print*, "step -> rhs"
+#ifdef CRAY_PRINT_DEBUG
+print*, "step -> rhs"
+#endif
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 !        call s_compute_rhs_full(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
 
-        print*, "step -< rti"
+#ifdef CRAY_PRINT_DEBUG
+print*, "step -< rti"
+#endif
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
-
-        print*, "step -> time_step_cycling"
+#ifdef CRAY_PRINT_DEBUG
+print*, "step -> time_step_cycling"
+#endif
         if (probe_wrt) then
             call s_time_step_cycling(t_step)
         end if
@@ -385,18 +389,21 @@ contains
                 end do
             end do
         end do
-
-        print*, "step -> s_apply_fourier_filter"
+#if CRAY_PRINT_DEBUG
+print*, "step -> s_apply_fourier_filter"
+#endif
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
-
-        print*, "step -> s_pressure_relaxation_procedure"
+#if CRAY_PRINT_DEBUG
+print*, "step -> s_pressure_relaxation_procedure"
+#endif
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
 
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
-
-        print*, "step -> s_compute_rhs"
+#ifdef CRAY_PRINT_DEBUG
+print*, "step -> s_compute_rhs"
+#endif
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 !        call s_compute_rhs_full(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
 

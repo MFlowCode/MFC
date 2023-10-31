@@ -24,7 +24,7 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
- !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)   
+    !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)   
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
@@ -47,6 +47,10 @@ module m_viscous
             end do
         end do
 !$acc update device(Res_viscous, Re_idx, Re_size)
+
+#ifdef CRAY_ACC_WAR
+!$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
+#endif
 
 
     end subroutine s_initialize_viscous_module
@@ -586,7 +590,7 @@ module m_viscous
             end do
 
         else ! Compute velocity gradient at cell centers using finite differences
-
+            call sleep(1)
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             !$acc update device(iv)
 
@@ -1126,8 +1130,9 @@ module m_viscous
                             norm_dir, weno_dir, &
                             is1_viscous, is2_viscous, is3_viscous)
         end if
-
-        print*, "after"
+#ifdef CRAY_PRINT_DEBUG
+print*, "after"
+#endif
 
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then

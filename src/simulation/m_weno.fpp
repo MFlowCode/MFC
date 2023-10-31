@@ -529,12 +529,16 @@ contains
         
         !$acc update device(is1_weno, is2_weno, is3_weno)
 
-        print*, "weno_init"
+#ifdef CRAY_PRINT_DEBUG
+print*, "weno_init"
+#endif
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
-        print*, "weno_body"
+#ifdef CRAY_PRINT_DEBUG
+print*, "weno_body"
+#endif
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
@@ -703,7 +707,7 @@ contains
 
 
                                 vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-
+#ifdef CRAY_PRINT_DEBUG
                                 if(j == 1) then
                                         print *, "WENO OUTPUT"
                                         print *, vL_rs_vf_x(j, k, l, i)
@@ -714,6 +718,7 @@ contains
                                         print *, dvd(0)
                                         print *, dvd(-1)
                                  end if
+#endif
                                 poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
@@ -738,11 +743,13 @@ contains
                                 end if
 
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+#ifdef CRAY_PRINT_DEBUG
                                 if(j == 1) then
                                         print *, "WENO OUTPUT"
                                         print *, vL_rs_vf_x(j, k, l, i)
                                         print *, vR_rs_vf_x(j, k, l, i)
                                  end if
+#endif
                              end do
                         end do
                     end do

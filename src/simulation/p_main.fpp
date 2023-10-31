@@ -238,15 +238,17 @@ program p_main
                 !$acc update host(q_cons_ts(1)%vf(i)%sf)
             end do
         end if
-
-        print*, "- 1 - s_compute_derived_variables"
+#ifdef CRAY_PRINT_DEBUG
+print*, "- 1 - s_compute_derived_variables"
+#endif
         call s_compute_derived_variables(t_step)
 
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
-
-        print*, "- 2 - time stepper"
+#ifdef CRAY_PRINT_DEBUG
+print*, "- 2 - time stepper"
+#endif
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -257,8 +259,9 @@ program p_main
         end if
 
         ! Time-stepping loop controls
-
-        print*, "- 3 - MPI"
+#ifdef CRAY_PRINT_DEBUG
+print*, "- 3 - MPI"
+#endif
         if (t_step == t_step_stop) then
 
             call s_mpi_barrier()

@@ -1048,8 +1048,9 @@ contains
                         end do
                     end if
                 end if
-
-                print*, "---- bubbles"
+#ifdef CRAY_PRINT_DEBUG
+print*, "---- bubbles"
+#endif
                 if (bubbles) then
                     if (qbmm) then
 
@@ -1080,7 +1081,9 @@ contains
                             end do
                         end do
                     else
-                        print*, "todo"
+#ifdef CRAY_PRINT_DEBUG
+print*, "todo"
+#endif
 !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
@@ -1467,7 +1470,6 @@ contains
                     end if
                 end if
 
-#if 0
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================
 
@@ -1659,7 +1661,9 @@ contains
                 end if
 
                 call nvtxStartRange("bubbles")
-                print*, "bubbles"
+#ifdef CRAY_PRINT_DEBUG
+print*, "bubbles"
+#endif
                 if (bubbles .and. (.not. qbmm)) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
@@ -1684,7 +1688,9 @@ contains
                 call nvtxEndRange()
 
                 call nvtxStartRange("Monopole")
-                print*, "Monopole"
+#ifdef CRAY_PRINT_DEBUG
+print*, "Monopole"
+#endif
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
                     if (id == ndirs) then 
@@ -1749,16 +1755,19 @@ contains
                         end do
                     end if
                 end if
-#endif
+
             end if  ! id loop
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
-            print*, "RHS_Hypoelasticity"
+#ifdef CRAY_PRINT_DEBUG
+print*, "RHS_Hypoelasticity"
+#endif
             if (hypoelasticity) then
-                
-                print*, "s_compute_hypoelastic_rhs"
+#ifdef CRAY_PRINT_DEBUG
+print*, "s_compute_hypoelastic_rhs"
+#endif
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
 
             end if
@@ -1767,8 +1776,9 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
-
-        print*, "run_time_info .or. probe_wrt"
+#ifdef CRAY_PRINT_DEBUG
+print*, "run_time_info .or. probe_wrt"
+#endif
         if (run_time_info .or. probe_wrt) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -1777,8 +1787,9 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             
             !$acc enter data copyin(ix, iy, iz)
-
-            print*, "todo"
+#ifdef CRAY_PRINT_DEBUG
+print*, "todo"
+#endif
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
