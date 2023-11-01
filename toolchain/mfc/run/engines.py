@@ -147,14 +147,16 @@ STDERR:
 
             if not ARG("dry_run"):
                 start_time = time.monotonic()
+                
+                env = os.environ.copy()
+                if ARG('gpus') is not None:
+                    env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
+
                 system(
                     self.get_exec_cmd(target), cwd=self.input.case_dirpath, 
-                    env={
-                        **os.environ.copy(),
-                        'CUDA_VISIBLE_DEVICES': ','.join([str(_) for _ in ARG('gpus')])
-                    }
+                    env=env
                 )
-                end_time   = time.monotonic()
+                end_time = time.monotonic()
                 cons.print(no_indent=True)
 
                 cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")

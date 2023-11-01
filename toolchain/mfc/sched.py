@@ -35,11 +35,11 @@ class Task:
     load: float
 
 
-def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int]) -> None:
+def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:
     nAvailable: int = nThreads
     threads:    typing.List[WorkerThreadHolder] = []
 
-    sched.LOAD = { id: 0.0 for id in devices }
+    sched.LOAD = { id: 0.0 for id in devices or [] }
 
     def join_first_dead_thread(progress, complete_tracker) -> None:
         nonlocal threads, nAvailable
@@ -50,7 +50,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int]) -> 
                     raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
-                for device in threadHolder.devices:
+                for device in threadHolder.devices or set():
                     sched.LOAD[device] -= threadHolder.load / threadHolder.ppn
 
                 progress.advance(complete_tracker)
@@ -82,18 +82,21 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int]) -> 
             # Launch Thread
             progress.advance(queue_tracker)
 
+            use_devices = None
             # Use the least loaded devices
-            devices = set()
-            for _ in range(task.ppn):
-                device = min(sched.LOAD.items(), key=lambda x: x[1])[0]
-                sched.LOAD[device] += task.load / task.ppn
+            if devices is not None:
+                use_devices = set()
+                for _ in range(task.ppn):
+                    device = min(sched.LOAD.items(), key=lambda x: x[1])[0]
+                    sched.LOAD[device] += task.load / task.ppn
+                    use_devices.add(device)
             
             nAvailable -= task.ppn
 
-            thread = WorkerThread(target=task.func, args=tuple(task.args) + (devices,))
+            thread = WorkerThread(target=task.func, args=tuple(task.args) + (use_devices,))
             thread.start()
 
-            threads.append(WorkerThreadHolder(thread, task.ppn, task.load, devices))
+            threads.append(WorkerThreadHolder(thread, task.ppn, task.load, use_devices))
 
 
         # Wait for the lasts tests to complete
