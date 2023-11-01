@@ -518,7 +518,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc update device(weno_polyn,nb)
+!$acc update device(weno_polyn,nb, num_dims)
         #:endif
 
 

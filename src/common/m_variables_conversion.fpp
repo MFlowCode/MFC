@@ -637,8 +637,8 @@ contains
         end if
 
 #ifdef MFC_SIMULATION
-!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
-!$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+!$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns,  mixture_err, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+!$acc update device( R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 !$acc update device(monopole, num_mono)
 #endif
@@ -1104,14 +1104,12 @@ contains
                     end do
 
 
-                    if(j == 1) then
-#ifdef CRAY_PRINT_DEBUG
-print *, "cbc debug"
-print *, E_K
-print *, pres_K
-print *, vel_K(dir_idx(1))
-#endif
-                    endif
+                    !if(j == 1) then
+                    !    print *, "cbc debug"
+                    !    print *, E_K
+                    !    print *, pres_K
+                    !    print *, vel_K(dir_idx(1))
+                    !endif
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
                     ! comment out above and it will run to completion

@@ -36,6 +36,7 @@ module m_qbmm
         integer, parameter :: nterms = ${nterms}$
     #:else
         integer :: nterms
+        !$acc declare create(nterms)
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
@@ -50,7 +51,7 @@ module m_qbmm
     integer, allocatable, dimension(:, :) :: bubmoms
 !$acc declare create(bubrs, bubmoms)
 #endif    
-    !$acc declare create(nterms, is1_qbmm, is2_qbmm, is3_qbmm)
+    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
 
 contains
 
@@ -67,7 +68,7 @@ contains
                 ! Rayleigh-Plesset with viscosity/surface tension
                 nterms = 6
             end if
-
+            
             !$acc update device(nterms)
 
         #:endif
