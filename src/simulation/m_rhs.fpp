@@ -77,9 +77,13 @@ module m_rhs
     !! of the divergence theorem on the integral-average cell-boundary values
     !! of the primitive variables, located in qK_prim_n, where K = L or R.
     !> @{
-    type(vector_field) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-    !> @}
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+    !$acc declare link(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+#else
+    type(vector_field) , allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
     !$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+#endif
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average first-order spatial derivatives of the primitive variables. The
@@ -274,13 +278,16 @@ contains
         if (any(Re_size > 0) .and. cyl_coord) then
             @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
             do i = 1, num_dims
-                @:ALLOCATE_GLOBAL(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                allocate(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
                                                        &  iy%beg:iy%end, &
                                                        &  iz%beg:iz%end))
+                @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
             end do
-            @:ALLOCATE_GLOBAL(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+            allocate(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
                                          & iy%beg:iy%end, &
                                          & iz%beg:iz%end))
+            @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+
         end if
         
         ixt = ix; iyt = iy; izt = iz
@@ -342,19 +349,14 @@ contains
         @:ALLOCATE_GLOBAL(qR_prim(1:num_dims))
 
         do i = 1, num_dims
-            @:ALLOCATE_GLOBAL(qL_prim(i)%vf(1:sys_size))
-            @:ALLOCATE_GLOBAL(qR_prim(i)%vf(1:sys_size))
-        end do
-
-        if (weno_Re_flux) then
-
-            do i = 1, num_dims
-                do l = mom_idx%beg, mom_idx%end
-                    @:ALLOCATE_GLOBAL(qL_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                    @:ALLOCATE_GLOBAL(qR_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                end do
+            allocate(qL_prim(i)%vf(1:sys_size))
+            allocate(qR_prim(i)%vf(1:sys_size))    
+            do l = mom_idx%beg, mom_idx%end
+                allocate(qL_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+                allocate(qR_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
             end do
-        end if
+            @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))           
+        end do
 
         if (mpp_lim .and. bubbles) then
             @:ALLOCATE(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -393,37 +395,50 @@ contains
         end if
         ! Allocation of dq_prim_ds_qp ======================================
 
+        @:ALLOCATE_GLOBAL(dq_prim_dx_qp(1:1))
+        @:ALLOCATE_GLOBAL(dq_prim_dy_qp(1:1))
+        @:ALLOCATE_GLOBAL(dq_prim_dz_qp(1:1))
+        
+
         if (any(Re_size > 0)) then
 
-            allocate(dq_prim_dx_qp%vf(1:sys_size))
-            allocate(dq_prim_dy_qp%vf(1:sys_size))
-            allocate(dq_prim_dz_qp%vf(1:sys_size))
+            allocate(dq_prim_dx_qp(1)%vf(1:sys_size))
+            allocate(dq_prim_dy_qp(1)%vf(1:sys_size))
+            allocate(dq_prim_dz_qp(1)%vf(1:sys_size))
             
             if (any(Re_size > 0)) then
 
                 do l = mom_idx%beg, mom_idx%end
-                    allocate(dq_prim_dx_qp%vf(l)%sf( &
+                    allocate(dq_prim_dx_qp(1)%vf(l)%sf( &
                               & ix%beg:ix%end, &
                               & iy%beg:iy%end, &
                               & iz%beg:iz%end))
                 end do
 
+                @:ACC_SETUP_VFs(dq_prim_dx_qp(1)) 
+
                 if (n > 0) then
 
+                    
+
                     do l = mom_idx%beg, mom_idx%end
-                        allocate(dq_prim_dy_qp%vf(l)%sf( &
+                        allocate(dq_prim_dy_qp(1)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
                                  & iy%beg:iy%end, &
                                  & iz%beg:iz%end))
                     end do
 
+                    @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
+
                     if (p > 0) then
+                        
                         do l = mom_idx%beg, mom_idx%end
-                            allocate(dq_prim_dz_qp%vf(l)%sf( &
+                            allocate(dq_prim_dz_qp(1)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
                                      & iy%beg:iy%end, &
                                      & iz%beg:iz%end))
                         end do
+                        @:ACC_SETUP_VFs(dq_prim_dz_qp(1))
                     end if
 
                 end if
@@ -432,8 +447,6 @@ contains
 
         end if
         ! END: Allocation of dq_prim_ds_qp =================================
-
-        @:ACC_SETUP_VFs(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
 
         ! Allocation/Association of dqK_prim_ds_n =======================
         @:ALLOCATE_GLOBAL(dqL_prim_dx_n(1:num_dims))
@@ -494,6 +507,7 @@ contains
                 end if
 
                 @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
+                @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
             end do
         end if
         ! END: Allocation/Association of d K_prim_ds_n ==================
@@ -805,6 +819,7 @@ contains
         if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
 
         call nvtxStartRange("Viscous")
+        print *, "VISCOUS"
         if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                             dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                                             qL_prim, &
@@ -874,21 +889,21 @@ contains
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
-                        dq_prim_dx_qp%vf(iv%beg:iv%end), &
+                        dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
                         dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                         dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                         id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
                         ix, iy, iz)
                     if (n > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv( &
-                            dq_prim_dy_qp%vf(iv%beg:iv%end), &
+                            dq_prim_dy_qp(1)%vf(iv%beg:iv%end), &
                             dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                             dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                             id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
                             ix, iy, iz)
                         if (p > 0) then
                             call s_reconstruct_cell_boundary_values_visc_deriv( &
-                                dq_prim_dz_qp%vf(iv%beg:iv%end), &
+                                dq_prim_dz_qp(1)%vf(iv%beg:iv%end), &
                                 dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                                 dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                                 id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
@@ -1360,16 +1375,16 @@ print*, "todo"
                     if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
-                                                                 dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
-                                                                 dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
-                                                                 dq_prim_dz_qp%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dx_qp(1)%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dy_qp(1)%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dz_qp(1)%vf(mom_idx%beg:mom_idx%end), &
                                                                  tau_Re_vf, &
                                                                  ixt, iyt, izt)
                         else
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
-                                                                 dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
-                                                                 dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
-                                                                 dq_prim_dy_qp%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dx_qp(1)%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dy_qp(1)%vf(mom_idx%beg:mom_idx%end), &
+                                                                 dq_prim_dy_qp(1)%vf(mom_idx%beg:mom_idx%end), &
                                                                  tau_Re_vf, &
                                                                  ixt, iyt, izt)
                         end if
@@ -2603,26 +2618,26 @@ print*, "todo"
 
         if (any(Re_size > 0)) then
             do l = mom_idx%beg, mom_idx%end
-                @:DEALLOCATE(dq_prim_dx_qp%vf(l)%sf)
+                @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
             end do
 
             if (n > 0) then
 
                 do l = mom_idx%beg, mom_idx%end
-                    @:DEALLOCATE(dq_prim_dy_qp%vf(l)%sf)
+                    @:DEALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf)
                 end do
 
                 if (p > 0) then
                     do l = mom_idx%beg, mom_idx%end
-                        @:DEALLOCATE(dq_prim_dz_qp%vf(l)%sf)
+                        @:DEALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf)
                     end do
                 end if
 
             end if
 
-            @:DEALLOCATE(dq_prim_dx_qp%vf)
-            @:DEALLOCATE(dq_prim_dy_qp%vf)
-            @:DEALLOCATE(dq_prim_dz_qp%vf)
+            @:DEALLOCATE(dq_prim_dx_qp(1)%vf)
+            @:DEALLOCATE(dq_prim_dy_qp(1)%vf)
+            @:DEALLOCATE(dq_prim_dz_qp(1)%vf)
         end if
 
         if (any(Re_size > 0)) then

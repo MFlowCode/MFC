@@ -901,7 +901,7 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
-        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3,'z')]
+        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
                 if (model_eqns == 3) then
