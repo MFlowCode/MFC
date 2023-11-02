@@ -40,6 +40,7 @@ module m_qbmm
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
+    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
@@ -51,7 +52,7 @@ module m_qbmm
     integer, allocatable, dimension(:, :) :: bubmoms
 !$acc declare create(bubrs, bubmoms)
 #endif    
-    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    
 
 contains
 
@@ -69,6 +70,7 @@ contains
                 nterms = 6
             end if
             
+            !$acc enter data copyin(nterms)
             !$acc update device(nterms)
 
         #:endif
@@ -185,7 +187,8 @@ contains
     end subroutine s_initialize_qbmm_module
 
     subroutine s_coeff(pres, rho, c, coeffs)
-!$acc routine seq
+!DIR$ INLINEALWAYS s_coeff
+!!$acc routine seq
         real(kind(0.d0)), intent(IN) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
         integer :: i1, i2
@@ -222,139 +225,27 @@ contains
 
     end subroutine s_coeff
 
-    subroutine s_mom_inv(q_prim_vf, momsp, moms3d, ix, iy, iz)
-        type(scalar_field), dimension(:), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(:), intent(INOUT) :: momsp
-        type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        subroutine s_hyqmom(frho, fup, fmom)
+!DIR$ INLINEALWAYS s_hyqmom
+!!$acc routine seq
+        real(kind(0d0)), dimension(2), intent(INOUT) :: frho, fup
+        real(kind(0d0)), dimension(3), intent(IN) :: fmom
+        real(kind(0d0)) :: bu, d2, c2
 
-        real(kind(0d0)), dimension(nmom) :: moms
-        real(kind(0d0)), dimension(nb) :: Rvec
-        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: n_tait, B_tait
+        bu = fmom(2)/fmom(1)
+        d2 = fmom(3)/fmom(1)
+        c2 = d2 - bu**2d0
+        frho(1) = fmom(1)/2d0; 
+        frho(2) = fmom(1)/2d0; 
+        c2 = maxval((/c2, verysmall/))
+        fup(1) = bu - DSQRT(c2)
+        fup(2) = bu + DSQRT(c2)
 
-        integer :: j, k, l, q, r, s !< Loop variables
-        integer :: id1, id2, id3
-        integer :: i1, i2
+    end subroutine s_hyqmom
 
-        is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
-
-        !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
-
-
-!$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
-        do id3 = is3_qbmm%beg, is3_qbmm%end
-            do id2 = is2_qbmm%beg, is2_qbmm%end
-                do id1 = is1_qbmm%beg, is1_qbmm%end
-
-                    alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
-                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
-                    rho = q_prim_vf(contxb)%sf(id1, id2, id3)
-                    if (bubble_model == 2) then
-                        n_tait = gammas(1)
-                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
-                        B_tait = pi_infs(1)
-                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
-                        c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
-                        if (c > 0.d0) then
-                            c = DSQRT(c)
-                        else
-                            c = sgm_eps
-                        end if
-                    end if
-
-                    call s_coeff(pres, rho, c, coeff)
-
-                    ! SHB: Manually adjusted pressure here for no-coupling case
-                    ! pres = 1d0/0.3d0
-
-                    if (alf > small_alf) then
-
-                        R3 = 0d0
-
-                        !$acc loop seq
-                        do q = 1, nb
-                            R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3d0
-                        end do
-
-                        nbub = (3.d0/(4.d0*pi))*alf/R3
-
-                        !$acc loop seq
-                        do q = 1, nb
-                            !$acc loop seq
-                            do r = 1, nmom
-                                moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
-                            end do
-
-                           
-
-                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
-
-
-                            !DIR$ UNROLL
-                            !$acc loop seq
-                            do i2 = 0, 2
-                                !DIR$ UNROLL
-                                !$acc loop seq
-                                do i1 = 0, 2
-                                    if ((i1 + i2) <= 2) then
-                                        momsum = 0d0
-                                        !$acc loop seq
-                                        do j = 1, nterms           
-                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
-                                                            *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
-                                        end do
-                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub * momsum
-
-                                    end if
-                                end do
-                            end do
-
-                            
-                        end do
-
-                        momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
-                        momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
-                        momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 2d0, 0d0)
-                        if (abs(gam - 1.d0) <= 1.d-4) then
-                            ! Gam \approx 1, don't risk imaginary quadrature
-                            momsp(4)%sf(id1, id2, id3) = 1.d0
-                        else
-                            momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
-                        end if
-
-                    
-                    else
-                        !$acc loop seq
-                        do q = 1, nb
-                            !$acc loop seq
-                            do i1 = 0, 2
-                                !$acc loop seq
-                                do i2 = 0, 2
-                                    moms3d(i1, i2, q)%sf(id1, id2, id3) = 0d0
-                                end do
-                            end do
-                        end do
-
-                        momsp(1)%sf(id1, id2, id3) = 0d0
-                        momsp(2)%sf(id1, id2, id3) = 0d0
-                        momsp(3)%sf(id1, id2, id3) = 0d0
-                        momsp(4)%sf(id1, id2, id3) = 0d0
-
-                    end if
-
-                end do
-            end do
-        end do
-
-
-    end subroutine s_mom_inv
-
-    subroutine s_chyqmom(momin, wght, abscX, abscY)
-!$acc routine seq
+        subroutine s_chyqmom(momin, wght, abscX, abscY)
+!DIR$ INLINEALWAYS s_chyqmom
+!!$acc routine seq
         real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nmom), intent(IN) :: momin
 
@@ -414,25 +305,9 @@ contains
 
     end subroutine s_chyqmom
 
-    subroutine s_hyqmom(frho, fup, fmom)
-        !$acc routine seq
-        real(kind(0d0)), dimension(2), intent(INOUT) :: frho, fup
-        real(kind(0d0)), dimension(3), intent(IN) :: fmom
-        real(kind(0d0)) :: bu, d2, c2
-
-        bu = fmom(2)/fmom(1)
-        d2 = fmom(3)/fmom(1)
-        c2 = d2 - bu**2d0
-        frho(1) = fmom(1)/2d0; 
-        frho(2) = fmom(1)/2d0; 
-        c2 = maxval((/c2, verysmall/))
-        fup(1) = bu - DSQRT(c2)
-        fup(2) = bu + DSQRT(c2)
-
-    end subroutine s_hyqmom
-
     function f_quad(abscX, abscY, wght, q, r, s)
-        !$acc routine seq
+!DIR$ INLINEALWAYS f_quad
+!!$acc routine seq
         real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght
         real(kind(0.d0)), intent(IN) :: q, r, s
         real(kind(0.d0)) :: f_quad_RV, f_quad
@@ -447,12 +322,144 @@ contains
     end function f_quad
 
     function f_quad2D(abscX, abscY, wght, pow)
-        !$acc routine seq
+!DIR$ INLINEALWAYS f_quad2D
+!!$acc routine seq
         real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght
         real(kind(0.d0)), dimension(3), intent(IN) :: pow
         real(kind(0.d0)) :: f_quad2D
 
         f_quad2D = sum(wght(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
     end function f_quad2D
+
+    subroutine s_mom_inv(q_prim_vf, momsp, moms3d, ix, iy, iz)
+        type(scalar_field), dimension(:), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(INOUT) :: momsp
+        type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
+        type(int_bounds_info), intent(IN) :: ix, iy, iz
+
+        real(kind(0d0)), dimension(nmom) :: moms
+        real(kind(0d0)), dimension(nb) :: Rvec
+        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY
+        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
+        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum
+        real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: n_tait, B_tait
+
+        integer :: j, k, l, q, r, s !< Loop variables
+        integer :: id1, id2, id3
+        integer :: i1, i2
+
+        is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
+
+        !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
+
+!$acc parallel loop collapse(3) gang vector default(present) private(moms, wght, abscX, abscY, coeff)
+        do id3 = is3_qbmm%beg, is3_qbmm%end
+            do id2 = is2_qbmm%beg, is2_qbmm%end
+                do id1 = is1_qbmm%beg, is1_qbmm%end
+
+                    alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
+                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
+                    rho = q_prim_vf(contxb)%sf(id1, id2, id3)
+                    if (bubble_model == 2) then
+                        n_tait = gammas(1)
+                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        B_tait = pi_infs(1)
+                        B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
+                        c = n_tait*(pres + B_tait)/(rho*(1.d0 - alf))
+                        if (c > 0.d0) then
+                            c = DSQRT(c)
+                        else
+                            c = sgm_eps
+                        end if
+                    end if
+
+                    call s_coeff(pres, rho, c, coeff)
+
+                    ! SHB: Manually adjusted pressure here for no-coupling case
+                    ! pres = 1d0/0.3d0
+
+                    if (alf > small_alf) then
+
+                        R3 = 0d0
+
+                        !$acc loop seq
+                        do q = 1, nb
+                            R3 = R3 + weight(q)*q_prim_vf(bubrs(q))%sf(id1, id2, id3)**3d0
+                        end do
+
+                        nbub = (3.d0/(4.d0*pi))*alf/R3
+
+                        !$acc loop seq
+                        do q = 1, nb
+                            !$acc loop seq
+                            do r = 1, nmom
+                                moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
+                            end do
+
+                           
+                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
+
+
+                            !DIR$ UNROLL
+                            !$acc loop seq
+                            do i2 = 0, 2
+                                !DIR$ UNROLL
+                                !$acc loop seq
+                                do i1 = 0, 2
+                                    if ((i1 + i2) <= 2) then
+                                        momsum = 0d0
+                                        !$acc loop seq
+                                        do j = 1, nterms           
+                                            momsum = momsum  + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q)) &
+                                                           *f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), (/momrhs(1, i1, i2, j, q), momrhs(2, i1, i2, j, q), 1d0/))
+                                        end do
+                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub * momsum
+
+                                    end if
+                                end do
+                            end do
+
+                            
+                        end do
+
+                        momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
+                        momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub*f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
+                        momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 2d0, 0d0)
+                        if (abs(gam - 1.d0) <= 1.d-4) then
+                            ! Gam \approx 1, don't risk imaginary quadrature
+                            momsp(4)%sf(id1, id2, id3) = 1.d0
+                        else
+                            momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0*(1d0 - gam), 0d0, 3d0*gam)
+                        end if
+
+                    
+                    else
+                        !$acc loop seq
+                        do q = 1, nb
+                            !$acc loop seq
+                            do i1 = 0, 2
+                                !$acc loop seq
+                                do i2 = 0, 2
+                                    moms3d(i1, i2, q)%sf(id1, id2, id3) = 0d0
+                                end do
+                            end do
+                        end do
+
+                        momsp(1)%sf(id1, id2, id3) = 0d0
+                        momsp(2)%sf(id1, id2, id3) = 0d0
+                        momsp(3)%sf(id1, id2, id3) = 0d0
+                        momsp(4)%sf(id1, id2, id3) = 0d0
+
+                    end if
+
+                end do
+            end do
+        end do
+
+
+    end subroutine s_mom_inv
+
+
 
 end module m_qbmm

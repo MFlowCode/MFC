@@ -329,18 +329,21 @@ contains
             do i = 0, 2
                 do j = 0, 2
                     do k = 1, nb
-                        @:ALLOCATE_GLOBAL(mom_3d(i, j, k)%sf( &
+                        allocate(mom_3d(i, j, k)%sf( &
                                       & ix%beg:ix%end, &
                                       & iy%beg:iy%end, &
                                       & iz%beg:iz%end))
+                        @:ACC_SETUP_SFs(mom_3d(i, j, k))
                     end do
                 end do
             end do
+
             do i = 1, nmomsp
-                @:ALLOCATE_GLOBAL(mom_sp(i)%sf( &
+                allocate(mom_sp(i)%sf( &
                         & ix%beg:ix%end, &
                         & iy%beg:iy%end, &
                         & iz%beg:iz%end))
+                @:ACC_SETUP_SFs(mom_sp(i))
             end do
         end if
 
@@ -819,7 +822,6 @@ contains
         if (qbmm) call s_mom_inv(q_prim_qp%vf, mom_sp, mom_3d, ix, iy, iz)
 
         call nvtxStartRange("Viscous")
-        print *, "VISCOUS"
         if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                             dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                                             qL_prim, &
@@ -1776,7 +1778,6 @@ print*, "Monopole"
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
-            print *, "HYPO"
 #ifdef CRAY_PRINT_DEBUG
 print*, "RHS_Hypoelasticity"
 #endif
