@@ -142,7 +142,6 @@ contains
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 
-        print *, "REACHED 1"
 #if defined(_OPENACC) 
 
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -154,8 +153,6 @@ contains
             end do
         end do
 
-         print *, "REACHED 1.5"
-
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
@@ -165,9 +162,6 @@ contains
             end do
         end do
 
-        print *, "REACHED 2"
-
-
 !$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
 #if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
@@ -176,8 +170,6 @@ contains
 #endif
 !$acc end host_data
 
-
-        print *, "REACHED 3"
         Nfq = 3
 
 !$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
@@ -254,7 +246,7 @@ contains
             ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #endif
 !$acc end host_data
-            print *, "REACHED 4"
+
 !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
