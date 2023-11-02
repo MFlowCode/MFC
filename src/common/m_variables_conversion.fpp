@@ -637,6 +637,7 @@ contains
         end if
 
 #ifdef MFC_SIMULATION
+!$acc enter data copyin(alt_soundspeed)
 !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns,  mixture_err, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
 !$acc update device( R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
@@ -893,7 +894,7 @@ contains
         real(kind(0d0)) :: nbub, R3, vftmp
         real(kind(0d0)), dimension(nb) :: Rtmp
 
-        real(kind(0d0)) :: G
+        real(kind(0d0)) :: G = 0d0
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -923,6 +924,8 @@ contains
                         dyn_pres = dyn_pres + q_cons_vf(i)%sf(j, k, l)* &
                                    q_prim_vf(i)%sf(j, k, l)/2d0
                     end do
+
+
 
                     ! Computing the energy from the pressure
                     if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then

@@ -1776,6 +1776,7 @@ print*, "Monopole"
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
+            print *, "HYPO"
 #ifdef CRAY_PRINT_DEBUG
 print*, "RHS_Hypoelasticity"
 #endif
