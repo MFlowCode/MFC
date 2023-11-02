@@ -18,6 +18,9 @@ module m_fftw
 
 #if defined(_OPENACC) && defined(__PGI)
     use cufft
+#else if defined(_OPENACC)
+    use hipfort
+    use hipfort_hipfft
 #endif
     ! ==========================================================================
 
@@ -27,7 +30,7 @@ module m_fftw
  s_apply_fourier_filter, &
  s_finalize_fftw_module
 
-#if !(defined(_OPENACC) && defined(__PGI))
+#if !(defined(_OPENACC))
     include 'fftw3.f03'
 #endif
 
@@ -43,17 +46,23 @@ module m_fftw
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(_OPENACC) 
     !$acc declare create(real_size, cmplx_size, x_size, batch_size)
+
 
     real(kind(0d0)),    allocatable :: data_real_gpu(:)
     complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
     !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 
-    integer :: fwd_plan_gpu, bwd_plan_gpu, ierr
+#if defined(__PGI)
+    integer :: fwd_plan_gpu, bwd_plan_gpu
+#else
+    type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
+#endif
+    integer :: ierr
 
-    integer, allocatable :: cufft_size(:), iembed(:), oembed(:)
+    integer, allocatable :: gpu_fft_size(:), iembed(:), oembed(:)
 
     integer :: istride, ostride, idist, odist, rank
 #endif
@@ -65,12 +74,6 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_initialize_fftw_module() ! ----------------------------------
 
-#if defined(_OPENACC) && !defined(__PGI)
-
-        print *, "The FFTW module is not supported when using OpenACC with a compiler other than NVHPC/PGI."
-        stop 1
-
-#endif
 
         ! Size of input array going into DFT
         real_size = p + 1
@@ -81,15 +84,15 @@ contains
 
         batch_size = x_size*sys_size
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(_OPENACC) 
         rank = 1; istride = 1; ostride = 1
 
-        allocate(cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
+        allocate(gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
-        cufft_size(1) = real_size; 
+        gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-
+        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size)
         !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
@@ -106,13 +109,20 @@ contains
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
-#if defined(_OPENACC) && defined(__PGI)
-        @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
-        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
-        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+#if defined(_OPENACC) 
 
-        ierr = cufftPlanMany(fwd_plan_gpu, rank, cufft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
-        ierr = cufftPlanMany(bwd_plan_gpu, rank, cufft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, CUFFT_Z2D, batch_size)
+        allocate(data_real_gpu(1:real_size*x_size*sys_size))
+        allocate(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        allocate(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        !$acc enter data create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+
+#if defined(__PGI)
+        ierr = cufftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
+        ierr = cufftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, CUFFT_Z2D, batch_size)
+#else
+        ierr = hipfftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, HIPFFT_D2Z, batch_size)
+        ierr = hipfftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, HIPFFT_Z2D, batch_size)
+#endif
 #endif
 
     end subroutine s_initialize_fftw_module ! ------------------------------
@@ -132,7 +142,8 @@ contains
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 
-#if defined(_OPENACC) && defined(__PGI)
+        print *, "REACHED 1"
+#if defined(_OPENACC) 
 
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
@@ -143,6 +154,8 @@ contains
             end do
         end do
 
+         print *, "REACHED 1.5"
+
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
@@ -152,23 +165,37 @@ contains
             end do
         end do
 
+        print *, "REACHED 2"
+
+
 !$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+#if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+#else
+        ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+#endif
 !$acc end host_data
 
+
+        print *, "REACHED 3"
         Nfq = 3
 
 !$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
-    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                 end do
             end do
         end do
 
+
 !$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+#if defined(__PGI)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+#else
+        ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+#endif
 !$acc end host_data
 
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -202,7 +229,11 @@ contains
             end do
 
 !$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+#if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+#else
+            ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+#endif
 !$acc end host_data
 
             Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
@@ -211,15 +242,19 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
-    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                     end do
                 end do
             end do
 
 !$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+#if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+#else
+            ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+#endif
 !$acc end host_data
-
+            print *, "REACHED 4"
 !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
@@ -232,7 +267,7 @@ contains
 
         end do
 
-#else
+#else 
         Nfq = 3
         do j = 0, m
             do k = 1, sys_size
@@ -270,10 +305,15 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(_OPENACC) 
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+#if defined(_PGI)
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
+#else
+        ierr = hipfftDestroy(fwd_plan_gpu)
+        ierr = hipfftDestroy(bwd_plan_gpu)
+#endif
 #else
         call fftw_free(fftw_real_data)
         call fftw_free(fftw_cmplx_data)
