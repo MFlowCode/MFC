@@ -82,3 +82,17 @@
         #:endfor
     end block
 #:enddef
+
+#:def ACC_SETUP_SFs(*args)
+    block
+
+        @:LOG({'@:ACC_SETUP_SFs(${', '.join(args)}$)'})
+
+        #:for arg in args
+            !$acc enter data copyin(${arg}$)
+            if (associated(${arg}$%sf)) then
+                !$acc enter data create(${arg}$%sf)
+            end if
+        #:endfor
+    end block
+#:enddef
