@@ -82,7 +82,7 @@ contains
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
-            model_eqns, num_fluids, adv_alphan, &
+            model_eqns, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, &
@@ -96,7 +96,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, &
+            nb, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
