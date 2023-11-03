@@ -95,6 +95,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
     )
+    add_link_options("SHELL:-hkeepfiles")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
