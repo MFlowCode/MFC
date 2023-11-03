@@ -21,3 +21,10 @@ echo "export CRAY_ACC_MODULE=${PWD}/build/simulation/simulation-wg${WGSIZE}.lld.
 echo "to use the new GPU offload code."
 echo "To use the original build"
 echo "unset CRAY_ACC_MODULE"
+
+# # This goes inside an sbatch script for multi-node submissions (> 1000 nodes important)
+# # Requet an nvme via
+# #SBATCH -C nvme
+# # Put this in the sbatch script before execution via srun
+# sbcast -pf ${PWD}/build/simulation/simulation-wg${WGSIZE}.lld.exe /mnt/bb/$USER/simulation-wg${WGSIZE}.lld.exe
+# export CRAY_ACC_MODULE=/mnt/bb/$USER/simulation-wg${WGSIZE}.lld.exe"
