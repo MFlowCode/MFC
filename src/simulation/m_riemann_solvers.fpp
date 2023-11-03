@@ -1928,31 +1928,31 @@ contains
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
 
-                                if (mpp_lim) then
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
-                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
-                                    end do
+    !                             if (mpp_lim) then
+    !                                 !$acc loop seq
+    !                                 do i = 1, num_fluids
+    !                                     qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
+    !                qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+    !                                     alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+    !                                 end do
 
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
-                                    end do
+    !                                 !$acc loop seq
+    !                                 do i = 1, num_fluids
+    !          qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+    !                                 end do
 
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
-                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
-                                    end do
+    !                                 !$acc loop seq
+    !                                 do i = 1, num_fluids
+    !                                  qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+    !        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+    !                                     alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+    !                                 end do
 
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
-                                    end do
-                                end if
+    !                                 !$acc loop seq
+    !                                 do i = 1, num_fluids
+    !  qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+    !                                 end do
+    !                             end if
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
@@ -1964,38 +1964,38 @@ contains
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
                                 end do
-                                if (any(Re_size > 0)) then
-                                    !$acc loop seq
-                                    do i = 1, 2
-                                        Re_L(i) = dflt_real
+                                ! if (any(Re_size > 0)) then
+                                !     !$acc loop seq
+                                !     do i = 1, 2
+                                !         Re_L(i) = dflt_real
 
-                                        if (Re_size(i) > 0) Re_L(i) = 0d0
+                                !         if (Re_size(i) > 0) Re_L(i) = 0d0
 
-                                        !$acc loop seq
-                                        do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
-                                                      + Re_L(i)
-                                        end do
+                                !         !$acc loop seq
+                                !         do q = 1, Re_size(i)
+                                !             Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                !                       + Re_L(i)
+                                !         end do
 
-                                        Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
+                                !         Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
 
-                                    end do
+                                !     end do
 
-                                    !$acc loop seq
-                                    do i = 1, 2
-                                        Re_R(i) = dflt_real
+                                !     !$acc loop seq
+                                !     do i = 1, 2
+                                !         Re_R(i) = dflt_real
 
-                                        if (Re_size(i) > 0) Re_R(i) = 0d0
+                                !         if (Re_size(i) > 0) Re_R(i) = 0d0
 
-                                        !$acc loop seq
-                                        do q = 1, Re_size(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
-                                                      + Re_R(i)
-                                        end do
+                                !         !$acc loop seq
+                                !         do q = 1, Re_size(i)
+                                !             Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res(i, q) &
+                                !                       + Re_R(i)
+                                !         end do
 
-                                        Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
-                                    end do
-                                end if
+                                !         Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
+                                !     end do
+                                ! end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
 
@@ -2012,20 +2012,21 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                     vel_R_rms, c_R)
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                ! > The computation of c_avg does not require all the variables, and therefore the non '_avg'
+                                !     variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                     vel_avg_rms, c_avg)
 
-                                if (any(Re_size > 0)) then
-                                    !$acc loop seq
-                                    do i = 1, 2
-                                        Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
-                                    end do
-                                end if
 
-                                if (wave_speeds == 1) then
+                                ! if (any(Re_size > 0)) then
+                                !     !$acc loop seq
+                                !     do i = 1, 2
+                                !         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
+                                !     end do
+                                ! end if
+
+                                ! if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
                                     s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
 
@@ -2036,27 +2037,27 @@ contains
                                           /(rho_L*(s_L - vel_L(idx1)) - &
                                             rho_R*(s_R - vel_R(idx1)))
 
-                                elseif (wave_speeds == 2) then
-                                    pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
-                                                    (vel_L(idx1) - &
-                                                     vel_R(idx1)))
+                                ! elseif (wave_speeds == 2) then
+                                !     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                !                     (vel_L(idx1) - &
+                                !                      vel_R(idx1)))
 
-                                    pres_SR = pres_SL
+                                !     pres_SR = pres_SL
 
-                                    Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L)/(1d0 + gamma_L))* &
-                                                         (pres_SL/pres_L - 1d0)*pres_L/ &
-                                                         ((pres_L + pi_inf_L/(1d0 + gamma_L)))))
-                                    Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R)/(1d0 + gamma_R))* &
-                                                         (pres_SR/pres_R - 1d0)*pres_R/ &
-                                                         ((pres_R + pi_inf_R/(1d0 + gamma_R)))))
+                                !     Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L)/(1d0 + gamma_L))* &
+                                !                          (pres_SL/pres_L - 1d0)*pres_L/ &
+                                !                          ((pres_L + pi_inf_L/(1d0 + gamma_L)))))
+                                !     Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R)/(1d0 + gamma_R))* &
+                                !                          (pres_SR/pres_R - 1d0)*pres_R/ &
+                                !                          ((pres_R + pi_inf_R/(1d0 + gamma_R)))))
 
-                                    s_L = vel_L(idx1) - c_L*Ms_L
-                                    s_R = vel_R(idx1) + c_R*Ms_R
+                                !     s_L = vel_L(idx1) - c_L*Ms_L
+                                !     s_R = vel_R(idx1) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(idx1) + vel_R(idx1)) + &
-                                                (pres_L - pres_R)/ &
-                                                (rho_avg*c_avg))
-                                end if
+                                !     s_S = 5d-1*((vel_L(idx1) + vel_R(idx1)) + &
+                                !                 (pres_L - pres_R)/ &
+                                !                 (rho_avg*c_avg))
+                                ! end if
 
                                 ! follows Einfeldt et al.
                                 ! s_M/P = min/max(0.,s_L/R)
@@ -2144,54 +2145,54 @@ contains
 
                                 ! Geometrical source flux for cylindrical coordinates
 
-                                #:if (NORM_DIR == 2)
-                                    if (cyl_coord) then
-                                        !Substituting the advective flux into the inviscid geometrical source flux
-                                        !$acc loop seq
-                                        do i = 1, E_idx
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                                        end do
-                                        ! Recalculating the radial momentum geometric source flux
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
-                                            xi_M*(rho_L*(vel_L(idx1)* &
-                                                         vel_L(idx1) + &
-                                                         s_M*(xi_L*(dir_flg(idx1)*s_S + &
-                                                                    (1d0 - dir_flg(idx1))* &
-                                                                    vel_L(idx1)) - vel_L(idx1)))) &
-                                            + xi_P*(rho_R*(vel_R(idx1)* &
-                                                           vel_R(idx1) + &
-                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
-                                                                      (1d0 - dir_flg(idx1))* &
-                                                                      vel_R(idx1)) - vel_R(idx1))))
-                                        ! Geometrical source of the void fraction(s) is zero
-                                        !$acc loop seq
-                                        do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
-                                        end do
-                                    end if
-                                #:endif
-                                #:if (NORM_DIR == 3)
-                                    if (grid_geometry == 3) then
-                                        !$acc loop seq
-                                        do i = 1, sys_size
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
-                                        end do
+                                ! #:if (NORM_DIR == 2)
+                                !     if (cyl_coord) then
+                                !         !Substituting the advective flux into the inviscid geometrical source flux
+                                !         !$acc loop seq
+                                !         do i = 1, E_idx
+                                !             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                !         end do
+                                !         ! Recalculating the radial momentum geometric source flux
+                                !         flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
+                                !             xi_M*(rho_L*(vel_L(idx1)* &
+                                !                          vel_L(idx1) + &
+                                !                          s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                !                                     (1d0 - dir_flg(idx1))* &
+                                !                                     vel_L(idx1)) - vel_L(idx1)))) &
+                                !             + xi_P*(rho_R*(vel_R(idx1)* &
+                                !                            vel_R(idx1) + &
+                                !                            s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                !                                       (1d0 - dir_flg(idx1))* &
+                                !                                       vel_R(idx1)) - vel_R(idx1))))
+                                !         ! Geometrical source of the void fraction(s) is zero
+                                !         !$acc loop seq
+                                !         do i = advxb, advxe
+                                !             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                !         end do
+                                !     end if
+                                ! #:endif
+                                ! #:if (NORM_DIR == 3)
+                                !     if (grid_geometry == 3) then
+                                !         !$acc loop seq
+                                !         do i = 1, sys_size
+                                !             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                !         end do
 
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
-                                            -xi_M*(rho_L*(vel_L(idx1)* &
-                                                          vel_L(idx1) + &
-                                                          s_M*(xi_L*(dir_flg(idx1)*s_S + &
-                                                                     (1d0 - dir_flg(idx1))* &
-                                                                     vel_L(idx1)) - vel_L(idx1)))) &
-                                            - xi_P*(rho_R*(vel_R(idx1)* &
-                                                           vel_R(idx1) + &
-                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
-                                                                      (1d0 - dir_flg(idx1))* &
-                                                                      vel_R(idx1)) - vel_R(idx1))))
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+                                !         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
+                                !             -xi_M*(rho_L*(vel_L(idx1)* &
+                                !                           vel_L(idx1) + &
+                                !                           s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                !                                      (1d0 - dir_flg(idx1))* &
+                                !                                      vel_L(idx1)) - vel_L(idx1)))) &
+                                !             - xi_P*(rho_R*(vel_R(idx1)* &
+                                !                            vel_R(idx1) + &
+                                !                            s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                !                                       (1d0 - dir_flg(idx1))* &
+                                !                                       vel_R(idx1)) - vel_R(idx1))))
+                                !         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
 
-                                    end if
-                                #:endif
+                                !     end if
+                                ! #:endif
 
                             end do
                         end do

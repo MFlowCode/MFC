@@ -653,15 +653,9 @@ print*, "weno_body"
         else
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (weno_dir == ${WENO_DIR}$) then
-                ! Replace
-                !$acc parallel loop gang collapse(2) default(present) private(dvd, poly, beta, alpha, omega
-                ! With
-                !!$acc parallel loop gang collapse(2) default(present) private(dvd, poly, beta, alpha, omega, &
-                !!$acc beta_coef_${XYZ}$(j, 0, 1), poly_coef_cbL_${XYZ}$)
+                !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega)
                 do l = is3_weno%beg, is3_weno%end
                     do k = is2_weno%beg, is2_weno%end
-                        ! Add this
-                        !!$acc loop vector private(dvd, poly, beta, alpha, omega)
                         do j = is1_weno%beg, is1_weno%end
 !$acc loop seq
                             do i = 1, v_size

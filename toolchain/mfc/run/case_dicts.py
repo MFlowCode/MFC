@@ -136,7 +136,7 @@ for fl_id in range(1,10+1):
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
 
-CASE_OPTIMIZATION = [ "nb", "weno_order" ]
+CASE_OPTIMIZATION = [ "nb", "weno_order", "num_fluids" ]
 
 
 def get_input_dict_keys(target_name: str) -> list:

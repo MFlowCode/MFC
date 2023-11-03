@@ -94,8 +94,17 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
+	"SHELL: -I /ccs/home/aradhakr34/HIP/hipfort/install_cce/include/hipfort/amdgcn"
     )
-    add_link_options("SHELL:-hkeepfiles")
+
+    add_link_options("SHELL: -L /ccs/home/aradhakr34/HIP/hipfort/install_cce/lib"	    
+	             "SHELL: -L /opt/rocm-5.5.1/lib"
+	             "SHELL: -lhipfort-amdgcn"
+	             "SHELL: -lhipfft"
+	             "SHELL: -lamdhip64"
+		     "SHELL:-hkeepfiles"
+	)
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
@@ -199,7 +208,7 @@ macro(HANDLE_SOURCES target)
                                  -I "${common_DIR}"
                                  -I "${common_DIR}/include"
                                  -I "${${target}_DIR}/include"
-                                 --line-numbering
+				 --line-numbering
                                  --no-folding
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs};${common_incs}"

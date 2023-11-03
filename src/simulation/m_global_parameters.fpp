@@ -105,10 +105,11 @@ module m_global_parameters
     integer :: model_eqns     !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
+        integer, parameter :: num_fluids = ${num_fluids}$   !< number of fluids
     #:else
         integer :: num_dims       !< Number of spatial dimensions
+        integer :: num_fluids
     #:endif
-    integer :: num_fluids     !< Number of fluids in the flow
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
@@ -138,10 +139,10 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order)
+        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids)
     #:endif
 
-!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+!$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -394,7 +395,9 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        num_fluids = dflt_int
+        #:if not MFC_CASE_OPTIMIZATION
+            num_fluids = dflt_int
+        #:endif
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
@@ -518,7 +521,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc update device(weno_polyn,nb, num_dims)
+!$acc update device(weno_polyn,nb, num_dims, num_fluids)
         #:endif
 
 
@@ -534,8 +537,10 @@ contains
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
 
+            #:if not MFC_CASE_OPTIMIZATION
             ! Setting number of fluids
-            num_fluids = 1
+                num_fluids = 1
+            #:endif
 
             ! Annotating structure of the state and flux vectors belonging
             ! to the system of equations defined by the selected number of

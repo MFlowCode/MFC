@@ -66,6 +66,7 @@ class MFCInputFile:
 #:set nb         = {int(self.case_dict.get("nb", 1))}
 #:set num_dims   = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
 #:set nterms     = {nterms}
+#:set num_fluids = {int(self.case_dict["num_fluids"])}
 """
 
         # Check if this case already has a case.fpp file.
@@ -81,7 +82,6 @@ class MFCInputFile:
 
 
         common.file_write(filepath, content)
-
 
     # Generate case.fpp & [target_name].inp
     def generate(self, target_name: str) -> None:

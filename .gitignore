@@ -40,4 +40,5 @@ examples/*/binary
 examples/*/fort.1
 examples/*/*.sh
 examples/*/*.err
+examples/*/workloads/*
 *.mod
