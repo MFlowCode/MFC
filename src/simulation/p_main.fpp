@@ -22,7 +22,7 @@ program p_main
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_start_up             !< Reading and checking procedures for the input
-    !< and the initial condition and grid data files
+    !< and the initial xcondition and grid data files
 
     use m_variables_conversion !< State variables type conversion procedures
 

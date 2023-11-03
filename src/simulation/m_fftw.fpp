@@ -20,6 +20,7 @@ module m_fftw
     use cufft
 #else if defined(_OPENACC)
     use hipfort
+    use hipfort_check
     use hipfort_hipfft
 #endif
     ! ==========================================================================
@@ -36,7 +37,7 @@ module m_fftw
 
     type(c_ptr) :: fwd_plan, bwd_plan
     type(c_ptr) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
-    integer :: real_size, cmplx_size, x_size, batch_size
+    integer :: real_size, cmplx_size, x_size, batch_size, Nfq
 
     real(c_double), pointer :: data_real(:) !< Real data
 
@@ -47,14 +48,19 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(_OPENACC) 
-    !$acc declare create(real_size, cmplx_size, x_size, batch_size)
+    !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
-
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), data_real_gpu)
+    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
+    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
+    !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+#else
     real(kind(0d0)),    allocatable :: data_real_gpu(:)
     complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
     !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-
+#endif
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
 #else
@@ -92,7 +98,7 @@ contains
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size)
+        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
         !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
@@ -111,10 +117,16 @@ contains
 
 #if defined(_OPENACC) 
 
+#ifdef CRAY_ACC_WAR
+        @:ALLOCATE_GLOBAL(data_real_gpu(1:real_size*x_size*sys_size))
+        @:ALLOCATE_GLOBAL(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE_GLOBAL(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+#else
         allocate(data_real_gpu(1:real_size*x_size*sys_size))
         allocate(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         allocate(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         !$acc enter data create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+#endif
 
 #if defined(__PGI)
         ierr = cufftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
@@ -135,13 +147,10 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
-        integer :: Nfq !< Number of kept modes
-
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
-
 #if defined(_OPENACC) 
 
 !$acc parallel loop collapse(3) gang vector default(present)
@@ -166,13 +175,14 @@ contains
 #if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-        ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+        ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
 #endif
+        call hipCheck(hipDeviceSynchronize())
 !$acc end host_data
-
         Nfq = 3
+        !$acc update device(Nfq)
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
+!$acc parallel loop collapse(3) gang vector default(present) 
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
@@ -181,20 +191,20 @@ contains
             end do
         end do
 
-
 !$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
 #if defined(__PGI)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-        ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+        ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
 #endif
+        call hipCheck(hipDeviceSynchronize())
 !$acc end host_data
 
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
+                    data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -224,13 +234,15 @@ contains
 #if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-            ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+            ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
 #endif
+            call hipCheck(hipDeviceSynchronize())
 !$acc end host_data
 
             Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
+            !$acc update device(Nfq)
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
+!$acc parallel loop collapse(3) gang vector default(present) 
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
@@ -243,8 +255,9 @@ contains
 #if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-            ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+            ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
 #endif
+            call hipCheck(hipDeviceSynchronize())
 !$acc end host_data
 
 !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
@@ -256,8 +269,9 @@ contains
                     end do
                 end do
             end do
-
+            
         end do
+
 
 #else 
         Nfq = 3
@@ -298,7 +312,7 @@ contains
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
 #if defined(_OPENACC) 
-        @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+        @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(_PGI)
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
