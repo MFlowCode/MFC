@@ -1,5 +1,16 @@
 #! /bin/bash
 
+# On Frontier, after building simulation run the script
+# ./cce_simulation_workgroup_256.sh to edit the workgroup
+# size in the generated code and recompile, then set the recommended
+# environment variable to use the new code.
+
+# Using the script requires `-hkeepfiles` at link! 
+
+# This script needs to be run after every time simulation
+# is built to generate a correct offload binary.
+# This include case-optimization builds!
+
 CCE_LLVM_PATH=${CRAY_CCE_CLANGSHARE}/../
 
 ## This was errantly 1024 by default in the generated binary
