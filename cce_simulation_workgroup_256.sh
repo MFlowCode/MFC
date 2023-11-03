@@ -1,4 +1,4 @@
-jkKK#! /bin/bash
+#! /bin/bash
 
 CCE_LLVM_PATH=${CRAY_CCE_CLANGSHARE}/../
 
