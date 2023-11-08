@@ -792,7 +792,6 @@ contains
                 real(kind(0d0)), dimension(:), allocatable :: nRtmp
 #else
                 real(kind(0d0)), dimension(nb) :: nRtmp
-        real(kind(0d0)), dimension(nb) :: nRtmp
 #endif
         #:else
             real(kind(0d0)), dimension(:), allocatable :: nRtmp
