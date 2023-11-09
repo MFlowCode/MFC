@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
+#:include '../simulation/include/case.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -786,7 +787,16 @@ contains
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
 
-        real(kind(0d0)), dimension(:), allocatable :: nRtmp
+        #:if MFC_CASE_OPTIMIZATION
+#ifndef MFC_SIMULATION
+                real(kind(0d0)), dimension(:), allocatable :: nRtmp
+#else
+                real(kind(0d0)), dimension(nb) :: nRtmp
+#endif
+        #:else
+            real(kind(0d0)), dimension(:), allocatable :: nRtmp
+        #:endif
+
         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(kind(0d0)) :: G_K
@@ -797,11 +807,21 @@ contains
         
         real(kind(0.d0)) :: ntmp
         
-        if (bubbles) then
-            allocate(nRtmp(nb))
-        else
-            allocate(nRtmp(0))
-        endif
+        #:if MFC_CASE_OPTIMIZATION
+#ifndef MFC_SIMULATION
+                if (bubbles) then 
+                    allocate(nRtmp(nb)) 
+                else 
+                    allocate(nRtmp(0)) 
+                endif 
+#endif
+        #:else
+            if (bubbles) then 
+                allocate(nRtmp(nb)) 
+            else 
+                allocate(nRtmp(0)) 
+            endif 
+        #:endif
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K, R3tmp)
         do l = izb, ize

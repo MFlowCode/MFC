@@ -527,7 +527,7 @@ module m_viscous
                               qL_prim_rsy_vf, qR_prim_rsy_vf, &
                               qL_prim_rsz_vf, qR_prim_rsz_vf
 
-        type(vector_field), dimension(sys_size) :: qL_prim, qR_prim
+        type(vector_field), dimension(1:num_dims) :: qL_prim, qR_prim
 
         type(vector_field) :: q_prim_qp
 
