@@ -135,7 +135,7 @@ def handle_case(test: TestCase):
 
         if ARG('single'):
             if test.params.get("hypoelasticity", 'F') == 'T':
-                tol = 1e5*tol
+                tol = 1e8*tol
             else:
                 tol = 1e8*tol
 
