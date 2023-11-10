@@ -55,6 +55,6 @@ MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 ## Acknowledgements
  
 <p align="justify">
-  MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF).
-  MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE, now ACCESS), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit, Crusher, and Wombat under allocation CFD154 (PI Bryngelson).
+  MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), the US Department of Energy, and the US National Science Foundation (NSF).
+  MFC computations use ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson).
 </p>
