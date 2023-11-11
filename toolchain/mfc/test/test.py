@@ -64,14 +64,17 @@ def __filter():
 
 def test():
     global CASES, nFAIL
-    
+   
     # Delete UUIDs that are not in the list of CASES from tests/
-    if ARG("generate"):
-        dir_uuids = set([name for name in os.listdir(".") if os.path.isdir(name)])
+    if ARG("remove_old_tests"):
+        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
         new_uuids = set([case.get_uuid() for case in CASES])
 
         for old_uuid in dir_uuids - new_uuids:
+            cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
             common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+        
+        return
 
     __filter()
 

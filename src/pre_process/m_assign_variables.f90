@@ -480,6 +480,13 @@ contains
                  + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
          end if
    
+        ! Set partial pressures to mixture pressure for the 6-eqn model
+        if (model_eqns == 3) then
+            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                q_prim_vf(i)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l)
+            end do
+        end if
+
         ! Smoothed bubble variables
         if (bubbles) then
             do i = 1, nb
