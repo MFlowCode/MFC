@@ -93,6 +93,7 @@ started, run ./mfc.sh build -h.""",
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
+    test_meg.add_argument("--remove-old-tests",  action="store_true", default=False, help="(Test Generation) Delete tests directories that are no longer.")
 
     # === RUN ===
     engines = [ e.slug for e in ENGINES ]

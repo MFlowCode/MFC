@@ -146,13 +146,15 @@ if [ "$1" == 'load' ]; then
 
     return
 elif [ "$1" == "format" ]; then
+    shift
+
     if ! command -v fprettify > /dev/null 2>&1; then
         pip3 install --upgrade fprettify
     fi
 
-    fprettify src --exclude "src/*/autogen" --recursive \
+    fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
         --indent 4 --c-relations --enable-replacements --enable-decl \
-        --whitespace-comma 1 --whitespace-multdiv 0 --whitespace-plusminus 1 \
+        --whitespace-comma 1 --whitespace-multdiv 1 --whitespace-plusminus 1 \
         --case 1 1 1 1 --strict-indent
     ret="$?"
 
