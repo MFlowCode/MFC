@@ -1074,9 +1074,9 @@ contains
                         end do
 
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                        if (id == ndirs) then                        
+                        if (id == ndirs .and. n_adap_dt .ge. 1) then
                             call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)                    
+                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                         end if
                     end if
                 end if                          
@@ -1277,7 +1277,7 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then                        
+                    if (id == ndirs .and. n_adap_dt .ge. 1) then                        
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
@@ -1680,7 +1680,7 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then                        
+                    if (id == ndirs .and. n_adap_dt .ge. 1) then                        
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                              q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if

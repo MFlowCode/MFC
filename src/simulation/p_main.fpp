@@ -251,8 +251,10 @@ program p_main
             call s_1st_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3) then
+        elseif (time_stepper == 3 .and. n_adap_dt .ne. -1) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3 .and. n_adap_dt == -1) then
+            call s_strang_splitting(t_step, time_avg)
         end if
 
         ! Time-stepping loop controls

@@ -749,6 +749,342 @@ contains
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
 
+    !> 3rd order TVD RK time-stepping algorithm
+        !! @param t_step Current time-step
+    subroutine s_3rd_order_tvd_rk_split(t_step, time_avg, dt_in) ! ------------------------
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(kind(0d0)), intent(IN) :: dt_in
+
+        integer :: i, j, k, l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp  !<
+        real(kind(0d0)) :: tmp
+        integer :: ierr
+
+        q_adap_dt = 0
+        
+        ! Stage 1 of 3 =====================================================
+        call cpu_time(start)
+
+        call nvtxStartRange("Time_Step")
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, t_step)
+
+        if (run_time_info) then
+            call s_write_run_time_information(q_prim_vf, t_step)
+        end if
+
+        if (probe_wrt) then
+            call s_time_step_cycling(t_step)
+        end if
+
+        if (t_step == t_step_stop) return
+
+!$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt_in*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
+                                error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(2)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_1',proc_rank,j,k,l,i,q_cons_ts(2)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(2)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(2)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
+                    end do
+                end do
+            enddo
+        end if
+
+        ! ==================================================================
+
+        ! Stage 2 of 3 =====================================================
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
+
+!$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
+                    end do
+                end do
+            end do
+        end do
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
+                                error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(2)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_2',proc_rank,j,k,l,i,q_cons_ts(2)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(2)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(2)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
+                    end do
+                end do
+            enddo
+        end if
+
+        ! ==================================================================
+
+        ! Stage 3 of 3 =====================================================
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, t_step)
+
+!$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
+                    end do
+                end do
+            end do
+        end do
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+
+        if (adv_n .and. alter_alpha) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        !$acc loop seq
+                        do i = 1, nb
+                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, rhs_vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R < 0"
+                                error stop "R < 0"
+                            end if
+                            if (isnan(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))) then
+                                print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, "R is NaN"
+                                error stop "R is NaN"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
+                        if (isnan(q_cons_ts(1)%vf(alf_idx)%sf(j, k, l))) then
+                            print *, 'substep_3',proc_rank,j,k,l,i,q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)
+                            print *, nR3bar, q_cons_ts(1)%vf(n_idx)%sf(j, k, l)
+                            print *, q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)
+                            print *, "alpha is NaN"
+                            error stop "alpha is NaN"
+                        end if
+                    end do
+                end do
+            end do
+        end if
+
+        call nvtxEndRange
+
+        call cpu_time(finish)
+
+        time = time + (finish - start)
+
+        if (t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
+
+        ! ==================================================================
+
+    end subroutine s_3rd_order_tvd_rk_split ! ------------------------------
+
+    !> 3rd order TVD RK time-stepping algorithm
+        !! @param t_step Current time-step
+    subroutine s_3rd_order_tvd_rk_adaptive(t_step, time_avg) ! ------------------------
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: bub_adv_src
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb ) :: bub_r_src, &
+                                                            bub_v_src, &
+                                                            bub_p_src, &
+                                                            bub_m_src
+        type(scalar_field) :: divu
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
+
+        integer :: i, j, k, l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp  !<
+
+        integer :: ierr
+        logical :: repeat
+        integer :: id
+
+        ! Compute q_prim from q_cons
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
+
+        ! Compute bubble source
+        call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
+                    q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
+
+        ! Update
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l) = &
+                                bub_r_src(j, k, l, 1)
+                    q_cons_ts(1)%vf(bub_idx%vs(1))%sf(j, k, l) = &
+                                bub_v_src(j, k, l, 1)
+                end do
+            end do
+        end do
+
+    end subroutine s_3rd_order_tvd_rk_adaptive ! ------------------------------
+
+
+    !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
+        !!      the flux term and 3rd order adaptive time stepping algorithm for 
+        !!      the source term
+        !! @param t_step Current time-step
+    subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
+        integer :: i, j, k, l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+
+        call cpu_time(start)
+
+        call nvtxStartRange("Operator_splitting")
+
+        ! Stage 1 of 3 =====================================================
+        call s_3rd_order_tvd_rk_split(t_step, time_avg, dt/2)
+
+        ! Stage 2 of 3 =====================================================
+        call s_3rd_order_tvd_rk_adaptive(t_step, time_avg)
+
+        ! Stage 3 of 3 =====================================================
+        call s_3rd_order_tvd_rk_split(t_step, time_avg, dt/2)
+
+        if (n == 0) then
+            j = 1; k = 0; l = 0;
+            if (mod(t_step - t_step_start, t_step_save) == 0) then
+                write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
+            end if
+        end if
+
+        call nvtxEndRange
+
+        call cpu_time(finish)
+
+        time = time + (finish - start)
+
+        if (t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
+
+        ! ==================================================================
+
+    end subroutine s_strang_splitting ! ------------------------------------
+
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step

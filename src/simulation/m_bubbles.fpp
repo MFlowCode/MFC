@@ -107,6 +107,10 @@ contains
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
+        real(kind(0d0)) :: err_R, err_V
+        real(kind(0d0)) :: dt_new, t_new
+        real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp
+
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
             do k = 0, n
@@ -264,26 +268,91 @@ contains
 
                         else if (bubble_model == 2) then
                             ! Keller-Miksis bubbles
-                            if ((n_adap_dt .gt. 1) .and. (myV/uratio < -5 .or. myR/rratio < 0.5)) then
+                            if (n_adap_dt == -1) then
                                 Cpinf = myP/uratio**2
                                 c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
                                 myR = myR/rratio
                                 myV = myV/uratio
-                                do i = 1,n_adap_dt
-                                    ! print *, i, myR, myV, R0(q), c_liquid
-                                    Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                                    rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
-                                    myR = myR + (dt*(uratio/rratio)/n_adap_dt)*myV
-                                    myV = myV + (dt*(uratio/rratio)/n_adap_dt)*rddot
-                                    if (myR < 0) then
-                                        print *, "myR < 0 in bubbles adaptive loop", myR
-                                        error stop "myR < 0"
-                                    end if 
-                                    if (isnan(myR) .or. isnan(myV)) then
-                                        print *, "myR/myV is NaN in bubbles adaptive loop"
-                                        error stop "NaN"
+
+                                t_new = 0d0
+                                do while (.true.)
+                                    dt_new = dt*(uratio/rratio) - t_new
+                                    if (dt_new .le. 1e-8) then
+                                        exit
                                     end if
+
+                                    do while (.true.)
+                                        myR_tmp(1) = myR
+                                        myV_tmp(1) = myV
+                                        ! Stage 1 
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(1), myV_tmp(1), pb)
+                                        myA_tmp(1) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(1), myV_tmp(1), R0(q), c_liquid)
+                                        myR_tmp(2) = myR + (dt_new/2)*myV_tmp(1)
+                                        myV_tmp(2) = myV + (dt_new/2)*myA_tmp(1)
+                                        if (myR_tmp(2) < 0) then
+                                            print *, "myR < 0 in bubbles adaptive loop", myR
+                                            error stop "myR < 0"
+                                        end if 
+                                        if (isnan(myR_tmp(2)) .or. isnan(myV_tmp(2))) then
+                                            print *, "myR/myV is NaN in bubbles adaptive loop"
+                                            error stop "NaN"
+                                        end if
+
+                                        ! Stage 2
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(2), myV_tmp(2), pb)
+                                        myA_tmp(2) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(2), myV_tmp(2), R0(q), c_liquid)
+                                        myR_tmp(3) = myR + (3*dt_new/4)*myV_tmp(2)
+                                        myV_tmp(3) = myV + (3*dt_new/4)*myA_tmp(2)
+                                        if (myR_tmp(2) < 0) then
+                                            print *, "myR < 0 in bubbles adaptive loop", myR
+                                            error stop "myR < 0"
+                                        end if 
+                                        if (isnan(myR_tmp(2)) .or. isnan(myV_tmp(2))) then
+                                            print *, "myR/myV is NaN in bubbles adaptive loop"
+                                            error stop "NaN"
+                                        end if
+
+                                        ! Stage 3
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(3), myV_tmp(3), pb)
+                                        myA_tmp(3) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(3), myV_tmp(3), R0(q), c_liquid)
+                                        myR_tmp(4) = myR + (dt_new/9)* (2*myV_tmp(1) + 3*myV_tmp(2) + 4*myV_tmp(3))
+                                        myV_tmp(4) = myV + (dt_new/9)* (2*myA_tmp(1) + 3*myA_tmp(2) + 4*myA_tmp(3))
+                                        if (myR < 0) then
+                                            print *, "myR < 0 in bubbles adaptive loop", myR
+                                            error stop "myR < 0"
+                                        end if 
+                                        if (isnan(myR) .or. isnan(myV)) then
+                                            print *, "myR/myV is NaN in bubbles adaptive loop"
+                                            error stop "NaN"
+                                        end if
+
+                                        ! Stage 4
+                                        Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
+                                        myA_tmp(4) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
+
+                                        ! Estimate error
+                                        err_R = (dt_new/72)*(-5*myV_tmp(1) + 6*myV_tmp(2) + 8*myV_tmp(3) - 9*myV_tmp(4))
+                                        err_V = (dt_new/72)*(-5*myA_tmp(1) + 6*myA_tmp(2) + 8*myA_tmp(3) - 9*myA_tmp(4))
+
+                                        if (abs(err_R/myR_tmp(4)) < 1e-4 .and. abs(err_V/myV_tmp(4)) < 1e-4) then
+                                            myR = myR_tmp(4)
+                                            myV = myV_tmp(4)
+                                            exit
+                                        else
+                                            dt_new = dt_new/2
+                                            if (j==1) then
+                                                write(111,*) t_new
+                                            end if
+                                        end if
+                                    end do
+                                    t_new = t_new + dt_new
                                 end do
+
+                                if (isnan(myR) .or. isnan(myV)) then
+                                    print *, "myR/myV is NaN after bubbles adaptive loop"
+                                    error stop "NaN"
+                                end if 
+
                                 ! write(*,*) dt, (uratio/rratio), dt*(uratio/rratio)/100
                                 Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                                 rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR, myV, R0(q), c_liquid)
@@ -300,11 +369,11 @@ contains
                                 myV = myV*uratio
                                 rddot = rddot*uratio**2/rratio
 
-                                bub_r_src(j, k, l, q) = nbub(j, k, l)*(myR - q_prim_vf(rs(q))%sf(j, k, l))/dt
-                                bub_v_src(j, k, l, q) = nbub(j, k, l)*(myV - q_prim_vf(vs(q))%sf(j, k, l))/dt
-
-                                q_adap_dt(j, k, l) = q_adap_dt(j, k, l) + 1
-
+                                bub_r_src(j, k, l, q) = nbub(j, k, l)*myR
+                                bub_v_src(j, k, l, q) = nbub(j, k, l)*myV
+                                if (isnan(bub_r_src(j, k, l, 1))) then
+                                    print *, "bub_r_src is NaN", nbub(j,k,l), myR,q_prim_vf(rs(q))%sf(j, k, l),dt
+                                end if
                             else
                                 Cpinf = myP/uratio**2
                                 Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
