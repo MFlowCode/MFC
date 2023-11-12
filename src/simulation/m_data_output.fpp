@@ -32,13 +32,16 @@ module m_data_output
 
     private; public :: s_initialize_data_output_module, &
  s_open_run_time_information_file, &
+ s_open_com_files, &
  s_open_probe_files, &
  s_write_run_time_information, &
  s_write_data_files, &
  s_write_serial_data_files, &
  s_write_parallel_data_files, &
+ s_write_com_files, &
  s_write_probe_files, &
  s_close_run_time_information_file, &
+ s_close_com_files, &
  s_close_probe_files, &
  s_finalize_data_output_module
 
@@ -53,13 +56,13 @@ module m_data_output
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(IN) :: q_cons_vf
+                intent(in) :: q_cons_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_prim_vf
+                intent(inOUT) :: q_prim_vf
 
-            integer, intent(IN) :: t_step
+            integer, intent(in) :: t_step
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -155,6 +158,44 @@ contains
         end if
 
     end subroutine s_open_run_time_information_file ! ----------------------
+    
+            !>  This opens a formatted data file where the root processor
+        !!      can write out the CoM information        
+    subroutine s_open_com_files() ! ----------------------------------------
+            character(len = path_len  + 3*name_len) :: file_path !<
+            !! Relative path to the CoM file in the case directory 
+            integer :: i !< Generic loop iterator
+            do i = 1, num_fluids
+                    ! Generating the relative path to the CoM data file
+                    write(file_path,'(A,I0,A)') '/fluid',i,'_com.dat'
+                    file_path = trim(case_dir) // trim(file_path)
+                    ! Creating the formatted data file and setting up its
+                    ! structure
+                    open(i+10, file = trim(file_path), &
+                        form = 'formatted', &
+                        position = 'append', &
+                        status   = 'unknown')
+                    if (n == 0) then
+                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                                     '=== Total Mass ' // &
+                                     '=== x-loc ' // &
+                                     '=== Total Volume ==='
+                    elseif (p == 0) then
+                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                                     '=== Total Mass ' // &
+                                     '=== x-loc ' // &
+                                     '=== y-loc ' // &
+                                     '=== Total Volume ==='
+                    else
+                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                                     '=== Total Mass ' // &
+                                     '=== x-loc ' // &
+                                     '=== y-loc ' // &
+                                     '=== z-loc ' // &
+                                     '=== Total Volume ==='
+                    end if
+            end do
+    end subroutine s_open_com_files ! --------------------------------------
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -176,12 +217,12 @@ contains
                   FORM='formatted', &
                   STATUS='unknown')
             ! POSITION = 'append', &
-            !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
-            !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
-            !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
-            !WRITE(i+30,'(A,F10.6)') 'z = ',probe(i)%z
-            !WRITE(i+30, *)
-            !WRITE(i+30,'(A)') '=== Non-Dimensional Time ' // &
+            !write(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
+            !write(i+30,'(A,F10.6)') 'x = ',probe(i)%x
+            !write(i+30,'(A,F10.6)') 'y = ',probe(i)%y
+            !write(i+30,'(A,F10.6)') 'z = ',probe(i)%z
+            !write(i+30, *)
+            !write(i+30,'(A)') '=== Non-Dimensional Time ' // &
             !                '=== Density ' // &
             !                '=== Velocity ' // &
             !                '=== Pressure ' // &
@@ -214,8 +255,8 @@ contains
         !!  @param t_step Current time step
     subroutine s_write_run_time_information(q_prim_vf, t_step) ! -----------
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in) :: t_step
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
         real(kind(0d0)) :: rho        !< Cell-avg. density
@@ -355,7 +396,7 @@ contains
                 end do
             end do
         end do
-        ! END: Computing Stability Criteria at Current Time-step ===========
+        ! end: Computing Stability Criteria at Current Time-step ===========
 
         ! Determining local stability criteria extrema at current time-step
 
@@ -433,10 +474,10 @@ contains
         !!  @param t_step Current time-step
     subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inOUT) :: q_prim_vf
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -794,23 +835,23 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_cons_vf
+            intent(in) :: q_cons_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf
+            intent(inOUT) :: q_prim_vf
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(KIND=MPI_OFFSET_KIND) :: disp
-        integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: MOK
+        integer(kind=MPI_OFFSET_kind) :: disp
+        integer(kind=MPI_OFFSET_kind) :: m_MOK, n_MOK, p_MOK
+        integer(kind=MPI_OFFSET_kind) :: WP_MOK, var_MOK, str_MOK
+        integer(kind=MPI_OFFSET_kind) :: NVARS_MOK
+        integer(kind=MPI_OFFSET_kind) :: MOK
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
@@ -835,52 +876,52 @@ contains
         data_size = (m + 1)*(n + 1)*(p + 1)
 
         ! Resize some integers so MPI can write even the biggest files
-        m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-        n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-        p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-        WP_MOK = int(8d0, MPI_OFFSET_KIND)
-        MOK = int(1d0, MPI_OFFSET_KIND)
-        str_MOK = int(name_len, MPI_OFFSET_KIND)
-        NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+        m_MOK = int(m_glb + 1, MPI_OFFSET_kind)
+        n_MOK = int(n_glb + 1, MPI_OFFSET_kind)
+        p_MOK = int(p_glb + 1, MPI_OFFSET_kind)
+        WP_MOK = int(8d0, MPI_OFFSET_kind)
+        MOK = int(1d0, MPI_OFFSET_kind)
+        str_MOK = int(name_len, MPI_OFFSET_kind)
+        NVARS_MOK = int(sys_size, MPI_OFFSET_kind)
 
         if (bubbles) then
             ! Write the data for each variable
             do i = 1, sys_size
-                var_MOK = int(i, MPI_OFFSET_KIND)
+                var_MOK = int(i, MPI_OFFSET_kind)
 
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        MPI_doUBLE_PRECISION, status, ierr)
             end do
             !Write pb and mv for non-polytropic qbmm
              if(qbmm .and. .not. polytropic) then
                 do i = sys_size + 1, sys_size + 2*nb*nnode
-                    var_MOK = int(i, MPI_OFFSET_KIND)
+                    var_MOK = int(i, MPI_OFFSET_kind)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_doUBLE_PRECISION, status, ierr)
                 end do
             end if           
         else
-            do i = 1, sys_size !TODO: check if correct (sys_size
-                var_MOK = int(i, MPI_OFFSET_KIND)
+            do i = 1, sys_size !TOdo: check if correct (sys_size
+                var_MOK = int(i, MPI_OFFSET_kind)
 
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        MPI_doUBLE_PRECISION, status, ierr)
             end do
         end if
 
@@ -890,6 +931,64 @@ contains
 
     end subroutine s_write_parallel_data_files ! ---------------------------
 
+        !>  This writes a formatted data file where the root processor
+        !!      can write out the CoM information    
+        !!  @param t_step Current time-step
+        !!  @param q_com Center of mass information
+        !!  @param moments Higher moment information
+        subroutine s_write_com_files(t_step,q_com) ! -------------------
+
+            integer, intent(in) :: t_step
+            real(kind(0d0)), dimension(num_fluids,11), intent(in) :: q_com
+
+            integer :: i !< Generic loop iterator
+            real(kind(0d0)) :: nondim_time !< Non-dimensional time
+
+            ! Non-dimensional time calculation
+            if (t_step_old /= dflt_int) then
+                nondim_time = real(t_step + t_step_old,kind(0d0))*dt
+            else
+                nondim_time = real(t_step,kind(0d0))*dt
+            end if
+
+            if (n == 0) then ! 1D simulation
+                do i = 1, num_fluids ! Loop through fluids
+                        if (proc_rank == 0) then
+                            write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                                nondim_time, &
+                                q_com(i,1), &
+                                q_com(i,2), &
+                                q_com(i,5) 
+                        end if
+                end do
+            elseif (p == 0) then ! 2D simulation
+                do i = 1, num_fluids ! Loop through fluids
+                        if (proc_rank == 0) then
+                            write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') &
+                                    nondim_time, &
+                                    q_com(i,1), &
+                                    q_com(i,2), &
+                                    q_com(i,3), &
+                                    q_com(i,5)
+                        end if
+                end do
+            else ! 3D simulation
+                do i = 1, num_fluids ! Loop through fluids
+                        if (proc_rank == 0) then
+                           write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,F24.8)') &
+                                    nondim_time, &
+                                    q_com(i,1), &
+                                    q_com(i,2), &
+                                    q_com(i,3), &
+                                    q_com(i,4), &
+                                    q_com(i,5)
+                        end if
+                end do
+            end if
+
+        end subroutine s_write_com_files ! -------------------------------------
+
+
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -897,9 +996,9 @@ contains
         !!  @param accel_mag Acceleration magnitude information
     subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag) ! -----------
 
-        integer, intent(IN) :: t_step
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(IN) :: accel_mag
+        integer, intent(in) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(kind(0d0)), dimension(-1:m) :: distx
         real(kind(0d0)), dimension(-1:n) :: disty
@@ -1515,6 +1614,17 @@ contains
         close (1)
 
     end subroutine s_close_run_time_information_file ! ---------------------
+
+     !> Closes communication files 
+        subroutine s_close_com_files() ! ---------------------------------------
+
+            integer :: i !< Generic loop iterator
+
+            do i = 1, num_fluids
+                close(i+10)
+            end do
+
+        end subroutine s_close_com_files ! -------------------------------------
 
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------

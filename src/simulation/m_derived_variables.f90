@@ -43,6 +43,7 @@ module m_derived_variables
 
     ! @name Variables for computing acceleration
     !> @{
+    real(KIND(0d0)), public, allocatable, dimension(:,:)     :: q_com
     real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
     real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
     !> @}
@@ -60,6 +61,9 @@ contains
         ! accuracy coefficients are wanted, the formulae required to compute
         ! these coefficients will have to be implemented in the subroutine
         ! s_compute_finite_difference_coefficients.
+
+        call s_open_com_files()
+        allocate(q_com(num_fluids,5))
 
         ! Allocating centered finite-difference coefficients
         if (probe_wrt) then
@@ -80,7 +84,7 @@ contains
                 end if
             end if
         end if
-
+        
     end subroutine s_initialize_derived_variables_module ! --------------------
 
     !> Allocate and open derived variables. Computing FD coefficients.
@@ -117,6 +121,9 @@ contains
         integer, intent(IN) :: t_step
 
         integer :: i, j, k !< Generic loop iterators
+        
+        call s_derive_center_of_mass(q_prim_ts(0)%vf, q_com)
+        call s_write_com_files(t_step, q_com)
 
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts(0)%vf, &
@@ -316,10 +323,161 @@ contains
 
     end subroutine s_derive_acceleration_component ! --------------------------
 
+    !> This subroutine is used together with the volume fraction
+    !!      model and when called upon, it computes the location of
+    !!      of the center of mass for each fluid from the inputted 
+    !!      primitive variables, q_prim_vf. The computed location
+    !!      is then written to a formatted data file by the root process.
+    !!  @param q_prim_vf Primitive variables
+    !!  @param q_com Mass,x-location,y-location,z-location,x-velocity,y-velocity,z-velocity,
+    !!  x-acceleration, y-acceleration, z-acceleration, weighted 
+    subroutine s_derive_center_of_mass(q_prim_vf,q_com)
+           
+       type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+       real(kind(0d0)), dimension(num_fluids,5), intent(inout) :: q_com
+
+       real(kind(0d0)) :: xbeg,xend,ybeg,yend,zbeg,zend !<
+       !! Maximum and minimum values of cell boundaries in each direction used in check for
+       !! reflective BC in computation of center of mass
+
+            integer :: i,j,k,l !< Generic loop iterators
+            real(kind(0d0)) :: tmp !< Temporary variable to store quantity for mpi_allreduce
+            real(kind(0d0)) :: dV !< Discrete cell volume
+
+            if (n == 0)  then !1D simulation
+                do i = 1,num_fluids !Loop over individual fluids
+                        q_com(i,:) = 0d0
+                        do l = 0, p !Loop over grid
+                            do k = 0, n
+                                do j = 0, m
+                                    dV = dx(j)
+                                    ! Mass
+                                    q_com(i,1) = q_com(i,1) + q_prim_vf(i)%sf(j,k,l)*dV
+                                    ! x-location weighted
+                                    q_com(i,2) = q_com(i,2) + q_prim_vf(i)%sf(j,k,l)*dV*x_cc(j)
+                                    ! Volume fraction
+                                    q_com(i,5) = q_com(i,5) + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
+                                end do
+                            end do
+                        end do
+                        ! Sum all components across all processors using MPI_ALLREDUCE
+                        if (num_procs > 1) then
+                            tmp = q_com(i,1)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,1))
+                            tmp = q_com(i,2)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,2))
+                            tmp = q_com(i,5)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,5))
+                        end if
+                        ! Compute quotients
+                        q_com(i,2) = q_com(i,2)/q_com(i,1)
+                end do
+            elseif (p == 0) then !2D simulation
+                do i = 1,num_fluids !Loop over individual fluids
+                        q_com(i,:) = 0d0
+                        do l = 0, p !Loop over grid
+                            do k = 0, n
+                                do j = 0, m
+                                    dV = dx(j)*dy(k)
+                                    ! Mass
+                                    q_com(i,1) = q_com(i,1) + q_prim_vf(i)%sf(j,k,l)*dV
+                                    ! x-location weighted
+                                    q_com(i,2) = q_com(i,2) + q_prim_vf(i)%sf(j,k,l)*dV*x_cc(j)
+                                    ! y-location weighted
+                                    q_com(i,3) = q_com(i,3) + q_prim_vf(i)%sf(j,k,l)*dV*y_cc(k)
+                                    ! Volume fraction
+                                    q_com(i,5) = q_com(i,5) + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
+                                end do
+                            end do
+                        end do
+                        ! Sum all components across all processors using MPI_ALLREDUCE
+                        if (num_procs > 1) then
+                            tmp = q_com(i,1)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,1))
+                            tmp = q_com(i,2)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,2))
+                            tmp = q_com(i,3)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,3))
+                            tmp = q_com(i,5)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,5))
+                        end if
+                        ! Compute quotients
+                        q_com(i,2) = q_com(i,2)/q_com(i,1)
+                        q_com(i,3) = q_com(i,3)/q_com(i,1)
+                end do
+            else !3D simulation
+                do i = 1,num_fluids !Loop over individual fluids
+                        q_com(i,:) = 0d0
+                        do l = 0, p !Loop over grid
+                            do k = 0, n
+                                do j = 0, m
+                                        dV = dx(j)*dy(k)*dz(l)
+                                        ! Mass
+                                        q_com(i,1) = q_com(i,1) + q_prim_vf(i)%sf(j,k,l)*dV
+                                        ! x-location weighted
+                                        q_com(i,2) = q_com(i,2) + q_prim_vf(i)%sf(j,k,l)*dV*x_cc(j)
+                                        ! y-location weighted
+                                        q_com(i,3) = q_com(i,3) + q_prim_vf(i)%sf(j,k,l)*dV*y_cc(k)
+                                        ! z-location weighted
+                                        q_com(i,4) = q_com(i,4) + q_prim_vf(i)%sf(j,k,l)*dV*z_cc(l)
+                                        ! Volume fraction
+                                        q_com(i,5) = q_com(i,5) + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
+                                end do
+                            end do
+                        end do
+                        ! Sum all components across all processors using MPI_ALLREDUCE
+                        if (num_procs > 1) then
+                            tmp = q_com(i,1)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,1))
+                            tmp = q_com(i,2)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,2))
+                            tmp = q_com(i,3)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,3))
+                            tmp = q_com(i,4)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,4))
+                            tmp = q_com(i,5)
+                            call s_mpi_allreduce_sum(tmp,q_com(i,5))
+                        end if
+                        ! Compute quotients
+                        q_com(i,2) = q_com(i,2)/q_com(i,1)
+                        q_com(i,3) = q_com(i,3)/q_com(i,1)
+                        q_com(i,4) = q_com(i,4)/q_com(i,1)
+                        q_com(i,5) = q_com(i,5)
+                end do
+            end if
+            ! Find computational domain boundaries
+            if (num_procs > 1) then
+                call s_mpi_allreduce_min(minval(x_cb(-1:m)),xbeg)
+                call s_mpi_allreduce_max(maxval(x_cb(-1:m)),xend)
+                if (n > 0) then
+                    call s_mpi_allreduce_min(minval(y_cb(-1:n)),ybeg)
+                    call s_mpi_allreduce_max(maxval(y_cb(-1:n)),yend)
+                    if (p > 0) then
+                        call s_mpi_allreduce_min(minval(z_cb(-1:p)),zbeg)
+                        call s_mpi_allreduce_max(maxval(z_cb(-1:p)),zend)
+                    end if
+                end if
+            else
+                xbeg = minval(x_cb(-1:m))
+                xend = maxval(x_cb(-1:m))
+                if (n > 0) then
+                    ybeg = minval(y_cb(-1:n))
+                    yend = maxval(y_cb(-1:n))
+                    if (p > 0) then
+                        zbeg = minval(z_cb(-1:p))
+                        zend = maxval(z_cb(-1:p))
+                    end if
+                end if
+            end if
+                       
+    end subroutine s_derive_center_of_mass ! ----------------------------------
 
     !> Deallocation procedures for the module
     subroutine s_finalize_derived_variables_module() ! -------------------
 
+        call s_close_com_files()
+        deallocate(q_com)
+       
         ! Closing CoM and flow probe files
         if (proc_rank == 0) then
             if (probe_wrt) then
