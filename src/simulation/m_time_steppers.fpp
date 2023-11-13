@@ -510,12 +510,12 @@ contains
         gm_alpha_qp%vf, &
         ix, iy, iz)
 
-        if (proc_rank == 32) then
-            j = 15; k = 23; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            j = 5; k = 22; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-        end if
+        ! if (proc_rank == 32) then
+        !     j = 15; k = 23; l = 0;
+        !     write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        !     j = 5; k = 22; l = 0;
+        !     write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        ! end if
 
         if (n == 0) then
             j = 1; k = 0; l = 0;
@@ -604,12 +604,12 @@ contains
         !     write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
         ! end if
 
-        if (proc_rank == 32) then
-            j = 15; k = 23; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            j = 5; k = 22; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-        end if
+        ! if (proc_rank == 32) then
+        !     j = 15; k = 23; l = 0;
+        !     write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        !     j = 5; k = 22; l = 0;
+        !     write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        ! end if
 
         if (n == 0) then
             j = 1; k = 0; l = 0;
@@ -701,16 +701,14 @@ contains
         ! end if
 
         if (proc_rank == 32) then
-            j = 15; k = 23; l = 0;
-            write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            j = 5; k = 22; l = 0;
-            write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            j = 8; k = 22; l = 0;
+            ! j = 15; k = 23; l = 0;
+            ! write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! j = 5; k = 22; l = 0;
+            ! write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            j = 14; k = 22; l = 0;
             write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            j = 12; k = 23; l = 0;
-            write(33,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
         end if
 
         if (n == 0) then
@@ -1062,11 +1060,18 @@ contains
         ! Stage 3 of 3 =====================================================
         call s_3rd_order_tvd_rk_split(t_step, time_avg, dt/2)
 
-        if (n == 0) then
-            j = 1; k = 0; l = 0;
+        if (n == 0 .and. t_step < t_step_stop) then
             if (mod(t_step - t_step_start, t_step_save) == 0) then
-                write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size),q_adap_dt(j, k, l)
-            end if
+                j = 1; k = 0; l = 0;
+                write(32,*) t_step+1,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            end if 
+        end if
+
+        if (proc_rank == 32 .and. t_step < t_step_stop) then
+            if (mod(t_step - t_step_start, t_step_save) == 0) then
+                j = 14; k = 22; l = 0;
+                write(32,*) t_step+1,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
+            end if 
         end if
 
         call nvtxEndRange
