@@ -719,6 +719,87 @@ contains
 
     end subroutine s_2D_TaylorGreen_Vortex ! -----------------------------------
 
+    !> 3D Taylor Green vortex used to generate turbulence
+        ! @param patch_id is the patch identifier
+    subroutine s_3D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
+
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(kind(0d0)) :: L0, U0 !< Taylor Green Vortex parameters
+        real(kind(0d0)) :: c, Ma !< Speed of sound and Mach number
+
+        integer :: i, j, k !< generic loop iterators
+
+        pi_inf = fluid_pp(1)%pi_inf
+        gamma = fluid_pp(1)%gamma
+        lit_gamma = (1d0 + gamma)/gamma
+
+        ! Transferring the patch's centroid and length information
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        length_x = patch_icpp(patch_id)%length_x
+        length_y = patch_icpp(patch_id)%length_y
+
+        ! Computing the beginning and the end x- and y-coordinates
+        ! of the patch based on its centroid and lengths
+        x_boundary%beg = x_centroid - 0.5d0*length_x
+        x_boundary%end = x_centroid + 0.5d0*length_x
+        y_boundary%beg = y_centroid - 0.5d0*length_y
+        y_boundary%end = y_centroid + 0.5d0*length_y
+
+        ! Since the patch doesn't allow for its boundaries to be
+        ! smoothed out, the pseudo volume fraction is set to 1 to
+        ! ensure that only the current patch contributes to the fluid
+        ! state in the cells that this patch covers.
+        eta = 1d0
+        ! U0 is the characteristic velocity of the vortex
+        U0 = patch_icpp(patch_id)%vel(1) 
+        ! L0 is the characteristic length of the vortex
+        L0 = patch_icpp(patch_id)%vel(2)
+        ! Ma is the Mach number
+        c = (lit_gamma * patch_icpp(patch_id)%pres/patch_icpp(patch_id)%alpha_rho(1)) ** 0.5
+        Ma = U0 / c
+        ! Checking whether the patch covers a particular cell in the
+        ! domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out,
+        ! the primitive variables of the current patch are assigned
+        ! to this cell.
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    if (x_boundary%beg <= x_cc(i) .and. &
+                        x_boundary%end >= x_cc(i) .and. &
+                        y_boundary%beg <= y_cc(j) .and. &
+                        y_boundary%end >= y_cc(j) .and. &
+                        z_boundary%beg <= z_cc(j) .and. &
+                        z_boundary%end >= z_cc(j) .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
+
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                        eta, q_prim_vf, patch_id_fp)
+
+                        @:analytical()
+
+                        ! Assign Parameters =========================================================
+                        q_prim_vf(mom_idx%beg  )%sf(i,j,k) = U0*SIN(x_cc(i)/L0)*COS(y_cc(j)/L0)*COS(z_cc(j)/L0)
+                        q_prim_vf(mom_idx%end  )%sf(i,j,k) = -U0*COS(x_cc(i)/L0)*SIN(y_cc(j)/L0)*COS(z_cc(j)/L0)
+                        q_prim_vf(E_idx        )%sf(i,j,k) = patch_icpp(patch_id)%pres + &
+                                                                q_prim_vf(1)%sf(i,j,0) * (U0 ** 2) * &
+                                                                (1/(lit_gamma * Ma ** 2) + &
+                                                                (COS(2*x_cc(i)) + COS(2*y_cc(j))) * &
+                                                                (COS(2*z_cc(j)) + 2))/16
+                        ! ================================================================================
+
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_3D_TaylorGreen_Vortex ! -----------------------------------
+
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
         !!  @param patch_id is the patch identifier
