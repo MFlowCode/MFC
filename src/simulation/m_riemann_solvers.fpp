@@ -1661,12 +1661,19 @@ contains
                                     vel_L_rms, c_L)
 
                                 if (isnan(c_L)) then
-                                    print *, "c_L is NaN", pres_L, rho_L, alpha_L, c_L, R0_L, nbub_L, (4/3)*pi*R0_L(1)**3*nbub_L
-                                    print *, "c_L is NaN", pres_R, rho_R, alpha_R, c_R, R0_R, nbub_R, (4/3)*pi*R0_R(1)**3*nbub_R
+                                    print *, "c_L is NaN"
+                                    print *, pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms
+                                    print *, R0_L, nbub_L, (4/3)*pi*R0_L(1)**3*nbub_L
                                 end if
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                     vel_R_rms, c_R)
+
+                                if (isnan(c_R)) then
+                                    print *, "c_R is NaN at ", proc_rank, j, k, l
+                                    print *, pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms
+                                    print *, R0_R, nbub_R, (4/3)*pi*R0_R(1)**3*nbub_R
+                                end if
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                     ! variables are placeholders to call the subroutine.
