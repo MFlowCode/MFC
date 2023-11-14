@@ -650,6 +650,14 @@ contains
         integer :: i, j, k, l,  q, ii, id !< Generic loop iterators
         integer :: term_index
 
+        real(kind(0d0)) :: x
+        real(kind(0d0)) :: y
+        real(kind(0d0)) :: z
+        real(kind(0d0)) :: F_mag
+        real(kind(0d0)) :: F_scale_x
+        real(kind(0d0)) :: F_scale_y
+        real(kind(0d0)) :: F_scale_z
+
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
 
@@ -845,7 +853,7 @@ contains
             ! ===============================================================
 
             if (alt_soundspeed) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1037,7 +1045,7 @@ contains
                             end do
                         end do
                    else
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1132,7 +1140,7 @@ contains
                 end do
                 !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                 if(qbmm .and. (.not. polytropic) ) then
-                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p
@@ -1256,7 +1264,7 @@ contains
                             end if
                         end do
                     else
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do l = 0, p
                                 do k = 0, n
@@ -1847,6 +1855,34 @@ contains
 
             end if  ! id loop
             call nvtxEndRange
+
+            ! F_mag = 1d0/100000d0
+            F_mag = 0d0
+
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        x = real(x_cc(j), kind(0d0))/x_cc(m)
+                        y = real(y_cc(k), kind(0d0))/y_cc(n)
+                        ! F_scale_x = x * 1d0/real(t_step + 1, kind(0d0))
+                        ! F_scale_y = y * 1d0/real(t_step + 1, kind(0d0))
+                        F_scale_x = x * 1d0/(101d0 ** 2) * &
+                            (real(t_step + 1, kind(0d0)) - 101) ** 2
+                        F_scale_y = y * 1d0/(101d0 ** 2) * &
+                            (real(t_step + 1, kind(0d0)) - 101) ** 2
+
+                        rhs_vf(momxb + id - 1)%sf(j, k, l) = &
+                            rhs_vf(momxb + id - 1)%sf(j, k, l) + &
+                                (F_mag * F_scale_x) ** 2 + (F_mag * F_scale_y) ** 2
+
+                        rhs_vf(E_idx)%sf(j, k, l) = &
+                            rhs_vf(E_idx)%sf(j, k, l) + &
+                                (F_mag * F_scale_x) ** 2 + (F_mag * F_scale_y) ** 2
+                    end do
+                end do
+            end do
+
+            ! print *, t_step, " - ", id, " - ", rhs_vf(momxb + id)%sf(0, 0, 0), " - ", rhs_vf(E_idx)%sf(0, 0, 0)
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
