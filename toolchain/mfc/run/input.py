@@ -1,7 +1,7 @@
 import os, re, json, math, dataclasses
 
 from ..printer import cons
-from ..        import common
+from ..        import common, build
 from ..state   import ARG, ARGS
 from .         import case_dicts
 
@@ -29,11 +29,11 @@ class MFCInputFile:
         
         return False
 
-    def __generate_inp(self, target_name: str) -> None:
-        cons.print(f"Generating [magenta]{target_name}.inp[/magenta].")
+    def __generate_inp(self, target) -> None:
+        cons.print(f"Generating [magenta]{target.name}.inp[/magenta].")
         cons.indent()
         
-        MASTER_KEYS: list = case_dicts.get_input_dict_keys(target_name)
+        MASTER_KEYS: list = case_dicts.get_input_dict_keys(target.name)
 
         ignored = []
 
@@ -62,12 +62,12 @@ class MFCInputFile:
         contents = f"&user_inputs\n{dict_str}&end/\n"
 
         # Save .inp input file
-        common.file_write(f"{self.case_dirpath}/{target_name}.inp", contents)
+        common.file_write(f"{self.case_dirpath}/{target.name}.inp", contents)
         
         cons.unindent()
         
-    def __save_fpp(self, target_name: str, contents: str) -> None:
-        filepath = os.path.join(os.getcwd(), "src", target_name, "include", "case.fpp")
+    def __save_fpp(self, target, contents: str) -> None:
+        filepath = os.path.join(os.getcwd(), "src", target.name, "include", "case.fpp")
 
         # Check if this case already has a case.fpp file.
         # If so, we don't need to generate a new one, which
@@ -164,7 +164,7 @@ class MFCInputFile:
 #:enddef
 """
         
-        self.__save_fpp("pre_process", content)
+        self.__save_fpp(build.PRE_PROCESS, content)
         
         cons.unindent()
         
@@ -202,7 +202,7 @@ class MFCInputFile:
         else:
             cons.print("[yellow]INFO:[/yellow] Case optimization is disabled. Use --case-optimization to enable it.")
 
-        self.__save_fpp("simulation", content)
+        self.__save_fpp(build.SIMULATION, content)
         cons.unindent()
 
     def __generate_post_fpp(self) -> None:
@@ -212,21 +212,21 @@ class MFCInputFile:
         cons.unindent()
         pass
 
-    # Generate case.fpp & [target_name].inp
-    def generate(self, target_name: str, bOnlyFPPs = False) -> None:
+    # Generate case.fpp & [target.name].inp
+    def generate(self, target, bOnlyFPPs = False) -> None:
         if not bOnlyFPPs:
-            self.__generate_inp(target_name)
+            self.__generate_inp(target)
         
         cons.print()
        
         def _default():
-            cons.print(f"No additional input file generation needed for [bold magenta]{target_name}[/bold magenta].")
+            cons.print(f"No additional input file generation needed for [bold magenta]{target.name}[/bold magenta].")
 
         {
             "pre_process"  : self.__generate_pre_fpp,
             "simulation"   : self.__generate_sim_fpp,
             "post_process" : self.__generate_post_fpp,
-        }.get(target_name, _default)()
+        }.get(target.name, _default)()
         
 
 # Load the input file

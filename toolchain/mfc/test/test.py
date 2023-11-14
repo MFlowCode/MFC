@@ -1,4 +1,4 @@
-import os, math, shutil
+import os, math, typing, shutil
 
 from random    import sample
 from ..printer import cons
@@ -8,7 +8,7 @@ from .case     import TestCase
 from .cases    import generate_cases
 from ..        import sched
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build_targets, get_install_dirpath, HDF5
+from ..build   import build_targets, HDF5
 
 from ..packer import tol as packtol
 from ..packer import packer
@@ -64,14 +64,17 @@ def __filter():
 
 def test():
     global CASES, nFAIL
-    
+   
     # Delete UUIDs that are not in the list of CASES from tests/
-    if ARG("generate"):
-        dir_uuids = set([name for name in os.listdir(".") if os.path.isdir(name)])
+    if ARG("remove_old_tests"):
+        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
         new_uuids = set([case.get_uuid() for case in CASES])
 
         for old_uuid in dir_uuids - new_uuids:
+            cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
             common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+        
+        return
 
     __filter()
 
@@ -105,9 +108,6 @@ def test():
     cons.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
     cons.print()
     
-    # Initialize GPU_LOAD to 0 for each GPU
-    _handle_case.GPU_LOAD = { id: 0 for id in ARG("gpus") }
-
     # Select the correct number of threads to use to launch test CASES
     # We can't use ARG("jobs") when the --case-optimization option is set
     # because running a test case may cause it to rebuild, and thus
@@ -115,9 +115,9 @@ def test():
     # engineer around this issue (for now).
     nThreads = ARG("jobs") if not ARG("case_optimization") else 1
     tasks    = [
-        sched.Task(ppn=case.ppn, func=handle_case, args=[ case ]) for case in CASES
+        sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in CASES
     ]
-    sched.sched(tasks, nThreads)
+    sched.sched(tasks, nThreads, ARG("gpus"))
 
     cons.print()
     if nFAIL == 0:
@@ -131,7 +131,7 @@ def test():
     cons.unindent()
 
 
-def _handle_case(test: TestCase):
+def _handle_case(test: TestCase, devices: typing.Set[int]):
     if test.params.get("qbmm", 'F') == 'T':
         tol = 1e-10
     elif test.params.get("bubbles", 'F') == 'T':
@@ -144,11 +144,7 @@ def _handle_case(test: TestCase):
     test.delete_output()
     test.create_directory()
 
-    load = test.get_cell_count()
-    gpu_id = min(_handle_case.GPU_LOAD.items(), key=lambda x: x[1])[0]
-    _handle_case.GPU_LOAD[gpu_id] += load
-    
-    cmd = test.run(["pre_process", "simulation"], gpu=gpu_id)
+    cmd = test.run(["pre_process", "simulation"], gpus=devices)
 
     out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
 
@@ -188,7 +184,7 @@ def _handle_case(test: TestCase):
 
     if ARG("test_all"):
         test.delete_output()
-        cmd = test.run(["pre_process", "simulation", "post_process"], gpu=gpu_id)
+        cmd = test.run(["pre_process", "simulation", "post_process"], gpus=devices)
         out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
@@ -197,7 +193,7 @@ def _handle_case(test: TestCase):
             if not os.path.exists(silo_filepath):
                 silo_filepath = os.path.join(test.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
     
-            h5dump = f"{get_install_dirpath(HDF5)}/bin/h5dump"
+            h5dump = f"{HDF5.get_install_dirpath()}/bin/h5dump"
 
             if ARG("no_hdf5"):
                 if not does_command_exist("h5dump"):
@@ -220,11 +216,8 @@ def _handle_case(test: TestCase):
 
     cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
 
-    _handle_case.GPU_LOAD[gpu_id] -= load
 
-_handle_case.GPU_LOAD = {}
-
-def handle_case(test: TestCase):
+def handle_case(test: TestCase, devices: typing.Set[int]):
     global nFAIL
     
     nAttempts = 0
@@ -233,7 +226,7 @@ def handle_case(test: TestCase):
         nAttempts += 1
 
         try:
-            _handle_case(test)
+            _handle_case(test, devices)
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {test.get_uuid()}. Retrying...[/bold yellow]")

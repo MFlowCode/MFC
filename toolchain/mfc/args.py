@@ -1,6 +1,6 @@
 import re, os.path, argparse, dataclasses
 
-from .build     import get_mfc_target_names, get_target_names, get_dependencies_names
+from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
 from .common    import format_list_to_string
 from .test.test import CASES as TEST_CASES
 from .packer    import packer
@@ -44,8 +44,9 @@ started, run ./mfc.sh build -h.""",
             mask = ""
 
         if "t" not in mask:
-            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=get_target_names(),
-                           default=get_mfc_target_names(), help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string(get_target_names())}.")
+            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=[ _.name for _ in TARGETS ],
+                           default=[ _.name for _ in DEFAULT_TARGETS ],
+                           help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string([ _.name for _ in TARGETS ])}.")
 
         if "m" not in mask:
             for f in dataclasses.fields(config):
@@ -61,14 +62,17 @@ started, run ./mfc.sh build -h.""",
             p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
 
         if "n" not in mask:
-            for name in get_dependencies_names():
-                p.add_argument(f"--no-{name}", action="store_true", help=f"Do not build the {name} dependency. Use the system's instead.")
+            for target in DEPENDENCY_TARGETS:
+                p.add_argument(f"--no-{target.name}", action="store_true", help=f"Do not build the {target.name} dependency. Use the system's instead.")
+
+        if "g" not in mask:
+            p.add_argument("-g", "--gpus", nargs="+", type=int, default=None, help="(Optional GPU override) List of GPU #s to use (environment default if unspecified).")
 
     # === BUILD ===
-    add_common_arguments(build)
+    add_common_arguments(build, "g")
 
     # === CLEAN ===
-    add_common_arguments(clean, "j")
+    add_common_arguments(clean, "jg")
 
     binaries = [ b.bin for b in BINARIES ]
 
@@ -81,7 +85,6 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
-    test.add_argument("-g", "--gpus",         type=str, default="0", help="(GPU) Comma separated list of GPU #s to use.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
     test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
 
@@ -90,6 +93,7 @@ started, run ./mfc.sh build -h.""",
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
+    test_meg.add_argument("--remove-old-tests",  action="store_true", default=False, help="(Test Generation) Delete tests directories that are no longer.")
 
     # === RUN ===
     engines = [ e.slug for e in ENGINES ]
@@ -119,7 +123,7 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(bench, "t")
 
     # === COUNT ===
-    add_common_arguments(count)
+    add_common_arguments(count, "g")
 
     args: dict = vars(parser.parse_args())
 
@@ -148,9 +152,5 @@ started, run ./mfc.sh build -h.""",
         
         if args[e] is not None:
             args[e] = os.path.abspath(args[e])
-
-    # Turn GPU ID list into a comma separated string
-    if "gpus" in args:
-        args["gpus"] = [int(g) for g in args["gpus"].split(",")]
 
     return args

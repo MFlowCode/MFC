@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
+#:include '../simulation/include/case.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -786,7 +787,16 @@ contains
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, dyn_pres_K
 
-        real(kind(0d0)), dimension(:), allocatable :: nRtmp
+        #:if MFC_CASE_OPTIMIZATION
+#ifndef MFC_SIMULATION
+                real(kind(0d0)), dimension(:), allocatable :: nRtmp
+#else
+                real(kind(0d0)), dimension(nb) :: nRtmp
+#endif
+        #:else
+            real(kind(0d0)), dimension(:), allocatable :: nRtmp
+        #:endif
+
         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(kind(0d0)) :: G_K
@@ -797,11 +807,21 @@ contains
         
         real(kind(0.d0)) :: ntmp
         
-        if (bubbles) then
-            allocate(nRtmp(nb))
-        else
-            allocate(nRtmp(0))
-        endif
+        #:if MFC_CASE_OPTIMIZATION
+#ifndef MFC_SIMULATION
+                if (bubbles) then 
+                    allocate(nRtmp(nb)) 
+                else 
+                    allocate(nRtmp(0)) 
+                endif 
+#endif
+        #:else
+            if (bubbles) then 
+                allocate(nRtmp(nb)) 
+            else 
+                allocate(nRtmp(0)) 
+            endif 
+        #:endif
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, dyn_pres_K, R3tmp)
         do l = izb, ize
@@ -982,6 +1002,11 @@ contains
                         q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                     end do
 
+                    ! Transferring the advection equation(s) variable(s)
+                    do i = adv_idx%beg, adv_idx%end
+                        q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                    end do
+
                     ! Zeroing out the dynamic pressure since it is computed
                     ! iteratively by cycling through the velocity equations
                     dyn_pres = 0d0
@@ -1010,18 +1035,14 @@ contains
 
                     ! Computing the internal energies from the pressure and continuities
                     if (model_eqns == 3) then
-                        do i = internalEnergies_idx%beg, internalEnergies_idx%end
-                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i - adv_idx%end)%sf(j, k, l)* &
-                                                       fluid_pp(i - adv_idx%end)%gamma* &
-                                                       q_prim_vf(E_idx)%sf(j, k, l) + &
-                                                       fluid_pp(i - adv_idx%end)%pi_inf
+                        do i = 1, num_fluids
+                            ! internal energy calculation for each of the fluids
+                            q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
+                                q_cons_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                                (fluid_pp(i)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + &
+                                 fluid_pp(i)%pi_inf)
                         end do
                     end if
-
-                    ! Transferring the advection equation(s) variable(s)
-                    do i = adv_idx%beg, adv_idx%end
-                        q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                    end do
 
                     if (bubbles) then
                         ! From prim: Compute nbub = (3/4pi) * \alpha / \bar{R^3}
@@ -1041,8 +1062,7 @@ contains
                             !Initialize nb 
                             nbub = 3d0 * q_prim_vf(alf_idx)%sf(j, k, l) / (4d0 * pi * R3tmp)
                         end if
-                   
-                        
+
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
