@@ -2,6 +2,7 @@ import os, glob, typing, hashlib, binascii, subprocess, itertools, dataclasses
 
 from ..      import case, common
 from ..state import ARG
+from ..build import MFCTarget, get_target
 
 Tend = 0.25
 Nt   = 50
@@ -99,7 +100,7 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, targets: typing.List[str], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
+    def run(self, targets: typing.List[typing.Union[str, MFCTarget]], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
             gpus_select = f"--gpus {' '.join([str(_) for _ in gpus])}"
         else:
@@ -113,9 +114,11 @@ class TestCase(case.Case):
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
         
+        target_names = [ get_target(t).name for t in targets ]
+
         command: str = f'''\
             {mfc_script} run {filepath} {tasks} {binary_option} \
-            {case_optimization} {jobs} -t {' '.join(targets)} \
+            {case_optimization} {jobs} -t {' '.join(target_names)} \
             {gpus_select} 2>&1\
             '''
 
