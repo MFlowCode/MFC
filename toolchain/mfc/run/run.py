@@ -53,7 +53,7 @@ Engine        (-e)  {ARG('engine')}
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
         cons.indent()
         cons.print()
-        input_file.generate(target)
+        input_file.generate_inp(target)
         cons.print()
         cons.unindent()
 
