@@ -31,19 +31,19 @@ module m_data_output
     implicit none
 
     private; public :: s_initialize_data_output_module, &
- s_open_run_time_information_file, &
- s_open_com_files, &
- s_open_probe_files, &
- s_write_run_time_information, &
- s_write_data_files, &
- s_write_serial_data_files, &
- s_write_parallel_data_files, &
- s_write_com_files, &
- s_write_probe_files, &
- s_close_run_time_information_file, &
- s_close_com_files, &
- s_close_probe_files, &
- s_finalize_data_output_module
+                       s_open_run_time_information_file, &
+                       s_open_com_files, &
+                       s_open_probe_files, &
+                       s_write_run_time_information, &
+                       s_write_data_files, &
+                       s_write_serial_data_files, &
+                       s_write_parallel_data_files, &
+                       s_write_com_files, &
+                       s_write_probe_files, &
+                       s_close_run_time_information_file, &
+                       s_close_com_files, &
+                       s_close_probe_files, &
+                       s_finalize_data_output_module
 
     abstract interface ! ===================================================
 
@@ -65,12 +65,14 @@ module m_data_output
             integer, intent(in) :: t_step
 
         end subroutine s_write_abstract_data_files ! -------------------
+
     end interface ! ========================================================
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
+    real(kind(0d0)), public, allocatable, dimension(:, :) :: c_mass
 
 !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
@@ -171,23 +173,23 @@ contains
                     file_path = trim(case_dir) // trim(file_path)
                     ! Creating the formatted data file and setting up its
                     ! structure
-                    open(i+10, file = trim(file_path), &
+                    open(i+120, file = trim(file_path), &
                         form = 'formatted', &
                         position = 'append', &
                         status   = 'unknown')
                     if (n == 0) then
-                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
                                      '=== Total Mass ' // &
                                      '=== x-loc ' // &
                                      '=== Total Volume ==='
                     elseif (p == 0) then
-                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
                                      '=== Total Mass ' // &
                                      '=== x-loc ' // &
                                      '=== y-loc ' // &
                                      '=== Total Volume ==='
                     else
-                            write(i+10,'(A)') '=== Non-Dimensional Time ' // &
+                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
                                      '=== Total Mass ' // &
                                      '=== x-loc ' // &
                                      '=== y-loc ' // &
@@ -469,9 +471,9 @@ contains
     end subroutine s_write_run_time_information ! --------------------------
 
     !>  The goal of this subroutine is to output the grid and
-        !!      conservative variables data files for given time-step.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param t_step Current time-step
+    !!      conservative variables data files for given time-step.
+    !!  @param q_cons_vf Cell-average conservative variables
+    !!  @param t_step Current time-step
     subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -892,10 +894,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_doUBLE_PRECISION, status, ierr)
+                                        MPI_DOUBLE_PRECISION, status, ierr)
             end do
             !Write pb and mv for non-polytropic qbmm
              if(qbmm .and. .not. polytropic) then
@@ -905,10 +907,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_doUBLE_PRECISION, status, ierr)
+                                            MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             end if           
         else
@@ -918,10 +920,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_doUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_doUBLE_PRECISION, status, ierr)
+                                        MPI_DOUBLE_PRECISION, status, ierr)
             end do
         end if
 
@@ -931,64 +933,56 @@ contains
 
     end subroutine s_write_parallel_data_files ! ---------------------------
 
-        !>  This writes a formatted data file where the root processor
-        !!      can write out the CoM information    
-        !!  @param t_step Current time-step
-        !!  @param q_com Center of mass information
-        !!  @param moments Higher moment information
-        subroutine s_write_com_files(t_step,q_com) ! -------------------
+    !>  This writes a formatted data file where the root processor
+    !!      can write out the CoM information    
+    !!  @param t_step Current time-step
+    !!  @param q_com Center of mass information
+    !!  @param moments Higher moment information
+    subroutine s_write_com_files(t_step,c_mass) ! -------------------
 
-            integer, intent(in) :: t_step
-            real(kind(0d0)), dimension(num_fluids,11), intent(in) :: q_com
+         integer, intent(in) :: t_step
+         real(kind(0d0)), dimension(num_fluids,5), intent(in) :: c_mass
+         integer :: i,j !< Generic loop iterator
+         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
-            integer :: i !< Generic loop iterator
-            real(kind(0d0)) :: nondim_time !< Non-dimensional time
+         ! Non-dimensional time calculation
+         if (t_step_old /= dflt_int) then
+              nondim_time = real(t_step + t_step_old,kind(0d0))*dt
+         else
+              nondim_time = real(t_step,kind(0d0))*dt
+         end if
 
-            ! Non-dimensional time calculation
-            if (t_step_old /= dflt_int) then
-                nondim_time = real(t_step + t_step_old,kind(0d0))*dt
-            else
-                nondim_time = real(t_step,kind(0d0))*dt
-            end if
-
+        if (proc_rank == 0) then   
             if (n == 0) then ! 1D simulation
-                do i = 1, num_fluids ! Loop through fluids
-                        if (proc_rank == 0) then
-                            write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8)') &
-                                nondim_time, &
-                                q_com(i,1), &
-                                q_com(i,2), &
-                                q_com(i,5) 
-                        end if
-                end do
+                    do i = 1, num_fluids ! Loop through fluids
+                        write(i+120, '(6X,4F24.12)') &
+                          nondim_time, &
+                          c_mass(i,1), &
+                          c_mass(i,2), &
+                          c_mass(i,5) 
+                    end do
             elseif (p == 0) then ! 2D simulation
-                do i = 1, num_fluids ! Loop through fluids
-                        if (proc_rank == 0) then
-                            write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') &
-                                    nondim_time, &
-                                    q_com(i,1), &
-                                    q_com(i,2), &
-                                    q_com(i,3), &
-                                    q_com(i,5)
-                        end if
-                end do
+                    do i = 1, num_fluids ! Loop through fluids
+                        write(i+120, '(6X,5F24.12)') &
+                          nondim_time, &
+                          c_mass(i,1), &
+                          c_mass(i,2), &
+                          c_mass(i,3), &
+                          c_mass(i,5)
+                    end do
             else ! 3D simulation
-                do i = 1, num_fluids ! Loop through fluids
-                        if (proc_rank == 0) then
-                           write(i+10, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,F24.8)') &
-                                    nondim_time, &
-                                    q_com(i,1), &
-                                    q_com(i,2), &
-                                    q_com(i,3), &
-                                    q_com(i,4), &
-                                    q_com(i,5)
-                        end if
-                end do
+                    do i = 1, num_fluids ! Loop through fluids
+                        write(i+120, '(6X,6F24.12)') &
+                          nondim_time, &
+                          c_mass(i,1), &
+                          c_mass(i,2), &
+                          c_mass(i,3), &
+                          c_mass(i,4), &
+                          c_mass(i,5)
+                    end do
             end if
-
-        end subroutine s_write_com_files ! -------------------------------------
-
-
+        end if
+    end subroutine s_write_com_files ! -------------------------------------
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -1332,7 +1326,7 @@ contains
                 if (n == 0) then
                     if (bubbles .and. (num_fluids <= 2)) then
                         if (qbmm) then
-                            write (i + 30, '(6x,f12.6,14f28.16)') &
+                            write (i + 30, '(6x,f12.12,14f28.16)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1349,7 +1343,7 @@ contains
                                 M20, &
                                 M02
                         else
-                            write (i + 30, '(6x,f12.6,8f24.8)') &
+                            write (i + 30, '(6x,f12.12,8f24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1363,7 +1357,7 @@ contains
                             ! ptot
                         end if
                     else if (bubbles .and. (num_fluids == 3)) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
+                        write (i + 30, '(6x,f12.12,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                             nondim_time, &
                             rho, &
@@ -1378,7 +1372,7 @@ contains
                             ptilde, &
                             ptot
                     else if (bubbles .and. num_fluids == 4) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
+                        write (i + 30, '(6x,f12.12,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                             nondim_time, &
                             q_cons_vf(1)%sf(j - 2, 0, 0), &
@@ -1395,7 +1389,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1415,7 +1409,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (hypoelasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1426,14 +1420,14 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
                             pres
                     end if
                 else
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                    write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8)') &
                         nondim_time, &
@@ -1493,7 +1487,7 @@ contains
 
                     if (proc_rank == 0) then
                         if (bubbles .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8)') &
+                            write (i + 70, '(6x,f12.12,f24.8)') &
                                 nondim_time, int_pres
                         end if
                     end if
@@ -1575,7 +1569,7 @@ contains
 
                     if (proc_rank == 0) then
                         if (bubbles .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8,f24.8)') &
+                            write (i + 70, '(6x,f12.12,f24.8,f24.8)') &
                                 nondim_time, int_pres, max_pres
                         end if
                     end if
@@ -1615,16 +1609,15 @@ contains
 
     end subroutine s_close_run_time_information_file ! ---------------------
 
-     !> Closes communication files 
-        subroutine s_close_com_files() ! ---------------------------------------
+    !> Closes communication files 
+    subroutine s_close_com_files() ! ---------------------------------------
 
-            integer :: i !< Generic loop iterator
+       integer :: i !< Generic loop iterator
+       do i = 1, num_fluids
+             close(i+120)
+       end do
 
-            do i = 1, num_fluids
-                close(i+10)
-            end do
-
-        end subroutine s_close_com_files ! -------------------------------------
+    end subroutine s_close_com_files ! -------------------------------------
 
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------
@@ -1646,6 +1639,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
+        allocate(c_mass(1:num_fluids,1:5))
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
@@ -1685,6 +1679,8 @@ contains
     subroutine s_finalize_data_output_module() ! ---------------------------
 
         integer :: i !< Generic loop iterator
+        
+        deallocate(c_mass)
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE(icfl_sf)

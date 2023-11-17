@@ -1024,7 +1024,6 @@ contains
 #endif
 
         call s_initialize_cbc_module()
-
         call s_initialize_derived_variables()
 
     end subroutine s_initialize_modules

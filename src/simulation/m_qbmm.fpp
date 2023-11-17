@@ -684,16 +684,16 @@ contains
                                     drdt = msum(2)
                                     if(moms(4) - moms(2)**2d0 > 0d0) then
                                         if(j == 1 .or. j == 2) then
-                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * -1d0
+                                            drdt2 = -(1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0)))
                                         else
-                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * 1d0
+                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0)))
                                         end if
                                     else
                                         !Edge case where variance < 0
                                         if(j == 1 .or. j == 2) then
-                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * -1d0
+                                            drdt2 = -(1d0 / (2d0 *DSQRT(verysmall))) 
                                         else
-                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * 1d0
+                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) 
                                         end if
                                     end if
                                     drdt2 = drdt2 * (msum(3) - 2d0*moms(2) * msum(2))                                   
