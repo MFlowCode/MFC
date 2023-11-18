@@ -223,7 +223,8 @@ def is_number(x: str) -> bool:
 def get_cpuinfo():
     if (does_command_exist("lscpu")):
         # Linux
-        proc = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,shell=True,universal_newlines=True)
+        proc1 = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,universal_newlines=True)
+        proc, err = proc1.communicate()
     elif (does_command_exist("sysctl")):
         # MacOS
         proc1 = subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE)
