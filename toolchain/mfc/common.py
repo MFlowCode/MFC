@@ -4,7 +4,6 @@ from .printer import cons
 
 from os.path import abspath, normpath, dirname, realpath
 
-
 MFC_ROOTDIR       = normpath(f"{dirname(realpath(__file__))}/../..")
 MFC_TESTDIR       = abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR        = abspath(f"{MFC_ROOTDIR}/build")
@@ -222,10 +221,10 @@ def is_number(x: str) -> bool:
         return False
 
 def get_cpuinfo():
-    if (which("lscpu") is not None):
+    if (does_command_exist("lscpu")):
         # Linux
         proc = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,shell=True,universal_newlines=True)
-    elif (which("sysctl") is not None):
+    elif (does_command_exist("sysctl")):
         # MacOS
         proc1 = subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE)
         proc2 = subprocess.Popen(['grep', 'machdep.cpu'], stdin=proc1.stdout,
@@ -243,12 +242,12 @@ def get_envinfo():
 
 def get_mpiinfo():
     ret = ""
-    if (which("mpif90") is not None):
+    if (does_command_exist("mpif90")):
         proc = subprocess.Popen(['which','mpif90'], stdout=subprocess.PIPE,universal_newlines=True)
         out, err = proc.communicate()
         ret = ret + "mpif90 -> " + out
 
-    if (which("mpicc") is not None):
+    if (does_command_exist("mpicc")):
         proc = subprocess.Popen(['which','mpicc'], stdout=subprocess.PIPE,
     universal_newlines=True)
         out, err = proc.communicate()
@@ -256,7 +255,7 @@ def get_mpiinfo():
     return ret
 
 def get_moduleinfo():
-    if (which("module") is not None):
+    if (does_command_exist("module")):
         proc = subprocess.Popen(['module', 'list'], stdout=subprocess.PIPE,
     universal_newlines=True)
         out, err = proc.communicate()
