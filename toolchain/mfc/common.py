@@ -254,18 +254,9 @@ def get_mpiinfo():
         ret = ret + "mpicc -> " + out
     return ret
 
-def get_moduleinfo():
-    if (does_command_exist("module")):
-        proc = subprocess.Popen(['module', 'list'], stdout=subprocess.PIPE,
-    universal_newlines=True)
-        out, err = proc.communicate()
-        return "Modules -> " + out
-    else:
-        return "No modules here..."
-
 def get_sysinfo():
     cpu = get_cpuinfo()
     env = get_envinfo()
-    mod = get_moduleinfo()
+    mod = format_list_to_string(get_loaded_modules())
     mpi = get_mpiinfo()
     return cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi
