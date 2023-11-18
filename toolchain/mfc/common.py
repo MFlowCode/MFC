@@ -220,3 +220,53 @@ def is_number(x: str) -> bool:
         return True
     except ValueError:
         return False
+
+def get_cpuinfo():
+    if (which("lscpu") is not None):
+        # Linux
+        proc = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,shell=True,universal_newlines=True)
+    elif (which("sysctl") is not None):
+        # MacOS
+        proc1 = subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE)
+        proc2 = subprocess.Popen(['grep', 'machdep.cpu'], stdin=proc1.stdout,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,universal_newlines=True)
+        proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
+        proc, err = proc2.communicate()
+    else:
+        proc = "No CPU info found"
+    return proc
+
+def get_envinfo():
+    myenv = ['FC','CC','CXX','OMPI_FC', 'OMPI_CC', 'OMPI_CXX']
+    env = [f"{x} -> {os.getenv(x,' ')}" for x in myenv]
+    return str(env)
+
+def get_mpiinfo():
+    ret = ""
+    if (which("mpif90") is not None):
+        proc = subprocess.Popen(['which','mpif90'], stdout=subprocess.PIPE,universal_newlines=True)
+        out, err = proc.communicate()
+        ret = ret + "mpif90 -> " + out
+
+    if (which("mpicc") is not None):
+        proc = subprocess.Popen(['which','mpicc'], stdout=subprocess.PIPE,
+    universal_newlines=True)
+        out, err = proc.communicate()
+        ret = ret + "mpicc -> " + out
+    return ret
+
+def get_moduleinfo():
+    if (which("module") is not None):
+        proc = subprocess.Popen(['module', 'list'], stdout=subprocess.PIPE,
+    universal_newlines=True)
+        out, err = proc.communicate()
+        return "Modules -> " + out
+    else:
+        return "No modules here..."
+
+def get_sysinfo():
+    cpu = get_cpuinfo()
+    env = get_envinfo()
+    mod = get_moduleinfo()
+    mpi = get_mpiinfo()
+    return cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi

@@ -46,6 +46,9 @@ class Pack:
         
         common.file_write(filepath, '\n'.join([ str(e) for e in sorted(self.entries.values(), key=lambda x: x.filepath) ]))
 
+    def save_metadata(self, filepath: str, sysinfo):
+        common.file_write(filepath, sysinfo)
+
     def hash_NaNs(self) -> bool:
         for entry in self.entries.values():
             for double in entry.doubles:
