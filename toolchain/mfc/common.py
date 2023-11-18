@@ -1,8 +1,14 @@
 import os, yaml, typing, shutil, subprocess, dataclasses
 
+from datetime import datetime
+
 from .printer import cons
 
 from os.path import abspath, normpath, dirname, realpath
+
+
+
+
 
 MFC_ROOTDIR       = normpath(f"{dirname(realpath(__file__))}/../..")
 MFC_TESTDIR       = abspath(f"{MFC_ROOTDIR}/tests")
@@ -225,6 +231,7 @@ def get_cpuinfo():
         # Linux
         proc1 = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,universal_newlines=True)
         proc, err = proc1.communicate()
+        proc = "From lscpu \n" + proc
     elif (does_command_exist("sysctl")):
         # MacOS
         proc1 = subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE)
@@ -232,14 +239,15 @@ def get_cpuinfo():
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,universal_newlines=True)
         proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
         proc, err = proc2.communicate()
+        proc = "From sysctl -a \n" + proc
     else:
         proc = "No CPU info found"
-    return proc
+    return "CPU Info: \n" + proc
 
 def get_envinfo():
     myenv = ['FC','CC','CXX','OMPI_FC', 'OMPI_CC', 'OMPI_CXX']
     env = [f"{x} -> {os.getenv(x,' ')}" for x in myenv]
-    return str(env)
+    return "Environment Info: \n" + format_list_to_string(env)
 
 def get_mpiinfo():
     ret = ""
@@ -253,11 +261,21 @@ def get_mpiinfo():
     universal_newlines=True)
         out, err = proc.communicate()
         ret = ret + "mpicc -> " + out
-    return ret
+    return "MPI Info: \n" + ret
+
+def get_hostinfo():
+    if (does_command_exist("hostname")):
+        proc = subprocess.Popen(['hostname'], stdout=subprocess.PIPE,universal_newlines=True)
+        out, err = proc.communicate()
+        return "Hostname -> " + out
+    else:
+        return "No hostname info found"
 
 def get_sysinfo():
-    cpu = get_cpuinfo()
-    env = get_envinfo()
-    mod = format_list_to_string(get_loaded_modules())
-    mpi = get_mpiinfo()
-    return cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi
+    time = "This file was created on: \n" + str(datetime.now())
+    host = get_hostinfo()
+    cpu  = get_cpuinfo()
+    env  = get_envinfo()
+    mod  = "Modules: \n" + format_list_to_string(get_loaded_modules())
+    mpi  = get_mpiinfo()
+    return  time + "\n\n" + host + "\n\n" + cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi 
