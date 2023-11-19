@@ -7,7 +7,7 @@ from ..state   import ARG
 from .case     import TestCase
 from .cases    import generate_cases
 from ..        import sched
-from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output, get_sysinfo
+from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..build   import build_targets, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
 from ..packer import tol as packtol
@@ -160,16 +160,14 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
     if err is not None:
         raise MFCException(f"Test {test}: {err}")
 
-    if pack.hash_NaNs():
+    if pack.has_NaNs():
         raise MFCException(f"Test {test}: NaNs detected in the case.")
 
     golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
     golden_meta_filepath = os.path.join(test.get_dirpath(), "golden-metadata.txt")
-    sysinfo = common.get_sysinfo()
     if ARG("generate"):
         common.delete_file(golden_filepath)
         pack.save(golden_filepath)
-        pack.save_metadata(golden_meta_filepath,sysinfo)
     else:
         if not os.path.isfile(golden_filepath):
             raise MFCException(f"Test {test}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
@@ -182,7 +180,6 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
                     golden.set(pentry)
 
             golden.save(golden_filepath)
-            pack.save_metadata(golden_meta_filepath,sysinfo)
         else:
             err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
             if msg is not None:

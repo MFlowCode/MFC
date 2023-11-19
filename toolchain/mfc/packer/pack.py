@@ -1,7 +1,10 @@
-import dataclasses, typing, os, re, math
+import dataclasses, typing, sys, os, re, math
 
 from ..       import common
+from ..build  import get_configured_targets
+from ..state  import CFG
 from ..common import MFCException
+from datetime import datetime
 
 from pathlib import Path
 
@@ -46,10 +49,37 @@ class Pack:
         
         common.file_write(filepath, '\n'.join([ str(e) for e in sorted(self.entries.values(), key=lambda x: x.filepath) ]))
 
-    def save_metadata(self, filepath: str, sysinfo):
-        common.file_write(filepath, sysinfo)
+        metadata = f"""\
+This file was created on {str(datetime.now())}.
 
-    def hash_NaNs(self) -> bool:
+mfc.sh:
+
+    Invocation: {' '.join(sys.argv[1:])}
+    Lock:       {CFG()}
+
+"""
+
+        for target in get_configured_targets():
+            cfg = target.get_configuration_txt()
+
+            if cfg is None:
+                continue
+
+            metadata += f"""\
+{target.name}:
+
+    {'    '.join(cfg.splitlines(keepends=True))}
+"""
+
+        metadata += f"""\
+CPU:
+
+    {'    '.join(common.get_cpuinfo().splitlines(keepends=True))}
+"""
+
+        common.file_write(f"{filepath.rstrip('.txt')}-metadata.txt", metadata)
+
+    def has_NaNs(self) -> bool:
         for entry in self.entries.values():
             for double in entry.doubles:
                 if math.isnan(double):
