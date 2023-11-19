@@ -1,5 +1,5 @@
 This file was created on: 
-2023-11-18 10:54:59.032516
+2023-11-19 00:23:30.310477
 
 Hostname -> shb-m1pro-3.local
 
@@ -22,3 +22,7 @@ nothing
 MPI Info: 
 mpif90 -> /opt/homebrew/bin/mpif90
 mpicc -> /opt/homebrew/bin/mpicc
+
+
+Lockfile: 
+{'config': {'debug': False, 'gpu': False, 'mpi': True}, 'version': 3}

@@ -268,6 +268,16 @@ def get_hostinfo():
     else:
         return "No hostname info found"
 
+def get_lockfile():
+    lockfile="build/lock.yaml"
+    if (os.path.isfile(lockfile)):
+        # found MFC lockfile
+        with open(lockfile,"r") as file:
+            lock = str(yaml.safe_load(file))
+        return "Lockfile: \n" + lock + "\n"
+    else:
+        return "No lockfile found"
+
 def get_sysinfo():
     time = "This file was created on: \n" + str(datetime.now())
     host = get_hostinfo()
@@ -275,4 +285,5 @@ def get_sysinfo():
     env  = get_envinfo()
     mod  = "Modules: \n" + format_list_to_string(get_loaded_modules())
     mpi  = get_mpiinfo()
-    return  time + "\n\n" + host + "\n\n" + cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi 
+    lock = get_lockfile()
+    return  time + "\n\n" + host + "\n\n" + cpu + "\n\n" + env + "\n\n" + mod + "\n\n" + mpi + "\n\n" + lock
