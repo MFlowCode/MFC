@@ -687,14 +687,14 @@ contains
                                         if(j == 1 .or. j == 2) then
                                             drdt2 = -1d0 / (2d0 * dsqrt(moms(4) - moms(2)**2d0))
                                         else
-                                            drdt2 =  1d0 / (2d0 * dqrt(moms(4) - moms(2)**2d0))
+                                            drdt2 =  1d0 / (2d0 * dsqrt(moms(4) - moms(2)**2d0))
                                         end if
                                     else
                                         ! Edge case where variance < 0
                                         if(j == 1 .or. j == 2) then
                                             drdt2 = -1d0 / (2d0 * dsqrt(verysmall))
                                         else
-                                            drdt2 =  1d0 / (2d0 * dsqrt(verysmall)))
+                                            drdt2 =  1d0 / (2d0 * dsqrt(verysmall))
                                         end if
                                     end if
 
