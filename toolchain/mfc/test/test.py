@@ -160,10 +160,11 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
     if err is not None:
         raise MFCException(f"Test {test}: {err}")
 
-    if pack.hash_NaNs():
+    if pack.has_NaNs():
         raise MFCException(f"Test {test}: NaNs detected in the case.")
 
     golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
+    golden_meta_filepath = os.path.join(test.get_dirpath(), "golden-metadata.txt")
     if ARG("generate"):
         common.delete_file(golden_filepath)
         pack.save(golden_filepath)

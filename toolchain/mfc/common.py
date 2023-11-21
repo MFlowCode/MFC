@@ -1,5 +1,7 @@
 import os, yaml, typing, shutil, subprocess, dataclasses
 
+from datetime import datetime
+
 from .printer import cons
 
 from os.path import abspath, normpath, dirname, realpath
@@ -220,3 +222,21 @@ def is_number(x: str) -> bool:
         return True
     except ValueError:
         return False
+
+def get_cpuinfo():
+    if (does_command_exist("lscpu")):
+        # Linux
+        proc1 = subprocess.Popen(['lscpu'], stdout=subprocess.PIPE,universal_newlines=True)
+        proc, err = proc1.communicate()
+        proc = "From lscpu \n" + proc
+    elif (does_command_exist("sysctl")):
+        # MacOS
+        proc1 = subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE)
+        proc2 = subprocess.Popen(['grep', 'machdep.cpu'], stdin=proc1.stdout,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,universal_newlines=True)
+        proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
+        proc, err = proc2.communicate()
+        proc = "From sysctl -a \n" + proc
+    else:
+        proc = "No CPU info found"
+    return "CPU Info: \n" + proc

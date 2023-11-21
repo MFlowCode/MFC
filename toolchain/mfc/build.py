@@ -1,4 +1,4 @@
-import os, typing, dataclasses
+import re, os, typing, dataclasses
 
 from .common    import MFCException, system, delete_directory, create_directory
 from .state     import ARG, CFG
@@ -70,7 +70,21 @@ class MFCTarget:
         return os.path.isfile(
             os.sep.join([self.get_build_dirpath(), "CMakeCache.txt"])
         )
-    
+
+    def get_configuration_txt(self) -> typing.Optional[dict]:
+        if not self.is_configured():
+            return None
+
+        configpath = os.path.join(self.get_build_dirpath(), "configuration.txt")
+        if not os.path.exists(configpath):
+            return None
+
+        with open(configpath) as f:
+            return f.read()
+
+        return None
+
+
     def build(self, history: typing.Set[str] = None):
         if history is None:
             history = set()
@@ -227,6 +241,10 @@ def build_targets(targets: typing.Iterable[typing.Union[MFCTarget, str]], histor
 def clean_targets(targets: typing.Iterable[typing.Union[MFCTarget, str]]):
     for target in targets:
         get_target(target).clean()
+
+
+def get_configured_targets() -> typing.List[MFCTarget]:
+    return [ target for target in TARGETS if target.is_configured() ]
 
 
 def build():
