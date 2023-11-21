@@ -1,28 +1,116 @@
-This file was created on: 
-2023-11-19 00:23:38.854393
+This file was created on 2023-11-19 23:43:45.054039.
 
-Hostname -> shb-m1pro-3.local
+mfc.sh:
 
+    Invocation: test -j 8 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No
 
-CPU Info: 
-From sysctl -a 
-machdep.cpu.cores_per_package: 10
-machdep.cpu.core_count: 10
-machdep.cpu.logical_per_package: 10
-machdep.cpu.thread_count: 10
-machdep.cpu.brand_string: Apple M1 Max
+pre_process:
 
+    CMake Configuration:
+    
+        CMake v3.27.7 on shb-m1pro-3.local
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
-Environment Info: 
-FC -> gfortran-13, CC -> gcc-13, CXX -> g++-13, OMPI_FC -> gfortran-13, OMPI_CC ->  , and OMPI_CXX -> g++-13
+syscheck:
 
-Modules: 
-nothing
+    CMake Configuration:
+    
+        CMake v3.27.7 on shb-m1pro-3.local
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
-MPI Info: 
-mpif90 -> /opt/homebrew/bin/mpif90
-mpicc -> /opt/homebrew/bin/mpicc
+simulation:
 
+    CMake Configuration:
+    
+        CMake v3.27.7 on shb-m1pro-3.local
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : g++-13
+        OMPI_FC  : gfortran-13
 
-Lockfile: 
-{'config': {'debug': False, 'gpu': False, 'mpi': True}, 'version': 3}
+CPU:
+
+    CPU Info: 
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 10
+    machdep.cpu.core_count: 10
+    machdep.cpu.logical_per_package: 10
+    machdep.cpu.thread_count: 10
+    machdep.cpu.brand_string: Apple M1 Max
+
