@@ -1,0 +1,30 @@
+CMake Configuration:
+
+    CMake v${CMAKE_VERSION} on ${SITE_NAME}
+
+    C       : ${CMAKE_C_COMPILER_ID} v${CMAKE_C_COMPILER_VERSION} (${CMAKE_C_COMPILER})
+    Fortran : ${CMAKE_Fortran_COMPILER_ID} v${CMAKE_Fortran_COMPILER_VERSION} (${CMAKE_Fortran_COMPILER})
+
+    PRE_PROCESS   : ${MFC_PRE_PROCESS}
+    SIMULATION    : ${MFC_SIMULATION}
+    POST_PROCESS  : ${MFC_POST_PROCESS}
+    SYSCHECK      : ${MFC_SYSCHECK}
+    DOCUMENTATION : ${MFC_DOCUMENTATION}
+    ALL           : ${MFC_ALL}
+
+    MPI     : ${MFC_MPI}
+    OpenACC : ${MFC_OpenACC}
+
+    Fypp    : ${FYPP_EXE}
+    Doxygen : ${DOXYGEN_EXECUTABLE}
+
+    Build Type : ${CMAKE_BUILD_TYPE}
+
+Configuration Environment:
+
+    CC       : $ENV{CC}
+    CXX      : $ENV{CXX}
+    FC       : $ENV{FC}
+    OMPI_CC  : $ENV{OMPI_CC}
+    OMPI_CXX : $ENV{OMPI_CXX}
+    OMPI_FC  : $ENV{OMPI_FC}

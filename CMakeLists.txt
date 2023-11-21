@@ -26,7 +26,7 @@ option(MFC_SYSCHECK      "Build syscheck"      OFF)
 option(MFC_DOCUMENTATION "Build documentation" OFF)
 option(MFC_ALL           "Build everything"    OFF)
 
-if (MFC_BUILD_ALL)
+if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
     set(MFC_SIMULATION    ON FORCE)
     set(MFC_POST_PROCESS  ON FORCE)
@@ -513,3 +513,9 @@ if (MFC_DOCUMENTATION)
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
             DESTINATION "docs/mfc")
 endif()
+
+site_name(SITE_NAME)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/configuration.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/configuration.txt")
