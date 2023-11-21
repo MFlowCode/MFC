@@ -19,6 +19,7 @@ __pycache__
 /tests/*/**
 !/tests/*/golden.txt
 !/tests/*/pack-metadata.txt
+!/tests/*/golden-metadata.txt
 !/tests/*/case.py
 !/tests/*/README.md
 

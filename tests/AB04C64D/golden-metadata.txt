@@ -1,11 +1,11 @@
-This file was created on 2023-11-19 23:46:24.706475.
+This file was created on 2023-11-21 08:17:49.681635.
 
 mfc.sh:
 
     Invocation: test -j 8 --generate
     Lock:       mpi=Yes & gpu=No & debug=No
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -14,8 +14,8 @@ pre_process:
         C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
         Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -71,7 +71,7 @@ syscheck:
         OMPI_CXX : g++-13
         OMPI_FC  : gfortran-13
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -80,8 +80,8 @@ simulation:
         C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
         Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
