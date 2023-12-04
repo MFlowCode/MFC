@@ -72,6 +72,7 @@ print(json.dumps({
     'avg_state'                    : 2,
     'perturb_flow'                 : 'T',
     'perturb_flow_fluid'           : 1,
+    'perturb_flow_mag'             : 1.E2,
     'bc_x%beg'                     : -1,
     'bc_x%end'                     : -1,
     'bc_y%beg'                     : -1,
