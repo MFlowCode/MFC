@@ -1,4 +1,4 @@
-import os, math, typing, shutil
+import os, math, typing, shutil, time
 
 from random    import sample
 from ..printer import cons
@@ -8,7 +8,7 @@ from .case     import TestCase
 from .cases    import generate_cases
 from ..        import sched
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build_targets, HDF5
+from ..build   import build_targets, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
 from ..packer import tol as packtol
 from ..packer import packer
@@ -91,7 +91,7 @@ def test():
 
         return
 
-    codes = ["pre_process", "simulation"] + (["post_process"] if ARG('test_all') else [])
+    codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
     if not ARG("case_optimization"):
         build_targets(codes)
 
@@ -100,12 +100,12 @@ def test():
     if len(ARG("only")) > 0:
         range_str = "Only " + format_list_to_string(ARG("only"), "bold magenta", "Nothing to run")
     
-    cons.print(f"[bold]Test {format_list_to_string(codes, 'magenta')}[/bold] | {range_str} ({len(CASES)} test{'s' if len(CASES) != 1 else ''})")
+    cons.print(f"[bold]Test {format_list_to_string([ x.name for x in codes ], 'magenta')}[/bold] | {range_str} ({len(CASES)} test{'s' if len(CASES) != 1 else ''})")
     cons.indent()
 
     # Run CASES with multiple threads (if available)
     cons.print()
-    cons.print(f" tests/[bold magenta]UUID[/bold magenta]    Summary")
+    cons.print(f" tests/[bold magenta]UUID[/bold magenta]     (s)      Summary")
     cons.print()
     
     # Select the correct number of threads to use to launch test CASES
@@ -132,6 +132,8 @@ def test():
 
 
 def _handle_case(test: TestCase, devices: typing.Set[int]):
+    start_time = time.time()
+
     if test.params.get("qbmm", 'F') == 'T':
         tol = 1e-10
     elif test.params.get("bubbles", 'F') == 'T':
@@ -144,7 +146,7 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
     test.delete_output()
     test.create_directory()
 
-    cmd = test.run(["pre_process", "simulation"], gpus=devices)
+    cmd = test.run([PRE_PROCESS, SIMULATION], gpus=devices)
 
     out_filepath = os.path.join(test.get_dirpath(), "out_pre_sim.txt")
 
@@ -158,10 +160,11 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
     if err is not None:
         raise MFCException(f"Test {test}: {err}")
 
-    if pack.hash_NaNs():
+    if pack.has_NaNs():
         raise MFCException(f"Test {test}: NaNs detected in the case.")
 
     golden_filepath = os.path.join(test.get_dirpath(), "golden.txt")
+    golden_meta_filepath = os.path.join(test.get_dirpath(), "golden-metadata.txt")
     if ARG("generate"):
         common.delete_file(golden_filepath)
         pack.save(golden_filepath)
@@ -184,7 +187,7 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         test.delete_output()
-        cmd = test.run(["pre_process", "simulation", "post_process"], gpus=devices)
+        cmd = test.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(test.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
@@ -214,7 +217,10 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
 
     test.delete_output()
 
-    cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {test.trace}")
+    end_time = time.time()
+    duration = end_time - start_time
+
+    cons.print(f"  [bold magenta]{test.get_uuid()}[/bold magenta]    {duration:6.2f}    {test.trace}")
 
 
 def handle_case(test: TestCase, devices: typing.Set[int]):

@@ -26,7 +26,7 @@ option(MFC_SYSCHECK      "Build syscheck"      OFF)
 option(MFC_DOCUMENTATION "Build documentation" OFF)
 option(MFC_ALL           "Build everything"    OFF)
 
-if (MFC_BUILD_ALL)
+if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
     set(MFC_SIMULATION    ON FORCE)
     set(MFC_POST_PROCESS  ON FORCE)
@@ -59,6 +59,9 @@ compiler (or a different version thereof), please:\n\
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
         message(FATAL_ERROR "${__err_msg}ERROR: GNU v5.0 or newer is required to build MFC.")
+    endif()
+    if (MFC_OpenACC)
+        message(FATAL_ERROR "${__err_msg}ERROR: MFC with GPU processing is not currently compatible with GNU compilers. Please use NVIDIA or Cray compilers.")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
@@ -510,3 +513,9 @@ if (MFC_DOCUMENTATION)
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
             DESTINATION "docs/mfc")
 endif()
+
+site_name(SITE_NAME)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/configuration.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/configuration.txt")

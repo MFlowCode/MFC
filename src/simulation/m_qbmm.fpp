@@ -676,27 +676,29 @@ contains
                                     end if
                                 end do
                             end do
-                            !Compute change in pb and mv for non-polytroic model
+
+                            ! Compute change in pb and mv for non-polytroic model
                             if(.not. polytropic) then
                                 !$acc loop seq                                                
                                 do j = 1, nnode
-                                    !Compute Rdot (drdt) at quadrature node in the ODE for pb (note this is not the same as bubble variable Rdot)
+                                    ! Compute Rdot (drdt) at quadrature node in the ODE for pb (note this is not the same as bubble variable Rdot)
                                     drdt = msum(2)
                                     if(moms(4) - moms(2)**2d0 > 0d0) then
                                         if(j == 1 .or. j == 2) then
-                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * -1d0
+                                            drdt2 = -1d0 / (2d0 * dsqrt(moms(4) - moms(2)**2d0))
                                         else
-                                            drdt2 = (1d0 / (2d0 *DSQRT(moms(4) - moms(2)**2d0))) * 1d0
+                                            drdt2 =  1d0 / (2d0 * dsqrt(moms(4) - moms(2)**2d0))
                                         end if
                                     else
-                                        !Edge case where variance < 0
+                                        ! Edge case where variance < 0
                                         if(j == 1 .or. j == 2) then
-                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * -1d0
+                                            drdt2 = -1d0 / (2d0 * dsqrt(verysmall))
                                         else
-                                            drdt2 = (1d0 / (2d0 *DSQRT(verysmall))) * 1d0
+                                            drdt2 =  1d0 / (2d0 * dsqrt(verysmall))
                                         end if
                                     end if
-                                    drdt2 = drdt2 * (msum(3) - 2d0*moms(2) * msum(2))                                   
+
+                                    drdt2 = drdt2 * (msum(3) - 2d0 * moms(2) * msum(2))                                   
                                     drdt = drdt + drdt2
 
                                     rhs_pb(id1, id2, id3, j, q) = (-3d0*gam*drdt/ abscX(j, q)) * (pb(id1, id2, id3, j, q)) 
@@ -708,7 +710,7 @@ contains
                             end if                            
                         end do
 
-                        !Compute special high-order moments
+                        ! Compute special high-order moments
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 0d0, 0d0)
                         momsp(2)%sf(id1, id2, id3) = 4.d0*pi*nbub* f_quad(abscX, abscY, wght, 2d0, 1d0, 0d0)
                         momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3d0, 2d0, 0d0)
