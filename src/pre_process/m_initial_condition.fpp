@@ -324,7 +324,7 @@ contains
 !                            q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                     ! Perturb velocity
                     call random_number(rand_real)
-                    rand_real = rand_real*1.d-2
+                    rand_real = rand_real*perturb_flow_mag
                     q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles) then
