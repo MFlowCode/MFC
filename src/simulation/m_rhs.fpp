@@ -845,7 +845,7 @@ contains
             ! ===============================================================
 
             if (alt_soundspeed) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -1037,7 +1037,7 @@ contains
                             end do
                         end do
                    else
-!$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1132,7 +1132,7 @@ contains
                 end do
                 !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
                 if(qbmm .and. (.not. polytropic) ) then
-                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p
@@ -1256,7 +1256,7 @@ contains
                             end if
                         end do
                     else
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do l = 0, p
                                 do k = 0, n
