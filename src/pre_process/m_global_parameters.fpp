@@ -103,6 +103,7 @@ module m_global_parameters
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
+    real(kind(0d0)) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
     real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
@@ -254,6 +255,7 @@ contains
         instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
+        perturb_flow_mag = dflt_real
         perturb_sph = .false.
         perturb_sph_fluid = dflt_int
         fluid_rho = dflt_real
