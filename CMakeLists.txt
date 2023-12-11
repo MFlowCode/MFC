@@ -76,6 +76,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.8)
                 message(FATAL_ERROR "${__err_msg}ERROR: Debug is not working with NVHPC 23.X and older and CPU options at present.")
             endif()
+        endif()
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
