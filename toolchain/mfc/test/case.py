@@ -94,10 +94,12 @@ BASE_CFG = {
 class TestCase(case.Case):
     ppn:   int
     trace: str
+    opt:   bool
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
+    def __init__(self, trace: str, mods: dict, ppn: int = None, opt: bool = None) -> None:
         self.trace = trace
-        self.ppn   = ppn if ppn is not None else 1
+        self.ppn   = ppn or 1
+        self.opt   = opt or False
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: typing.List[typing.Union[str, MFCTarget]], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
@@ -110,7 +112,7 @@ class TestCase(case.Case):
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
         binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
-        case_optimization =  "--case-optimization" if ARG("case_optimization")  else "--no-build"
+        case_optimization =  "--case-optimization" if ARG("case_optimization") or self.opt else "--no-build"
         
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
         

@@ -240,6 +240,8 @@ macro(HANDLE_SOURCES target useCommon)
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
+    string(TOUPPER ${target} ${target}_UPPER)
+
     # Gather src/[<target>,common]/*.f90
     file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90")
     set(${target}_SRCs ${${target}_F90s})
@@ -256,9 +258,9 @@ macro(HANDLE_SOURCES target useCommon)
     endif()
 
     # Locate src/[<target>,common]/include/*.fpp
-    if (EXISTS "${${target}_DIR}/include")
-        file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
-    endif()
+    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp"
+                                               "${CMAKE_CURRENT_BINARY_DIR}/include/*.fpp")
+
     if (${useCommon})
         file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fpp")
         list(APPEND ${target}_incs ${common_incs})
@@ -272,11 +274,14 @@ macro(HANDLE_SOURCES target useCommon)
         add_custom_command(
             OUTPUT   ${f90}
             COMMAND  ${FYPP_EXE} -m re
-                                 -I "${common_DIR}"
-                                 -I "${common_DIR}/include"
+                                 -I "${CMAKE_CURRENT_BINARY_DIR}/include"
                                  -I "${${target}_DIR}/include"
+                                 -I "${common_DIR}/include"
+                                 -I "${common_DIR}"
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
+                                 -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
+                                 -D MFC_CASE_OPTIMIZATION=False
                                  --line-numbering
                                  --no-folding
                                  "${fpp}" "${f90}"
@@ -328,10 +333,10 @@ function(MFC_SETUP_TARGET)
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
     endif()
 
-    string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
+    string(TOUPPER "${ARGS_TARGET}" ${ARGS_TARGET}_UPPER)
     target_compile_definitions(
         ${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
-                               MFC_${ARGS_TARGET_UPPER}
+                               MFC_${${ARGS_TARGET}_UPPER}
     )
 
     if (MFC_MPI AND ARGS_MPI)

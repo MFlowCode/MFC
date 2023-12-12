@@ -161,6 +161,7 @@ STDERR:
 
                 cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
+            cons.print()
             cons.unindent()
 
 
