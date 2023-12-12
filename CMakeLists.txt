@@ -446,6 +446,19 @@ if (MFC_SYSCHECK)
 endif()
 
 if (MFC_DOCUMENTATION)
+    # Files in docs/examples are used to generate docs/documentation/examples.md
+    file(GLOB_RECURSE examples_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/*")
+
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
+        DEPENDS "${examples_DOCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating examples.md"
+    )
+
+    file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
+
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
     # target, <target>_docs, that generates documentation for <target> using
     # Doxygen. It is then added as a dependency of the documentation target.
@@ -472,13 +485,20 @@ if (MFC_DOCUMENTATION)
             "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
             "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
 
+        set(opt_example_dependency "")
+        if (target STREQUAL "documentation")
+            set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
+        endif()
+
+        file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
+        list(APPEND ${target}_DOCs "${common_DOCs}")
+
         add_custom_command(
             OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
-                    "${${target}_SRCs}"
-            COMMAND  "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
-                            "${CMAKE_CURRENT_SOURCE_DIR}" && 
-                    "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
+                    "${opt_example_dependency}"
+                    "${${target}_SRCs}" "${${target}_DOCs}"
+            COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             COMMENT "${target}: Generating documentation"
         )
@@ -503,7 +523,7 @@ if (MFC_DOCUMENTATION)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "df83fbf22cfff76b875c13d324baf584c74e96d0"
+        GIT_TAG           "df88fe4fdd97714fadfd3ef17de0b4401f804052"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""
