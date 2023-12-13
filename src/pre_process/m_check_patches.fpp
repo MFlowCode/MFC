@@ -302,6 +302,7 @@ contains
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry! --------------
 
+
     !>  This subroutine verifies that the geometric parameters of
         !!      the analytical patch have consistently been inputted by
         !!      the user.

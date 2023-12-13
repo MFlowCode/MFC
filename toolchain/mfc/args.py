@@ -1,7 +1,7 @@
 import re, os.path, argparse, dataclasses
 
 from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
-from .common    import format_list_to_string
+from .common    import MFCException, format_list_to_string
 from .test.test import CASES as TEST_CASES
 from .packer    import packer
 
@@ -45,7 +45,7 @@ started, run ./mfc.sh build -h.""",
 
         if "t" not in mask:
             p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=[ _.name for _ in TARGETS ],
-                           default=[ _.name for _ in DEFAULT_TARGETS ],
+                           default=[ _.name for _ in sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder) ],
                            help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string([ _.name for _ in TARGETS ])}.")
 
         if "m" not in mask:
@@ -70,6 +70,8 @@ started, run ./mfc.sh build -h.""",
 
     # === BUILD ===
     add_common_arguments(build, "g")
+    build.add_argument("-i", "--input", type=str, default=None, help="(GPU Optimization) Build a version of MFC optimized for a case.")
+    build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
     # === CLEAN ===
     add_common_arguments(clean, "jg")
@@ -128,16 +130,17 @@ started, run ./mfc.sh build -h.""",
     args: dict = vars(parser.parse_args())
 
     # Add default arguments of other subparsers
-    def append_defaults_to_data(name: str, parser):
-        if args["command"] != name:
-            vals, errs = parser.parse_known_args(["-i None"])
-            for key,val in vars(vals).items():
-                if not key in args:
-                    args[key] = val
+    for name, parser in [("run",    run),   ("test",   test), ("build", build),
+                         ("clean",  clean), ("bench", bench), ("count", count)]:
+        if args["command"] == name:
+            continue
 
-    for a, b in [("run",    run  ), ("test",  test ), ("build", build),
-                 ("clean",  clean), ("bench", bench), ("count", count)]:
-        append_defaults_to_data(a, b)
+        vals, errs = parser.parse_known_args(["-i", "None"])
+        for key, val in vars(vals).items():
+            if key == "input":
+                args[key] = args.get(key)
+            elif not key in args:
+                args[key] = args.get(key, val)
 
     if args["command"] is None:
         parser.print_help()
@@ -146,11 +149,17 @@ started, run ./mfc.sh build -h.""",
     # "Slugify" the name of the job
     args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
+    # build's --case-optimization and --input depend on each other
+    if args["command"] == "build":
+        if (args["input"] is not None) ^ args["case_optimization"] :
+            raise MFCException(f"./mfc.sh build's --case-optimization requires --input")
+
+    # Input files to absolute paths
     for e in ["input", "input1", "input2"]:
         if e not in args:
             continue
-        
-        if args[e] is not None:
+
+        if args.get(e) is not None:
             args[e] = os.path.abspath(args[e])
 
     return args

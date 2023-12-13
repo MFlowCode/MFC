@@ -509,8 +509,10 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 | Parameter           | Type    | Description |
 | ---:                | :----:  | :--- |
 | `perturb_flow`      | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_flow_fluid`       | Integer | Fluid density whose flow is to be perturbed |
+| `perturb_flow_mag`       | Real | Set the magnitude of flow perturbations |
 | `perturb_sph`       | Logical | Perturb the initial partial density by random noise |
-| `perturb_sph_fluid` | Integer | Fluid component whose partial density to be perturbed |
+| `perturb_sph_fluid` | Integer | Fluid component whose partial density is to be perturbed |
 | `vel_profile`       | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `instability_wave`  | Logical | Perturb the initial velocity field by instability waves |
 
@@ -518,9 +520,13 @@ The table lists velocity field parameters. The parameters are optionally used to
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
-- `perturb_sph` activates the perturbation of intial partial density by random noise. 
+- `perturb_flow_fluid` specifies the fluid component whose flow is to be perturbed.
 
-- `perturb_sph_fluid` specifies the fluid component whose the partial density to be perturbed.
+- `perturb_flow` activates the perturbation of initial velocity by random noise.
+
+- `perturb_sph` activates the perturbation of initial partial density by random noise. 
+
+- `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
