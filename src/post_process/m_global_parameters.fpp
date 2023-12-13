@@ -111,6 +111,7 @@ module m_global_parameters
     !> @}
 
     logical :: parallel_io    !< Format of the data files
+    logical :: file_per_process !< output format
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -294,6 +295,7 @@ contains
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
+        file_per_process = .true.
         E_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
