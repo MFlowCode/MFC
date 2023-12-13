@@ -95,6 +95,7 @@ module m_global_parameters
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
     logical :: parallel_io !< Format of the data files
+    logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
 
     logical :: vel_profile !< Set hypertangent streamwise velocity profile
@@ -249,6 +250,7 @@ contains
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         parallel_io = .false.
+        file_per_process = .true.
         precision = 2
         vel_profile = .false.
         instability_wave = .false.

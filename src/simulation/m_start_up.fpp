@@ -117,6 +117,8 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
+        character(len=1000) :: line
+
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
@@ -141,7 +143,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type
+            R0_type, file_per_process
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -155,8 +157,11 @@ contains
             read (1, NML=user_inputs, iostat=iostatus)
 
             if (iostatus /= 0) then
-                call s_mpi_abort('Invalid line in simulation.inp. It is '// &
-                    'likely due to a datatype mismatch. Exiting ...')
+                backspace(1)
+                read(1,fmt='(A)') line
+                print*, 'Invalid line in namelist: '//trim(line)
+                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                'likely due to a datatype mismatch. Exiting ...')
             end if
 
             close (1)
@@ -392,6 +397,8 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
 
+        character(len = 10) :: t_step_start_string
+
         integer :: i
 
         allocate (x_cb_glb(-1:m_glb))
@@ -463,76 +470,136 @@ contains
             end if
         end if
 
-        ! Open the file to read conservative variables
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (file_per_process) then
+            call s_int_to_str(t_step_start, t_step_start_string)
+            ! Open the file to read conservative variables
+            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (file_exist) then
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            ! Initialize MPI data I/O
+                ! Initialize MPI data I/O
 
+                call s_initialize_mpi_data(q_cons_vf)
 
-            call s_initialize_mpi_data(q_cons_vf)
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            ! Resize some integers so MPI can read even the biggest file
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
 
-            ! Read the data for each variable
-            if (bubbles .or. hypoelasticity) then
+                    do i = 1, sys_size!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                do i = 1, sys_size!adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if(qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
-                end do
-                !Read pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
-                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+        else
+            ! Open the file to read conservative variables
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                ! Initialize MPI data I/O
+
+                call s_initialize_mpi_data(q_cons_vf)
+
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
+
+                    do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                               'native', mpi_info_int, ierr)
+                                            'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                        MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if(qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+                            ! Initial displacement to skip at beginning of file
+                            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                                'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                            'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
             else
-                do i = 1, adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
-
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
-                end do
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
-
-            call s_mpi_barrier()
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
