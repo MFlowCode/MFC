@@ -95,6 +95,8 @@ def test():
     if not ARG("case_optimization"):
         build_targets(codes)
 
+    cons.print()
+
     range_str = f"from [bold magenta]{ARG('from')}[/bold magenta] to [bold magenta]{ARG('to')}[/bold magenta]"
 
     if len(ARG("only")) > 0:
@@ -113,11 +115,9 @@ def test():
     # because running a test case may cause it to rebuild, and thus
     # interfere with the other test CASES. It is a niche feature so we won't
     # engineer around this issue (for now).
-    nThreads = ARG("jobs") if not ARG("case_optimization") else 1
-    tasks    = [
-        sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in CASES
-    ]
-    sched.sched(tasks, nThreads, ARG("gpus"))
+    sched.sched(
+        [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in CASES ],
+        ARG("jobs"), ARG("gpus"))
 
     cons.print()
     if nFAIL == 0:

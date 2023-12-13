@@ -543,11 +543,15 @@ contains
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'num_patches. Exiting ...')
             ! Constraints on perturbing the initial condition
-        elseif ((perturb_flow .and. perturb_flow_fluid == dflt_int) &
+        elseif ((perturb_flow &
+                .and. &
+                (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) &
                 .or. &
-                ((perturb_flow .neqv. .true.) .and. (perturb_flow_fluid /= dflt_int))) then
+                ((perturb_flow .neqv. .true.) &
+                .and. &
+                (perturb_flow_fluid /= dflt_int .or. perturb_flow_mag /= dflt_real))) then
             call s_mpi_abort('Unsupported choice of the combination of '// &
-                'values for perturb_flow and perturb_flow_fluid. '// &
+                'values for perturb_flow, perturb_flow_fluid, and perturb_flow_mag. '// &
                 'Exiting ...')
         elseif ((perturb_flow_fluid > num_fluids) &
                 .or. &

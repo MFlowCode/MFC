@@ -65,8 +65,8 @@ contains
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &
             & 'a_z', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', 'z_b', 'bc_x%beg',     &
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
-            & 'pref', 'rhoref', 'poly_sigma', 'R0ref', 'Web', 'Ca', 'Re_inv',  &
-            & 'sigR', 'sigV', 'rhoRV' ]
+            & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
+            & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
