@@ -251,7 +251,7 @@ contains
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         parallel_io = .false.
-        file_per_process = .true.
+        file_per_process = .false.
         precision = 2
         vel_profile = .false.
         instability_wave = .false.
