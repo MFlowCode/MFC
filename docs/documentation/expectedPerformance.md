@@ -34,7 +34,7 @@ CPU results utilize an entire die.
 
 ## Weak scaling
 
-Strong scaling results are obtained by increasing the problem size with the number of processes so that work per process remains constant.
+Weak scaling results are obtained by increasing the problem size with the number of processes so that work per process remains constant.
 
 ### AMD MI250X GPU
 
