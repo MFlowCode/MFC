@@ -374,7 +374,7 @@ contains
         null_weights = .false.
         mixture_err = .false.
         parallel_io = .false.
-        file_per_process = .true.
+        file_per_process = .false.
         precision = 2
         hypoelasticity = .false.
         weno_flat = .true.

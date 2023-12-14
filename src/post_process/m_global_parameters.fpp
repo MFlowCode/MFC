@@ -295,7 +295,7 @@ contains
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
-        file_per_process = .true.
+        file_per_process = .false.
         E_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
