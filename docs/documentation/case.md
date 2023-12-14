@@ -344,6 +344,7 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 | `format`             | Integer | Output format. [1]: Silo-HDF5; [2] Binary	|
 | `precision`          | Integer | [1] Single; [2] Double	 |
 | `parallel_io`        | Logical | Parallel I/O	|
+| `file_per_process`   | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`      | Logical | Write conservative variables |
 | `prim_vars_wrt`      | Logical | Write primitive variables	|
 | `alpha_rho_wrt(i)`   | Logical | Add the partial density of the fluid $i$ to the database \|
@@ -377,7 +378,10 @@ The table lists formatted database output parameters. The parameters define vari
 With parallel I/O, MFC inputs and outputs a single file throughout pre-process, simulation, and post-process, regardless of the number of processors used.
 Parallel I/O enables the use of different number of processors in each of the processes (i.e. simulation data generated using 1000 processors can be post-processed using a single processor).
 
-- `cons_vars_wrt` and `prim_vars_wrt} activate output of conservative and primitive state variables into the database, respectively.
+- `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO. The default behaviour is to use a shared file.
+    File per process is usefull when running on 10's of thousands of ranks.
+
+- `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
 
 - `[variable's name]_wrt` activates output of the each specified variable into the database.
 
