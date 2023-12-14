@@ -446,15 +446,16 @@ if (MFC_SYSCHECK)
 endif()
 
 if (MFC_DOCUMENTATION)
-    # Files in docs/examples are used to generate docs/documentation/examples.md
-    file(GLOB_RECURSE examples_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/*")
+    # Files in examples/ are used to generate docs/documentation/examples.md
+    file(GLOB_RECURSE examples_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/examples/*")
 
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
-        DEPENDS "${examples_DOCs}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh;${examples_DOCs}"
         COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
                        "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMENT "Generating examples.md"
+        VERBATIM
     )
 
     file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
@@ -486,7 +487,7 @@ if (MFC_DOCUMENTATION)
             "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
 
         set(opt_example_dependency "")
-        if (target STREQUAL "documentation")
+        if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
         endif()
 

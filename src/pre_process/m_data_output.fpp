@@ -29,6 +29,8 @@ module m_data_output
     use m_variables_conversion
 
     use m_helper
+
+    use m_delay_file_access
     ! ==========================================================================
 
     implicit none
@@ -396,80 +398,147 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: MOK
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical :: file_exist
+        logical :: file_exist, dir_check
 
         ! Generic loop iterator
         integer :: i
 
-        ! Initialize MPI data I/O
-        call s_initialize_mpi_data(q_cons_vf)
-        
-        ! Open the file to write all flow variables
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
-        file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) then
-            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-        end if
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                           mpi_info_int, ifile, ierr)
+        if (file_per_process) then
+            if (proc_rank == 0) then
+                file_loc = trim(case_dir)//'/restart_data/lustre_0'
+                call my_inquire(file_loc, dir_check)
+                if (dir_check .neqv. .true.) then
+                   call s_create_directory(trim(file_loc))
+                end if
+                call s_create_directory(trim(file_loc))
+            end if
+            call s_mpi_barrier()
+            call DelayFileAccess (proc_rank)
+            ! Initialize MPI data I/O
+            call s_initialize_mpi_data(q_cons_vf)
+            
+            ! Open the file to write all flow variables
+            write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            file_loc = trim(restart_dir)//'/lustre_0'//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                            mpi_info_int, ifile, ierr)
 
-        ! Size of local arrays
-        data_size = (m + 1)*(n + 1)*(p + 1)
+            ! Size of local arrays
+            data_size = (m + 1)*(n + 1)*(p + 1)
 
-        ! Resize some integers so MPI can write even the biggest files
-        m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-        n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-        p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-        WP_MOK = int(8d0, MPI_OFFSET_KIND)
-        MOK = int(1d0, MPI_OFFSET_KIND)
-        str_MOK = int(name_len, MPI_OFFSET_KIND)
-        NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            ! Resize some integers so MPI can write even the biggest files
+            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+            WP_MOK = int(8d0, MPI_OFFSET_KIND)
+            MOK = int(1d0, MPI_OFFSET_KIND)
+            str_MOK = int(name_len, MPI_OFFSET_KIND)
+            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-        ! Write the data for each variable
-        if (bubbles) then
-            do i = 1, sys_size! adv_idx%end
-                var_MOK = int(i, MPI_OFFSET_KIND)
+            ! Write the data for each variable
+            if (bubbles) then
+                do i = 1, sys_size! adv_idx%end
+                    var_MOK = int(i, MPI_OFFSET_KIND)
 
-                ! Initial displacement to skip at beginning of file
-                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                end do
+                !Additional variables pb and mv for non-polytropic qbmm
+                if(qbmm .and. .not. polytropic) then
+                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                       'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
-            end do
-            !Additional variables pb and mv for non-polytropic qbmm
-            if(qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*nnode
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                                MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
+            else
+                do i = 1, sys_size !TODO: check if this is right
+    !            do i = 1, adv_idx%end
+                    var_MOK = int(i, MPI_OFFSET_KIND)
+
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                end do
+            end if
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+        else
+            ! Initialize MPI data I/O
+            call s_initialize_mpi_data(q_cons_vf)
+            
+            ! Open the file to write all flow variables
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                            mpi_info_int, ifile, ierr)
+
+            ! Size of local arrays
+            data_size = (m + 1)*(n + 1)*(p + 1)
+
+            ! Resize some integers so MPI can write even the biggest files
+            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+            WP_MOK = int(8d0, MPI_OFFSET_KIND)
+            MOK = int(1d0, MPI_OFFSET_KIND)
+            str_MOK = int(name_len, MPI_OFFSET_KIND)
+            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+            ! Write the data for each variable
+            if (bubbles) then
+                do i = 1, sys_size! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
+                                        'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+                end do
+                !Additional variables pb and mv for non-polytropic qbmm
+                if(qbmm .and. .not. polytropic) then
+                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                            'native', mpi_info_int, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                                MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
+            else
+                do i = 1, sys_size !TODO: check if this is right
+    !            do i = 1, adv_idx%end
+                    var_MOK = int(i, MPI_OFFSET_KIND)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                        'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             end if
-        else
-            do i = 1, sys_size !TODO: check if this is right
-!            do i = 1, adv_idx%end
-                var_MOK = int(i, MPI_OFFSET_KIND)
 
-                ! Initial displacement to skip at beginning of file
-                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                       'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        MPI_DOUBLE_PRECISION, status, ierr)
-            end do
-        end if
-
-        call MPI_FILE_CLOSE(ifile, ierr)
-
+            call MPI_FILE_CLOSE(ifile, ierr)
+        endif
 #endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------

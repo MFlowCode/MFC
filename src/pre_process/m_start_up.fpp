@@ -105,6 +105,8 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
+        character(len=1000) :: line
+
         ! Namelist for all of the parameters to be inputed by the user
         namelist /user_inputs/ case_dir, old_grid, old_ic, &
             t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
@@ -121,7 +123,8 @@ contains
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
-            sigR, sigV, dist_type, rhoRV, R0_type
+            sigR, sigV, dist_type, rhoRV, R0_type, &
+            file_per_process
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -134,6 +137,9 @@ contains
                   STATUS='old', ACTION='read')
             read (1, NML=user_inputs, iostat=iostatus)
             if (iostatus /= 0) then
+                backspace(1)
+                read(1,fmt='(A)') line
+                print*, 'Invalid line in namelist: '//trim(line)
                 call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
                 'likely due to a datatype mismatch. Exiting ...')
             end if

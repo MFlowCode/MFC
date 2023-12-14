@@ -134,6 +134,7 @@ module m_global_parameters
     !> @}
 
     logical :: parallel_io !< Format of the data files
+    logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
 
     integer, allocatable, dimension(:) :: proc_coords !<
@@ -373,6 +374,7 @@ contains
         null_weights = .false.
         mixture_err = .false.
         parallel_io = .false.
+        file_per_process = .false.
         precision = 2
         hypoelasticity = .false.
         weno_flat = .true.
