@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import math
 
 # Configuring case dictionary
 print(json.dumps({
@@ -13,13 +14,13 @@ print(json.dumps({
     'x_domain%end'                 : 1.E+00,
     'y_domain%beg'                 : 0.E+00,
     'y_domain%end'                 : 1.E+00,
-    'm'                            : 999,
-    'n'                            : 999,
+    'm'                            : 499,
+    'n'                            : 499,
     'p'                            : 0,
-    'dt'                           : 5e-05,
+    'dt'                           : 8e-05,
     't_step_start'                 : 0,
-    't_step_stop'                  : 1,
-    't_step_save'                  : 1,
+    't_step_stop'                  : 10000,
+    't_step_save'                  : 100,
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -32,7 +33,7 @@ print(json.dumps({
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'mp_weno'                      : 'F',
-    #'recon_type'                   : 1,
+    'recon_type'                   : 1,
     'weno_order'                   : 5,
     'weno_eps'                     : 1e-16,
     #'muscl_order'                  : 2,
@@ -49,53 +50,52 @@ print(json.dumps({
     # Formatted Database Files Structure Parameters ============
     'format'                       : 1,
     'precision'                    : 2,
-    'alpha_rho_wrt(1)'                 : 'T',
-    #'prim_vars_wrt'                :'T',
+    'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================
                                                             
     # Patch 1: Base ============================================
     'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : 0.25,
-    'patch_icpp(1)%y_centroid'     : 0.25,
-    'patch_icpp(1)%length_x'       : 0.5,
-    'patch_icpp(1)%length_y'       : 0.5,
-    'patch_icpp(1)%vel(1)'         : 1.206,
-    'patch_icpp(1)%vel(2)'         : 1.206,
-    'patch_icpp(1)%pres'           : 0.029,
-    'patch_icpp(1)%alpha_rho(1)'   : 0.138,
+    'patch_icpp(1)%x_centroid'     : 0.4,
+    'patch_icpp(1)%y_centroid'     : 0.4,
+    'patch_icpp(1)%length_x'       : 0.8,
+    'patch_icpp(1)%length_y'       : 0.8,
+    'patch_icpp(1)%vel(1)'         : 4/math.sqrt(11),
+    'patch_icpp(1)%vel(2)'         : 4/math.sqrt(11),
+    'patch_icpp(1)%pres'           : 9/310,
+    'patch_icpp(1)%alpha_rho(1)'   : 77/558,
     'patch_icpp(1)%alpha(1)'       : 1,
     # ==========================================================
     # Patch 1: Base ============================================
     'patch_icpp(2)%geometry'       : 3,
-    'patch_icpp(2)%x_centroid'     : 0.25,
-    'patch_icpp(2)%y_centroid'     : 0.75,
-    'patch_icpp(2)%length_x'       : 0.5,
-    'patch_icpp(2)%length_y'       : 0.5,
-    'patch_icpp(2)%vel(1)'         : 1.206,
+    'patch_icpp(2)%x_centroid'     : 0.4,
+    'patch_icpp(2)%y_centroid'     : 0.9,
+    'patch_icpp(2)%length_x'       : 0.8,
+    'patch_icpp(2)%length_y'       : 0.2,
+    'patch_icpp(2)%vel(1)'         : 4/math.sqrt(11),
     'patch_icpp(2)%vel(2)'         : 0,
     'patch_icpp(2)%pres'           : 0.3,
-    'patch_icpp(2)%alpha_rho(1)'   : 0.5323,
+    'patch_icpp(2)%alpha_rho(1)'   : 33/62,
     'patch_icpp(2)%alpha(1)'       : 1,
     # ==========================================================
     # Patch 1: Base ============================================
     'patch_icpp(3)%geometry'       : 3,
-    'patch_icpp(3)%x_centroid'     : 0.75E+00,
-    'patch_icpp(3)%y_centroid'     : 0.25E+00,
-    'patch_icpp(3)%length_x'       : 0.5,
-    'patch_icpp(3)%length_y'       : 0.5,
+    'patch_icpp(3)%x_centroid'     : 0.9E+00,
+    'patch_icpp(3)%y_centroid'     : 0.4E+00,
+    'patch_icpp(3)%length_x'       : 0.2,
+    'patch_icpp(3)%length_y'       : 0.8,
     'patch_icpp(3)%vel(1)'         : 0,
-    'patch_icpp(3)%vel(2)'         : 1.206,
+    'patch_icpp(3)%vel(2)'         : 4/math.sqrt(11),
     'patch_icpp(3)%pres'           : 0.3,
-    'patch_icpp(3)%alpha_rho(1)'   : 0.5323,
+    'patch_icpp(3)%alpha_rho(1)'   : 33/62,
     'patch_icpp(3)%alpha(1)'       : 1,
     # ==========================================================
     # Patch 1: Base ============================================
     'patch_icpp(4)%geometry'       : 3,
-    'patch_icpp(4)%x_centroid'     : 0.75E+00,
-    'patch_icpp(4)%y_centroid'     : 0.75E+00,
-    'patch_icpp(4)%length_x'       : 0.5,
-    'patch_icpp(4)%length_y'       : 0.5,
+    'patch_icpp(4)%x_centroid'     : 0.9E+00,
+    'patch_icpp(4)%y_centroid'     : 0.9E+00,
+    'patch_icpp(4)%length_x'       : 0.2,
+    'patch_icpp(4)%length_y'       : 0.2,
     'patch_icpp(4)%vel(1)'         : 0,
     'patch_icpp(4)%vel(2)'         : 0,
     'patch_icpp(4)%pres'           : 1.5,
