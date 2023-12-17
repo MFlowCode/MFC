@@ -7,6 +7,7 @@ This page shows a summary of these results.
 
 The following table outlines expected performance in terms of the number of time steps per hour, rounded to the nearest hundred (higher is better).
 A 3D inviscid, 6-equation problem is solved for various problem sizes (grid cells) and hardware.
+A 3rd order (3-stage) Runge-Kutta time-stepper is used.
 CPU results utilize an entire processor die.
 
 | Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
@@ -18,7 +19,7 @@ CPU results utilize an entire processor die.
 | Intel Xeon Gold 6226 | 12 (cores)     | 2.5k           | 0.7k           | 0.4k         | GNU 10.3.0  | PACE Phoenix  |
 | Apple Silicon M2     | 6 (cores)       | 2.8k           | 0.6k           | 0.2k         | GNU 13.2.0  | N/A           |
 
-We also show the expected performance of MFC for a 3D inviscid 5-equation problem in the table below.
+We also show the expected performance of MFC for the same problem as above, except for the 5-equation model used, in the table below.
 It is presented in the same manner as the one above.
 
 | Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
