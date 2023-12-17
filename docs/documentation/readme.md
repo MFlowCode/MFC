@@ -7,7 +7,7 @@
 - [Case Files](case.md)
 - [Example Cases](examples.md)
 - [Running MFC](running.md)
-- [Flow Visualisation](visualisation.md)
+- [Flow Visualization](visualization.md)
 - [Performance Results](expectedPerformance.md)
 - [MFC's Authors](authors.md)
 - [References](references.md)
