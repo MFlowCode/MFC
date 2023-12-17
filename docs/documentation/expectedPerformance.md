@@ -1,12 +1,12 @@
 # Performance Results
 
-MFC has been extensively benchmarked on CPUs and GPU devices.
-A summary of these results follows.
+MFC has been benchmarked on several CPUs and GPU devices.
+This page shows a summary of these results.
 
 ## Expected time-steps/hour
 
-The following table outlines expected performance in terms of the number of time steps per hour (rounded to the nearest hundred, higher is better).
-A 3D inviscid, 6-equation (`'model_eqns' : 3`) problem is solved for various problem sizes (grid cells) and hardware.
+The following table outlines expected performance in terms of the number of time steps per hour, rounded to the nearest hundred (higher is better).
+A 3D inviscid, 6-equation problem is solved for various problem sizes (grid cells) and hardware.
 CPU results utilize an entire processor die.
 
 | Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
@@ -18,9 +18,8 @@ CPU results utilize an entire processor die.
 | Intel Xeon Gold 6226 | 12 (cores)     | 2.5k           | 0.7k           | 0.4k         | GNU 10.3.0  | PACE Phoenix  |
 | Apple Silicon M2     | 6 (cores)       | 2.8k           | 0.6k           | 0.2k         | GNU 13.2.0  | N/A           |
 
-If `'model_eqns' : 3` is replaced by `'model_eqns' : 2`, an inviscid 5-equation model is used.
-The below table shows expected performance via the number of time steps per hour (rounded to the nearest hundred) for various problem sizes and hardware for an inviscid, 5-equation, 3D simulation.
-CPU results use an entire processor die.
+We also show the expected performance of MFC for a 3D inviscid 5-equation problem in the table below.
+It is presented in the same manner as the one above.
 
 | Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
 | ---:                 | :----:  |    :----:      |  :---:         | :---:        | :----:      | :---          |
