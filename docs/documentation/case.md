@@ -379,7 +379,7 @@ With parallel I/O, MFC inputs and outputs a single file throughout pre-process, 
 Parallel I/O enables the use of different number of processors in each of the processes (i.e. simulation data generated using 1000 processors can be post-processed using a single processor).
 
 - `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO. The default behaviour is to use a shared file.
-    File per process is usefull when running on 10's of thousands of ranks.
+    File per process is usefull when running on 10's of thousands of ranks. If `file_per_process` is true, then pre_process, simulation, and post_process must be ran with the same number of ranks.
 
 - `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
 
