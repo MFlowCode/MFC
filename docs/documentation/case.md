@@ -20,8 +20,7 @@ print(json.dumps({
 }))
 ```
 
-Thus, you can run your case file with Python to view the computed case dictionary
-that will be processed by MFC when you run:
+Thus, you can run your case file with Python to view the computed case dictionary that will be processed by MFC when you run:
 
 ```console
 $ python3 my_case_file.py
@@ -376,10 +375,9 @@ The table lists formatted database output parameters. The parameters define vari
 
 - `parallel_io` activates parallel input/output (I/O) of data files. It is highly recommended to activate this option in a parallel environment.
 With parallel I/O, MFC inputs and outputs a single file throughout pre-process, simulation, and post-process, regardless of the number of processors used.
-Parallel I/O enables the use of different number of processors in each of the processes (i.e. simulation data generated using 1000 processors can be post-processed using a single processor).
+Parallel I/O enables the use of different number of processors in each of the processes (i.e., simulation data generated using 1000 processors can be post-processed using a single processor).
 
-- `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO. The default behaviour is to use a shared file.
-    File per process is usefull when running on 10's of thousands of ranks. If `file_per_process` is true, then pre_process, simulation, and post_process must be ran with the same number of ranks.
+- `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO. The default behavior is to use a shared file. File per process is useful when running on 10's of thousands of ranks. If `file_per_process` is true, then pre_process, simulation, and post_process must be run with the same number of ranks.
 
 - `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
 
@@ -387,7 +385,7 @@ Parallel I/O enables the use of different number of processors in each of the pr
 
 - `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
 
-- `fd_order` specifies the order of finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4. `fd_order` $=$ 1, 2, and 4 correspond to the first, second, and fourth order finite difference schemes, respectively.
+- `fd_order` specifies the order of the finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4. `fd_order` $=$ 1, 2, and 4 correspond to the first, second, and fourth-order finite difference schemes, respectively.
 
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
@@ -412,7 +410,7 @@ The table lists acoustic source parameters. The parameters are optionally used t
 
 - `num_mono` defines the total number of source planes by an integer.
 
-- `Mono(i)%pulse` specifies the choice of the acoustic wave form generated from $i$-th source plane by an integer.
+- `Mono(i)%pulse` specifies the choice of the acoustic waveform generated from $i$-th source plane by an integer.
 `Mono(i)%pulse` $=$ 1, 2, and 3 correspond to sinusoidal wave, Gaussian wave, and square wave, respectively.
 
 - `Mono(i)%npulse` defines the number of cycles of the acoustic wave generated from $i$-th source plane by an integer.
