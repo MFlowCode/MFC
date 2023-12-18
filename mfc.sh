@@ -4,7 +4,7 @@ unset u_c
 unset u_cg
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=6
+MFC_PYTHON_MIN_MINOR=9
 
 # Check whether this script was called from MFC's root directory.
 if [ ! -f "$(pwd)/toolchain/mfc.py" ]; then
