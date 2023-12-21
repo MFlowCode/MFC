@@ -106,7 +106,6 @@ if [ "$1" == 'load' ]; then
     # Find length of longest module_name in $MODULES for $COMPUTER
     max_module_length="0"
     for module_name in ${MODULES[@]}; do
-        echo "$module_name"
         module_length="${#module_name}"
 
         if [ "$module_length" -gt "$max_module_length" ]; then
