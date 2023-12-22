@@ -1,0 +1,17 @@
+[default]
+extend-ignore-identifiers-re = [
+    "AttributeID.*Supress.*",
+]
+
+[default.extend-identifiers]
+AttributeIDSupressMenu = "AttributeIDSupressMenu"
+
+[default.extend-words]
+INOUT = "INOUT"
+Childs = "Childs"
+myu = "myu"
+nd = "nd"
+WRONLY = "WRONLY"
+
+[files]
+extend-exclude = ["docs/documentation/references*"]

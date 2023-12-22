@@ -49,10 +49,10 @@ ARGS = vars(parser.parse_args())
 ```
 
 The first argument is always a JSON string representing `mfc.sh run`'s internal
-state. It contains all the runtime information you might want from the build/run system.
-We hide it from the help menu with `help=argparse.SUPPRESS` since it is not meant
-to be passed in by users. You can add as many additional positional arguments as
-you may need.
+state.
+It contains all the runtime information you might want from the build/run system.
+We hide it from the help menu with `help=argparse.SUPPRESS` since it is not meant to be passed in by users.
+You can add as many additional positional arguments as you may need.
 
 To run such a case, use the following format:
 
@@ -109,13 +109,13 @@ Definition of the parameters is described in the following subsections.
 | `t_step_stop`            | Integer | Simulation stopping time step |
 | `t_step_save`            | Integer | Frequency to output data |
 
-The parameters define the boundaries of the spatial and temporal domains, and their discritization that are used in simulation.
+The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
 - `[x,y,z]_domain%[beg,end]` define the spatial domain in $x$, $y$, and $z$ Cartesian coordinates:
 
 $$ x \in \left[ x \\_ domain \\% beg, x \\_ domain \\% end \right], y \in \left[ y \\_ domain \\% beg, y \\_ domain \\% end \right], z \in \left[ z \\_ domain \\% beg, z \\_ domain \\% end \right] $$
 
-- $m$, $n$, and $p$ define the number of finite volume cells that uniformly discritize the domain along the $x$, $y$, and $z$ axes, respectively.
+- $m$, $n$, and $p$ define the number of finite volume cells that uniformly discretize the domain along the $x$, $y$, and $z$ axes, respectively.
 Note that the actual number of cells in each coordinate axis is given as $[m,n,p]+1$.
 For example, $m=n=p=499$ discretizes the domain into $500^3$ cells. 
 When the simulation is 2D/axi-symmetric or 1D, it requires that $p=0$ or $p=n=0$, respectively.
@@ -127,14 +127,28 @@ The grid is gradually stretched such that the domain boundaries are pushed away 
 
 $$ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_a)}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_b)}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_b-x_a)}{2L} \right) \right]  \Bigg] $$
 
-where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively. `L` is the domain length along the `x` axis: `L`=`x_domain%end`-`x_domain%beg`. Crudely speaking, `x_a` and `x_b` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively. $a_x$ defines the smoothness of the stretching. Stretching along the $y$ and $z$ axes follows the same logistics. Optimal choice of the parameters for grid stretching is case-dependent and left to the user. `loops_x[y,z]` defines the number of times
-the grid stretching funciton is applied and has a default value of one.
+where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively.
+`L` is the domain length along the `x` axis: `L`=`x_domain%end`-`x_domain%beg`.
+Crudely speaking, `x_a` and `x_b` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively.
+$a_x$ defines the smoothness of the stretching.
+Stretching along the $y$ and $z$ axes follows the same logistics.
+Optimal choice of the parameters for grid stretching is case-dependent and left to the user.
+`loops_x[y,z]` defines the number of times the grid stretching function is applied and has a default value of one.
 
-- `cyl_coord` activates cylindrical coordinates. The domain is defined in $x$-$y$-$z$ cylindrical coordinates, instead of Cartesian coordinates. Domain discritization is accordingly conducted along the axes of cylindrical coordinates. Wnen $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates. In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes. MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
+- `cyl_coord` activates cylindrical coordinates.
+The domain is defined in $x$-$y$-$z$ cylindrical coordinates, instead of Cartesian coordinates.
+Domain discretization is accordingly conducted along the axes of cylindrical coordinates.
+When $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates.
+In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes.
+MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
 
-- `dt` specifies the constant time step size that is used in simulation. The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
+- `dt` specifies the constant time step size that is used in simulation.
+The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
 
-- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively. `t_step_save` is the time step interval for data output during simulation. To newly start simulation, set `t_step_start`=0. To restart simulation from $k$-th time step, set `t_step_start`=k.
+- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
+`t_step_save` is the time step interval for data output during simulation.
+To newly start simulation, set `t_step_start`=0.
+To restart simulation from $k$-th time step, set `t_step_start`=k.
 
 ### 3. Patches
 
@@ -204,14 +218,16 @@ end if
 
 #### Hard Coded Patches
 
-Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+Some patch configurations are not adequately handled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
     case(200)
         ! Primitive variables assignment
 ```
 
-and use `patch_icpp(i)%geometry = 7` and `patch_icpp(i)%hcid = 200` in the input file. Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
+and use `patch_icpp(i)%geometry = 7` and `patch_icpp(i)%hcid = 200` in the input file.
+Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
+As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indites the number of dimensions.
 
 #### Parameter Descriptions
 
@@ -479,18 +495,18 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 
 - `R0ref` specifies the reference bubble radius.
 
-- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibirum bubble radius.
+- `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
 
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to simpson's rule. 
+- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to Simpson's rule. 
 
-- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibirium bubble radius for polydisperse populations. 
+- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations. 
 
 - `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
 - `mu_l0`, `ss`, and `pv`, `gamma_v`, `M_v`, `mu_v`, and `k_v` specify simulation parameters for the non-polytropic gas compression model.
 `mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
-Implementation of the parameterse into the model follow [Ando (2010)](references.md#Ando10).
+Implementation of the parameters into the model follow [Ando (2010)](references.md#Ando10).
 
 - `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity. 
 
@@ -514,7 +530,8 @@ Implementation of the parameterse into the model follow [Ando (2010)](references
 | `vel_profile`       | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `instability_wave`  | Logical | Perturb the initial velocity field by instability waves |
 
-The table lists velocity field parameters. The parameters are optionally used to define initial velocity profiles and perturbations.
+The table lists velocity field parameters.
+The parameters are optionally used to define initial velocity profiles and perturbations.
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
@@ -528,7 +545,7 @@ The table lists velocity field parameters. The parameters are optionally used to
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with `vel_profile`=TRUE.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with `vel_profile = TRUE`.
 
 
 ## Enumerations
@@ -602,9 +619,9 @@ also listed in this table.
 |    5 | Transducer |
 |    6 | Cyl_coord along axial-dir |
 
-The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports). This includes
-types exclusive to one-, two-, and three-dimensional problems with special souce geometry like transducers as well as coordinate systems such as cylindrical coordinates. The monopole support number (`#`) corresponds to the input value in `input.py` labeled  `Mono(i)%support` where
-$i$ is the monopole source index.
+The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports).
+This includes types exclusive to one-, two-, and three-dimensional problems with special sauce geometry like transducers as well as coordinate systems such as cylindrical coordinates.
+The monopole support number (`#`) corresponds to the input value in `input.py` labeled `Mono(i)%support` where $i$ is the monopole source index.
 
 ### Conservative Variables Ordering
 
@@ -635,7 +652,7 @@ The above variables correspond to optional physics.
 | num_fluids volume fractions   | num_fluids volume fractions   |
 | N/A                           | num_fluids partial pressures  |
 
-The above variables are used for all simualtions.
+The above variables are used for all simulations.
 
 | 5-eqn | 6-eqn |
 | ----  |  ---- |
