@@ -177,7 +177,10 @@ To restart simulation from $k$-th time step, set `t_step_start`=k.
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
-The Table lists the patch parameters. The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition. Note that the domain must be fully filled with patche(s). The code outputs error messages when an empty region is left in the domain.
+The Table lists the patch parameters.
+The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
+Note that the domain must be fully filled with patche(s).
+The code outputs error messages when an empty region is left in the domain.
 
 #### Analytical Definition of Primitive Variables
 
@@ -218,7 +221,10 @@ end if
 
 #### Hard Coded Patches
 
-Some patch configurations are not adequately handled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+Some patch configurations are not adequately handled with the above analytic variable definitions.
+In this case, a hard coded patch can be used.
+Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
     case(200)
@@ -231,13 +237,17 @@ As a convention, any hard coded patches that are part of the MFC master branch s
 
 #### Parameter Descriptions
 
-- `num_patches` defines the total number of patches defined in the domain. The number has to be a positive integer.
+- `num_patches` defines the total number of patches defined in the domain.
+The number has to be a positive integer.
 
-- `num_fluids` defines the total number of fluids defined in each of the patches. The number has to be a positive integer.
+- `num_fluids` defines the total number of fluids defined in each of the patches.
+The number has to be a positive integer.
 
-- `patch_icpp(j)%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 13. Definition of the patch type for each integer is listed in table [Patch Types](#patch-types).
+- `patch_icpp(j)%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 13.
+Definition of the patch type for each integer is listed in table [Patch Types](#patch-types).
 
-- `[x,y,z]_centroid`, `length_[x,y,z]`, and/or `radius` are used to uniquely define the geometry of the patch with given type. Requisite combinations of the parameters for each type can be found in is listed in table [Patch types](#patch-types).
+- `[x,y,z]_centroid`, `length_[x,y,z]`, and/or `radius` are used to uniquely define the geometry of the patch with given type.
+Requisite combinations of the parameters for each type can be found in is listed in table [Patch types](#patch-types).
 
 - `patch_icpp(j)%alter_patch(i)` activates alternation of `patch(i)` with `patch(j)`.
 For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a rectangular `patch(1)`:
@@ -247,14 +257,16 @@ For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a
 
 - `smoothen` activates smoothening of the boundary of the patch that alters the existing patch.
 When smoothening occurs, fluids of the two patches are mixed in the region of the boundary.
-For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when `patch_icpp(2)smoothen`=TRUE. `smooth_coeff` controls the thickness of the region of smoothening (sharpness of the mixture region). The default value of `smooth_coeff` is unity. The region of smoothening is thickened with decreasing the value.
+For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when `patch_icpp(2)smoothen`=TRUE.
+`smooth_coeff` controls the thickness of the region of smoothening (sharpness of the mixture region).
+The default value of `smooth_coeff` is unity. The region of smoothening is thickened with decreasing the value.
 Optimal choice of the value of `smooth_coeff` is case-dependent and left to the user.
 
-- `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `texttt{patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction. These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
+- `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `texttt{patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
+These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-algorithm).
 
-- 'model%scale', 'model%rotate` and `model%translate` define how the model should be transformed to domain-space by first
-scaling by `model%scale`, then rotating about the Z, X, and Y axes (using `model%rotate`), and finally translating by `model%translate`.
+- 'model%scale', 'model%rotate` and `model%translate` define how the model should be transformed to domain-space by first scaling by `model%scale`, then rotating about the Z, X, and Y axes (using `model%rotate`), and finally translating by `model%translate`.
 
 ### 4. Fluid Material’s
 
@@ -308,20 +320,24 @@ The parameters are used to specify options in algorithms that are used to integr
 Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](references.md#Bryngelson19).
 Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](references.md#Coralic15).
 
-- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12. See table [Boundary Conditions](#boundary-conditions) for details.
+- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
+See table [Boundary Conditions](#boundary-conditions) for details.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3. 
 `model_eqns` $=$ 1, 2, and 3 correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md#Johnsen08)), 5-equation model ([Allaire et al., 2002](references.md#Allaire02)), and 6-equation model ([Saurel et al., 2009](references.md#Saurel09)), respectively.
 The difference of the two models is assessed by ([Schmidmayer et al., 2019](references.md#Schmidmayer19)).
 Note that some code parameters are only compatible with 5-equation model.
 
-- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used. The effect and use of the source term are assessed by [Schmidmayer et al., 2019](references.md#Schmidmayer19).
+- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
+The effect and use of the source term are assessed by [Schmidmayer et al., 2019](references.md#Schmidmayer19).
 
-- `adv_alphan` activates the advection equations of all the components of fluid. If this parameter is set false, the void fraction of $N$-th component is computed as the residual of the void fraction of the other components at each cell:
+- `adv_alphan` activates the advection equations of all the components of fluid.
+If this parameter is set false, the void fraction of $N$-th component is computed as the residual of the void fraction of the other components at each cell:
 
 $$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
 
-where $\alpha_i$ is the void fraction of $i$-th component. When a single-component flow is simulated, it requires that `adv_alphan` $=$ `True`.
+where $\alpha_i$ is the void fraction of $i$-th component.
+When a single-component flow is simulated, it requires that `adv_alphan` $=$ `True`.
 
 - `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that $\alpha_i>\varepsilon$ is satisfied at each time step.
 
@@ -332,7 +348,8 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
-- `weno_eps` specifies the lower bound of the WENO nonlinear weights. Practically, `weno_eps` $<10^{-6}$ is used.
+- `weno_eps` specifies the lower bound of the WENO nonlinear weights.
+Practically, `weno_eps` $<10^{-6}$ is used.
 
 - `mapped_weno` activates mapping of the nonlinear WENO weights to the more accurate nonlinear weights in order to reinstate the optimal order of accuracy of the reconstruction in the proximity of critical points ([Henrick et al., 2005](references.md#Henrick05)).
 
@@ -340,16 +357,20 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 
 - `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](references.md#Balsara00); [Suresh and Huynh, 1997](references.md#Suresh97)).
 
-- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3. `riemann_solver` $=$ 1,2, and 3 correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md#Toro13)).
+- `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3.
+`riemann_solver` $=$ 1,2, and 3 correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md#Toro13)).
 
-- `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2. `avg_state` $=$ 1 and 2 correspond to Roe- and arithmetic averages, respectively.
+- `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
+`avg_state` $=$ 1 and 2 correspond to Roe- and arithmetic averages, respectively.
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds` $=$ 1 and 2 correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
 
-- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values. If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
+- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
+If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
 
-- `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values. This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
+- `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
+This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
 
 ### 6. Formatted Output
@@ -393,7 +414,10 @@ The table lists formatted database output parameters. The parameters define vari
 With parallel I/O, MFC inputs and outputs a single file throughout pre-process, simulation, and post-process, regardless of the number of processors used.
 Parallel I/O enables the use of different number of processors in each of the processes (i.e., simulation data generated using 1000 processors can be post-processed using a single processor).
 
-- `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO. The default behavior is to use a shared file. File per process is useful when running on 10's of thousands of ranks. If `file_per_process` is true, then pre_process, simulation, and post_process must be run with the same number of ranks.
+- `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO.
+The default behavior is to use a shared file.
+File per process is useful when running on 10's of thousands of ranks.
+If `file_per_process` is true, then pre_process, simulation, and post_process must be run with the same number of ranks.
 
 - `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
 
@@ -401,7 +425,8 @@ Parallel I/O enables the use of different number of processors in each of the pr
 
 - `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
 
-- `fd_order` specifies the order of the finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4. `fd_order` $=$ 1, 2, and 4 correspond to the first, second, and fourth-order finite difference schemes, respectively.
+- `fd_order` specifies the order of the finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4.
+`fd_order` $=$ 1, 2, and 4 correspond to the first, second, and fourth-order finite difference schemes, respectively.
 
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
@@ -420,7 +445,9 @@ Parallel I/O enables the use of different number of processors in each of the pr
 | `Mono(i)%mag`     | Real    | Pulse magnitude	|
 | `Mono(i)%length`  | Real    | Spatial pulse length |
 
-The table lists acoustic source parameters. The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source). Details of the acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
+The table lists acoustic source parameters.
+The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source).
+Details of the acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
 
 - `Monopole` activates the acoustic source.
 
@@ -442,7 +469,8 @@ The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`mymono_length`/2, `mymono_length`/2].\\
 `Mono(i)%support` $=3$ specifies a semi-infinite source plane in 3-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2]. There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
+There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
 
 ### 8. Ensemble-Averaged Bubble Model
 
@@ -473,7 +501,8 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 | `sigV` 	       | Real 		|	Standard deviation for probability density function of bubble velocity (only when qbmm is true) |
 | `rhoRV`	       | Real 		|	Correlation coefficient for joint probability density function of bubble radius and velocity (only when qbmm is true) |
 
-These options work only for gas-liquid two component flows. Component indexes are required to be 1 for liquid and 2 for gas.
+These options work only for gas-liquid two component flows.
+Component indexes are required to be 1 for liquid and 2 for gas.
 
 - \* These parameters should be pretended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
 - †  These parameters should be pretended with patch indexes that are respectively filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
@@ -497,7 +526,8 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
 
-- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations. `R0_type` $=$ 1 corresponds to Simpson's rule. 
+- `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
+`R0_type` $=$ 1 corresponds to Simpson's rule. 
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations. 
 
@@ -545,7 +575,8 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for 2D and 3D cases, together with `vel_profile = TRUE`.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile.
+This option only works for 2D and 3D cases, together with `vel_profile = TRUE`.
 
 
 ## Enumerations
@@ -572,8 +603,8 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 *: This boundary condition is only used for `bc_y%beg` when using cylindrical coordinates (`cyl_coord = 'T'` and 3d). For axisymmetric problems, use `bc_y%beg = -2` with `cyl_coord = 'T'` in 2D.
 
-The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions). Their number (`#`)
-corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
+The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
+Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
 
 ### Patch types
@@ -602,11 +633,10 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 20   | 2D Taylor-Green Vortex  | 2  | N     | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
 | 21   | Model              | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model%filepath`. |
 
-The patch types supported by the MFC are listed in table [Patch Types](#patch-types). This includes
-types exclusive to one-, two-, and three-dimensional problems. The patch type number (`#`)
-corresponds to the input value in `input.py` labeled  `patch_icpp(j)%geometry` where
-$j$ is the patch index. Each patch requires a different set of parameters, which are 
-also listed in this table.
+The patch types supported by the MFC are listed in table [Patch Types](#patch-types).
+This includes types exclusive to one-, two-, and three-dimensional problems.
+The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%geometry` where $j$ is the patch index.
+Each patch requires a different set of parameters, which are also listed in this table.
 
 ### Monopole supports
 
