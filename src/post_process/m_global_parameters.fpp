@@ -78,7 +78,8 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    !> @name Simulation Algorithm Parameters!< Number of different fluids present in the flow
+    !> @name Simulation Algorithm Parameters
+    !> @{
     integer :: model_eqns      !< Multicomponent flow model
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: relax           !< phase change

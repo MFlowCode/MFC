@@ -135,17 +135,14 @@ contains
             end if
         end if
 
-        ! phase change checkers. 1st, check if it is activated
+        ! phase change checkers.
         if ( relax ) then
-            ! 2nd, checking if the correct equation model is chosen
             if ( model_eqns /= 3 ) then
                 call s_mpi_abort( 'phase change requires model_eqns = 3. ' // &
                     'Exiting ...')
-            ! if model_eqns == 3, check if the relax models are within the exapected range
             elseif ( ( relax_model .lt. 0 ) .or. ( relax_model .gt. 6 ) ) then
                     call s_mpi_abort( 'relax_model should be in between 0 and 6. ' // &
                     'Exiting ...' )
-            ! if 0 <= relax_model <= 6, check if 0 <= palpha_eps,ptgalpha_eps <= 1d0
             elseif ( ( palpha_eps .le. 0d0 ) .or. ( palpha_eps .ge. 1d0 ) .or. &
                    ( ptgalpha_eps .le. 0d0 ) .or. ( ptgalpha_eps .ge. 1d0 ) ) then
                call s_mpi_abort( 'both palpha_eps and ptgalpha_eps must &
@@ -156,11 +153,6 @@ contains
                call s_mpi_abort( 'relax is not set as true, but other phase change parameters have & 
                been modified. Either activate phase change or set the values to default. ' // 'Exiting ...')
         end if
-
-        ! note that, for now palpha_eps and ptgalpha_eps have different purposes. In the future,
-        ! p_infinite_relaxation might be adjusted so that these two mean the same.
-        ! palpha_eps is only used for the old phase-change modules, while the 
-        ! ptgalpha_eps is the tolerance for the ptg solver of the new solvers
 
         if (num_fluids /= dflt_int &
                 .and. &
@@ -301,18 +293,7 @@ contains
         elseif (hypoelasticity .and. (riemann_solver /= 1)) then
             call s_mpi_abort( 'hypoelasticity requires riemann_solver = 1'// &
                 'Exiting ...')
-        elseif ( relax ) then
-        ! for now palpha_eps and ptgalpha_eps have different porposes. In the future,
-            ! p_infinite_relaxation might be adjusted so that these two mean the same
-            if ( ( palpha_eps < 0d0 ) .or. ( palpha_eps > 1d0 ) ) then
-                call s_mpi_abort( 'palpha_eps must be in between 0 and 1' // &
-                'Exiting ...')
-            elseif ( ptgalpha_eps < 0d0 ) then
-                call s_mpi_abort( 'ptgalpha_eps must be positive' // &
-                'Exiting ...')
-            end if
         end if
-
         ! END: Simulation Algorithm Parameters =============================
 
         ! Finite Difference Parameters =====================================
@@ -377,8 +358,6 @@ contains
                     'of values of num_fluids '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
-            ! note that, by default, cv(i) = 0. So, this should not throw any errors
-            ! in case the user does not specify any values to this quantity.
             elseif ( fluid_pp(i)%cv < 0d0 ) then
                     call s_mpi_abort('Unsupported value of '// &
                     'fluid_pp('//trim(iStr)//')%'// &

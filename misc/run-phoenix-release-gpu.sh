@@ -21,3 +21,4 @@ gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
 
 ./mfc.sh test -a -b mpirun -j $(nproc) \
               --gpu -g $gpu_ids
+

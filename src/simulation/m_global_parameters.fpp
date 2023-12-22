@@ -117,7 +117,7 @@ module m_global_parameters
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
     real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
-	real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction

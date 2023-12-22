@@ -75,7 +75,7 @@ module m_global_parameters
     logical :: relax           !< activate phase change
     integer :: relax_model     !< Relax Model
     real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
-	real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Alpha limiter

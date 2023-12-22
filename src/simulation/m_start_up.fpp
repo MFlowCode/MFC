@@ -854,12 +854,12 @@ contains
                     end do
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                        dyn_pres, pi_inf, gamma, rho, qv, pres )
-                                          
+                        dyn_pres, pi_inf, gamma, rho, qv, pres)
+
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
-                        v_vf(i + adv_idx%beg - 1)%sf(j, k, l) * (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
-                        + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
+                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -910,7 +910,7 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
 
-        if ( relax ) CALL s_relaxation_solver(q_cons_ts(1)%vf)
+        if ( relax ) call s_relaxation_solver(q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime 

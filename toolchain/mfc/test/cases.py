@@ -101,8 +101,8 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
             cases.append(create_case(stack, "mixture_err",   {'mixture_err': 'T'}))
-            cases.append(create_case(stack, "avg_state=1",   {'avg_state':   1}))
-            cases.append(create_case(stack, "wave_speeds=2", {'wave_speeds': 2}))
+            cases.append(create_case(stack, "avg_state=1",   {'avg_state':   '1'}))
+            cases.append(create_case(stack, "wave_speeds=2", {'wave_speeds': '2'}))
             
             if riemann_solver == 2:
                 cases.append(create_case(stack, "model_eqns=3", {'model_eqns': 3}))

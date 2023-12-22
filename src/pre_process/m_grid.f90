@@ -71,7 +71,6 @@ contains
 
         if (stretch_x) then
 
-            ! working in dimensionless form
             length = abs(x_cb(m) - x_cb(-1))
             x_cb = x_cb/length
             x_a = x_a/length
@@ -127,7 +126,6 @@ contains
 
         if (stretch_y) then
 
-            ! working in dimensionless form
             length = abs(y_cb(n) - y_cb(-1))
             y_cb = y_cb/length
             y_a = y_a/length
@@ -166,7 +164,6 @@ contains
 
         if (stretch_z) then
 
-            ! working in dimensionless form
             length = abs(z_cb(p) - z_cb(-1))
             z_cb = z_cb/length
             z_a = z_a/length
@@ -227,7 +224,6 @@ contains
         end do
         x_cb_glb(m_glb) = x_domain%end
         if (stretch_x) then
-            ! working in dimensionless form
             length = abs(x_cb_glb(m_glb) - x_cb_glb(-1))
 
             x_cb_glb = x_cb_glb/length
@@ -263,7 +259,6 @@ contains
             end if
             y_cb_glb(n_glb) = y_domain%end
             if (stretch_y) then
-                ! working in dimensionless form
                 length = abs(y_cb_glb(n_glb) - y_cb_glb(-1))
 
                 y_cb_glb = y_cb_glb/length
@@ -290,7 +285,6 @@ contains
                 end do
                 z_cb_glb(p_glb) = z_domain%end
                 if (stretch_z) then
-                    ! working in dimensionless form
                     length = abs(z_cb_glb(p_glb) - z_cb_glb(-1))
 
                     z_cb_glb = z_cb_glb/length

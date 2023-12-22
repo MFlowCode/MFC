@@ -94,6 +94,7 @@ if [ "$1" == 'load' ]; then
     # Reset modules to default system configuration
     if [ "$u_c" != 'p' ]; then
         module reset > /dev/null 2>&1
+        code="$?"
 
         # Purge if reset is not available
         if [ "$code" -ne '0' ]; then

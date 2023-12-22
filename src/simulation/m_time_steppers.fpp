@@ -91,6 +91,7 @@ contains
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
 
+
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
         end do
@@ -98,8 +99,8 @@ contains
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
+                                                iy_t%beg:iy_t%end, &
+                                                iz_t%beg:iz_t%end))
             end do
         end do
 
@@ -114,91 +115,91 @@ contains
             do i = 0, 3
                 do j = 1, sys_size
                     @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
-                        iy_t%beg:iy_t%end, &
-                        iz_t%beg:iz_t%end))
+                                                    iy_t%beg:iy_t%end, &
+                                                    iz_t%beg:iz_t%end))
                 end do
             end do
         end if
 
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
-
+        
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end))
+                                      iy_t%beg:iy_t%end, &
+                                      iz_t%beg:iz_t%end))
         end do
 
         if (bubbles) then
             do i = bub_idx%beg, bub_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
         @:ALLOCATE(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-        else if (qbmm .and. polytropic) then
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+        else if(qbmm .and. polytropic) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
         @:ALLOCATE(mv_ts(1:2))
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(mv_ts(2)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-        else if (qbmm .and. polytropic) then
+                          iy_t%beg:iy_t%end, &
+                          iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+        else if(qbmm .and. polytropic) then
             @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
             @:ALLOCATE(mv_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
             @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%beg + 1, &
-                iy_t%beg:iy_t%beg + 1, &
-                iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+                          iy_t%beg:iy_t%beg + 1, &
+                          iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
         if (hypoelasticity) then
 
             do i = stress_idx%beg, stress_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
+                                          iy_t%beg:iy_t%end, &
+                                          iz_t%beg:iz_t%end))
             end do
         end if
 
@@ -265,7 +266,7 @@ contains
             end do
         end do
         !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -273,7 +274,7 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
+                                      pb_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
@@ -282,7 +283,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -290,16 +291,18 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
+                                      mv_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
                 end do
             end do
-        end if
+        end if 
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         call nvtxEndRange
 
@@ -356,7 +359,7 @@ contains
             end do
         end do
         !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -364,7 +367,7 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
-                                    pb_ts(1)%sf(j, k, l, q, i) &
+                                      pb_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
@@ -373,7 +376,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -381,7 +384,7 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
-                                    mv_ts(1)%sf(j, k, l, q, i) &
+                                      mv_ts(1)%sf(j, k, l, q, i) &
                                     + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
@@ -392,11 +395,14 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv,t_step)
 
 !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -412,7 +418,7 @@ contains
             end do
         end do
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -421,8 +427,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2d0
+                                     +  pb_ts(2)%sf(j, k, l, q, i) &
+                                    + dt*rhs_pb(j, k, l, q, i))/2d0
                             end do
                         end do
                     end do
@@ -430,7 +436,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -439,8 +445,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2d0
+                                     +  mv_ts(2)%sf(j, k, l, q, i) &
+                                    + dt*rhs_mv(j, k, l, q, i))/2d0
                             end do
                         end do
                     end do
@@ -449,6 +455,10 @@ contains
         end if
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
 
         call nvtxEndRange
 
@@ -471,7 +481,7 @@ contains
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-        integer :: i, j, k, l, q
+        integer :: i, j, k, l, q 
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
@@ -506,7 +516,7 @@ contains
             end do
         end do
         !Evolve pb and mv for non-polytropic qbmm
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -523,7 +533,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -541,6 +551,7 @@ contains
         end if
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
         if ( model_eqns == 3 .and. (.not.relax ) ) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
@@ -565,7 +576,7 @@ contains
             end do
         end do
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -574,8 +585,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4d0
+                                     +  pb_ts(2)%sf(j, k, l, q, i) &
+                                    + dt*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -583,7 +594,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -592,8 +603,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
-                                     + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4d0
+                                     +  mv_ts(2)%sf(j, k, l, q, i) &
+                                    + dt*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -601,10 +612,11 @@ contains
             end do
         end if
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+
         if ( model_eqns == 3 .and. (.not.relax ) ) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
-        
+
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
@@ -624,7 +636,7 @@ contains
             end do
         end do
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -633,8 +645,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
+                                    + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
+                                    + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -642,7 +654,7 @@ contains
             end do
         end if
 
-        if (qbmm .and. (.not. polytropic)) then
+        if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
             do i = 1, nb
                 do l = 0, p
@@ -651,8 +663,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
+                                    + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
+                                    + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -660,7 +672,8 @@ contains
             end do
         end if
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)      
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
         if ( model_eqns == 3 .and. (.not.relax ) ) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if

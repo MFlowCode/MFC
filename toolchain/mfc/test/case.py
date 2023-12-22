@@ -54,8 +54,7 @@ BASE_CFG = {
     'fluid_pp(1)%pi_inf'           : 0.0,
     'fluid_pp(1)%cv'               : 0.0,
     'fluid_pp(1)%qv'               : 0.0,
-    'fluid_pp(1)%qvp'              : 0.0,
-    
+    'fluid_pp(1)%qvp'              : 0.0,   
     'bubbles'                       : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,
@@ -138,7 +137,6 @@ class TestCase(case.Case):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
     def delete_output(self):
-
         dirpath = self.get_dirpath()
 
         exts = ["*.inp", "*.1", "*.dat", "*.inf"]
@@ -155,16 +153,6 @@ class TestCase(case.Case):
 
     def create_directory(self):
         dirpath = self.get_dirpath()
-
-        if delete:
-            common.delete_directory(os.path.join(dirpath, "D"))
-            common.delete_directory(os.path.join(dirpath, "p_all"))
-            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
-
-        if delete:
-            common.delete_directory(os.path.join(dirpath, "D"))
-            common.delete_directory(os.path.join(dirpath, "p_all"))
-            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
 
         common.create_directory(dirpath)
 

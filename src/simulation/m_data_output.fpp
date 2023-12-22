@@ -24,6 +24,7 @@ module m_data_output
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compile_specific
+
     use m_helper
 
     use m_delay_file_access
@@ -454,7 +455,7 @@ contains
         integer :: i, j, k, l, ii , r!< Generic loop iterators
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub, nR3, vftmp             !< Temporary bubble number density
+        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
@@ -576,8 +577,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
 
-            ! if (model_eqns == 2 .OR. model_eqns == 3) then
-            if ( model_eqns == 2 ) then
+            if (model_eqns == 2) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -1455,9 +1455,6 @@ contains
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                             end do
 
-                            ! JRChreim: keep an eye on how qv was added to this pressure calculation.
-                            ! Note there is an (1-alpha) extra term in the denominator,
-                            ! typically not present for energy calculations
                             pres = ( &
                                    (q_cons_vf(E_idx)%sf(j, k, l) - &
                                     0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &
@@ -1530,9 +1527,6 @@ contains
                                     vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                                 end do
 
-                                ! JRChreim: keep an eye on how qv was added to this pressure calculation.
-                                ! Note there is an (1-alpha) extra term in the denominator,
-                                ! typically not present for energy calculations
                                 pres = ( &
                                        (q_cons_vf(E_idx)%sf(j, k, l) - &
                                         0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, k, l)**2.d0)/rho)/ &

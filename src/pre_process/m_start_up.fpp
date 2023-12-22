@@ -768,9 +768,10 @@ contains
         call s_generate_initial_condition()
 
         if (relax) then
-            ! this print statement is not necessary, just to let the end user know
-            PRINT *, 'initial condition might have been altered due to enforcement of &
-            pTg-equilirium (relax = "T" activated)'
+            if (proc_rank == 0) then
+                print *, 'initial condition might have been altered due to enforcement of &
+                pTg-equilirium (relax = "T" activated)'
+            end if
 
             call s_relaxation_solver(q_cons_vf)
         end if
