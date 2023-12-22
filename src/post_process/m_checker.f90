@@ -169,7 +169,7 @@ contains
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_z%end. Exiting ...')
         elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
-            call s_mpi_abort('Unsupported coice of boundary condition -13')
+            call s_mpi_abort('Unsupported choice of boundary condition -13')
         elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
                 .or. &
                 (p > 0 .and. bc_z%beg == dflt_int)) then 
