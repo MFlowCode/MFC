@@ -1,6 +1,6 @@
 # Flow visualization
 
-Post-processed database in Silo-HDF5 format can be visualized and analyzed using VisIt ([Childs et al., 2012](references.md#Childs12)).
+Post-processed database in Silo-HDF5 format can be visualized and analyzed using VisIt.
 VisIt is an open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
 Versions of VisIt after 2.6.0 have been confirmed to work with the MFC databases for some parallel environments.
 Nevertheless, installation and configuration of VisIt can be environment-dependent and are left to the user.

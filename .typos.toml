@@ -8,10 +8,12 @@ AttributeIDSupressMenu = "AttributeIDSupressMenu"
 
 [default.extend-words]
 INOUT = "INOUT"
-Childs = "Childs"
-myu = "myu"
-nd = "nd"
 WRONLY = "WRONLY"
+nd = "nd"
+# Childs = "Childs"
+# myu = "myu"
+
+
 
 [files]
 extend-exclude = ["docs/documentation/references*", "tests/"]
