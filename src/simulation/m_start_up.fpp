@@ -179,7 +179,7 @@ contains
 
     !> The goal of this procedure is to verify that each of the
     !!      user provided inputs is valid and that their combination
-    !!      consitutes a meaningful configuration for the simulation.
+    !!      constitutes a meaningful configuration for the simulation.
     subroutine s_check_input_file() ! --------------------------------------
 
         ! Relative path to the current directory file in the case directory

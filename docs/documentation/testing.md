@@ -5,15 +5,18 @@ To run MFC's test suite, run
 $ ./mfc.sh test -j <thread count>
 ```
 
-It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate. *golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC. A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy. Run `./mfc.sh test -h` for a full list of accepted arguments.
+It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate.
+*golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC.
+A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy.
+Run `./mfc.sh test -h` for a full list of accepted arguments.
 
 Most notably, you can consult the full list of tests by running
 ```
 $ ./mfc.sh test -l
 ```
 
-To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options. To run a 
-(non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
+To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
+To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
 
 ### Creating Tests
 
@@ -26,9 +29,13 @@ It is recommended that a range be specified when generating golden files for new
 
 **Note:** If you output new variables and want to update the golden files to include these without modifying the original data, use the `--add-new-variables` option instead.
 
-Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py). The function `generate_cases` is responsible for generating the list of test cases. Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/case.py). The function operates on two variables:
+Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py).
+The function `generate_cases` is responsible for generating the list of test cases.
+Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/case.py).
+The function operates on two variables:
 
-- `stack`: A stack that holds the variations to the default case parameters. By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
+- `stack`: A stack that holds the variations to the default case parameters.
+By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
 
 - `cases`: A list that holds fully-formed `Case` objects, that will be returned at the end of the function. 
 
@@ -42,7 +49,8 @@ class Case:
 ```
 
 where:
-- The `trace` is a string that contains a human-readable description of what parameters were varied, or more generally what the case is meant to test. **Each `trace` must be distinct.**
+- The `trace` is a string that contains a human-readable description of what parameters were varied, or more generally what the case is meant to test.
+**Each `trace` must be distinct.**
 - `params` is the fully resolved case dictionary, as would appear in a Python case input file.
 - `ppn` is the number of processes per node to use when running the case.
 
@@ -83,5 +91,8 @@ To test updated post process code, append the `-a` or `--test-all` option:
 $ ./mfc.sh test -a -j 8
 ```
 
-This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files. It will also turn most write parameters (`*_wrt`) on. Then, it searches through the silo files using `h5dump` to ensure that there are no NaNs or Infinitys. Although adding this option does not guarantee that accurate silo files are generated, it does ensure that post process does not fail or produce malformed data. 
+This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files.
+It will also turn most write parameters (`*_wrt`) on.
+Then, it searches through the silo files using `h5dump` to ensure that there are no NaNs or Infinitys.
+Although adding this option does not guarantee that accurate silo files are generated, it does ensure that post process does not fail or produce malformed data. 
 

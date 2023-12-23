@@ -54,7 +54,7 @@ module m_assign_variables
         s_assign_patch_primitive_variables, &
         s_assign_patch_mixture_primitive_variables, &
         s_assign_patch_species_primitive_variables, &
-        s_finialize_assign_variables_module
+        s_finalize_assign_variables_module
 
 contains
 
@@ -558,13 +558,13 @@ contains
 
     end subroutine s_assign_patch_species_primitive_variables! ------------
 
-    subroutine s_finialize_assign_variables_module
+    subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either
         ! the patch mixture or species primitive variables to a cell in the
         ! computational domain
         s_assign_patch_primitive_variables => null()
 
-    end subroutine s_finialize_assign_variables_module
+    end subroutine s_finalize_assign_variables_module
 
 end module
