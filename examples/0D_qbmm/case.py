@@ -2,7 +2,6 @@
 
 import math, json
 
-thruogh = 1
 x0      = 10.E-06
 p0      = 101325.
 rho0    = 1000.
