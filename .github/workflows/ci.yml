@@ -88,7 +88,7 @@ jobs:
           /bin/bash mfc.sh test -j $(nproc) $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          OPT2: ${{ matrix.debug == 'debug' && '-% 75' || '' }}
+          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   docker:
     name:    Github | Docker
