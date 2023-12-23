@@ -14,4 +14,4 @@ nd = "nd"
 WRONLY = "WRONLY"
 
 [files]
-extend-exclude = ["docs/documentation/references*"]
+extend-exclude = ["docs/documentation/references*", "tests/"]
