@@ -28,7 +28,8 @@ module m_helper
         s_swap, &
         f_cross, &
         f_create_transform_matrix, &
-        f_create_bbox
+        f_create_bbox, &
+        s_print_2D_array
 
 contains
 
@@ -131,6 +132,34 @@ contains
 
     end subroutine s_comp_n_from_cons
 
+    subroutine s_print_2D_array(A, div)
+
+        real(kind(0d0)), dimension(:,:) :: A
+        integer :: i, j
+        integer :: m, n
+        real :: c
+        real, optional :: div
+
+        m = size(A,1)
+        n = size(A,2)
+
+        if (present(div)) then 
+            c = div
+        else
+            c = 1
+        endif
+        
+        print*, m, n
+
+        do i = 1,m
+            do j = 1,n
+                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
+            end do
+            write(*, fmt="(A1)") " "
+        end do
+        write(*, fmt="(A1)") " "
+
+    end subroutine
 
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly

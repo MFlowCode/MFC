@@ -15,7 +15,7 @@ PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', 'stype_x', 'stype_y', 'stype_z'
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -86,6 +86,12 @@ SIMULATION = COMMON + [
 for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
     SIMULATION.append(f'bc_{cmp}%end')
+    SIMULATION.append(f'bc_{cmp}%vb1')
+    SIMULATION.append(f'bc_{cmp}%vb2')
+    SIMULATION.append(f'bc_{cmp}%vb3')
+    SIMULATION.append(f'bc_{cmp}%ve1')
+    SIMULATION.append(f'bc_{cmp}%ve2')
+    SIMULATION.append(f'bc_{cmp}%ve3')
 
 for wrt_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
