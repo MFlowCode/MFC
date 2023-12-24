@@ -5,7 +5,7 @@
 !> @brief This module contains the subroutines that read in and check the
 !!              consistency of the user provided inputs. This module also allocates, initializes and 
 !!              deallocates the relevant variables and sets up the time stepping, 
-!!              MPI decompostion and I/O procedures
+!!              MPI decomposition and I/O procedures
 module m_start_up
 
     ! Dependencies =============================================================
@@ -55,7 +55,7 @@ contains
 
         character(len=1000) :: line
 
-        ! Namelist for all of the parameters to be inputed by the user
+        ! Namelist for all of the parameters to be inputted by the user
         namelist /user_inputs/ case_dir, m, n, p, t_step_start, &
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, adv_alphan, &
@@ -597,7 +597,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_data_output_module()
 
-        ! Associate pointers for serial or paralle I/O
+        ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
         else

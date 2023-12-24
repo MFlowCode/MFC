@@ -25,7 +25,7 @@ module m_mpi_proxy
 
     implicit none
 
-    !> @name Buffers of the conservative variables recieved/sent from/to neighbooring
+    !> @name Buffers of the conservative variables received/sent from/to neighboring
     !! processors. Note that these variables are structured as vectors rather
     !! than arrays.
     !> @{
@@ -33,7 +33,7 @@ module m_mpi_proxy
     real(kind(0d0)), allocatable, dimension(:) :: q_cons_buffer_out
     !> @}
 
-    !> @name Recieve counts and displacement vector variables, respectively, used in
+    !> @name Receive counts and displacement vector variables, respectively, used in
     !! enabling MPI to gather varying amounts of data from all processes to the
     !! root process
     !> @{
@@ -112,7 +112,7 @@ contains
 
         end if
 
-        ! Allocating and configuring the recieve counts and the displacement
+        ! Allocating and configuring the receive counts and the displacement
         ! vector variables used in variable-gather communication procedures.
         ! Note that these are only needed for either multidimensional runs
         ! that utilize the Silo database file format or for 1D simulations.
@@ -641,7 +641,7 @@ contains
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  Communicates the buffer regions associated with the grid
-        !!      variables with processors in charge of the neighbooring
+        !!      variables with processors in charge of the neighboring
         !!      sub-domains. Note that only cell-width spacings feature
         !!      buffer regions so that no information relating to the
         !!      cell-boundary locations is communicated.
@@ -841,7 +841,7 @@ contains
     end subroutine s_mpi_sendrecv_grid_vars_buffer_regions ! ---------------
 
     !>  Communicates buffer regions associated with conservative
-        !!      variables with processors in charge of the neighbooring
+        !!      variables with processors in charge of the neighboring
         !!      sub-domains
         !!  @param q_cons_vf Conservative variables
         !!  @param pbc_loc Processor boundary condition (PBC) location
@@ -1577,7 +1577,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Mimimum flow variable extent
+        ! Minimum flow variable extent
         call MPI_GATHERV(minval(q_sf), 1, MPI_DOUBLE_PRECISION, &
                          data_extents(1, 0), recvcounts, 2*displs, &
                          MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -1631,7 +1631,7 @@ contains
             deallocate (q_cons_buffer_out)
         end if
 
-        ! Deallocating the recieve counts and the displacement vector
+        ! Deallocating the receive counts and the displacement vector
         ! variables used in variable-gather communication procedures
         if ((format == 1 .and. n > 0) .or. n == 0) then
             deallocate (recvcounts)

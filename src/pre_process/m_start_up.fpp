@@ -109,7 +109,7 @@ contains
 
         character(len=1000) :: line
 
-        ! Namelist for all of the parameters to be inputed by the user
+        ! Namelist for all of the parameters to be inputted by the user
         namelist /user_inputs/ case_dir, old_grid, old_ic, &
             t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
             stretch_x, stretch_y, stretch_z, a_x, a_y, &
@@ -852,8 +852,9 @@ contains
         call s_finalize_variables_conversion_module()
         call s_finalize_data_output_module()
         call s_finalize_global_parameters_module()
-        call s_finialize_assign_variables_module()
+        call s_finalize_assign_variables_module()
         if (relax) call s_finalize_relaxation_solver_module()
+        
 
         ! Finalization of the MPI environment
         call s_mpi_finalize()

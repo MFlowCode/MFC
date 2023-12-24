@@ -37,7 +37,7 @@ module m_derived_types
         type(scalar_field), allocatable, dimension(:) :: vf !< Vector field
     end type vector_field
 
-    !> Integer boounds for variables
+    !> Integer bounds for variables
     type int_bounds_info
         integer :: beg
         integer :: end

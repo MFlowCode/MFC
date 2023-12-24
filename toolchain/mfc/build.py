@@ -119,7 +119,7 @@ class MFCTarget:
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
             f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'Release'}",
             # Used by FIND_PACKAGE (/FindXXX) to search for packages, with the
-            # second heighest level of priority, still letting users manually
+            # second highest level of priority, still letting users manually
             # specify <PackageName>_ROOT, which has precedence over CMAKE_PREFIX_PATH.
             # See: https://cmake.org/cmake/help/latest/command/find_package.html.
             f"-DCMAKE_PREFIX_PATH={install_prefixes}",

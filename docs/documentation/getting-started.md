@@ -12,7 +12,8 @@ $ git checkout <release tag>
 
 ## Build Environment
 
-MFC can be built in multiple ways on various operating systems. Please select your desired configuration from the list bellow:
+MFC can be built in multiple ways on various operating systems.
+Please select your desired configuration from the list bellow:
 
 <details>
   <summary><h2>*nix</h2></summary>
@@ -70,20 +71,15 @@ Then, in order to initialize your development environment, open a terminal windo
 "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 ```
 
-To follow this guide, please replace `./mfc.sh` with `mfc.bat` when running any
-commands. `./mfc.sh` is intended Unix-like systems. You will also have access to the `.sln`
-Microsoft Visual Studio solution files for an IDE (Integrated Development 
-Environment).
+To follow this guide, please replace `./mfc.sh` with `mfc.bat` when running any commands. `./mfc.sh` is intended Unix-like systems.
+You will also have access to the `.sln` Microsoft Visual Studio solution files for an IDE (Integrated Development Environment).
 
   </details>
 
   <details>
      <summary><h3>Windows + WSL</h3></summary>
 
-Install the latest version of the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/)
-as well as a distribution such as Ubuntu which can be found [here](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV). Acquiring an   interactive session is as simple as typing `wsl` in your
-command prompt, or alternatively, selecting the distribution from the dropdown menu
-available in the [Microsoft Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701).
+Install the latest version of the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) as well as a distribution such as Ubuntu which can be found [here](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV). Acquiring an   interactive session is as simple as typing `wsl` in your command prompt, or alternatively, selecting the distribution from the dropdown menu available in the [Microsoft Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701).
 
 You can now follow the appropriate instructions for your distribution.
 
@@ -111,7 +107,12 @@ $ touch ~/.bash_profile
 $ open ~/.bash_profile
 ```
   
-An editor should open. Please paste the following lines into it before saving the file. If you wish to use a version of GNU's GCC other than 11, modify the first assignment. These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC. Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9). We do *not* support `clang` due to conflicts with our Silo dependency.
+An editor should open.
+Please paste the following lines into it before saving the file.
+If you wish to use a version of GNU's GCC other than 11, modify the first assignment.
+These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC.
+Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9).
+We do *not* support `clang` due to conflicts with our Silo dependency.
 
 ```console
 # === MFC MPI Installation ===
@@ -132,7 +133,8 @@ $ brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
 $ HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
 ```
 
-They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`. Building this package might take a while.
+They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`.
+Building this package might take a while.
 
 </details>
 
@@ -188,9 +190,14 @@ MFC can be built with support for various (compile-time) features:
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
-When these options are given to `mfc.sh`, they will be remembered when you issue future commands. You can enable and disable features at any time by passing any of the arguments above. For example, if you have previously built MFC with MPI support and no longer wish to run using MPI, you can pass `--no-mpi` once, for the change to be permanent.
+When these options are given to `mfc.sh`, they will be remembered when you issue future commands.
+You can enable and disable features at any time by passing any of the arguments above.
+For example, if you have previously built MFC with MPI support and no longer wish to run using MPI, you can pass `--no-mpi` once, for the change to be permanent.
 
-MFC is composed of three codes, each being a separate _target_. By default, all targets (`pre_process`, `simulation`, and `post_process`) are selected. To only select a subset, use the `-t` (i.e `--targets`) argument. For a detailed list of options, arguments, and features, please refer to `./mfc.sh build --help`.
+MFC is composed of three codes, each being a separate _target_.
+By default, all targets (`pre_process`, `simulation`, and `post_process`) are selected.
+To only select a subset, use the `-t` (i.e., `--targets`) argument.
+For a detailed list of options, arguments, and features, please refer to `./mfc.sh build --help`.
 
 Most first-time users will want to build MFC using 8 threads (or more!) with MPI support:
 ```console

@@ -459,7 +459,7 @@ contains
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
-        real(kind(0d0)) :: E_e                          !< Temp. elastic energy contrbution
+        real(kind(0d0)) :: E_e                          !< Temp. elastic energy contribution
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -555,7 +555,7 @@ contains
             FMT = "(2F40.14)"
         end if
 
-        ! writting an output directory
+        ! writing an output directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
         file_path = trim(t_step_dir)//'/.'
 

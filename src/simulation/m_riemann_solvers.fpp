@@ -1031,7 +1031,7 @@ contains
                                 end if
 
                                 if (s_L >= 0d0) then
-                                    p_Star = pres_L ! Only usefull to recalculate the radial momentum geometric source flux
+                                    p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
@@ -1060,7 +1060,7 @@ contains
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
-                                    ! Only usefull to recalculate the radial momentum geometric source flux
+                                    ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
@@ -1177,7 +1177,7 @@ contains
                                     do i = intxb, intxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
-                                    ! Recalculating the radial momentum geometric source flux (substracting the pressure part)
+                                    ! Recalculating the radial momentum geometric source flux (subtracting the pressure part)
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
                                     ! Geometrical source of the void fraction(s) is zero

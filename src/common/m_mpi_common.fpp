@@ -28,7 +28,7 @@ module m_mpi_common
 contains
 
 
-    !> The subroutine intializes the MPI execution environment
+    !> The subroutine initializes the MPI execution environment
         !!      and queries both the number of processors which will be
         !!      available for the job and the local processor rank.
     subroutine s_mpi_initialize() ! ----------------------------------------
@@ -45,7 +45,7 @@ contains
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
 
-        ! Checking whether the MPI environment has been properly intialized
+        ! Checking whether the MPI environment has been properly initialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting ...'
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)

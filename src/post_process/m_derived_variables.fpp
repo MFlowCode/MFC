@@ -589,7 +589,7 @@ contains
             !! Maximum value of the gradient magnitude (gm) of the density field
             !! in entire computational domain and not just the local sub-domain.
             !! The first position in the variable contains the maximum value and
-            !! the second contains the rank of the processor on which it occured.
+            !! the second contains the rank of the processor on which it occurred.
 
         real(kind(0d0)) :: alpha_unadv !< Unadvected volume fraction
 
@@ -657,7 +657,7 @@ contains
         ! Comparing the local maximum gradient magnitude of the density on
         ! this processor to the those computed on the remaining processors.
         ! This allows for the global maximum to be computed and the rank of
-        ! the processor on which it has occured to be recorded.
+        ! the processor on which it has occurred to be recorded.
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
 
         ! Computing Numerical Schlieren Function ===========================
