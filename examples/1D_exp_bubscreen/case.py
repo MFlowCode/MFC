@@ -23,7 +23,7 @@ pv      = 2.3388E+03    #vapor pressure
 
 # water 
 # These _v and _n parameters ONLY correspond to the bubble model of Preston (2010 maybe 2008)
-# (this model would replace the usual Rayleigh-plesset or Keller-miksis model (it's more compilcated))
+# (this model would replace the usual Rayleigh-plesset or Keller-miksis model (it's more complicated))
 #gamma_v = 1.33
 #M_v     = 18.02
 #mu_v    = 0.8816E-05
@@ -234,7 +234,7 @@ print(json.dumps({
     'Ca'                    : Ca,
     # weber number (corresponds to surface tension) 
     'Web'                   : We,
-    # inverse reynolds number (coresponds to viscosity)
+    # inverse reynolds number (corresponds to viscosity)
     'Re_inv'                : Re_inv,
     # ==========================================================
 
