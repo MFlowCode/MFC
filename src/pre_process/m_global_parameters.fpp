@@ -226,7 +226,7 @@ contains
         stretch_y = .false.
         stretch_z = .false.
         stype_x = 1
-        stype_y = 1
+        stype_y = 1 
         stype_z = 1
 
         a_x = dflt_real
@@ -253,6 +253,13 @@ contains
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0d0
+                bc_${DIM}$%ve${DIR}$ = 0d0
+            #:endfor
+        #:endfor
 
         parallel_io = .false.
         file_per_process = .false.
