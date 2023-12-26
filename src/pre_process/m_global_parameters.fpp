@@ -57,7 +57,6 @@ module m_global_parameters
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
 
     logical :: stretch_x, stretch_y, stretch_z !<
-    integer :: stype_x, stype_y, stype_z
     !! Grid stretching flags for the x-, y- and z-coordinate directions
 
     ! Parameters of the grid stretching function for the x-, y- and z-coordinate
@@ -225,9 +224,6 @@ contains
         stretch_x = .false.
         stretch_y = .false.
         stretch_z = .false.
-        stype_x = 1
-        stype_y = 1 
-        stype_z = 1
 
         a_x = dflt_real
         a_y = dflt_real

@@ -269,7 +269,7 @@ contains
             elseif (x_b == dflt_real) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_x and x_b. Exiting ...')
-            elseif (x_a >= x_b .and. stype_x == 1) then
+            elseif (x_a >= x_b) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_x, x_a and x_b. '// &
                     'Exiting ...')
@@ -306,7 +306,7 @@ contains
             elseif (y_b == dflt_real) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_y and y_b. Exiting ...')
-            elseif (y_a >= y_b .and. stype_y == 1) then
+            elseif (y_a >= y_b) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_y, y_a and y_b. '// &
                     'Exiting ...')
@@ -348,7 +348,7 @@ contains
             elseif (z_b == dflt_real) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_z and z_b. Exiting ...')
-            elseif (z_a >= z_b .and. stype_z == 1) then
+            elseif (z_a >= z_b) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                     'values for stretch_z, z_a and z_b. '// &
                     'Exiting ...')

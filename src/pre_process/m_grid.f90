@@ -226,31 +226,21 @@ contains
         if (stretch_x) then
             length = abs(x_cb_glb(m_glb) - x_cb_glb(-1))
 
-            if (stype_x == 1) then
+            x_cb_glb = x_cb_glb/length
 
-                x_cb_glb = x_cb_glb/length
+            x_a = x_a/length
+            x_b = x_b/length
 
-                x_a = x_a/length
-                x_b = x_b/length
-
-                do j = 1, loops_x
-                    do i = -1, m_glb
-                        x_cb_glb(i) = x_cb_glb(i)/a_x* &
-                                    (a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) &
-                                    + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
-                                    - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
-                    end do
-                end do
-
-                x_cb_glb = x_cb_glb*length
-
-            elseif (stype_x == 2) then
-
+            do j = 1, loops_x
                 do i = -1, m_glb
-                    x_cb_glb(i) = (length/2d0) + x_b*asinh(a_x*(x_cb_glb(i) - x_a))
+                    x_cb_glb(i) = x_cb_glb(i)/a_x* &
+                                (a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) &
+                                + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
+                                - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
                 end do
+            end do
 
-            end if
+            x_cb_glb = x_cb_glb*length
 
         end if
 
@@ -273,31 +263,21 @@ contains
             if (stretch_y) then
                 length = abs(y_cb_glb(n_glb) - y_cb_glb(-1))
                 
-                if (stype_y == 1) then
-                    
-                    y_cb_glb = y_cb_glb/length
+                y_cb_glb = y_cb_glb/length
 
-                    y_a = y_a/length
-                    y_b = y_b/length
+                y_a = y_a/length
+                y_b = y_b/length
 
-                    do j = 1, loops_y
-                        do i = -1, n_glb
-                            y_cb_glb(i) = y_cb_glb(i)/a_y* &
-                                        (a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) &
-                                        + log(cosh(a_y*(y_cb_glb(i) - y_b))) &
-                                        - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
-                        end do
-                    end do
-
-                    y_cb_glb = y_cb_glb*length
-                    
-                elseif (stype_y == 2) then
-
+                do j = 1, loops_y
                     do i = -1, n_glb
-                        y_cb_glb(i) = (length/2d0) + y_b*asinh(a_y*(y_cb_glb(i) - y_a))
+                        y_cb_glb(i) = y_cb_glb(i)/a_y* &
+                                    (a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) &
+                                    + log(cosh(a_y*(y_cb_glb(i) - y_b))) &
+                                    - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
                     end do
+                end do
 
-                endif
+                y_cb_glb = y_cb_glb*length
 
             end if
 
@@ -311,29 +291,21 @@ contains
                 if (stretch_z) then
                     length = abs(z_cb_glb(p_glb) - z_cb_glb(-1))
 
-                    if (stype_z == 1) then
-                        z_cb_glb = z_cb_glb/length
-                        z_a = z_a/length
-                        z_b = z_b/length
+                    z_cb_glb = z_cb_glb/length
+                    z_a = z_a/length
+                    z_b = z_b/length
 
-                        do j = 1, loops_z
-                            do i = -1, p_glb
-                                z_cb_glb(i) = z_cb_glb(i)/a_z* &
-                                            (a_z + log(cosh(a_z*(z_cb_glb(i) - z_a))) &
-                                            + log(cosh(a_z*(z_cb_glb(i) - z_b))) &
-                                            - 2d0*log(cosh(a_z*(z_b - z_a)/2d0)))
-                            end do
-                        end do
-
-                        z_cb_glb = z_cb_glb*length
-
-                    elseif (stype_z == 2) then
-
+                    do j = 1, loops_z
                         do i = -1, p_glb
-                            z_cb_glb(i) = (length/2d0) + z_b*asinh(a_z*(z_cb_glb(i) - z_a))
+                            z_cb_glb(i) = z_cb_glb(i)/a_z* &
+                                        (a_z + log(cosh(a_z*(z_cb_glb(i) - z_a))) &
+                                        + log(cosh(a_z*(z_cb_glb(i) - z_b))) &
+                                        - 2d0*log(cosh(a_z*(z_b - z_a)/2d0)))
                         end do
+                    end do
 
-                    end if
+                    z_cb_glb = z_cb_glb*length
+
                 end if
             end if
         end if
