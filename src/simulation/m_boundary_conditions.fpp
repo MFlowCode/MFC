@@ -1207,13 +1207,13 @@ module m_boundary_conditions
                             do j = 1, buff_size
                                 if (i == momxb) then
                                     q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%ve1
+                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%ve2
+                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%ve3
+                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb3
                                 else
                                     q_prim_vf(i)%sf(-j, k, l) = &
                                         q_prim_vf(i)%sf(0, k, l)
