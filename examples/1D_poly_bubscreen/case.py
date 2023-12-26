@@ -68,7 +68,6 @@ Tpulse  = Lpulse/cact
 Tfinal  = 1.*10.*Tpulse*c0/x0
 Nt      = int(Tfinal/dt)
 
-myu = 0.0
 Nt  = 1000
 
 Nfiles = 20.
@@ -132,7 +131,7 @@ print(json.dumps({
     'patch_icpp(1)%geometry'       : 1,
     'patch_icpp(1)%x_centroid'     : 0.,
     'patch_icpp(1)%length_x'       : 20.E-03/x0,
-    'patch_icpp(1)%vel(1)'         : myu,
+    'patch_icpp(1)%vel(1)'         : 0,
     'patch_icpp(1)%pres'           : 1,
     'patch_icpp(1)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,
     'patch_icpp(1)%alpha(1)'       : vf0,
@@ -141,7 +140,7 @@ print(json.dumps({
     # 'patch_icpp(1)%geometry'       : 1,
     # 'patch_icpp(1)%x_centroid'     : 0.,
     # 'patch_icpp(1)%length_x'       : 20.E-03/x0,
-    # 'patch_icpp(1)%vel(1)'         : myu,
+    # 'patch_icpp(1)%vel(1)'         : 0,
     # 'patch_icpp(1)%pres'           : 1,
     # 'patch_icpp(1)%alpha_rho(1)'   : (1.-1.E-12)*1.E+03/rho0,
     # 'patch_icpp(1)%alpha(1)'       : 1.E-12,
@@ -153,7 +152,7 @@ print(json.dumps({
     # 'patch_icpp(2)%x_centroid'     : 0.,
     # 'patch_icpp(2)%length_x'       : 5.E-03/x0,
     # 'patch_icpp(2)%alter_patch(1)' : 'T',
-    # 'patch_icpp(2)%vel(1)'         : myu,
+    # 'patch_icpp(2)%vel(1)'         : 0,
     # 'patch_icpp(2)%pres'           : 1,
     # 'patch_icpp(2)%alpha_rho(1)'   : (1.-vf0)*1.E+03/rho0,
     # 'patch_icpp(2)%alpha(1)'       : vf0,

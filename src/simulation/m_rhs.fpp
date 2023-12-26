@@ -69,7 +69,7 @@ module m_rhs
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
-    !! interior Guassian quadrature points. These are WENO-reconstructed from
+    !! interior Gaussian quadrature points. These are WENO-reconstructed from
     !! their respective cell-average values, obtained through the application
     !! of the divergence theorem on the integral-average cell-boundary values
     !! of the primitive variables, located in qK_prim_n, where K = L or R.

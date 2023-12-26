@@ -189,8 +189,8 @@ module m_global_parameters
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
-    !! fluids. This enables waves and interfaces of varying strenghts and in all
-    !! of the fluids to be made simulatenously visible on a single plot.
+    !! fluids. This enables waves and interfaces of varying strengths and in all
+    !! of the fluids to be made simultaneously visible on a single plot.
 
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order

@@ -12,7 +12,7 @@ module m_constants
     real(kind(0d0)), parameter :: pi        = 3.141592653589793d0 !< Pi
     real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
     
-    integer, parameter :: num_stcls_min   = 5    !< Mininum # of stencils
+    integer, parameter :: num_stcls_min   = 5    !< Minimum # of stencils
     integer, parameter :: path_len        = 400  !< Maximum path length
     integer, parameter :: name_len        = 50   !< Maximum name length
     integer, parameter :: dflt_int        = -100 !< Default integer value
