@@ -225,10 +225,6 @@ contains
 
                         ! Adaptive time stepping
                         if (adap_dt) then
-                            ! Scaling
-                            myR = myR/rratio
-                            myV = myV/uratio
-
                             ! Determine the starting time step
                             !! Evaluate f(x0,y0)
                             myR_tmp(1) = myR
@@ -349,9 +345,6 @@ contains
                                 if (t_new == dt) exit
 
                             end do
-
-                            myR = myR*rratio
-                            myV = myV*uratio
 
                             bub_r_src(j, k, l, q) = nbub(j, k, l)*myR
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*myV
@@ -554,11 +547,11 @@ contains
             f_rddot = f_rddot_G(fCpbw, fR, fV, fH, fHdot, c_gas, fntait, fBtait)
         else if (bubble_model == 2) then
             ! Keller-Miksis bubbles
-            fCpinf = fP/uratio**2
-            fCpbw = f_cpbw_KM(fR0, fR/rratio, fV/uratio, fpb)
-            c_liquid = DSQRT(fntait*(fP + fBtait)/(fRho*(1.d0 - alf)))/uratio ! Need to confirm 
-            f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, 1d0, fR/rratio, fV/uratio, fR0, c_liquid)
-            f_rddot = f_rddot*uratio**2/rratio
+            fCpinf = fP
+            fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
+            c_liquid = DSQRT(fntait*(fP + fBtait)/(fRho*(1.d0 - alf))) ! Need to confirm 
+            f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, 1d0, fR, fV, fR0, c_liquid)
+            f_rddot = f_rddot
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)

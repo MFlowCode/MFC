@@ -1572,8 +1572,8 @@ contains
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i)/rratio, V0_L(i)/uratio, 0d0)*uratio**2
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i)/rratio, V0_R(i)/uratio, 0d0)*uratio**2
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
                                             else
                                                 pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
                                                 pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))

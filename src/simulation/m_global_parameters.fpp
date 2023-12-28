@@ -283,8 +283,6 @@ module m_global_parameters
     integer :: R0_type
 
     real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
-    real(kind(0d0)) :: uratio   !< 
-    real(kind(0d0)) :: rratio   !< 
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
@@ -436,8 +434,6 @@ contains
         adap_dt = .false.
 
         pi_fac = 1d0
-        uratio = 1d0
-        rratio = 1d0
 
         ! User inputs for qbmm for simulation code
         qbmm = .false.
