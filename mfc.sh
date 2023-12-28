@@ -142,7 +142,14 @@ if [ "$1" == 'load' ]; then
         fi
     done
 
-    ok "All modules have been loaded for $M$COMPUTER$CR on $M$CG$CR"'s.'
+    if [ "$cg" == 'gpu' ]; then
+        isnv=$($FC --version | grep NVIDIA | wc -l)
+        if [ $isnv -eq 0 ]; then
+            export CC=nvc CXX=nvc++ FC=nvfortran
+        fi
+    fi
+    ok 'All modules and environment variables have been loaded.'
+
 
     return
 elif [ "$1" == "format" ]; then
