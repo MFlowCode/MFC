@@ -896,8 +896,6 @@ contains
             end do
         end do
 
-        call s_populate_conservative_variables_buffers(q_cons_ts(1)%vf, pb, mv)
-
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
