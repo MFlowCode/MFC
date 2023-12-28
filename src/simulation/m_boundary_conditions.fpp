@@ -1231,9 +1231,9 @@ module m_boundary_conditions
                             do k = 0, n
                                 do j = 1, buff_size
                                     pb(-j, k, l, q, i) = &
-                                    pb(0, k, l, q, i)
+                                        pb(0, k, l, q, i)
                                     mv(-j, k, l, q, i) = &
-                                    mv(0, k, l, q, i)
+                                        mv(0, k, l, q, i)
                                 end do
                             end do
                         end do
