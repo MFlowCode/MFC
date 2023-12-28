@@ -1548,15 +1548,20 @@ contains
                                     end do
 
                                     if(.not. qbmm) then
-                                        nbub_L_denom = 0d0
-                                        nbub_R_denom = 0d0
-                                        !$acc loop seq
-                                        do i = 1, nb
-                                            nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
-                                            nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
-                                        end do
-                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom                                        
+                                        if (adv_n .and. alter_alpha) then
+                                            nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, n_idx)
+                                            nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, n_idx)
+                                        else
+                                            nbub_L_denom = 0d0
+                                            nbub_R_denom = 0d0
+                                            !$acc loop seq
+                                            do i = 1, nb
+                                                nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
+                                                nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
+                                            end do
+                                            nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
+                                            nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                        end if
                                     else
                                         !nb stored in 0th moment of first R0 bin in variable conversion module
                                         nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, bubxb)
@@ -1567,8 +1572,8 @@ contains
                                     do i = 1, nb
                                         if (.not. qbmm) then
                                             if (polytropic) then
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i)/rratio, V0_L(i)/uratio, 0d0)*uratio**2
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i)/rratio, V0_R(i)/uratio, 0d0)*uratio**2
                                             else
                                                 pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
                                                 pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
@@ -1801,6 +1806,14 @@ contains
                                             *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end if
 
+                                if (adv_n) then
+                                    flux_rs${XYZ}$_vf(j, k, l, n_idx) = &
+                                        xi_M*nbub_L &
+                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*nbub_R &
+                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                end if
+                                
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then

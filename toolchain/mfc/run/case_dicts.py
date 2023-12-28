@@ -7,7 +7,7 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "file_per_process"
+    "Ca", "polydisperse", "file_per_process", "adv_n", "alter_alpha"
 ]
 
 
@@ -15,7 +15,7 @@ PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', 'pi_fac', 'uratio', 'rratio'
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -80,7 +80,7 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi'
+    'num_integrals', 'cu_mpi', 'pi_fac', 'uratio', 'rratio', 'adap_dt'
 ]
 
 for cmp in ["x", "y", "z"]:

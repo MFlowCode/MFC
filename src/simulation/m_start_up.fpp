@@ -143,7 +143,9 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, file_per_process
+            R0_type, file_per_process, &
+            pi_fac, rratio, uratio, &
+            adv_n, alter_alpha, adap_dt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -901,8 +903,10 @@ contains
             call s_1st_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3) then
+        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3 .and. adap_dt) then
+            call s_strang_splitting(t_step, time_avg)
         end if
 
         ! Time-stepping loop controls

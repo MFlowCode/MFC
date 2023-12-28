@@ -84,6 +84,7 @@ module m_global_parameters
     type(int_bounds_info) :: mom_idx                    !< Indexes of first & last momentum eqns.
     integer :: E_idx                      !< Index of total energy equation
     integer :: alf_idx                    !< Index of void fraction
+    integer :: n_idx                      !< Index of number density
     type(int_bounds_info) :: adv_idx                    !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx       !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx                    !< Indexes of first & last bubble variable eqns.
@@ -98,9 +99,13 @@ module m_global_parameters
     logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
 
-    logical :: vel_profile !< Set hypertangent streamwise velocity profile
+    logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
- 
+
+    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    real(kind(0d0)) :: uratio !<
+    real(kind(0d0)) :: rratio !<
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -159,6 +164,8 @@ module m_global_parameters
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    logical :: adv_n !< Solve the number density equation
+    logical :: alter_alpha  !< Recompute alpha from number density
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -174,8 +181,6 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
-
-
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -323,6 +328,9 @@ contains
         Web = dflt_real
         poly_sigma = dflt_real
 
+        adv_n = .false.
+        alter_alpha = .false.
+
         qbmm = .false.
         nmom = 1
         sigR = dflt_real
@@ -337,6 +345,10 @@ contains
         phi_nv = dflt_real
         Pe_c = dflt_real
         Tw = dflt_real
+
+        pi_fac = 1d0
+        uratio = 1d0
+        rratio = 1d0
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -424,6 +436,11 @@ contains
                 end if
                 sys_size = bub_idx%end
 
+                if (adv_n) then
+                    n_idx = bub_idx%end + 1
+                    sys_size = n_idx
+                end if
+                
                 allocate (weight(nb), R0(nb), V0(nb))
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))

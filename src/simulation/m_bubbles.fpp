@@ -105,6 +105,13 @@ contains
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions       
 
+        real(kind(0d0)) :: err_R, err_V, err
+        real(kind(0d0)) :: t_new
+        real(kind(0d0)) :: h, h0, h1, h_min
+        real(kind(0d0)) :: d0, d1, d2
+        real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp
+        integer :: ii_max
+
         !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
             do k = 0, n
@@ -191,13 +198,13 @@ contains
                         else
                             myRho = myalpha_rho(1)
                             n_tait = gammas(1)
-                            B_tait = pi_infs(1)
+                            B_tait = pi_infs(1)/pi_fac
                         end if
                         
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait-1)/n_tait ! make this the usual pi_inf
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
+                        ! myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
@@ -227,18 +234,149 @@ contains
                             rddot = f_rddot(Cpbw, myR, myV, myH, myHdot, c_gas, n_tait, B_tait)
                         else if (bubble_model == 2) then
                             ! Keller-Miksis bubbles
-                            Cpinf = myP
-                            Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                            ! c_gas = dsqrt( n_tait*(Cpbw+B_tait) / myRho)
-                            c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))
-                            rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, myRho, myR, myV, R0(q), c_liquid)
+                            if (adap_dt) then
+                                ! Values at current step
+                                Cpinf = myP/uratio**2
+                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
+                                myR = myR/rratio
+                                myV = myV/uratio
+
+                                ! Determine the starting time step
+                                !! Evaluate f(x0,y0)
+                                myR_tmp(1) = myR
+                                myV_tmp(1) = myV
+                                Cpbw = f_cpbw_KM(R0(q), myR_tmp(1), myV_tmp(1), pb)
+                                myA_tmp(1) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(1), myV_tmp(1), R0(q), c_liquid)
+
+                                !! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
+                                d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
+                                d1 = DSQRT((myV_tmp(1)**2 + myA_tmp(1)**2)/2)
+                                if (d0 < 1e-5 .or. d1 < 1e-5) then
+                                    h0 = 1e-6
+                                else
+                                    h0 = 0.01*(d0/d1)
+                                end if 
+
+                                !! Evaluate f(x0+h0,y0+h0*f(x0,y0))
+                                myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
+                                myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
+                                Cpbw = f_cpbw_KM(R0(q), myR_tmp(2), myV_tmp(2), pb)
+                                myA_tmp(2) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(2), myV_tmp(2), R0(q), c_liquid)
+
+                                !! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
+                                d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2) /2) / h0
+
+                                !! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
+                                !!      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
+                                if (max(d1,d2) < 1e-15) then
+                                    h1 = max(1e-6, h0*1e-3)
+                                else
+                                    h1 = (0.01/max(d1,d2))**(1/3d0)
+                                end if
+
+                                !! Set h = min(100*h0,h1)
+                                h = min(100*h0,h1)
+                                ! if (j==0) print *, "h_init = ", h, h0, h1
+
+                                ! Advancing one step
+                                t_new = 0d0
+                                h_min = h
+                                ii_max = 1
+                                do while (.true.)
+                                    if (t_new + h > dt) then
+                                        h = dt - t_new
+                                    end if 
+
+                                    ii = 1
+                                    ! Advancing one sub-step
+                                    do while (.true.)
+                                        ! Advance one sub-step and evaluate the error
+                                        ! Stage 0
+                                        myR_tmp(1) = myR
+                                        myV_tmp(1) = myV
+
+                                        ! Stage 1
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(1), myV_tmp(1), pb)
+                                        myA_tmp(1) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(1), myV_tmp(1), R0(q), c_liquid)
+                                        myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
+                                        myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
+
+                                        ! Stage 2
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(2), myV_tmp(2), pb)
+                                        myA_tmp(2) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(2), myV_tmp(2), R0(q), c_liquid)
+                                        myR_tmp(3) = myR_tmp(1) + (h/4)*(myV_tmp(1) + myV_tmp(2))
+                                        myV_tmp(3) = myV_tmp(1) + (h/4)*(myA_tmp(1) + myA_tmp(2))
+
+                                        ! Stage 3
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(3), myV_tmp(3), pb)
+                                        myA_tmp(3) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(3), myV_tmp(3), R0(q), c_liquid)
+                                        myR_tmp(4) = myR + (h/6)* (myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
+                                        myV_tmp(4) = myV + (h/6)* (myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
+
+                                        ! Stage 4
+                                        Cpbw = f_cpbw_KM(R0(q), myR_tmp(4), myV_tmp(4), pb)
+                                        myA_tmp(4) = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR_tmp(4), myV_tmp(4), R0(q), c_liquid)
+
+                                        ! Estimate error
+                                        err_R = (-5*h/24)*(myV_tmp(2) + myV_tmp(3) - 2*myV_tmp(4)) &
+                                                / max(abs(myR_tmp(1)),abs(myR_tmp(4)))
+                                        err_V = (-5*h/24)*(myA_tmp(2) + myA_tmp(3) - 2*myA_tmp(4)) &
+                                                / max(abs(myV_tmp(1)),abs(myV_tmp(4)))
+                                        err = DSQRT((err_R**2 + err_V**2) / 2) / 1e-3 ! Rtol = 1e-3
+
+                                        ! Determine acceptance/rejection and update step size
+                                        if ((err <= 1+1e-5) .and. myR_tmp(4) > 0) then
+                                            ! Accepted. Finalize the sub-step
+                                            myR = myR_tmp(4)
+                                            myV = myV_tmp(4)
+                                            t_new = t_new + h
+
+                                            ! Update step size for the next sub-step
+                                            h = h * min(2d0,max(0.5d0,(1/err)**(1/3d0)))
+
+                                            exit
+                                        else
+                                            ! Rejected. Update step size for the next try on sub-step
+                                            if (myR_tmp(4) > 0) then
+                                                h = h * min(2d0,max(0.5d0,(1d0/err)**(1/3d0)))
+                                            else
+                                                h = 0.5 * h
+                                            end if 
+                                        end if
+                                        if (ii == 1000) then
+                                            print *, 'too many iteration (>1000) in bubbles'
+                                        end if
+                                        ii = ii + 1
+                                        if (h < h_min) h_min = h
+                                    end do
+
+                                    if (ii > ii_max) ii_max = ii
+
+                                    ! Exit the loop if the final time reached dt
+                                    if (t_new == dt) exit
+
+                                end do
+
+                                myR = myR*rratio
+                                myV = myV*uratio
+
+                                bub_r_src(j, k, l, q) = nbub(j, k, l)*myR
+                                bub_v_src(j, k, l, q) = nbub(j, k, l)*myV
+                            else
+                                Cpinf = myP/uratio**2
+                                Cpbw = f_cpbw_KM(R0(q), myR/rratio, myV/uratio, pb)
+                                c_liquid = DSQRT(n_tait*(myP + B_tait)/(myRho*(1.d0 - alf)))/uratio ! Need to confirm 
+                                rddot = f_rddot_KM(pbdot, Cpinf, Cpbw, 1d0, myR/rratio, myV/uratio, R0(q), c_liquid)
+                                rddot = rddot*uratio**2/rratio
+                                bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+                            end if
                         else if (bubble_model == 3) then
                             ! Rayleigh-Plesset bubbles
                             Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
                             rddot = f_rddot_RP(myP, myRho, myR, myV, R0(q), Cpbw)
                         end if
 
-                        bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+                        ! bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
 
                         if (alf < 1.d-11) then
                             bub_adv_src(j, k, l) = 0d0
