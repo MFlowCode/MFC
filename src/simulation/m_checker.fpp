@@ -275,6 +275,19 @@ contains
             call s_mpi_abort( 'hypoelasticity requires riemann_solver = 1'// &
                 'Exiting ...')
         end if
+
+        if (adap_dt) then
+            if (time_stepper /= 3) then
+                call s_mpi_abort('Unsupported combination of adap_dt '// &
+                    'and time_stepper. Exiting ...')
+            else if (qbmm) then
+                call s_mpi_abort('Unsupported combination of adap_dt '// &
+                    'and qbmm. Exiting ...')
+            else if (.not. polytropic) then
+                call s_mpi_abort('Unsupported combination of adap_dt '// &
+                    'and polytropic. Exiting ...')
+            end if
+        end if
         ! END: Simulation Algorithm Parameters =============================
 
         ! Finite Difference Parameters =====================================
