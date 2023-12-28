@@ -326,9 +326,11 @@ Details of the simulation algorithms and implementation of the WENO scheme can b
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
 See table [Boundary Conditions](#boundary-conditions) for details.
 
-- `bc_[x,y,z]\%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%beg = -16`. Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
+- `bc_[x,y,z]\%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%beg = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
 
-- `bc_[x,y,z]\%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%end = -16`. Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]\%end = 16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
+- `bc_[x,y,z]\%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%end = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]\%end = 16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3. 
 `model_eqns` $=$ 1, 2, and 3 correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md#Johnsen08)), 5-equation model ([Allaire et al., 2002](references.md#Allaire02)), and 6-equation model ([Saurel et al., 2009](references.md#Saurel09)), respectively.
