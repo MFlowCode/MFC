@@ -811,21 +811,25 @@ contains
             end do
         end if
 
-        ! ! Check
-        ! ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ! ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ! Check
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
 
-        ! call s_convert_conservative_to_primitive_variables( &
-        ! q_cons_ts(1)%vf, &
-        ! q_prim_vf, &
-        ! gm_alpha_qp%vf, &
-        ! ix, iy, iz)
+        call s_convert_conservative_to_primitive_variables( &
+        q_cons_ts(1)%vf, &
+        q_prim_vf, &
+        gm_alpha_qp%vf, &
+        ix, iy, iz)
 
-        ! if (n == 0) then
-        !     j = 1; k = 0; l = 0;
-        !     if (mod(t_step - t_step_start, t_step_save) == 0) then
-        !         write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-        !     end if
+        ! if (proc_rank == 0) then
+            ! j = 15; k = 23; l = 0;
+            ! write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! j = 5; k = 22; l = 0;
+            ! write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+            ! write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
+        j = 79; k = 79; l = 0;
+        write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
         ! end if
 
         call nvtxEndRange

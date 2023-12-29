@@ -103,6 +103,7 @@ module m_global_parameters
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    real(kind(0d0)) :: len_ratio !< Bubble-background flow length scale ratio (= R0/x0)
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -156,7 +157,7 @@ module m_global_parameters
     !> @{
     integer :: nb
     real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
+    real(kind(0d0)) :: Ca, Web, Re_inv, Cpv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
@@ -324,6 +325,7 @@ contains
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
+        Cpv = 1d0
         poly_sigma = dflt_real
 
         adv_n = .false.
@@ -345,6 +347,7 @@ contains
         Tw = dflt_real
 
         pi_fac = 1d0
+        len_ratio = 1d0
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max

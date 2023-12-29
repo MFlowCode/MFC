@@ -134,18 +134,17 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
-            R0ref, &
+            R0ref, len_ratio, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, weno_order, &
 #:endif
-            Ca, Web, Re_inv, &
+            Ca, Web, Re_inv, Cpv, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
             R0_type, file_per_process, &
-            pi_fac, rratio, uratio, &
-            adv_n, alter_alpha, adap_dt
+            pi_fac, adv_n, alter_alpha, adap_dt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
