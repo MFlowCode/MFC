@@ -1,0 +1,19 @@
+name: Line Count
+
+on:
+  push:
+
+  pull_request:
+
+  workflow_dispatch:
+
+jobs:
+  docs:
+    name:    Line Count
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Count
+      run: ./mfc.sh count
