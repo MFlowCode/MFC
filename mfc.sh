@@ -161,8 +161,8 @@ elif [ "$1" == "format" ]; then
 
     fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
         --indent 4 --c-relations --enable-replacements --enable-decl \
-        --whitespace-comma 1 --whitespace-multdiv 1 --whitespace-plusminus 1 \
-        --case 1 1 1 1 --strict-indent
+        --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 \
+        --case 1 1 1 1 --strict-indent --line-length 1000
     ret="$?"
 
     if [ "$ret" != '0' ]; then
