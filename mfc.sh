@@ -159,10 +159,26 @@ elif [ "$1" == "format" ]; then
         pip3 install --upgrade fprettify
     fi
 
+    if [ "$1" == "diff" ]; then 
+        shift
+        out=$(fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
+            --indent 4 --c-relations --enable-replacements --enable-decl \
+            --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 \
+            --case 1 1 1 1 --strict-indent --line-length 1000 -s -d)
+        if [ -z "${out}" ]; then
+            echo "Already pretty!"
+            exit 0
+        else
+            error "Not pretty, run ./mfc.sh format"
+
+            exit 1
+        fi
+    fi
+
     fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
         --indent 4 --c-relations --enable-replacements --enable-decl \
         --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 \
-        --case 1 1 1 1 --strict-indent --line-length 1000
+        --case 1 1 1 1 --strict-indent --line-length 1000 
     ret="$?"
 
     if [ "$ret" != '0' ]; then
