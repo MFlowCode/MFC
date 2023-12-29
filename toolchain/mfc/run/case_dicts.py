@@ -6,7 +6,7 @@ COMMON = [
     "hypoelasticity", "cyl_coord", "pref", "p", "parallel_io",
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
-    "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
+    "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "Cpv", "n", "precision",
     "Ca", "polydisperse", "file_per_process", "adv_n", "alter_alpha"
 ]
 
