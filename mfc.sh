@@ -159,12 +159,10 @@ elif [ "$1" == "format" ]; then
         pip3 install --upgrade fprettify
     fi
 
+    opts="--recursive --silent --indent 4 --c-relations --enable-replacements --enable-decl --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 --case 1 1 1 1 --strict-indent --line-length 1000"
     if [ "$1" == "diff" ]; then 
         shift
-        out=$(fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
-            --indent 4 --c-relations --enable-replacements --enable-decl \
-            --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 \
-            --case 1 1 1 1 --strict-indent --line-length 1000 -s -d)
+        out=$(fprettify ${@:-src} --exclude "src/*/autogen" $opts -s -d)
         if [ -z "${out}" ]; then
             echo "Already pretty!"
             exit 0
@@ -175,10 +173,7 @@ elif [ "$1" == "format" ]; then
         fi
     fi
 
-    fprettify ${@:-src} --exclude "src/*/autogen" --recursive --silent \
-        --indent 4 --c-relations --enable-replacements --enable-decl \
-        --whitespace-comma 0 --whitespace-multdiv 0 --whitespace-plusminus 1 \
-        --case 1 1 1 1 --strict-indent --line-length 1000 
+    fprettify ${@:-src} --exclude "src/*/autogen" $opts 
     ret="$?"
 
     if [ "$ret" != '0' ]; then
