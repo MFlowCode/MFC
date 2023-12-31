@@ -271,7 +271,7 @@ contains
                                 if (t_new + h > dt) then
                                     h = dt - t_new
                                 end if 
-
+                                                            
                                 ii = 1
                                 ! Advancing one sub-step
                                 do while (.true.)
@@ -348,24 +348,12 @@ contains
 
                             bub_r_src(j, k, l, q) = nbub(j, k, l)*myR
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*myV
+
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                     pb, pbdot, alf, n_tait, B_tait, &
                                     bub_adv_src(j, k, l), divu%sf(j, k, l))
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
-
-                            if (j == 79 .and. k == 79) then
-                                write(33,*) myRho, myP, myR, myV, alf, rddot
-
-                                Cpinf = myP
-                                Cpbw = f_cpbw_KM(R0(q), myR, myV, pb)
-                                c_liquid = DSQRT(n_tait*(Cpinf + B_tait)/(myRho*(1.d0 - alf)))
-                                write(34,*) Cpinf, Cpbw, c_liquid
-                                write(35,*) Ca, Web, Re_inv
-                                write(36,*) Ca*((R0(q)*len_ratio/(myR)))**(3d0*gam)*(myV)/(myR), &
-                                                (2d0/Web)*(myV)/((myR)**2d0), &
-                                                Re_inv*(((myV)/(myR))**2d0)
-                            end if 
                         end if
                         
                         if (alf < 1.d-11) then

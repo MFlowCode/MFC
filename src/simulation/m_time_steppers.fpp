@@ -555,13 +555,9 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
         real(kind(0d0)), intent(IN) :: dt_in
 
-        integer :: i, j, k, l, q 
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
+        integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: nR3bar
-
-        type(int_bounds_info) :: ix, iy, iz
-        type(vector_field) :: gm_alpha_qp  !<
 
         ! Stage 1 of 3 =====================================================
 
@@ -811,27 +807,6 @@ contains
             end do
         end if
 
-        ! Check
-        ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        call s_convert_conservative_to_primitive_variables( &
-        q_cons_ts(1)%vf, &
-        q_prim_vf, &
-        gm_alpha_qp%vf, &
-        ix, iy, iz)
-
-        ! if (proc_rank == 0) then
-            ! j = 15; k = 23; l = 0;
-            ! write(20,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            ! write(30,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            ! j = 5; k = 22; l = 0;
-            ! write(21,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-            ! write(31,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size), q_adap_dt(j, k, l)
-        j = 79; k = 79; l = 0;
-        write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-        ! end if
-
         call nvtxEndRange
 
         call cpu_time(finish)
@@ -865,7 +840,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
 
-        integer :: j, k, l !< Generic loop iterator
+        integer :: j, k, l, q !< Generic loop iterator
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp  !<
 
@@ -887,15 +862,17 @@ contains
         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                     q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
 
-        ! Update
-        !$acc parallel loop collapse(3) gang vector default(present)
+        ! Update bubble variables
+        !$acc parallel loop collapse(4) gang vector default(present)
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
-                    q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l) = &
-                                bub_r_src(j, k, l, 1)
-                    q_cons_ts(1)%vf(bub_idx%vs(1))%sf(j, k, l) = &
-                                bub_v_src(j, k, l, 1)
+                    do q = 1, nb
+                        q_cons_ts(1)%vf(bub_idx%rs(q))%sf(j, k, l) = &
+                                    bub_r_src(j, k, l, q)
+                        q_cons_ts(1)%vf(bub_idx%vs(q))%sf(j, k, l) = &
+                                    bub_v_src(j, k, l, q)
+                    end do
                 end do
             end do
         end do
@@ -903,7 +880,7 @@ contains
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
-        !!      the flux term and 3rd order adaptive time stepping algorithm for 
+        !!      the flux term and adaptive time stepping algorithm for 
         !!      the source term
         !! @param t_step Current time-step
     subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
@@ -913,9 +890,6 @@ contains
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
-
-        type(int_bounds_info) :: ix, iy, iz
-        type(vector_field) :: gm_alpha_qp  !<
 
         call cpu_time(start)
 
@@ -929,23 +903,6 @@ contains
 
         ! Stage 3 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg, dt/2)
-
-        ! ! Check
-        ! ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ! ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        ! call s_convert_conservative_to_primitive_variables( &
-        ! q_cons_ts(1)%vf, &
-        ! q_prim_vf, &
-        ! gm_alpha_qp%vf, &
-        ! ix, iy, iz)
-
-        ! if (n == 0) then
-        !     j = 1; k = 0; l = 0;
-        !     if (mod(t_step - t_step_start, t_step_save) == 0) then
-        !         write(32,*) t_step,(q_prim_vf(i)%sf(j, k, l),i=1,sys_size)
-        !     end if
-        ! end if
 
         call nvtxEndRange
 
