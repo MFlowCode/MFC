@@ -14,11 +14,14 @@ def handle_dir(dirpath: str) -> typing.Tuple[typing.List[typing.Tuple[str, int]]
         with open(filepath) as f:
             count = 0
             for l in f.read().split('\n'):
-                if not (l.isspace() or len(l) == 0):
-                    if not l.lstrip()[0] == '!':
-                        count = count + 1 
-                    if l.lstrip()[0:5] == "!$acc":
-                        count = count + 1 
+                # Skip whitespace
+                if l.isspace() or len(l) == 0:
+                    continue
+                # Skip comments but not !$acc ones!
+                if l.lstrip().startswith("!") and not l.lstrip().startswith("!$acc"):
+                    continue
+                count += 1
+
             files.append((filepath, count))
             total += count
 
