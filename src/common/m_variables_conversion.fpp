@@ -200,7 +200,7 @@ contains
         real(kind(0d0)), optional, intent(OUT) :: G_K
         real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
-        ! Transfering the density, the specific heat ratio function and the
+        ! Transferring the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
         rho = q_vf(1)%sf(i, j, k)
         gamma = q_vf(gamma_idx)%sf(i, j, k)
@@ -220,7 +220,7 @@ contains
         !!      model to transfer the density, the specific heat ratio
         !!      function and liquid stiffness function from the vector
         !!      of conservative or primitive variables to their scalar
-        !!      counterparts. Specifially designed for when subgrid bubbles
+        !!      counterparts. Specifically designed for when subgrid bubbles
         !!      must be included.
         !! @param qK_vf primitive variables
         !! @param rho_K density
@@ -1261,7 +1261,7 @@ contains
             @:DEALLOCATE(bubrs)
         end if
 
-        ! Nullifying the procedure pointer to the subroutine transfering/
+        ! Nullifying the procedure pointer to the subroutine transferring/
         ! computing the mixture/species variables to the mixture variables
         s_convert_to_mixture_variables => null()
 
