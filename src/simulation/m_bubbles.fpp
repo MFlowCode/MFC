@@ -298,8 +298,8 @@ contains
                                     myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
                                                 pb, pbdot, alf, n_tait, B_tait, &
                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
-                                    myR_tmp(4) = myR + (h/6)* (myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
-                                    myV_tmp(4) = myV + (h/6)* (myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
+                                    myR_tmp(4) = myR + (h/6)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
+                                    myV_tmp(4) = myV + (h/6)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
 
                                     ! Stage 4
                                     myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
@@ -311,7 +311,7 @@ contains
                                             / max(abs(myR_tmp(1)),abs(myR_tmp(4)))
                                     err_V = (-5*h/24)*(myA_tmp(2) + myA_tmp(3) - 2*myA_tmp(4)) &
                                             / max(abs(myV_tmp(1)),abs(myV_tmp(4)))
-                                    err = DSQRT((err_R**2 + err_V**2) / 2) / 1e-3 ! Rtol = 1e-3
+                                    err = DSQRT((err_R**2 + err_V**2) / 2) / 1e-2 ! Rtol = 1e-2
 
                                     ! Determine acceptance/rejection and update step size
                                     if ((err <= 1+1e-5) .and. myR_tmp(4) > 0) then
