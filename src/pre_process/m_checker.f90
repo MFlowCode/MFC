@@ -105,8 +105,8 @@ contains
                be in (0,1). ' // 'Exiting ...')
            end if
            
-        elseif ( ( relax_model /= dflt_int ) .or. ( palpha_eps /= 0.0d0 ) &
-            .or. ( ptgalpha_eps /= 0.0d0 ) ) then
+        elseif ( ( relax_model /= dflt_int ) .or. ( palpha_eps /= dflt_real ) &
+            .or. ( ptgalpha_eps /= dflt_real ) ) then
             call s_mpi_abort( 'relax is not set as true, but other phase change parameters have & 
             been modified. Either activate phase change or set the values to default. ' // 'Exiting ...')
         end if

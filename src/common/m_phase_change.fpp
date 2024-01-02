@@ -5,7 +5,7 @@
 #:include 'macros.fpp'
 
 !> @brief This module is used to relax the model equations (6-eqn model)
-!> towards pressure and temperature (6-eqn to 4-eqn), and (if wanted) gibbs-free
+!> towards pressure and temperature (6-eqn to 4-eqn), and (if wanted) Gibbs free
 !> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
 !> procedure.
 module m_phase_change
@@ -43,8 +43,10 @@ module m_phase_change
             import :: scalar_field, sys_size
             type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         end subroutine
+        !> @}
 
     end interface
+    !> @}
 
     !> @name Parameters for the first order transition phase change
     !> @{
@@ -67,11 +69,10 @@ module m_phase_change
 
 contains
 
-        !>  The purpose of this subroutine is to initialize the phase change module
-        !!         by setting the parameters needed for phase change and 
-        !!         selecting the phase change module that will be used
-        !!         (pT- or pTg-equilibirum)
-        !!     @param A, B, C, D Gibbs free energy phase change parameters
+    !>  The purpose of this subroutine is to initialize the phase change module
+        !!      by setting the parameters needed for phase change and 
+        !!      selecting the phase change module that will be used
+        !!      (pT- or pTg-equilibrium)
     subroutine s_initialize_phasechange_module()
 
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
@@ -96,15 +97,14 @@ contains
 
     end subroutine s_initialize_phasechange_module !-------------------------------
 
-        !>  This subroutine is created to activate either the pT- (N fluids) or the
-        !!         pTg-equilibrium (2 fluids for g-equilibrium)
-        !!         model, also considering mass depletion, depending on the incoming
-        !!         state conditions.
-        !!     @param q_cons_vf Cell-average conservative variables
-        !!     @param pS equilibrium pressure at the interface
+    !>  This subroutine is created to activate either the pT- (N fluids) or the
+        !!      pTg-equilibrium (2 fluids for g-equilibrium)
+        !!      model, also considering mass depletion, depending on the incoming
+        !!      state conditions.
+        !!  @param q_cons_vf Cell-average conservative variables
     subroutine s_infinite_relaxation_k(q_cons_vf) ! ----------------
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0.0d0)) :: pS, pSOV, pSSL !< equilibirum pressure for mixture, overheated vapor, and subcooled liquid
+        real(kind(0.0d0)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
         real(kind(0.0d0)) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
         real(kind(0.0d0)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
@@ -160,7 +160,8 @@ contains
                     end do
 
                     ! calculating the total energy that MUST be preserved throughout the pT- and pTg-relaxation procedures
-                    ! at each of the cells. Note I calculate UE as TE - KE due to nonconservation at the dicontinuities
+                    ! at each of the cells. The internal energy is calculated as the total energy minus the kinetic
+                    ! energy to preserved its value at sharp interfaces
                     rhoe = q_cons_vf(E_idx)%sf(j, k, l) - dynE
 
                     ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
@@ -175,7 +176,7 @@ contains
                                            .and.  (q_cons_vf(vp + contxb - 1)%sf(j, k, l) > mixM*rM)) &
                                            .and.  (pS < pCr) .and. (TS < TCr)) then
 
-                        ! Checking if phase change is needed, by checking whther the final solution is either subcoooled
+                        ! Checking if phase change is needed, by checking whether the final solution is either subcoooled
                         ! liquid or overheated vapor.
 
                         ! overheated vapor case
@@ -292,25 +293,32 @@ contains
 
     end subroutine s_infinite_relaxation_k ! ----------------
 
-        !>  This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
-        !!     @param q_cons_vf Cell-average conservative variables
-        !!     @param pS equilibrium pressure at the interface
+    !>  This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
+        !!  @param j generic loop iterator for x direction 
+        !!  @param k generic loop iterator for y direction 
+        !!  @param l generic loop iterator for z direction 
+        !!  @param MFL flag that tells whether the fluid is pure gas (0), pure liquid (1), or a mixture (2)
+        !!  @param pS equilibrium pressure at the interface
+        !!  @param p_infpT stiffness for the participating fluids under pT-equilibrium
+        !!  @param rM sum of the reacting masses
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param rhoe mixture energy
+        !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
 !$acc routine seq
 
         ! initializing variables
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0.0d0)), intent(OUT) :: pS, TS !< pressure and temperature at pT-equilibrium
-        real(kind(0.0d0)), dimension(num_fluids), intent(OUT) :: p_infpT !< stiffness for the participating fluids
-        real(kind(0.0d0)), intent(IN) :: rM, rhoe !< reacting masses and total internal energy
-        integer, intent(IN) :: j, k, l, MFL !< generic loop iterators
+        real(kind(0.0d0)), intent(OUT) :: pS, TS 
+        real(kind(0.0d0)), dimension(num_fluids), intent(OUT) :: p_infpT 
+        real(kind(0.0d0)), intent(IN) :: rM, rhoe 
+        integer, intent(IN) :: j, k, l, MFL 
         real(kind(0.0d0)), dimension(num_fluids) :: pk !< individual initial pressures
-        integer, dimension(num_fluids) :: ig !< flags to toogle inclusion of fluid for pT-equilibrium
+        integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
 
-        ! variables for the Newton Solver
-        real(kind(0.0d0)) :: gp, gpp, hp, pO, mCP, mQ
-        ! generic loop iterator
-        integer :: i, ns
+        real(kind(0.0d0)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
+        
+        integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; pk(1:num_fluids) = 0.0d0
@@ -390,18 +398,24 @@ contains
 
     end subroutine s_infinite_pt_relaxation_k ! -----------------------
 
-        !>  This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT
-        !!     and 2 fluids under pTg-equilibrium. There is a final common p and T during relaxation
-        !!     @param q_cons_vf Cell-average conservative variables
-        !!     @param pS equilibrium pressure at the interface
+    !>  This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT
+        !!      and 2 fluids under pTg-equilibrium. There is a final common p and T during relaxation
+        !!  @param j generic loop iterator for x direction 
+        !!  @param k generic loop iterator for y direction 
+        !!  @param l generic loop iterator for z direction 
+        !!  @param pS equilibrium pressure at the interface
+        !!  @param p_infpT stiffness for the participating fluids under pT-equilibrium
+        !!  @param rhoe mixture energy
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
 !$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: p_infpT !< stiffness for the participating fluids for pT-equilibrium
-        real(kind(0.0d0)), intent(INOUT) :: pS, TS !< pressure and Temperature at pTg-equilibrium
-        real(kind(0.0d0)), intent(IN) :: rhoe !< mixture internal energy
-        integer, intent(IN) :: j, k, l !< generic loop iterators
+        real(kind(0.0d0)), dimension(num_fluids), intent(IN) :: p_infpT
+        real(kind(0.0d0)), intent(INOUT) :: pS, TS
+        real(kind(0.0d0)), intent(IN) :: rhoe
+        integer, intent(IN) :: j, k, l
         real(kind(0.0d0)), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
         real(kind(0.0d0)), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
         real(kind(0.0d0)), dimension(2) :: R2D, DeltamP !< residual and correction array
@@ -412,12 +426,12 @@ contains
         integer :: i, ns
 
         ! pTg-equilibrium solution procedure
-        ! Newton Sover parameters
+        ! Newton Solver parameters
         ! counter
         ns = 0
 
         ! Relaxation factor
-        Om = 1.0d-4
+        Om = 1.0d-3
 
         p_infpTg = p_infpT
 
@@ -439,7 +453,7 @@ contains
         R2D(1) = 0.0d0; R2D(2) = 0.0d0
         DeltamP(1) = 0.0d0; DeltamP(2) = 0.0d0
         do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
-                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1e4))) &
+                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) &
                   .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
@@ -506,19 +520,23 @@ contains
 
     end subroutine s_infinite_ptg_relaxation_k ! -----------------------
 
-        !>  This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative
-        !!  but their sum is positive. Inert phases are not corrected at this moment 
-        !!     @param q_cons_vf Cell-average conservative variables
-        !!     @param rM sum of the reacting masses
+    !>  This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative
+        !!      but their sum is positive. Inert phases are not corrected at this moment 
+        !!  @param MCT partial density correction parameter
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param rM sum of the reacting masses
+        !!  @param j generic loop iterator for x direction
+        !!  @param k generic loop iterator for y direction
+        !!  @param l generic loop iterator for z direction
     subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 !$acc routine seq
 
         !> @name variables for the correction of the reacting partial densities
         !> @{
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0.0d0)), intent(INOUT) :: rM !< sum of the reacting masses
+        real(kind(0.0d0)), intent(INOUT) :: rM
         real(kind(0.0d0)), intent(OUT) :: MCT
-        integer, intent(IN) :: j, k, l !< generic loop iterators
+        integer, intent(IN) :: j, k, l
         !> @}
 
         if (rM < 0.0d0) then
@@ -557,18 +575,26 @@ contains
 
     end subroutine s_correct_partial_densities
 
-        !>  This auxiliary subroutine calculates the 2 x 2 Jacobian and, its inverse and transpose
-        !!  to be used in the pTg-equilibirium procedure 
-        !!     @param Jac Jacobian Matrix
-        !!     @param InvJac Inverse of the Jacobian Matrix
-        !!     @param TJac Transpose of the Jacobian Matrix
+    !>  This auxiliary subroutine calculates the 2 x 2 Jacobian and, its inverse and transpose
+        !!      to be used in the pTg-equilibirium procedure 
+        !!  @param InvJac Inverse of the Jacobian Matrix
+        !!  @param j generic loop iterator for x direction
+        !!  @param Jac Jacobian Matrix
+        !!  @param k generic loop iterator for y direction
+        !!  @param l generic loop iterator for z direction
+        !!  @param mCPD  sum of the total alpha*rho*cp
+        !!  @param mCVGP auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press
+        !!  @param mCVGP2 auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press^2
+        !!  @param pS equilibrium pressure at the interface
+        !!  @param q_cons_vf Cell-average conservative variables    
+        !!  @param TJac Transpose of the Jacobian Matrix
     subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 !$acc routine seq
         
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0.0d0)), intent(IN) :: pS, mCPD, mCVGP, mCVGP2 !< equilibrium pressure and auxiliary variables
-        integer, intent(IN) :: j, k, l !< generic loop iterators
-        real(kind(0.0d0)), dimension(2, 2), intent(OUT) :: Jac, InvJac, TJac !< Matrices for the Newton Solver
+        real(kind(0.0d0)), intent(IN) :: pS, mCPD, mCVGP, mCVGP2
+        integer, intent(IN) :: j, k, l
+        real(kind(0.0d0)), dimension(2, 2), intent(OUT) :: Jac, InvJac, TJac
         real(kind(0.0d0)) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
 
         ! mass of the reacting liquid
@@ -597,9 +623,9 @@ contains
                       - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) &
                 + mCVGP2)*TS**2
 
-        ! F = (F1,F2) is the fuction whose roots we are looking for
+        ! F = (F1,F2) is the function whose roots we are looking for
         ! x = (m1, p) are the independent variables. m1 = mass of the first participant fluid, p = pressure
-        ! F1 = 0 is the gibbs free energy quality
+        ! F1 = 0 is the Gibbs free energy quality
         ! F2 = 0 is the enforcement of the thermodynamic (total - kinectic) energy
         ! dF1dm
         Jac(1, 1) = dFdT*dTdm
@@ -649,16 +675,24 @@ contains
 
     end subroutine s_compute_jacobian_matrix
 
-        !>  This auxiliary subroutine computes the residue of the pTg-equilibrium procedure
-        !!     @param R2D (2D) residue array
-        !!     @param pS equilibrium pressure at the interface
+    !>  This auxiliary subroutine computes the residue of the pTg-equilibrium procedure
+        !!  @param j generic loop iterator for x direction
+        !!  @param k generic loop iterator for y direction
+        !!  @param l generic loop iterator for z direction
+        !!  @param mCPD  sum of the total alpha*rho*cp
+        !!  @param mCVGP auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press
+        !!  @param mQD sum of the total alpha*rho*qv
+        !!  @param q_cons_vf Cell-average conservative variables    
+        !!  @param pS equilibrium pressure at the interface
+        !!  @param rhoe mixture energy
+        !!  @param R2D (2D) residue array
     subroutine s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
 !$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0.0d0)), intent(IN) :: pS, rhoe, mCPD, mCVGP, mQD !< equilibrium pressure, mixture energy, and auxiliary variables
-        integer, intent(IN) :: j, k, l !< generic loop iterators
-        real(kind(0.0d0)), dimension(2), intent(OUT) :: R2D !< residual for the Newton solver of the pTg-equilibrium
+        real(kind(0.0d0)), intent(IN) :: pS, rhoe, mCPD, mCVGP, mQD
+        integer, intent(IN) :: j, k, l
+        real(kind(0.0d0)), dimension(2), intent(OUT) :: R2D
         real(kind(0.0d0)) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
 
         ! mass of the reacting liquid
@@ -691,15 +725,16 @@ contains
 
     end subroutine s_compute_pTg_residue
 
-        !>  This auxiliary subroutine finds the Saturation temperature for a given 
-        !!  saturation pressure through a newton solver
-        !!     @param TSat Saturation Temperature
-        !!     @param pSat Saturation Pressure
+    !>  This auxiliary subroutine finds the Saturation temperature for a given 
+        !!      saturation pressure through a newton solver
+        !!  @param pSat Saturation Pressure
+        !!  @param TSat Saturation Temperature
+        !!  @param TSIn equilibrium Temperature    
     subroutine s_TSat(pSat, TSat, TSIn)
 !$acc routine seq
 
-        real(kind(0.0d0)), intent(OUT) :: TSat !< Saturation temperature
-        real(kind(0.0d0)), intent(IN) :: pSat, TSIn !< Saturation pressure
+        real(kind(0.0d0)), intent(OUT) :: TSat
+        real(kind(0.0d0)), intent(IN) :: pSat, TSIn
         real(kind(0.0d0)) :: dFdT, FT, Om !< auxiliary variables
 
         ! Generic loop iterators
@@ -720,17 +755,25 @@ contains
             ns = 0
 
             ! underrelaxation factor
-            Om = 1E-5
+            Om = 1.0d-3
             do while ((DABS(FT) > ptgalpha_eps) .or. (ns == 0))
                 ! increasing counter
                 ns = ns + 1
 
                 ! calculating residual
-                FT = A + B / TSat + C * DLOG( TSat ) + D * DLOG( ( pSat + ps_inf( lp ) ) ) - DLOG( pSat + ps_inf( vp ) )
+                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &
+                            *(1 - DLOG(TSat)) - (qvps(lp) - qvps(vp)) &
+                            + cvs(lp)*(gs_min(lp) - 1)*DLOG(pSat + ps_inf(lp)) &
+                            - cvs(vp)*(gs_min(vp) - 1)*DLOG(pSat + ps_inf(vp))) &
+                      + qvs(lp) - qvs(vp)
 
                 ! calculating the jacobian
-                dFdT = - B / ( TSat ** 2) + C / TSat
-
+                dFdT = &
+                    -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*DLOG(TSat) &
+                    - (qvps(lp) - qvps(vp)) &
+                    + cvs(lp)*(gs_min(lp) - 1)*DLOG(pSat + ps_inf(lp)) &
+                    - cvs(vp)*(gs_min(vp) - 1)*DLOG(pSat + ps_inf(vp))
+   
                 ! updating saturation temperature
                 TSat = TSat - Om * FT/dFdT
                 
@@ -740,7 +783,7 @@ contains
 
     end subroutine s_TSat
 
-        !>  This subroutine finalizes the phase change module
+    !>  This subroutine finalizes the phase change module
     subroutine s_finalize_relaxation_solver_module()
 
         s_relaxation_solver => null()
