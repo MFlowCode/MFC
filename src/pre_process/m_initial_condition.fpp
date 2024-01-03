@@ -2,13 +2,13 @@
 !! @file m_initial_condition.f90
 !! @brief Contains module m_initial_condition
 
-!> @brief This module provides a platform that is analagous to constructive
+!> @brief This module provides a platform that is analogous to constructive
 !!              solid geometry techniques and in this way allows for the creation
 !!              of a wide variety of initial conditions. Several 1D, 2D and 3D
 !!              fundamental geometries are included that may further be combined
 !!              into more complex shapes. This is achieved by carefully setting
 !!              up the order in which the patches are laid out in the domain and
-!!              specifying the priority that each patch has over the preceeding
+!!              specifying the priority that each patch has over the preceding
 !!              ones. The resulting shapes may be identified both by the values
 !!              of their primitive variables and the associated patch identities.
 !!              Note that the user may choose to read in and modify a preexisting
@@ -424,7 +424,7 @@ contains
         real(kind(0d0)) :: gam,pi_inf,rho1,mach,c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
-        integer :: ii, jj !< block matrix indicies
+        integer :: ii, jj !< block matrix indices
 
         ! Set fluid flow properties
         gam = 1.+1./fluid_pp(1)%gamma

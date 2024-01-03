@@ -239,7 +239,7 @@ contains
                 (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -14)) then
             call s_mpi_abort('Unsupported value of bc_z%beg. Exiting ...')
         elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
-            call s_mpi_abort('Unsupported coice of boundary condition -13')
+            call s_mpi_abort('Unsupported choice of boundary condition -13')
         elseif (bc_z%end /= dflt_int &
                 .and. &
                 (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then

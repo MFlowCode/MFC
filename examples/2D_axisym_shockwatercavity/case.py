@@ -102,7 +102,7 @@ xe =  3.6226 * D0
 yb =  0 * D0
 ye =  1.6358 * D0
 
-# Stretching factor, to make sure the domaing is sufficiently large after the mesh strecth
+# Stretching factor, to make sure the domaing is sufficiently large after the mesh stretch
 StF = 4.0                                                                             
 
 # number of elements into y direction

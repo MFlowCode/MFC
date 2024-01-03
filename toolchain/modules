@@ -15,7 +15,7 @@ s-gpu nvhpc/22.11 cuda/nvhpc
 b     PSC Bridges2
 b-all python/3.8.6
 b-cpu allocations/1.0 gcc/10.2.0 openmpi/4.0.5-gcc10.2.0
-b-gpu openmpi/4.0.5-nvhpc22.9 nvhpc/22.9
+b-gpu openmpi/4.0.5-nvhpc22.9 nvhpc/22.9 cuda
 
 a     OLCF Ascent
 a-all python cmake/3.22.2
