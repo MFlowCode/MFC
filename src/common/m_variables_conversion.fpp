@@ -233,7 +233,7 @@ contains
         !! @param rho_K density
         !! @param gamma_K specific heat ratio
         !! @param pi_inf_K liquid stiffness
-        !! @param qv_K fluid referece energy
+        !! @param qv_K fluid reference energy
         !! @param j Cell index
         !! @param k Cell index
         !! @param l Cell index
