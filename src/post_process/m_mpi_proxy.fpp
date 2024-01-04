@@ -159,7 +159,7 @@ contains
             & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb' ]
+            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -168,7 +168,7 @@ contains
             & 'E_wrt', 'pres_wrt', 'gamma_wrt',                & 
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', & 
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
-            & 'polytropic', 'polydisperse', 'file_per_process' ]
+            & 'polytropic', 'polydisperse', 'file_per_process', 'relax' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -182,6 +182,9 @@ contains
         do i = 1, num_fluids_max
             call MPI_BCAST(fluid_pp(i)%gamma, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%pi_inf, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%cv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qvp, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
 
