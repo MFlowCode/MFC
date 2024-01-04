@@ -4,7 +4,8 @@ unset u_c
 unset u_cg
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=9
+MFC_PYTHON_MIN_MINOR=8
+MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
 
 # Check whether this script was called from MFC's root directory.
 if [ ! -f "$(pwd)/toolchain/mfc.py" ]; then
@@ -81,14 +82,14 @@ if [ "$1" == 'load' ]; then
     }
 
     COMPUTER="$(__extract "$u_c")"
-    
+
     if [[ -z "$COMPUTER" ]]; then
         error "Computer $M$u_cg$CR not recognized."
         return
     fi
-    
+
     MODULES=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
-    
+
     log "Loading modules for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
     # Reset modules to default system configuration
@@ -124,7 +125,7 @@ if [ "$1" == 'load' ]; then
         if [ "$delta" -ge "0" ]; then
             printf "%0.s " $(seq 0 $delta)
         fi
-    
+
         # Load the module
         module load "$module_name" > /dev/null 2>&1
 
@@ -190,7 +191,7 @@ elif [ "$1" == "docker" ]; then
         dockerintopts='--interactive --tty'
     fi
 
-    __docker_run() { 
+    __docker_run() {
         docker run $dockerintopts --rm --workdir /home/me/MFC            \
                    --mount type=bind,source="$(pwd)",target=/home/me/MFC \
                    sbryngelson/mfc:latest $@
@@ -330,11 +331,27 @@ if [ "$bShouldInstallCMake" = true ]; then
 fi
 
 
+is_python_compatible() {
+    if ! ${1:-python3} -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
+        return 1
+    fi
+
+    return 0
+}
+
+
+assert_python_compatible() {
+    if ! is_python_compatible $1; then
+        error "$MAGENTA$(${1:-python3} --version)$COLOR_RESET (${1:-python3}) is out of date. Required >= $MAGENTA$MFC_PYTHON_MIN_STR$COLOR_RESET."
+
+        exit 1
+    fi
+}
+
+
 if [ -f "$(pwd)/build/venv/bin/activate" ]; then
-    # Check Python is still working within the VENV
-    if ! $(pwd)/build/venv/bin/python3 --version > /dev/null 2>&1; then
-        # If not, delete it and install it again
-        warn "$MAGENTA""Python$COLOR_RESET is no longer working inside the Virtualenv."
+    if ! is_python_compatible "$(pwd)/build/venv/bin/python3"; then
+        warn "$MAGENTA""Python$COLOR_RESET is outdated inside the Virtualenv."
         warn "Deleting the Virtualenv and starting from scratch..."
 
         rm -r "$(pwd)/build/venv"
@@ -349,12 +366,7 @@ if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate"
         exit 1
     fi
 
-    # CHeck Python's version for compatibility
-    if ! python3 -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
-        error "$(python3 --version) is incompatible.$MAGENTA Python$COLOR_RESET v$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR or higher is required."
-
-        exit 1
-    fi
+    assert_python_compatible
 
     get_pip_url="https://bootstrap.pypa.io/pip/get-pip.py"
 
@@ -381,6 +393,8 @@ fi
 
 # Create a Python virtualenv if it hasn't already been created
 if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
+    assert_python_compatible
+
     if ! python3 -m venv "$(pwd)/build/venv"; then
         error "Failed to create a$MAGENTA Python$COLOR_RESET virtual environment. Delete the build/venv folder and try again."
 
@@ -420,7 +434,7 @@ fi
 
 # Activate the Python venv
 source "$(pwd)/build/venv/bin/activate"
-ok "(venv) Entered the$MAGENTA Python$COLOR_RESET virtual environment."
+ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environment (>= $MAGENTA$MFC_PYTHON_MIN_STR$COLOR_RESET)."
 
 
 # Install Python dependencies if, either:
@@ -456,5 +470,5 @@ log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
 deactivate
 
 
-# Exit proper exit code
+# Exit with proper exit code
 exit $code
