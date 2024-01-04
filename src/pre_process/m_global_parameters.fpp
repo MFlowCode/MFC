@@ -72,6 +72,10 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters ==========================================
     integer :: model_eqns      !< Multicomponent flow model
+    logical :: relax           !< activate phase change
+    integer :: relax_model     !< Relax Model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Alpha limiter
@@ -240,6 +244,10 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
+        relax = .false.
+        relax_model= dflt_int
+        palpha_eps = dflt_real
+        ptgalpha_eps = dflt_real
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
@@ -294,6 +302,9 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
+            patch_icpp(i)%cv = 0d0
+            patch_icpp(i)%qv = 0d0
+            patch_icpp(i)%qvp = 0d0
             patch_icpp(i)%tau_e = 0d0
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
@@ -349,6 +360,9 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+            fluid_pp(i)%cv      = 0d0
+            fluid_pp(i)%qv      = 0d0
+            fluid_pp(i)%qvp      = 0d0
             fluid_pp(i)%G = 0d0
         end do
 

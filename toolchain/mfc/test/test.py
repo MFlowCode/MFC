@@ -140,6 +140,8 @@ def _handle_case(test: TestCase, devices: typing.Set[int]):
         tol = 1e-10
     elif test.params.get("hypoelasticity", 'F') == 'T':
         tol = 1e-7 
+    elif test.params.get("relax", 'F') == 'T':
+        tol = 1e-10
     else:
         tol = 1e-12
 

@@ -135,6 +135,25 @@ contains
             end if
         end if
 
+        ! phase change checkers.
+        if ( relax ) then
+            if ( model_eqns /= 3 ) then
+                call s_mpi_abort( 'phase change requires model_eqns = 3. ' // &
+                    'Exiting ...')
+            elseif ( ( relax_model .lt. 0 ) .or. ( relax_model .gt. 6 ) ) then
+                    call s_mpi_abort( 'relax_model should be in between 0 and 6. ' // &
+                    'Exiting ...' )
+            elseif ( ( palpha_eps .le. 0d0 ) .or. ( palpha_eps .ge. 1d0 ) .or. &
+                   ( ptgalpha_eps .le. 0d0 ) .or. ( ptgalpha_eps .ge. 1d0 ) ) then
+               call s_mpi_abort( 'both palpha_eps and ptgalpha_eps must &
+               be in (0,1). ' // 'Exiting ...')
+           end if
+        elseif ( ( relax_model /= dflt_int ) .or. ( palpha_eps /= dflt_real ) &
+            .or. ( ptgalpha_eps /= dflt_real ) ) then
+               call s_mpi_abort( 'relax is not set as true, but other phase change parameters have & 
+               been modified. Either activate phase change or set the values to default. ' // 'Exiting ...')
+        end if
+
         if (num_fluids /= dflt_int &
                 .and. &
                 (num_fluids < 1 .or. num_fluids > num_fluids)) then
@@ -339,6 +358,10 @@ contains
                     'of values of num_fluids '// &
                     'and fluid_pp('//trim(iStr)//')%'// &
                     'pi_inf. Exiting ...')
+            elseif ( fluid_pp(i)%cv < 0d0 ) then
+                    call s_mpi_abort('Unsupported value of '// &
+                    'fluid_pp('//trim(iStr)//')%'// &
+                    'cv. Make sure cv is positive. Exiting ...')
             end if
 
             do j = 1, 2

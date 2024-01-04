@@ -52,7 +52,9 @@ BASE_CFG = {
 
     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
-
+    'fluid_pp(1)%cv'               : 0.0,
+    'fluid_pp(1)%qv'               : 0.0,
+    'fluid_pp(1)%qvp'              : 0.0,   
     'bubbles'                       : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,

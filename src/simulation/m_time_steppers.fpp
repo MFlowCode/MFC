@@ -395,7 +395,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
@@ -454,7 +456,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
 
         call nvtxEndRange
 
@@ -548,7 +552,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
 
         ! ==================================================================
 
@@ -607,7 +613,9 @@ contains
         end if
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
 
         ! ==================================================================
 
@@ -666,7 +674,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        if ( model_eqns == 3 .and. (.not.relax ) ) then
+            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
 
         call nvtxEndRange
 

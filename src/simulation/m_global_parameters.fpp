@@ -114,6 +114,10 @@ module m_global_parameters
     integer :: riemann_solver !< Riemann solver algorithm
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
+    logical :: relax          !< activate phase change
+    integer :: relax_model    !< Relaxation model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
@@ -126,7 +130,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order)
     #:endif
 
-!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity, relax, palpha_eps,ptgalpha_eps)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -317,8 +321,8 @@ module m_global_parameters
      integer :: strxb, strxe
      !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(gammas, pi_infs)
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -376,6 +380,10 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        relax = .false.
+        relax_model = dflt_int
+        palpha_eps = dflt_real
+        ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
@@ -393,6 +401,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%cv      = 0d0
+            fluid_pp(i)%qv      = 0d0
+            fluid_pp(i)%qvp     = 0d0
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real
