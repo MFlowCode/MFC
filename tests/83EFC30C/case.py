@@ -40,7 +40,7 @@ case = {
     "null_weights": "F",
     "mp_weno": "F",
     "riemann_solver": 1,
-    "wave_speeds": 2,
+    "wave_speeds": "2",
     "avg_state": 2,
     "format": 1,
     "precision": 2,

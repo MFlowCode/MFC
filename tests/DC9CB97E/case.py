@@ -41,7 +41,7 @@ case = {
     "mp_weno": "F",
     "riemann_solver": 1,
     "wave_speeds": 1,
-    "avg_state": 1,
+    "avg_state": "1",
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "F",
