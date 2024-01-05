@@ -136,7 +136,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
         'c_wrt'        : 'T',
     }
-        
+
     if case['p'] != 0:
         mods['fd_order']  = 1
         mods['omega_wrt(1)'] = 'T'

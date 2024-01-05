@@ -24,6 +24,10 @@ fi
 # If the user wishes to run the "load" script
 if [ "$1" == 'load' ]; then
     shift; . "$(pwd)/toolchain/bootstrap/modules.sh" $@; return
+elif [ "$1" == "lint" ]; then
+    . "$(pwd)/toolchain/bootstrap/python.sh"
+
+    shift; . "$(pwd)/toolchain/bootstrap/lint.sh"    $@; exit 0
 elif [ "$1" == "format" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
@@ -37,9 +41,13 @@ mkdir -p "$(pwd)/build"
 . "$(pwd)/toolchain/bootstrap/cmake.sh"
 . "$(pwd)/toolchain/bootstrap/python.sh"
 
+echo
+
 # Run the main.py bootstrap script
-python3 "$(pwd)/toolchain/mfc.py" "$@"
+python3 "$(pwd)/toolchain/main.py" "$@"
 code=$?
+
+echo
 
 if [ $code -ne 0 ]; then
     error "mfc.py finished with a $code exit code."

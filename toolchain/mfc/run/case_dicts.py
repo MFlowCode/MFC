@@ -151,14 +151,17 @@ CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
 def get_input_dict_keys(target_name: str) -> list:
     result = None
-    if target_name == "pre_process":  result = PRE_PROCESS.copy()
-    if target_name == "simulation":   result = SIMULATION.copy()
-    if target_name == "post_process": result = POST_PROCESS.copy()
+    if target_name == "pre_process":
+        result = PRE_PROCESS.copy()
+    if target_name == "simulation":
+        result = SIMULATION.copy()
+    if target_name == "post_process":
+        result = POST_PROCESS.copy()
 
-    if result == None:
+    if result is None:
         raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
 
     if not ARG("case_optimization") or target_name != "simulation":
         return result
-    
+
     return [ x for x in result if x not in CASE_OPTIMIZATION ]

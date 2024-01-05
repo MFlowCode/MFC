@@ -15,24 +15,24 @@ class MFCInputFile:
     filename:     str
     case_dirpath: str
     case_dict:    dict
-    
+
     def __get_ndims(self) -> int:
         return 1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)
-    
+
     def __is_ic_analytical(self, key: str, val: str) -> bool:
         if common.is_number(val) or not isinstance(val, str):
             return False
-        
-        for array in QPVF_IDX_VARS.keys():
+
+        for array in QPVF_IDX_VARS:
             if re.match(fr'^patch_icpp\([0-9]+\)%{array}', key):
                 return True
-        
+
         return False
 
     def generate_inp(self, target) -> None:
-        cons.print(f"Generating [magenta]{target.name}.inp[/magenta].")
+        cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
         cons.indent()
-        
+
         MASTER_KEYS: list = case_dicts.get_input_dict_keys(target.name)
 
         ignored = []
@@ -45,12 +45,11 @@ class MFCInputFile:
                     dict_str += f" {key} = 0d0\n"
                     ignored.append(key)
                     continue
-                
+
                 if not isinstance(val, str) or len(val) == 1:
                     dict_str += f"{key} = {val}\n"
                 else:
                     dict_str += f"{key} = '{val}'\n"
-                continue
             else:
                 ignored.append(key)
 
@@ -58,12 +57,12 @@ class MFCInputFile:
                 raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
 
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.case_dict)-len(ignored)}/{len(self.case_dict)} parameters.")
-        
+
         contents = f"&user_inputs\n{dict_str}&end/\n"
 
         # Save .inp input file
         common.file_write(f"{self.case_dirpath}/{target.name}.inp", contents)
-        
+
         cons.unindent()
 
     def __save_fpp(self, target, contents: str) -> None:
@@ -75,55 +74,56 @@ class MFCInputFile:
 
         inc_dir = os.path.join(target.get_build_dirpath(), "include")
         common.create_directory(inc_dir)
-        
+
         fpp_path = os.path.join(inc_dir, f"case.fpp")
-        opt_fpp  = open(fpp_path).read() if os.path.exists(fpp_path) else ""
+        opt_fpp  = common.file_read(fpp_path) if os.path.exists(fpp_path) else ""
 
         if __contents_equal(contents, opt_fpp):
             cons.print("[yellow]INFO:[/yellow] Custom case.fpp file is up to date.")
             return
 
         cons.print("[yellow]INFO:[/yellow] Writing a custom case.fpp file: --case-optimization configuration has changed.")
-        common.file_write(fpp_path, contents)            
+        common.file_write(fpp_path, contents)
 
+    # pylint: disable=too-many-locals
     def __get_pre_fpp(self) -> str:
         DATA = {
             1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
             2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
             3: {'ptypes': [8,  9, 10, 11, 12, 13, 14, 19, 21], 'sf_idx': 'i, j, k'}
         }[self.__get_ndims()]
-                
+
         patches = {}
 
-        for key, val in self.case_dict.items():            
+        for key, val in self.case_dict.items():
             if not self.__is_ic_analytical(key, val):
                 continue
-            
+
             patch_id = re.search(r'[0-9]+', key).group(0)
-                        
+
             if patch_id not in patches:
                 patches[patch_id] = []
-            
+
             patches[patch_id].append((key, val))
 
         srcs = []
-        
+
         for pid, items in patches.items():
             ptype = self.case_dict[f"patch_icpp({pid})%geometry"]
-            
+
             if ptype not in DATA['ptypes']:
                 raise common.MFCException(f"Patch #{pid} of type {ptype} cannot be analytically defined.")
 
             def rhs_replace(match):
                 return {
                     'x': 'x_cc(i)', 'y': 'y_cc(j)', 'z': 'z_cc(k)',
-                    
+
                     'xc': f'patch_icpp({pid})%x_centroid', 'yc': f'patch_icpp({pid})%y_centroid', 'zc': f'patch_icpp({pid})%z_centroid',
                     'lx': f'patch_icpp({pid})%length_x',   'ly': f'patch_icpp({pid})%length_y',   'lz': f'patch_icpp({pid})%length_z',
-                    
+
                     'r':     f'patch_icpp({pid})%radius',  'eps':   f'patch_icpp({pid})%epsilon', 'beta':  f'patch_icpp({pid})%beta',
                     'tau_e': f'patch_icpp({pid})%tau_e',   'radii': f'patch_icpp({pid})%radii',
-                    
+
                     'e' : f'{math.e}', 'pi': f'{math.pi}',
                 }.get(match.group(), match.group())
 
@@ -132,12 +132,12 @@ class MFCInputFile:
                 varname         = re.findall(r"[a-zA-Z][a-zA-Z0-9_]*", attribute)[1]
                 qpvf_idx_var    = QPVF_IDX_VARS[varname]
                 qpvf_idx_offset = ""
-                
+
                 if len(re.findall(r"[0-9]+", attribute)) == 2:
                     idx = int(re.findall(r'[0-9]+', attribute)[1]) - 1
                     if idx != 0:
                         qpvf_idx_offset = f" + {idx}"
-                
+
                 sf_idx = DATA['sf_idx']
 
                 cons.print(f"[yellow]INFO:[/yellow] {self.__get_ndims()}D Analytical Patch #{pid}: Code generation for [magenta]{varname}[/magenta]...")
@@ -168,7 +168,7 @@ class MFCInputFile:
     def __get_sim_fpp(self) -> str:
         if ARG("case_optimization"):
             cons.print("[yellow]INFO:[/yellow] Case optimization is enabled.")
-            
+
             nterms = -100
 
             bubble_model = int(self.case_dict.get("bubble_model", "-100"))
@@ -221,7 +221,7 @@ class MFCInputFile:
     def generate(self, target) -> None:
         self.generate_inp(target)
         cons.print()
-        self.generate_fpp(target)         
+        self.generate_fpp(target)
 
 
 # Load the input file
@@ -232,8 +232,8 @@ def load(empty_data: dict = None) -> MFCInputFile:
     if not ARG("input"):
         if empty_data is None:
             raise common.MFCException("Please provide an input file.")
-        else:
-            load.CACHED_MFCInputFile = MFCInputFile("empty.py", "empty.py", empty_data)
+
+        load.CACHED_MFCInputFile = MFCInputFile("empty.py", "empty.py", empty_data)
     else:
         filename: str = ARG("input").strip()
 
@@ -261,7 +261,7 @@ def load(empty_data: dict = None) -> MFCInputFile:
             raise common.MFCException(f"Input file {filename} did not produce valid JSON. It should only print the case dictionary.\n\n{exc}\n")
 
         load.CACHED_MFCInputFile = MFCInputFile(filename, dirpath, dictionary)
-    
+
     return load.CACHED_MFCInputFile
 
 

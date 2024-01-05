@@ -1,6 +1,6 @@
 import os, typing, dataclasses
 
-from .. import common
+from mfc import common
 from ..state import ARG
 
 @dataclasses.dataclass
@@ -26,11 +26,11 @@ class PBSSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("qsub")
 
-    def gen_submit_cmd(self, filename: str) -> typing.List[str]:
+    def gen_submit_cmd(self, filepath: str) -> typing.List[str]:
         if ARG("wait"):
             raise common.MFCException("PBS Queue: Sorry, --wait is unimplemented.")
 
-        return ["qsub", filename]
+        return ["qsub", filepath]
 
 
 class LSFSystem(QueueSystem):
@@ -40,13 +40,13 @@ class LSFSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("bsub") and common.does_command_exist("bqueues")
 
-    def gen_submit_cmd(self, filename: str) -> None:
+    def gen_submit_cmd(self, filepath: str) -> None:
         cmd = ["bsub"]
 
         if ARG("wait"):
-            cmd += ["--wait"]        
+            cmd += ["--wait"]
 
-        return cmd + [filename]
+        return cmd + [filepath]
 
 
 class SLURMSystem(QueueSystem):
@@ -56,13 +56,13 @@ class SLURMSystem(QueueSystem):
     def is_active(self) -> bool:
         return common.does_command_exist("sbatch")
 
-    def gen_submit_cmd(self, filename: str) -> None:
+    def gen_submit_cmd(self, filepath: str) -> None:
         cmd = ["sbatch"]
-    
+
         if ARG("wait"):
             cmd += ["--wait"]
 
-        return cmd + [filename]
+        return cmd + [filepath]
 
 
 QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
@@ -72,4 +72,4 @@ def get_system() -> QueueSystem:
         if system.is_active():
             return system
 
-    raise common.MFCException(f"Failed to detect a queue system.")
+    raise common.MFCException("Failed to detect a queue system.")
