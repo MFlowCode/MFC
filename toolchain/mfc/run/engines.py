@@ -1,4 +1,4 @@
-import re, os, time, copy, queue, typing, datetime, subprocess, dataclasses, multiprocessing
+import re, os, time, copy, typing, datetime, subprocess, dataclasses, multiprocessing
 
 from ..state     import ARG, ARGS
 from ..printer   import cons
@@ -27,13 +27,18 @@ def profiler_prepend():
     return []
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(init=False)
 class Engine:
-    name: str
-    slug: str
+    name:  str
+    slug:  str
+    input: MFCInputFile
 
-    def init(self, input: MFCInputFile) -> None:
-        self.input = input
+    def __init__(self, name: str, slug: str) -> None:
+        self.name = name
+        self.slug = slug
+
+    def init(self, _input: MFCInputFile) -> None:
+        self.input = _input
 
         self._init()
 
@@ -52,13 +57,14 @@ def _interactive_working_worker(cmd: typing.List[str], q: multiprocessing.Queue)
     cmd = [ str(_) for _ in cmd ]
     cons.print(f"$ {' '.join(cmd)}")
     result = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
     q.put(result)
 
 class InteractiveEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Interactive", "interactive")
 
+    # pylint: disable=attribute-defined-outside-init
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary()
 
@@ -119,7 +125,7 @@ using the <-b,--binary> option. For example:
             self.bKnowWorks = result.returncode == 0
 
             if not self.bKnowWorks:
-                error_txt = f"""\
+                error_txt = """\
 MFC's [bold magenta]syscheck[/bold magenta] (system check) failed to run successfully.
 Please review the output bellow and ensure that your system is configured correctly:
 
@@ -147,13 +153,12 @@ STDERR:
 
             if not ARG("dry_run"):
                 start_time = time.monotonic()
-                
                 env = os.environ.copy()
                 if ARG('gpus') is not None:
                     env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
 
                 system(
-                    self.get_exec_cmd(target), cwd=self.input.case_dirpath, 
+                    self.get_exec_cmd(target), cwd=self.input.case_dirpath,
                     env=env
                 )
                 end_time = time.monotonic()
@@ -180,18 +185,18 @@ Email         (-@)  {ARG("email")}
 """
 
     def run(self, targets: typing.List[MFCTarget]) -> None:
-        system = queues.get_system()
-        cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
+        qsystem = queues.get_system()
+        cons.print(f"Detected the [bold magenta]{qsystem.name}[/bold magenta] queue system.")
 
         targets = [SYSCHECK] + targets
 
         cons.print(f"Running {format_list_to_string([_.name for _ in targets], 'bold magenta')}:")
         cons.indent()
 
-        self.__create_batch_file(system, targets)
+        self.__create_batch_file(qsystem, targets)
 
         if not ARG("dry_run"):
-            self.__execute_batch_file(system)
+            self.__execute_batch_file(qsystem)
 
             cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
             cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
@@ -211,7 +216,7 @@ Email         (-@)  {ARG("email")}
             self.__get_batch_filename()
         ]))
 
-    def __generate_prologue(self, system: queues.QueueSystem) -> str:
+    def __generate_prologue(self, qsystem: queues.QueueSystem) -> str:
         modules = f""
 
         if does_system_use_modules():
@@ -232,7 +237,7 @@ $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                    
 $(printf "$TABLE_FORMAT_LINE" "Partition:"     "{ARG("partition")}"      "Walltime:"      "{ARG("walltime")}")
 $(printf "$TABLE_FORMAT_LINE" "Account:"       "{ARG("account")}"        "Nodes:"         "{ARG("nodes")}")
 $(printf "$TABLE_FORMAT_LINE" "Job Name:"      "{ARG("name")}"           "Engine"         "{ARG("engine")}")
-$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Email:"         "{ARG("email")}")
+$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{qsystem.name}"                     "Email:"         "{ARG("email")}")
 END
 )
 
@@ -267,14 +272,15 @@ exit $code
         # See if it computable
         try:
             # We assume eval is safe because we control the expression.
+            # pylint: disable=eval-used
             r = str(eval(expr, ARGS()))
             return r if not isspace(r) else None
         except Exception as exc:
-            raise MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.")
+            raise MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.") from exc
 
-    def __batch_evaluate(self, s: str, system: queues.QueueSystem, targets: typing.List[MFCTarget]):
+    def __batch_evaluate(self, s: str, qsystem: queues.QueueSystem, targets: typing.List[MFCTarget]):
         replace_list = [
-            ("{MFC::PROLOGUE}", self.__generate_prologue(system)),
+            ("{MFC::PROLOGUE}", self.__generate_prologue(qsystem)),
             ("{MFC::PROFILER}", ' '.join(profiler_prepend())),
             ("{MFC::EPILOGUE}", self.__generate_epilogue()),
             ("{MFC::BINARIES}", ' '.join([f"'{target.get_install_binpath()}'" for target in targets])),
@@ -295,29 +301,29 @@ exit $code
                 s = s.replace(match, repl)
             else:
                 # If not specified, then remove the line it appears on
-                s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
+                s = re.sub(rf"^.*{match}.*$\n", "", s, flags=re.MULTILINE)
 
                 cons.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it appears on will be discarded.")
 
         return s
 
-    def __create_batch_file(self, system: queues.QueueSystem, targets: typing.List[MFCTarget]):
+    def __create_batch_file(self, qsystem: queues.QueueSystem, targets: typing.List[MFCTarget]):
         cons.print("> Generating batch file...")
         filepath = self.__get_batch_filepath()
         cons.print("> Evaluating template file...")
-        content = self.__batch_evaluate(system.template, system, targets)
+        content = self.__batch_evaluate(qsystem.template, qsystem, targets)
 
         cons.print("> Writing batch file...")
         file_write(filepath, content)
 
-    def __execute_batch_file(self, queue: queues.QueueSystem):
+    def __execute_batch_file(self, qsystem: queues.QueueSystem):
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        cmd = queue.gen_submit_cmd(self.__get_batch_filename())
+        cmd = qsystem.gen_submit_cmd(self.__get_batch_filename())
 
         if system(cmd, cwd=self.__get_batch_dirpath()) != 0:
-            raise MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath()}. Please check the file for errors.")
+            raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {self.__get_batch_filepath()}. Please check the file for errors.")
 
 
 ENGINES = [ InteractiveEngine(), BatchEngine() ]
@@ -331,7 +337,7 @@ def get_engine(slug: str) -> Engine:
             engine = candidate
             break
 
-    if engine == None:
+    if engine is None:
         raise MFCException(f"Unsupported engine {slug}.")
 
     return engine

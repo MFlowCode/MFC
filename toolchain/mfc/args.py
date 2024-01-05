@@ -2,16 +2,15 @@ import re, os.path, argparse, dataclasses
 
 from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
 from .common    import MFCException, format_list_to_string
-from .test.test import CASES as TEST_CASES
-from .packer    import packer
+from .test.cases import generate_cases
+from .run.engines  import ENGINES
+from .run.mpi_bins import BINARIES
 
+# pylint: disable=too-many-locals, too-many-statements
 def parse(config):
-    from .run.engines  import ENGINES
-    from .run.mpi_bins import BINARIES
-
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
-        description=f"""\
+        description="""\
 Welcome to the MFC master script. This tool automates and manages building, testing, \
 running, and cleaning of MFC in various configurations on all supported platforms. \
 The README documents this tool and its various commands in more detail. To get \
@@ -19,7 +18,7 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parsers = parser.add_subparsers(dest="command")    
+    parsers = parser.add_subparsers(dest="command")
     run     = parsers.add_parser(name="run",    help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test    = parsers.add_parser(name="test",   help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     build   = parsers.add_parser(name="build",  help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -27,12 +26,12 @@ started, run ./mfc.sh build -h.""",
     bench   = parsers.add_parser(name="bench",  help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count   = parsers.add_parser(name="count",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer  = parsers.add_parser(name="packer", help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        
+
     packers = packer.add_subparsers(dest="packer")
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     pack.add_argument("input", metavar="INPUT", type=str, default="", help="Input file of case to pack.")
     pack.add_argument("-o", "--output", metavar="OUTPUT", type=str, default=None, help="Base name of output file.")
-    
+
     compare = packers.add_parser(name="compare", help="Compare two cases.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     compare.add_argument("input1", metavar="INPUT1", type=str, default=None, help="First pack file.")
     compare.add_argument("input2", metavar="INPUT2", type=str, default=None, help="Second pack file.")
@@ -54,7 +53,7 @@ started, run ./mfc.sh build -h.""",
                 p.add_argument(f"--no-{f.name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
 
             p.set_defaults(**{ f.name: getattr(config, f.name) for f in dataclasses.fields(config) })
-            
+
         if "j" not in mask:
             p.add_argument("-j", "--jobs", metavar="JOBS", type=int, default=1, help="Allows for JOBS concurrent jobs.")
 
@@ -79,10 +78,12 @@ started, run ./mfc.sh build -h.""",
     binaries = [ b.bin for b in BINARIES ]
 
     # === TEST ===
+    test_cases = generate_cases()
+
     add_common_arguments(test, "t")
     test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
-    test.add_argument("-f", "--from",         default=TEST_CASES[0].get_uuid(), type=str, help="First test UUID to run.")
-    test.add_argument("-t", "--to",           default=TEST_CASES[-1].get_uuid(), type=str, help="Last test UUID to run.")
+    test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
+    test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
     test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
@@ -91,7 +92,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
 
     test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-    
+
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
@@ -135,7 +136,7 @@ started, run ./mfc.sh build -h.""",
         if args["command"] == name:
             continue
 
-        vals, errs = parser.parse_known_args(["-i", "None"])
+        vals, _ = parser.parse_known_args(["-i", "None"])
         for key, val in vars(vals).items():
             if key == "input":
                 args[key] = args.get(key)
@@ -152,7 +153,7 @@ started, run ./mfc.sh build -h.""",
     # build's --case-optimization and --input depend on each other
     if args["command"] == "build":
         if (args["input"] is not None) ^ args["case_optimization"] :
-            raise MFCException(f"./mfc.sh build's --case-optimization requires --input")
+            raise MFCException("./mfc.sh build's --case-optimization requires --input")
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:

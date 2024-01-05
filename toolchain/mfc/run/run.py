@@ -24,7 +24,7 @@ def validate_job_options() -> None:
             raise MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
 
-def run_targets(targets: typing.List[MFCTarget]):    
+def run_targets(targets: typing.List[MFCTarget]):
     cons.print("[bold]Run[/bold]")
     cons.indent()
 
@@ -67,12 +67,3 @@ def run_target(target: MFCTarget):
 
 def run() -> None:
     run_targets([ get_target(_) for _ in ARG("targets")])
-
-
-def run_targets_with(targets: typing.List[MFCTarget]):
-    pass
-
-
-def run_target_with(target: MFCTarget):
-    run_targets_with([target])
-
