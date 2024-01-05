@@ -27,7 +27,6 @@ module m_mpi_common
 
 contains
 
-
     !> The subroutine initializes the MPI execution environment
         !!      and queries both the number of processors which will be
         !!      available for the job and the local processor rank.
@@ -61,7 +60,6 @@ contains
 
     end subroutine s_mpi_initialize ! --------------------------------------
 
-
     subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
 
         type(scalar_field), &
@@ -80,25 +78,25 @@ contains
         end do
 
         !Additional variables pb and mv for non-polytropic qbmm
-#ifdef MFC_PRE_PROCESS 
-        if(qbmm .and. .not. polytropic) then
+#ifdef MFC_PRE_PROCESS
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i) 
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i) 
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i)
                 end do
-            end do                  
+            end do
         end if
 #endif
 
-#ifdef MFC_SIMULATION 
-        if(qbmm .and. .not. polytropic) then
+#ifdef MFC_SIMULATION
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i)
                 end do
-            end do                  
+            end do
         end if
 #endif
         ! Define global(g) and local(l) sizes for flow variables
@@ -118,11 +116,11 @@ contains
         end do
 
 #ifndef MFC_POST_PROCESS
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
 
             end do
         end if
@@ -131,7 +129,6 @@ contains
 #endif
 
     end subroutine s_initialize_mpi_data ! ---------------------------------
-
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
@@ -145,7 +142,6 @@ contains
 #endif
 
     end subroutine mpi_bcast_time_step_values
-
 
     !>  The goal of this subroutine is to determine the global
         !!      extrema of the stability criteria in the computational
@@ -202,7 +198,6 @@ contains
 #endif
 
     end subroutine s_mpi_reduce_stability_criteria_extrema ! ---------------
-
 
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
@@ -270,7 +265,6 @@ contains
 
     end subroutine s_mpi_allreduce_max ! -----------------------------------
 
-
     !>  The following subroutine takes the inputted variable and
         !!      determines its minimum value on the entire computational
         !!      domain. The result is stored back into inputted variable.
@@ -299,7 +293,6 @@ contains
 #endif
 
     end subroutine s_mpi_reduce_min ! --------------------------------------
-
 
     !>  The following subroutine takes the first element of the
         !!      2-element inputted variable and determines its maximum
@@ -343,8 +336,8 @@ contains
         character(len=*), intent(in), optional :: prnt
 
         if (present(prnt)) then
-            print*, prnt
-            call flush(6)
+            print *, prnt
+            call flush (6)
 
         end if
 
@@ -353,7 +346,7 @@ contains
         stop 1
 
 #else
-        
+
         ! Terminating the MPI environment
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
 
@@ -373,7 +366,6 @@ contains
 
     end subroutine s_mpi_barrier ! -----------------------------------------
 
-
     !> The subroutine finalizes the MPI execution environment.
     subroutine s_mpi_finalize() ! ------------------------------------------
 
@@ -385,6 +377,5 @@ contains
 #endif
 
     end subroutine s_mpi_finalize ! ----------------------------------------
-
 
 end module m_mpi_common

@@ -70,10 +70,10 @@ contains
     end subroutine s_get_cwd
 
     subroutine s_get_basename(dirpath, basename)
-        character(LEN=*), intent(IN)  :: dirpath
+        character(LEN=*), intent(IN) :: dirpath
         character(LEN=*), intent(OUT) :: basename
 
-        integer           :: iUnit
+        integer :: iUnit
         character(len=30) :: tmpfilepath
 
         write (tmpfilepath, '(A,I0)') 'basename_', proc_rank
@@ -84,8 +84,8 @@ contains
         call system('basename "'//trim(dirpath)//'" > '//trim(tmpfilepath))
 #endif
 
-        open  (newunit=iUnit, FILE=trim(tmpfilepath), FORM='formatted', STATUS='old')
-        read  (iUnit, '(A)') basename
+        open (newunit=iUnit, FILE=trim(tmpfilepath), FORM='formatted', STATUS='old')
+        read (iUnit, '(A)') basename
         close (iUnit)
 
         call s_delete_file(trim(tmpfilepath))
