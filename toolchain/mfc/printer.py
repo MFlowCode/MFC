@@ -28,14 +28,14 @@ class MFCPrinter:
             msg = ""
 
         if no_indent:
-            self.raw.print(str(msg), *args, **kwargs)
+            self.raw.print(str(msg), soft_wrap=True, *args, **kwargs)
         else:
             print_s, lines = "", str(msg).split('\n', maxsplit=-1)
             for i, s in enumerate(lines):
                 newline = '\n' if (i != len(lines)-1) else ''
                 print_s += f"{''.join(self.stack)}{s}{newline}"
 
-            self.raw.print(print_s, *args, **kwargs)
+            self.raw.print(print_s, soft_wrap=True, *args, **kwargs)
 
     def print_exception(self):
         self.raw.print_exception()

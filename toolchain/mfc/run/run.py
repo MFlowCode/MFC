@@ -1,11 +1,11 @@
-import re, typing
+import re
 
-from ..build   import MFCTarget, get_target, build_targets
+from ..build   import get_targets, build
 from ..printer import cons
 from ..state   import ARG
 from ..common  import MFCException, isspace
 
-from .  import engines, input
+from . import engines, input
 
 
 def validate_job_options() -> None:
@@ -24,13 +24,13 @@ def validate_job_options() -> None:
             raise MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
 
-def run_targets(targets: typing.List[MFCTarget]):
+def run(targets = None):
+    targets = get_targets(targets or ARG("targets"))
+
+    build(targets)
+
     cons.print("[bold]Run[/bold]")
     cons.indent()
-
-    if len(targets) == 0:
-        cons.print(f"> No target selected.")
-        return
 
     input_file = input.load()
 
@@ -57,13 +57,4 @@ Engine        (-e)  {ARG('engine')}
         cons.print()
         cons.unindent()
 
-    build_targets(targets)
     engine.run(targets)
-
-
-def run_target(target: MFCTarget):
-    run_targets([target])
-
-
-def run() -> None:
-    run_targets([ get_target(_) for _ in ARG("targets")])
