@@ -2,7 +2,7 @@ import re, os, time, copy, typing, datetime, subprocess, dataclasses, multiproce
 
 from ..state     import ARG, ARGS
 from ..printer   import cons
-from ..build     import MFCTarget, SYSCHECK
+from ..build     import MFCTarget, SYSCHECK, get_targets
 from ..common    import MFCException, does_command_exist, isspace, system
 from ..common    import format_list_to_string, does_system_use_modules
 from ..common    import get_loaded_modules, file_write
@@ -78,7 +78,8 @@ Tasks (/node) (-n)  {ARG('tasks_per_node')}
 MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
-    def get_exec_cmd(self, target: MFCTarget) -> typing.List[str]:
+
+    def __get_exec_cmd(self, target: MFCTarget) -> typing.List[str]:
         cmd = []
         if ARG("mpi"):
             cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
@@ -89,8 +90,9 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
         return cmd
 
+    def run(self, targets) -> None:
+        targets = get_targets(targets)
 
-    def run(self, targets: typing.List[MFCTarget]) -> None:
         if not self.bKnowWorks:
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
@@ -158,7 +160,7 @@ STDERR:
                     env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
 
                 system(
-                    self.get_exec_cmd(target), cwd=self.input.case_dirpath,
+                    self.__get_exec_cmd(target), cwd=self.input.case_dirpath,
                     env=env
                 )
                 end_time = time.monotonic()
@@ -184,11 +186,11 @@ Account       (-a)  {ARG("account")}
 Email         (-@)  {ARG("email")}
 """
 
-    def run(self, targets: typing.List[MFCTarget]) -> None:
+    def run(self, targets) -> None:
         qsystem = queues.get_system()
         cons.print(f"Detected the [bold magenta]{qsystem.name}[/bold magenta] queue system.")
 
-        targets = [SYSCHECK] + targets
+        targets = get_targets([SYSCHECK] + targets)
 
         cons.print(f"Running {format_list_to_string([_.name for _ in targets], 'bold magenta')}:")
         cons.indent()
@@ -278,7 +280,9 @@ exit $code
         except Exception as exc:
             raise MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.") from exc
 
-    def __batch_evaluate(self, s: str, qsystem: queues.QueueSystem, targets: typing.List[MFCTarget]):
+    def __batch_evaluate(self, s: str, qsystem: queues.QueueSystem, targets):
+        targets = get_targets(targets)
+
         replace_list = [
             ("{MFC::PROLOGUE}", self.__generate_prologue(qsystem)),
             ("{MFC::PROFILER}", ' '.join(profiler_prepend())),

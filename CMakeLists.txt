@@ -196,11 +196,11 @@ endif()
 # *  For each .fpp file found with filepath <dirpath>/<filename>.fpp, using a 
 #    custom command, instruct CMake how to generate a file with path
 #
-#                     src/<target>/autogen/<filename>.f90
+#                     src/<target>/fypp/<filename>.f90
 #
 #    by running Fypp on <dirpath>/<filename>.fpp. It is important to understand
 #    that this does not actually run the pre-processor. Rather, it instructs
-#    CMake what to do when it finds a src/<target>/autogen/<filename>.f90 path
+#    CMake what to do when it finds a src/<target>/fypp/<filename>.f90 path
 #    in the source list for a target. Thus, an association is made from an .f90
 #    file to its corresponding .fpp file (if applicable) even though the
 #    generation is of the form .fpp -> .f90.
@@ -223,7 +223,7 @@ endif()
 #    one of them is modified).
 #
 #    .fpp files in src/common are treated as if they were in src/<target> (not
-#    pre-processed to src/common/autogen/) so as not to clash with other targets'
+#    pre-processed to src/common/fypp/) so as not to clash with other targets'
 #    .fpp files (this has caused problems in the past).
 #
 # *  Export, in the variable <target>_SRCs, a list of all source files (.f90)
@@ -250,7 +250,7 @@ macro(HANDLE_SOURCES target useCommon)
         list(APPEND ${target}_SRCs ${common_F90s})
     endif()
 
-    # src/[<target>,common]/*.fpp -> src/<target>/autogen/*.f90
+    # src/[<target>,common]/*.fpp -> src/<target>/fypp/*.f90
     file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
     if (${useCommon})
         file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
@@ -259,22 +259,22 @@ macro(HANDLE_SOURCES target useCommon)
 
     # Locate src/[<target>,common]/include/*.fpp
     file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp"
-                                               "${CMAKE_CURRENT_BINARY_DIR}/include/*.fpp")
+                                               "${CMAKE_BINARY_DIR}/include/${target}/*.fpp")
 
     if (${useCommon})
         file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fpp")
         list(APPEND ${target}_incs ${common_incs})
     endif()
 
-    file(MAKE_DIRECTORY "${${target}_DIR}/autogen")
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fypp/${target}")
     foreach(fpp ${${target}_FPPs})
         cmake_path(GET fpp FILENAME fpp_filename)
-        set(f90 "${${target}_DIR}/autogen/${fpp_filename}.f90")
+        set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.f90")
 
         add_custom_command(
             OUTPUT   ${f90}
             COMMAND  ${FYPP_EXE} -m re
-                                 -I "${CMAKE_CURRENT_BINARY_DIR}/include"
+                                 -I "${CMAKE_BINARY_DIR}/include/${target}"
                                  -I "${${target}_DIR}/include"
                                  -I "${common_DIR}/include"
                                  -I "${common_DIR}"
