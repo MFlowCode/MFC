@@ -46,7 +46,7 @@ module m_fftw
 #if defined(MFC_OpenACC) && defined(__PGI)
     !$acc declare create(real_size, cmplx_size, x_size, batch_size)
 
-    real(kind(0d0)),    allocatable :: data_real_gpu(:)
+    real(kind(0d0)), allocatable :: data_real_gpu(:)
     complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
     !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
@@ -84,13 +84,13 @@ contains
 #if defined(MFC_OpenACC) && defined(__PGI)
         rank = 1; istride = 1; ostride = 1
 
-        allocate(cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
+        allocate (cufft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
         cufft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
 
-        !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
+!$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
@@ -134,7 +134,7 @@ contains
 
 #if defined(MFC_OpenACC) && defined(__PGI)
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
@@ -143,7 +143,7 @@ contains
             end do
         end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
@@ -152,30 +152,30 @@ contains
             end do
         end do
 
-!$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+        !$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
-!$acc end host_data
+        !$acc end host_data
 
         Nfq = 3
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
-    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                 end do
             end do
         end do
 
-!$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+        !$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
-!$acc end host_data
+        !$acc end host_data
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
+                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -183,7 +183,7 @@ contains
 
         do i = 1, fourier_rings
 
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
@@ -192,7 +192,7 @@ contains
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
@@ -201,30 +201,30 @@ contains
                 end do
             end do
 
-!$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+            !$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
-!$acc end host_data
+            !$acc end host_data
 
             Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
+            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(Nfq)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
-    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                     end do
                 end do
             end do
 
-!$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+            !$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
-!$acc end host_data
+            !$acc end host_data
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
                         q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do

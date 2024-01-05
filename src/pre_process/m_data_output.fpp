@@ -148,10 +148,10 @@ contains
         end do
 
         !Outputting pb and mv for non-polytropic qbmm
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
-                    write (file_num, '(I0)') r + (i-1)*nnode + sys_size
+                    write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir)//'/pb'//trim(file_num) &
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
@@ -163,7 +163,7 @@ contains
 
             do i = 1, nb
                 do r = 1, nnode
-                    write (file_num, '(I0)') r + (i-1)*nnode + sys_size
+                    write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir)//'/mv'//trim(file_num) &
                                //'.dat'
                     open (1, FILE=trim(file_loc), FORM='unformatted', &
@@ -201,7 +201,7 @@ contains
 
                     open (2, FILE=trim(file_loc))
                     do j = 0, m
-                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv )
+                        call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
 
                         lit_gamma = 1d0/gamma + 1d0
 
@@ -223,13 +223,13 @@ contains
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
-                            if(qbmm) then
-                                nbub = q_cons_vf(bubxb)%sf(j, 0, 0)                           
+                            if (qbmm) then
+                                nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
                                 do k = 1, nb
                                     nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                                 end do
-                                
+
                                 call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
                             end if
 
@@ -251,10 +251,10 @@ contains
                 close (2)
             end do
 
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -265,7 +265,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -296,10 +296,10 @@ contains
                 end do
                 close (2)
             end do
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -312,7 +312,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -342,10 +342,10 @@ contains
                 end do
                 close (2)
             end do
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -360,7 +360,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -409,15 +409,15 @@ contains
                 file_loc = trim(case_dir)//'/restart_data/lustre_0'
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
-                   call s_create_directory(trim(file_loc))
+                    call s_create_directory(trim(file_loc))
                 end if
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess (proc_rank)
+            call DelayFileAccess(proc_rank)
             ! Initialize MPI data I/O
             call s_initialize_mpi_data(q_cons_vf)
-            
+
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
             file_loc = trim(restart_dir)//'/lustre_0'//trim(mpiiofs)//trim(file_loc)
@@ -427,7 +427,7 @@ contains
             end if
             if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                            mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -450,7 +450,7 @@ contains
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -460,7 +460,7 @@ contains
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-    !            do i = 1, adv_idx%end
+                    !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -473,7 +473,7 @@ contains
         else
             ! Initialize MPI data I/O
             call s_initialize_mpi_data(q_cons_vf)
-            
+
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step_start, '.dat'
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
@@ -482,7 +482,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                            mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -505,12 +505,12 @@ contains
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                           'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -518,28 +518,28 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                            'native', mpi_info_int, ierr)
+                                               'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                 MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-    !            do i = 1, adv_idx%end
+                    !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                           'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
-        endif
+        end if
 #endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------
