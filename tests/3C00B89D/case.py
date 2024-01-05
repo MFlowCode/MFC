@@ -41,7 +41,7 @@ case = {
     "mp_weno": "F",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "avg_state": "1",
+    "avg_state": 1,
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "F",
@@ -136,7 +136,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
         'c_wrt'        : 'T',
     }
-        
+
     if case['p'] != 0:
         mods['fd_order']  = 1
         mods['omega_wrt(1)'] = 'T'

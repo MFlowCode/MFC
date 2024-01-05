@@ -1,9 +1,8 @@
-import re, os, typing, hashlib, dataclasses
+import os, typing, hashlib, dataclasses
 
-from .common    import MFCException, system, delete_directory, create_directory
-from .state     import ARG, CFG
-from .printer   import cons
-from .run       import input
+from .common import MFCException, system, delete_directory, create_directory
+from .state  import ARG, CFG
+from .run    import input
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -26,10 +25,10 @@ class MFCTarget:
     isRequired:   bool             # Should it always be built? (no matter what -t | --targets is)
     requires:     Dependencies     # Build dependencies of the target
     runOrder:     int              # For MFC Targets: Order in which targets should logically run
-    
+
     def __hash__(self) -> int:
         return hash(self.name)
-    
+
     # Get path to directory that will store the build files
     def get_build_dirpath(self) -> str:
         subdir = 'dependencies' if self.isDependency else CFG().make_slug()
@@ -66,7 +65,7 @@ class MFCTarget:
             "install",
             'dependencies' if self.isDependency else CFG().make_slug()
         ])
-    
+
     def get_install_binpath(self) -> str:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(), "bin", self.name])
@@ -104,17 +103,21 @@ class MFCTarget:
         build_dirpath   = self.get_build_dirpath()
         cmake_dirpath   = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath()
-        
+
         install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath()])
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
             # See: https://cmake.org/cmake/help/latest/manual/cmake.1.html.
-            f"-Wno-dev",
+            "-Wno-dev",
+            # Disable warnings about unused command line arguments. This is
+            # useful for passing arguments to CMake that are not used by the
+            # current target.
+            "--no-warn-unused-cli",
             # Save a compile_commands.json file with the compile commands used to
             # build the configured targets. This is mostly useful for debugging.
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
-            f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             # Set build type (e.g Debug, Release, etc.).
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
             f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'Release'}",
@@ -135,45 +138,44 @@ class MFCTarget:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
             flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
 
-        configure = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
+        command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
         delete_directory(build_dirpath)
         create_directory(build_dirpath)
 
-        if system(configure, no_exception=True) != 0:
+        if system(command, no_exception=True) != 0:
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
-
 
     def build(self):
         input.load({}).generate_fpp(self)
 
-        build = ["cmake", "--build",  self.get_build_dirpath(),
-                          "--target", self.name,
-                          "-j",       ARG("jobs"),
-                          "--config", 'Debug' if ARG('debug') else 'Release']
+        command = ["cmake", "--build",    self.get_build_dirpath(),
+                            "--target",   self.name,
+                            "--parallel", ARG("jobs"),
+                            "--config",   'Debug' if ARG('debug') else 'Release']
         if ARG('verbose'):
-            build.append("--verbose")
+            command.append("--verbose")
 
-        system(build, exception_text=f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
+        system(command, exception_text=f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
 
     def install(self):
-        install = ["cmake", "--install", self.get_build_dirpath()]
+        command = ["cmake", "--install", self.get_build_dirpath()]
 
-        system(install, exception_text=f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
-        
+        system(command, exception_text=f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
+
     def clean(self):
         build_dirpath = self.get_build_dirpath()
 
         if not os.path.isdir(build_dirpath):
             return
 
-        clean = ["cmake", "--build",  build_dirpath, "--target", "clean",
-                          "--config", "Debug" if ARG("debug") else "Release" ]
+        command = ["cmake", "--build",  build_dirpath, "--target", "clean",
+                            "--config", "Debug" if ARG("debug") else "Release" ]
 
         if ARG("verbose"):
-            clean.append("--verbose")
+            command.append("--verbose")
 
-        system(clean, exception_text=f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
+        system(command, exception_text=f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
 
 
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
@@ -196,7 +198,7 @@ TARGET_MAP = { target.name: target for target in TARGETS }
 def get_target(target: typing.Union[str, MFCTarget]) -> MFCTarget:
     if isinstance(target, MFCTarget):
         return target
-    
+
     if target in TARGET_MAP:
         return TARGET_MAP[target]
 
@@ -218,7 +220,7 @@ def build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] 
         history = set()
 
     t = get_target(target)
-    
+
     if t.name in history or not t.is_buildable():
         return
 
@@ -235,7 +237,7 @@ def build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] 
 def build_targets(targets: typing.Iterable[typing.Union[MFCTarget, str]], history: typing.Set[str] = None):
     if history is None:
         history = set()
- 
+
     for target in list(REQUIRED_TARGETS) + targets:
         build_target(target, history)
 
@@ -245,7 +247,7 @@ def clean_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] 
         history = set()
 
     t = get_target(target)
-    
+
     if t.name in history or not t.is_buildable():
         return
 
@@ -274,4 +276,3 @@ def build():
 
 def clean():
     clean_targets(ARG("targets"))
-
