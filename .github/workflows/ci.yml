@@ -82,6 +82,9 @@ jobs:
           if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
           /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
 
+      - name: Ensure empty diff (prepare)
+        run:  find tests/ -type f | grep -v golden | xargs -L1 rm
+
       - name: Test
         run:  |
           if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
@@ -90,7 +93,7 @@ jobs:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
-      - name: Ensure empty diff
+      - name: Ensure empty diff (check)
         run:  git diff --exit-code tests/
 
   docker:
@@ -100,10 +103,13 @@ jobs:
     - name: Clone
       uses: actions/checkout@v3
 
+    - name: Ensure empty diff (prepare)
+      run:  find tests/ -type f | grep -v golden | xargs -L1 rm
+
     - name: Test
       run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
 
-    - name: Ensure empty diff
+    - name: Ensure empty diff (check)
       run:  git diff --exit-code tests/
 
   self:
@@ -125,13 +131,16 @@ jobs:
           . ./mfc.sh load -c p -m gpu
           ./mfc.sh build -j 2 $(if [ '${{ matrix.device }}' == 'gpu' ]; then echo '--gpu'; fi)
 
+      - name: Ensure empty diff (prepare)
+        run:  find tests/ -type f | grep -v golden | xargs -L1 rm
+
       - name: Test
         run: |
           . ./mfc.sh load -c p -m gpu
           mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
           sbatch run-phoenix-release-${{ matrix.device }}.sh
 
-      - name: Ensure empty diff
+      - name: Ensure empty diff (check)
         run:  exit $(git status --porcelain tests/ | wc -l)
 
       - name: Print
