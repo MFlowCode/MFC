@@ -144,6 +144,8 @@ class MFCTarget:
         delete_directory(build_dirpath)
         create_directory(build_dirpath)
 
+        input.load({}).generate_fpp(self)
+
         if system(command).returncode != 0:
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 

@@ -1,12 +1,11 @@
 import re, os.path, argparse, dataclasses
 
-from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
-from .common    import MFCException, format_list_to_string
-from .test.cases import generate_cases
-from .run.engines  import ENGINES
-from .run.mpi_bins import BINARIES
+from .run.run      import get_baked_templates
+from .build        import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
+from .common       import MFCException, format_list_to_string
+from .test.cases   import generate_cases
 
-# pylint: disable=too-many-locals, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config):
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
@@ -75,8 +74,6 @@ started, run ./mfc.sh build -h.""",
     # === CLEAN ===
     add_common_arguments(clean, "jg")
 
-    binaries = [ b.bin for b in BINARIES ]
-
     # === TEST ===
     test_cases = generate_cases()
 
@@ -100,29 +97,28 @@ started, run ./mfc.sh build -h.""",
     test.add_argument(metavar="FORWARDED", default=[], dest="--", nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
 
     # === RUN ===
-    engines = [ e.slug for e in ENGINES ]
-
     add_common_arguments(run)
-    run.add_argument("input",                  metavar="INPUT",              type=str,                     help="Input file to run.")
-    run.add_argument("arguments",              metavar="ARGUMENTS", nargs="*", type=str, default=[],       help="Additional arguments to pass to the case file.")
-    run.add_argument("-e", "--engine",         choices=engines,              type=str, default=engines[0], help="Job execution/submission engine choice.")
+    run.add_argument("input",                      metavar="INPUT",              type=str,                     help="Input file to run.")
+    run.add_argument("arguments",                  metavar="ARGUMENTS", nargs="*", type=str, default=[],       help="Additional positional arguments to pass to the case file.")
+    run.add_argument("-e", "--engine",             choices=["interactive", "batch"],              type=str, default="interactive", help="Job execution/submission engine choice.")
     run.add_argument("--output-summary",                                     type=str, default=None,       help="(Interactive) Output a YAML summary file.")
-    run.add_argument("-p", "--partition",      metavar="PARTITION",          type=str, default="",         help="(Batch) Partition for job submission.")
-    run.add_argument("-N", "--nodes",          metavar="NODES",              type=int, default=1,          help="(Batch) Number of nodes.")
-    run.add_argument("-n", "--tasks-per-node", metavar="TASKS",              type=int, default=1,          help="Number of tasks per node.")
-    run.add_argument("-w", "--walltime",       metavar="WALLTIME",           type=str, default="01:00:00", help="(Batch) Walltime.")
-    run.add_argument("-a", "--account",        metavar="ACCOUNT",            type=str, default="",         help="(Batch) Account to charge.")
-    run.add_argument("-@", "--email",          metavar="EMAIL",              type=str, default="",         help="(Batch) Email for job notification.")
-    run.add_argument("-#", "--name",           metavar="NAME",               type=str, default="MFC",      help="(Batch) Job name.")
-    run.add_argument("-b", "--binary",         choices=binaries,             type=str, default=None,       help="(Interactive) Override MPI execution binary")
-    run.add_argument("-s", "--scratch",        action="store_true",                    default=False,      help="Build from scratch.")
-    run.add_argument("--ncu",                  nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
-    run.add_argument("--nsys",                 nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument(      "--dry-run",        action="store_true",                    default=False,      help="(Batch) Run without submitting batch file.")
-    run.add_argument("--case-optimization",    action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-    run.add_argument(      "--no-build",       action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
-    run.add_argument("--wait",                 action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
-    run.add_argument("-f", "--flags",          metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="(Interactive) Arguments to forward to the MPI invocation.")
+    run.add_argument("-p", "--partition",          metavar="PARTITION",          type=str, default="",         help="(Batch) Partition for job submission.")
+    run.add_argument("-q", "--quality_of_service", metavar="QOS",          type=str, default="",         help="(Batch) Quality of Service for job submission.")
+    run.add_argument("-N", "--nodes",              metavar="NODES",              type=int, default=1,          help="(Batch) Number of nodes.")
+    run.add_argument("-n", "--tasks-per-node",     metavar="TASKS",              type=int, default=1,          help="Number of tasks per node.")
+    run.add_argument("-w", "--walltime",           metavar="WALLTIME",           type=str, default="01:00:00", help="(Batch) Walltime.")
+    run.add_argument("-a", "--account",            metavar="ACCOUNT",            type=str, default="",         help="(Batch) Account to charge.")
+    run.add_argument("-@", "--email",              metavar="EMAIL",              type=str, default="",         help="(Batch) Email for job notification.")
+    run.add_argument("-#", "--name",               metavar="NAME",               type=str, default="MFC",      help="(Batch) Job name.")
+    run.add_argument("-s", "--scratch",            action="store_true",                    default=False,      help="Build from scratch.")
+    run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
+    run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
+    run.add_argument(      "--dry-run",            action="store_true",                    default=False,      help="(Batch) Run without submitting batch file.")
+    run.add_argument("--case-optimization",        action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    run.add_argument(      "--no-build",           action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
+    run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
+    run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="(Interactive) Arguments to forward to the MPI invocation.")
+    run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
 
     # === BENCH ===
     add_common_arguments(bench, "t")
@@ -153,10 +149,11 @@ started, run ./mfc.sh build -h.""",
     # "Slugify" the name of the job
     args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
-    # build's --case-optimization and --input depend on each other
+    # We need to check for some invalid combinations of arguments because of
+    # the limitations of argparse.
     if args["command"] == "build":
         if (args["input"] is not None) ^ args["case_optimization"] :
-            raise MFCException("./mfc.sh build's --case-optimization requires --input")
+            raise MFCException("./mfc.sh build's --case-optimization and --input must be used together.")
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:
