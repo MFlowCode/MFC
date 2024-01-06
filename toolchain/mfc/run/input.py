@@ -215,7 +215,7 @@ class MFCInputFile:
         if target.isDependency:
             return
 
-        cons.print(f"Generating [magenta]{build.get_target(target).name}/include/case.fpp[/magenta].")
+        cons.print(f"Generating [magenta]case.fpp[/magenta].")
         cons.indent()
 
         self.__save_fpp(target, self.get_fpp(target))
