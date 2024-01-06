@@ -144,7 +144,7 @@ class MFCTarget:
         delete_directory(build_dirpath)
         create_directory(build_dirpath)
 
-        if system(command, no_exception=True) != 0:
+        if system(command).returncode != 0:
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(no_indent=True)
@@ -159,14 +159,16 @@ class MFCTarget:
         if ARG('verbose'):
             command.append("--verbose")
 
-        system(command, exception_text=f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(no_indent=True)
 
     def install(self):
         command = ["cmake", "--install", self.get_build_dirpath()]
 
-        system(command, exception_text=f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(no_indent=True)
 
@@ -182,7 +184,8 @@ class MFCTarget:
         if ARG("verbose"):
             command.append("--verbose")
 
-        system(command, exception_text=f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
 
 
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
