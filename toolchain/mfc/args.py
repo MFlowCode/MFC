@@ -85,7 +85,6 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
@@ -98,29 +97,32 @@ started, run ./mfc.sh build -h.""",
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
     test_meg.add_argument("--remove-old-tests",  action="store_true", default=False, help="(Test Generation) Delete tests directories that are no longer.")
 
+    test.add_argument(metavar="FORWARDED", default=[], dest="--", nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
+
     # === RUN ===
     engines = [ e.slug for e in ENGINES ]
 
     add_common_arguments(run)
-    run.add_argument("input",                  metavar="INPUT",                 type=str,                     help="Input file to run.")
-    run.add_argument("arguments",              metavar="ARGUMENTS", nargs='*',  type=str, default=[],         help="Additional arguments to pass to the case file.")
-    run.add_argument("-e", "--engine",         choices=engines,                 type=str, default=engines[0], help="Job execution/submission engine choice.")
-    run.add_argument("-p", "--partition",      metavar="PARTITION",             type=str, default="",         help="(Batch) Partition for job submission.")
-    run.add_argument("-N", "--nodes",          metavar="NODES",                 type=int, default=1,          help="(Batch) Number of nodes.")
-    run.add_argument("-n", "--tasks-per-node", metavar="TASKS",                 type=int, default=1,          help="Number of tasks per node.")
-    run.add_argument("-w", "--walltime",       metavar="WALLTIME",              type=str, default="01:00:00", help="(Batch) Walltime.")
-    run.add_argument("-a", "--account",        metavar="ACCOUNT",               type=str, default="",         help="(Batch) Account to charge.")
-    run.add_argument("-@", "--email",          metavar="EMAIL",                 type=str, default="",         help="(Batch) Email for job notification.")
-    run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default="MFC",      help="(Batch) Job name.")
-    run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs='+',  type=str, default=[],         help="(Batch) Additional batch options.")
-    run.add_argument("-b", "--binary",         choices=binaries,                type=str, default=None,       help="(Interactive) Override MPI execution binary")
-    run.add_argument("-s", "--scratch",        action="store_true",                       default=False,      help="Build from scratch.")
-    run.add_argument("--ncu",                  nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Compute.")
-    run.add_argument("--nsys",                 nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
-    run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-    run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
-    run.add_argument("--wait",                 action="store_true",                       default=False,      help="(Batch) Wait for the job to finish.")
+    run.add_argument("input",                  metavar="INPUT",              type=str,                     help="Input file to run.")
+    run.add_argument("arguments",              metavar="ARGUMENTS", nargs="*", type=str, default=[],       help="Additional arguments to pass to the case file.")
+    run.add_argument("-e", "--engine",         choices=engines,              type=str, default=engines[0], help="Job execution/submission engine choice.")
+    run.add_argument("--output-summary",                                     type=str, default=None,       help="(Interactive) Output a YAML summary file.")
+    run.add_argument("-p", "--partition",      metavar="PARTITION",          type=str, default="",         help="(Batch) Partition for job submission.")
+    run.add_argument("-N", "--nodes",          metavar="NODES",              type=int, default=1,          help="(Batch) Number of nodes.")
+    run.add_argument("-n", "--tasks-per-node", metavar="TASKS",              type=int, default=1,          help="Number of tasks per node.")
+    run.add_argument("-w", "--walltime",       metavar="WALLTIME",           type=str, default="01:00:00", help="(Batch) Walltime.")
+    run.add_argument("-a", "--account",        metavar="ACCOUNT",            type=str, default="",         help="(Batch) Account to charge.")
+    run.add_argument("-@", "--email",          metavar="EMAIL",              type=str, default="",         help="(Batch) Email for job notification.")
+    run.add_argument("-#", "--name",           metavar="NAME",               type=str, default="MFC",      help="(Batch) Job name.")
+    run.add_argument("-b", "--binary",         choices=binaries,             type=str, default=None,       help="(Interactive) Override MPI execution binary")
+    run.add_argument("-s", "--scratch",        action="store_true",                    default=False,      help="Build from scratch.")
+    run.add_argument("--ncu",                  nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
+    run.add_argument("--nsys",                 nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
+    run.add_argument(      "--dry-run",        action="store_true",                    default=False,      help="(Batch) Run without submitting batch file.")
+    run.add_argument("--case-optimization",    action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    run.add_argument(      "--no-build",       action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
+    run.add_argument("--wait",                 action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
+    run.add_argument("-f", "--flags",          metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="(Interactive) Arguments to forward to the MPI invocation.")
 
     # === BENCH ===
     add_common_arguments(bench, "t")
@@ -129,6 +131,7 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(count, "g")
 
     args: dict = vars(parser.parse_args())
+    args["--"] = args.get("--", [])
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),

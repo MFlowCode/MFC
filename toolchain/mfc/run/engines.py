@@ -82,7 +82,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
     def __get_exec_cmd(self, target: MFCTarget) -> typing.List[str]:
         cmd = []
         if ARG("mpi"):
-            cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
+            cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("--")[:]
 
         cmd += profiler_prepend()
 
