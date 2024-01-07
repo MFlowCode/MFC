@@ -13,13 +13,13 @@ module m_compute_cbc
     implicit none
 
     private; public :: s_compute_slip_wall_L, &
-        s_compute_nonreflecting_subsonic_buffer_L, &
-        s_compute_nonreflecting_subsonic_inflow_L, &
-        s_compute_nonreflecting_subsonic_outflow_L, &
-        s_compute_force_free_subsonic_outflow_L, &
-        s_compute_constant_pressure_subsonic_outflow_L, &
-        s_compute_supersonic_inflow_L, &
-        s_compute_supersonic_outflow_L
+ s_compute_nonreflecting_subsonic_buffer_L, &
+ s_compute_nonreflecting_subsonic_inflow_L, &
+ s_compute_nonreflecting_subsonic_outflow_L, &
+ s_compute_force_free_subsonic_outflow_L, &
+ s_compute_constant_pressure_subsonic_outflow_L, &
+ s_compute_supersonic_inflow_L, &
+ s_compute_supersonic_outflow_L
 
 contains
 
@@ -28,7 +28,7 @@ contains
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
     subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -52,7 +52,7 @@ contains
         !!      buffer reduces the amplitude of any reflections caused by
         !!      outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -62,25 +62,25 @@ contains
         integer :: i !< Generic loop iterator
 
         L(1) = (5d-1 - 5d-1*sign(1d0, lambda(1)))*lambda(1) &
-            *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+               *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, momxb
             L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                *(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
+                   *(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
             L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                *(dvel_ds(dir_idx(i - contxe)))
+                   *(dvel_ds(dir_idx(i - contxe)))
         end do
 
         do i = E_idx, advxe - 1
             L(i) = (5d-1 - 5d-1*sign(1d0, lambda(2)))*lambda(2) &
-                *(dadv_ds(i - momxe))
+                   *(dadv_ds(i - momxe))
         end do
 
         L(advxe) = (5d-1 - 5d-1*sign(1d0, lambda(3)))*lambda(3) &
-                *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+                   *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_nonreflecting_subsonic_buffer_L ! -------------
 
@@ -89,7 +89,7 @@ contains
         !!      CBC assumes an incoming flow and reduces the amplitude of
         !!      any reflections caused by outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -111,7 +111,7 @@ contains
         !!      subsonic CBC presumes an outgoing flow and reduces the
         !!      amplitude of any reflections caused by outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -147,7 +147,7 @@ contains
         !!      at the boundary is simply advected outward at the fluid
         !!      velocity.
     subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -179,7 +179,7 @@ contains
         !!      subsonic outflow maintains a fixed pressure at the CBC
         !!      boundary in absence of any transverse effects.
     subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -212,7 +212,7 @@ contains
         !!      transverse terms may generate a time dependence at the
         !!      inflow boundary.
     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
@@ -232,7 +232,7 @@ contains
         !!      flow evolution at the boundary is determined completely
         !!      by the interior data.
     subroutine s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
-    !$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds

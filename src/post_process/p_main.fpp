@@ -28,7 +28,7 @@ program p_main
 
     real(kind(0d0)) :: pres
     real(kind(0d0)) :: c
-    real(kind(0d0)) :: H 
+    real(kind(0d0)) :: H
 
     call s_initialize_mpi_domain()
 

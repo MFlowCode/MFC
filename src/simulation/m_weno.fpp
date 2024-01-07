@@ -3,7 +3,6 @@
 !! @brief Contains module m_weno
 #:include 'macros.fpp'
 
-
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
 !!              that is supplemented with monotonicity preserving bounds (MPWENO)
 !!              and a mapping function that boosts the accuracy of the non-linear
@@ -40,11 +39,8 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-        real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
-
-
-
 
     ! WENO Coefficients ========================================================
 
@@ -110,12 +106,12 @@ module m_weno
 
     real(kind(0d0)) :: test
 
-!$acc declare create( &
-!$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-!$acc                v_size, is1, is2, is3, test)
+    !$acc declare create( &
+    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
+    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
+    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
+    !$acc                v_size, is1, is2, is3, test)
 
 contains
 
@@ -146,20 +142,20 @@ contains
         is3%end = p - is3%beg
 
         @:ALLOCATE(poly_coef_cbL_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
         @:ALLOCATE(poly_coef_cbR_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
 
         @:ALLOCATE(d_cbL_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
         @:ALLOCATE(d_cbR_x(0:weno_polyn, is1%beg + weno_polyn:is1%end - weno_polyn))
 
         @:ALLOCATE(beta_coef_x(is1%beg + weno_polyn:is1%end - weno_polyn, 0:weno_polyn, &
-                              0:2*(weno_polyn - 1)))
+            0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(1, is1)
 
         @:ALLOCATE(v_rs_ws_x(is1%beg:is1%end, &
-                                 is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
 
         ! ==================================================================
 
@@ -178,20 +174,20 @@ contains
         is3%end = p - is3%beg
 
         @:ALLOCATE(poly_coef_cbL_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
         @:ALLOCATE(poly_coef_cbR_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
 
         @:ALLOCATE(d_cbL_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
         @:ALLOCATE(d_cbR_y(0:weno_polyn, is2%beg + weno_polyn:is2%end - weno_polyn))
 
         @:ALLOCATE(beta_coef_y(is2%beg + weno_polyn:is2%end - weno_polyn, 0:weno_polyn, &
-                              0:2*(weno_polyn - 1)))
+            0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(2, is2)
 
         @:ALLOCATE(v_rs_ws_y(is2%beg:is2%end, &
-                                 is1%beg:is1%end, is3%beg:is3%end, 1:sys_size))
+            is1%beg:is1%end, is3%beg:is3%end, 1:sys_size))
 
         ! ==================================================================
 
@@ -203,20 +199,20 @@ contains
         is3%beg = -buff_size; is3%end = p - is3%beg
 
         @:ALLOCATE(poly_coef_cbL_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
         @:ALLOCATE(poly_coef_cbR_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
-                                  0:weno_polyn - 1))
+            0:weno_polyn - 1))
 
         @:ALLOCATE(d_cbL_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
         @:ALLOCATE(d_cbR_z(0:weno_polyn, is3%beg + weno_polyn:is3%end - weno_polyn))
 
         @:ALLOCATE(beta_coef_z(is3%beg + weno_polyn:is3%end - weno_polyn, 0:weno_polyn, &
-                              0:2*(weno_polyn - 1)))
+            0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(3, is3)
 
         @:ALLOCATE(v_rs_ws_z(is3%beg:is3%end, &
-                                 is2%beg:is2%end, is1%beg:is1%end, 1:sys_size))
+            is2%beg:is2%end, is1%beg:is1%end, 1:sys_size))
 
         ! ==================================================================
 
@@ -365,66 +361,66 @@ contains
                         beta_coef_${XYZ}$ (i + 1, 0, 0) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                      s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
-                                                                                 s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
+                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
+                                                                                                                                                                s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
 
                         beta_coef_${XYZ}$ (i + 1, 0, 1) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                                                                        s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                                                                              s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                                                                          s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
-                                                                                                                       s_cb(i + 1)))
+                                                                                                             s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
+                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
+                                                                                                                                                                                                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
+                                                                                                                                                                                                                                                s_cb(i + 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 0, 2) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                                                                         s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                                                                         s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
-                                                                                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
+                                                                                                              s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
+                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
+                                                                                                                                                                                                          s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 0) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                             s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                                                                                     s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
+                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
+                                                                                                                                                            s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 1) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
                                                                s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
-                                                                         s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                                                                                s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                                                                      s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
-                                                                                                                           s_cb(i)))
+                                                                                                             s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
+                                                                                                                                                         s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
+                                                                                                                                                                                              s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
+                                                                                                                                                                                                                                             s_cb(i)))
 
                         beta_coef_${XYZ}$ (i + 1, 1, 2) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                 s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
+                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
                             ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                                                                s_cb(i + 2))**2d0)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 0) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                                                                               s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
-                                                                                (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
+                                                                                                                s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
+                                                                                                                                          (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
                             ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
                                                                s_cb(i + 1))**2d0)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 1) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                                                                       s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                                                                      s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                                                                          s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
-                                                                                                                       s_cb(i - 1)))
+                                                                                                              s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
+                                                                                                                                                                s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
+                                                                                                                                                                                                               s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
+                                                                                                                                                                                                                                                          s_cb(i - 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 2, 2) = &
                             4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
                                                                     s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                             s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                                                                                     s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
+                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
+                                                                                                                                                            s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
 
                     end do
 
@@ -453,11 +449,11 @@ contains
 
 ! END: Computing WENO5 Coefficients ================================
         if (weno_dir == 1) then
-!$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
+            !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
         elseif (weno_dir == 2) then
-!$acc update device(poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y)
+            !$acc update device(poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y)
         else
-!$acc update device(poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z)
+            !$acc update device(poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z)
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -467,11 +463,11 @@ contains
     end subroutine s_compute_weno_coefficients ! ---------------------------
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
-                          norm_dir, weno_dir, &
-                          is1_d, is2_d, is3_d)
+                      norm_dir, weno_dir, &
+                      is1_d, is2_d, is3_d)
 
         type(scalar_field), dimension(1:), intent(IN) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) ::  vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
         type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
@@ -490,8 +486,8 @@ contains
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
-        
-!$acc update device(is1, is2, is3)
+
+        !$acc update device(is1, is2, is3)
 
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
@@ -500,7 +496,7 @@ contains
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -511,9 +507,9 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -524,9 +520,9 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+                !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -537,172 +533,171 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
+                if (weno_dir == ${WENO_DIR}$) then
+                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
-                                    dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                             - v_rs_ws_${XYZ}$(j, k, l, i)
-                                    dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              - v_rs_ws_${XYZ}$(j - 1, k, l, i)
+                                    dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
+                                             - v_rs_ws_${XYZ}$ (j, k, l, i)
+                                    dvd(-1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              - v_rs_ws_${XYZ}$ (j - 1, k, l, i)
 
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(-1)
+                                    poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 0, 0)*dvd(0)
+                                    poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 1, 0)*dvd(-1)
 
-                                    beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(0)*dvd(0) &
+                                    beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(0)*dvd(0) &
                                               + weno_eps
-                                    beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(-1)*dvd(-1) &
+                                    beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-                                    alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
+                                    alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
 
-                                    if(mapped_weno) then
+                                    if (mapped_weno) then
 
-                                        alpha = (d_cbL_${XYZ}$(:, j)*(1d0 + d_cbL_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbL_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$(:, j))))
+                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
                                         omega = alpha/sum(alpha)
 
                                     end if
 
-                                    vL_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
+                                    vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
                                     ! reconstruct from right side
 
-                                    poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(0)
-                                    poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                              + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(-1)
+                                    poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 0, 0)*dvd(0)
+                                    poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(-1)
 
-                                    alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
+                                    alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
 
-                                    if(mapped_weno) then
+                                    if (mapped_weno) then
 
-                                        alpha = (d_cbR_${XYZ}$(:, j)*(1d0 + d_cbR_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbR_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$(:, j))))
+                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
                                         omega = alpha/sum(alpha)
 
                                     end if
 
-                                    vR_rs_vf_${XYZ}$(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
+                                    vR_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
                                 end do
                             end do
                         end do
                     end do
-!$acc end parallel loop
-            end if
+                    !$acc end parallel loop
+                end if
             #:endfor
         else
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (weno_dir == ${WENO_DIR}$) then
-!$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-!$acc loop seq
-                            do i = 1, v_size
+                if (weno_dir == ${WENO_DIR}$) then
+                    !$acc parallel loop gang vector collapse (3)  default(present) private(dvd, poly, beta, alpha, omega)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                !$acc loop seq
+                                do i = 1, v_size
 
-                                dvd(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                         - v_rs_ws_${XYZ}$(j + 1, k, l, i)
-                                dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                         - v_rs_ws_${XYZ}$(j, k, l, i)
-                                dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          - v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                dvd(-2) = v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                          - v_rs_ws_${XYZ}$(j - 2, k, l, i)
+                                    dvd(1) = v_rs_ws_${XYZ}$ (j + 2, k, l, i) &
+                                             - v_rs_ws_${XYZ}$ (j + 1, k, l, i)
+                                    dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
+                                             - v_rs_ws_${XYZ}$ (j, k, l, i)
+                                    dvd(-1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              - v_rs_ws_${XYZ}$ (j - 1, k, l, i)
+                                    dvd(-2) = v_rs_ws_${XYZ}$ (j - 1, k, l, i) &
+                                              - v_rs_ws_${XYZ}$ (j - 2, k, l, i)
 
-                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(1) &
-                                          + poly_coef_cbL_${XYZ}$(j, 0, 1)*dvd(0)
-                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(0) &
-                                          + poly_coef_cbL_${XYZ}$(j, 1, 1)*dvd(-1)
-                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                          + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
+                                    poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 0, 0)*dvd(1) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 0, 1)*dvd(0)
+                                    poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 1, 0)*dvd(0) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 1, 1)*dvd(-1)
+                                    poly(2) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 2, 0)*dvd(-1) &
+                                              + poly_coef_cbL_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1) &
-                                          + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0) &
-                                          + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0) &
-                                          + weno_eps
-                                beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0) &
-                                          + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1) &
-                                          + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1) &
-                                          + weno_eps
-                                beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1) &
-                                          + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2) &
-                                          + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2) &
-                                          + weno_eps
+                                    beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(1)*dvd(1) &
+                                              + beta_coef_${XYZ}$ (j, 0, 1)*dvd(1)*dvd(0) &
+                                              + beta_coef_${XYZ}$ (j, 0, 2)*dvd(0)*dvd(0) &
+                                              + weno_eps
+                                    beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(0)*dvd(0) &
+                                              + beta_coef_${XYZ}$ (j, 1, 1)*dvd(0)*dvd(-1) &
+                                              + beta_coef_${XYZ}$ (j, 1, 2)*dvd(-1)*dvd(-1) &
+                                              + weno_eps
+                                    beta(2) = beta_coef_${XYZ}$ (j, 2, 0)*dvd(-1)*dvd(-1) &
+                                              + beta_coef_${XYZ}$ (j, 2, 1)*dvd(-1)*dvd(-2) &
+                                              + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) &
+                                              + weno_eps
 
-                                alpha = d_cbL_${XYZ}$(:, j)/(beta*beta)
-
-                                omega = alpha/sum(alpha)
-
-                                if(mapped_weno) then                                   
-
-                                    alpha = (d_cbL_${XYZ}$(:, j)*(1d0 + d_cbL_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                            *(omega/(d_cbL_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$(:, j))))
+                                    alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
 
-                                end if
+                                    if (mapped_weno) then
 
+                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
-                                vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+                                        omega = alpha/sum(alpha)
 
-                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
-                                          + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
-                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(0) &
-                                          + poly_coef_cbR_${XYZ}$(j, 1, 1)*dvd(-1)
-                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          + poly_coef_cbR_${XYZ}$(j, 2, 0)*dvd(-1) &
-                                          + poly_coef_cbR_${XYZ}$(j, 2, 1)*dvd(-2)
+                                    end if
 
-                                alpha = d_cbR_${XYZ}$(:, j)/(beta*beta)
+                                    vL_rs_vf_${XYZ}$ (j, k, l, i) = sum(omega*poly)
 
-                                omega = alpha/sum(alpha)
+                                    poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 0, 0)*dvd(1) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 0, 1)*dvd(0)
+                                    poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(0) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 1, 1)*dvd(-1)
+                                    poly(2) = v_rs_ws_${XYZ}$ (j, k, l, i) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 2, 0)*dvd(-1) &
+                                              + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                if(mapped_weno) then
-
-                                    alpha = (d_cbR_${XYZ}$(:, j)*(1d0 + d_cbR_${XYZ}$(:, j) - 3d0*omega) + omega**2d0) &
-                                            *(omega/(d_cbR_${XYZ}$(:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$(:, j))))
+                                    alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
 
                                     omega = alpha/sum(alpha)
 
-                                end if
+                                    if (mapped_weno) then
 
-                                vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
+                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
+                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
+                                        omega = alpha/sum(alpha)
+
+                                    end if
+
+                                    vR_rs_vf_${XYZ}$ (j, k, l, i) = sum(omega*poly)
+
+                                end do
                             end do
                         end do
                     end do
-                end do
-!$acc end parallel loop
+                    !$acc end parallel loop
 
-                if (mp_weno) then
-                    call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
-                     vR_rs_vf_${XYZ}$)                   
+                    if (mp_weno) then
+                        call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
+                                                     vR_rs_vf_${XYZ}$)
+                    end if
+
                 end if
-
-            end if
             #:endfor
         end if
 
@@ -740,7 +735,7 @@ contains
         !$acc update device(v_size)
 
         if (weno_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(4) gang vector default(present)
             do j = 1, v_size
                 do q = is3%beg, is3%end
                     do l = is2%beg, is2%end
@@ -750,7 +745,7 @@ contains
                     end do
                 end do
             end do
-!$acc end parallel loop
+            !$acc end parallel loop
         end if
         ! ==================================================================
 
@@ -765,7 +760,7 @@ contains
                         use CuTensorEx
 
                         !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
-     v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
+                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1, sys_size], order=[2, 1, 3, 4])
                         !$acc end host_data
                     end block
                 else
@@ -773,13 +768,13 @@ contains
                         use CuTensorEx
 
                         !$acc host_data use_device(v_rs_ws_x, v_rs_ws_y)
- v_rs_ws_y = reshape(v_rs_ws_x, shape = [n+1+2*buff_size, m+2*buff_size+1,p+1+2*buff_size,sys_size], order = [2, 1, 3, 4])
+                        v_rs_ws_y = reshape(v_rs_ws_x, shape=[n + 1 + 2*buff_size, m + 2*buff_size + 1, p + 1 + 2*buff_size, sys_size], order=[2, 1, 3, 4])
                         !$acc end host_data
                     end block
                 end if
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
                     do q = is3%beg, is3%end
                         do l = is2%beg, is2%end
@@ -806,12 +801,12 @@ contains
                     use CuTensorEx
 
                     !$acc host_data use_device(v_rs_ws_x, v_rs_ws_z)
- v_rs_ws_z = reshape(v_rs_ws_x, shape = [p+1+2*buff_size, n+2*buff_size+1,m+2*buff_size+1,sys_size], order = [3, 2, 1, 4])
+                    v_rs_ws_z = reshape(v_rs_ws_x, shape=[p + 1 + 2*buff_size, n + 2*buff_size + 1, m + 2*buff_size + 1, sys_size], order=[3, 2, 1, 4])
                     !$acc end host_data
                 end block
             else
 #endif
-!$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, v_size
                     do q = is3%beg, is3%end
                         do l = is2%beg, is2%end
@@ -831,8 +826,6 @@ contains
 
     end subroutine s_initialize_weno ! -------------------------------------
 
-
-
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by
         !!      enforcing monotonicity preserving bounds of Suresh and
@@ -850,7 +843,7 @@ contains
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
         integer :: i, j, k, l
-        
+
         real(kind(0d0)), dimension(-1:1) :: d !< Curvature measures at the zone centers
 
         real(kind(0d0)) :: d_MD, d_LC !<
@@ -870,16 +863,15 @@ contains
             !! may be utilized with the scheme. In theory, for stability, a CFL
             !! number less than 1/(1+alpha) is necessary. The default value for
             !! alpha is 2.
-        
 
         real(kind(0d0)), parameter :: beta = 4d0/3d0 !<
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
 
         real(kind(0d0)), parameter :: alpha_mp = 2d0
-        real(kind(0d0)), parameter :: beta_mp  = 4d0/3d0
+        real(kind(0d0)), parameter :: beta_mp = 4d0/3d0
 
- !$acc parallel loop gang vector collapse (4)  default(present) private(d)
+        !$acc parallel loop gang vector collapse (4)  default(present) private(d)
         do l = is3%beg, is3%end
             do k = is2%beg, is2%end
                 do j = is1%beg, is1%end
@@ -936,10 +928,10 @@ contains
                                          vL_LC))
 
                         vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
-                                                      + (sign(5d-1, vL_min - vL_rs_vf(j, k, l, i)) &
-                                                         + sign(5d-1, vL_max - vL_rs_vf(j, k, l, i))) &
-                                                      *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
-                                                           abs(vL_max - vL_rs_vf(j, k, l, i)))
+                                               + (sign(5d-1, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                  + sign(5d-1, vL_max - vL_rs_vf(j, k, l, i))) &
+                                               *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
+                                                    abs(vL_max - vL_rs_vf(j, k, l, i)))
                         ! END: Left Monotonicity Preserving Bound ==========================
 
                         ! Right Monotonicity Preserving Bound ==============================
@@ -995,16 +987,16 @@ contains
                                          vR_LC))
 
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
-                                                      + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
-                                                         + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
-                                                      *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
-                                                           abs(vR_max - vR_rs_vf(j, k, l, i)))
-                         ! END: Right Monotonicity Preserving Bound =========================
+                                               + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                  + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
+                                               *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
+                                                    abs(vR_max - vR_rs_vf(j, k, l, i)))
+                        ! END: Right Monotonicity Preserving Bound =========================
                     end do
                 end do
             end do
         end do
-!$acc end parallel loop
+        !$acc end parallel loop
 
     end subroutine s_preserve_monotonicity ! -------------------------------
 
