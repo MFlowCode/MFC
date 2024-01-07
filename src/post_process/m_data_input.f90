@@ -95,7 +95,7 @@ contains
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
-                ' is missing. Exiting ...')
+                             ' is missing. Exiting ...')
         end if
 
         ! Reading the Grid Data File for the x-direction ===================
@@ -112,7 +112,7 @@ contains
             close (1)
         else
             call s_mpi_abort('File x_cb.dat is missing in '// &
-                trim(t_step_dir)//'. Exiting ...')
+                             trim(t_step_dir)//'. Exiting ...')
         end if
 
         ! Computing the cell-width distribution
@@ -139,7 +139,7 @@ contains
                 close (1)
             else
                 call s_mpi_abort('File y_cb.dat is missing in '// &
-                    trim(t_step_dir)//'. Exiting ...')
+                                 trim(t_step_dir)//'. Exiting ...')
             end if
 
             ! Computing the cell-width distribution
@@ -166,7 +166,7 @@ contains
                     close (1)
                 else
                     call s_mpi_abort('File z_cb.dat is missing in '// &
-                        trim(t_step_dir)//'. Exiting ...')
+                                     trim(t_step_dir)//'. Exiting ...')
                 end if
 
                 ! Computing the cell-width distribution
@@ -199,8 +199,8 @@ contains
                 close (1)
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
-                    '.dat is missing in '//trim(t_step_dir)// &
-                    '. Exiting ...')
+                                 '.dat is missing in '//trim(t_step_dir)// &
+                                 '. Exiting ...')
             end if
 
         end do
@@ -234,7 +234,7 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
 
-        character(len = 10) :: t_step_string
+        character(len=10) :: t_step_string
 
         integer :: i
 
@@ -294,7 +294,7 @@ contains
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    call s_mpi_abort( 'File '//trim(file_loc)//' is missing. Exiting...')
+                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -337,14 +337,14 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                               MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 else
                     do i = 1, adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                               MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
 
@@ -387,9 +387,9 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                            'native', mpi_info_int, ierr)
+                                               'native', mpi_info_int, ierr)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                               MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 else
                     do i = 1, adv_idx%end
@@ -399,9 +399,9 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                            'native', mpi_info_int, ierr)
+                                               'native', mpi_info_int, ierr)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                               MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
 
