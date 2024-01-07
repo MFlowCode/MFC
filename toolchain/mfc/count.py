@@ -11,7 +11,7 @@ def handle_dir(dirpath: str) -> typing.Tuple[typing.List[typing.Tuple[str, int]]
 
     for filepath in glob.glob(os.path.join(dirpath, '*.*f*')):
         with open(filepath) as f:
-            count = 0
+            counter = 0
             for l in f.read().split('\n'):
                 # Skip whitespace
                 if l.isspace() or len(l) == 0:
@@ -19,10 +19,10 @@ def handle_dir(dirpath: str) -> typing.Tuple[typing.List[typing.Tuple[str, int]]
                 # Skip comments but not !$acc ones!
                 if l.lstrip().startswith("!") and not l.lstrip().startswith("!$acc"):
                     continue
-                count += 1
+                counter += 1
 
-            files.append((filepath, count))
-            total += count
+            files.append((filepath, counter))
+            total += counter
 
     files.sort(key=lambda x: x[1], reverse=True)
 
