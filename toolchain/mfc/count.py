@@ -22,7 +22,7 @@ def handle_dir(dirpath: str) -> typing.Tuple[typing.List[typing.Tuple[str, int]]
                 count += 1
 
             files.append((filepath, count))
-            total += n
+            total += count
 
     files.sort(key=lambda x: x[1], reverse=True)
 
