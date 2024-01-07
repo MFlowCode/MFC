@@ -1,14 +1,13 @@
 import typing
 
-from ..    import common
+from mfc   import common
 from .case import TestCase, create_case, CaseGeneratorStack
-from ..printer import cons
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
     for dimCmp in dimInfo[0]:
         params.update({f'bc_{dimCmp}%beg': bc, f'bc_{dimCmp}%end': bc})
-    
+
     return params
 
 
@@ -67,14 +66,15 @@ def get_dimensions():
     return r
 
 
+# pylint: disable=too-many-locals, too-many-statements
 def generate_cases() -> typing.List[TestCase]:
     stack, cases = CaseGeneratorStack(), []
 
-    def alter_bcs(dimInfo, dimParams):
+    def alter_bcs(dimInfo):
         for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
             cases.append(create_case(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
-    def alter_weno(dimInfo, dimParams):
+    def alter_weno():
         for weno_order in [3, 5]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
 
@@ -101,9 +101,9 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
             cases.append(create_case(stack, "mixture_err",   {'mixture_err': 'T'}))
-            cases.append(create_case(stack, "avg_state=1",   {'avg_state':   '1'}))
-            cases.append(create_case(stack, "wave_speeds=2", {'wave_speeds': '2'}))
-            
+            cases.append(create_case(stack, "avg_state=1",   {'avg_state':   1}))
+            cases.append(create_case(stack, "wave_speeds=2", {'wave_speeds': 2}))
+
             if riemann_solver == 2:
                 cases.append(create_case(stack, "model_eqns=3", {'model_eqns': 3}))
 
@@ -115,7 +115,7 @@ def generate_cases() -> typing.List[TestCase]:
 
             stack.pop()
 
-    def alter_num_fluids(dimInfo, dimParams):
+    def alter_num_fluids():
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
 
@@ -131,37 +131,37 @@ def generate_cases() -> typing.List[TestCase]:
             alter_riemann_solvers(num_fluids)
 
             if num_fluids == 1:
-                stack.push(f"Viscous", {
+                stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
 
-                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
+                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
                 for weno_Re_flux in ['T']:
-                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
+                    stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
                 stack.pop()
 
             if num_fluids == 2:
-                stack.push(f"Viscous", {
+                stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
                     'patch_icpp(1)%vel(1)': 1.0}) 
 
-                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
+                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
                 for weno_Re_flux in ['T']:
-                    stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
+                    stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
                 stack.pop()
                 stack.pop()
 
-            stack.pop() 
+            stack.pop()
 
-    def alter_2d(dimInfo, dimParams):
+    def alter_2d():
         stack.push("Axisymmetric", {
             'num_fluids' : 2, 'bc_y%beg': -2, 'cyl_coord': 'T',
             'fluid_pp(2)%gamma':          2.5,    'fluid_pp(2)%pi_inf':         0.0,  'patch_icpp(1)%alpha_rho(1)': 0.81,
@@ -174,22 +174,22 @@ def generate_cases() -> typing.List[TestCase]:
         cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
         cases.append(create_case(stack, "model_eqns=3", {'model_eqns': 3}))
 
-        stack.push(f"Viscous", {
+        stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
             'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11}) 
 
-        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
+        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
         cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
-            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
+            stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
             cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
         stack.pop()
         stack.pop()
 
-    def alter_3d(dimInfo, dimParams):
-        stack.push(f"Cylindrical", {
+    def alter_3d():
+        stack.push("Cylindrical", {
             'bc_y%beg': -14, 'bc_z%beg': -1, 'bc_z%end': -1, 'cyl_coord': 'T', 'x_domain%beg': 0.E+00, 
             'x_domain%end': 5.E+00, 'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00, 'z_domain%beg': 0.E+00,
             'z_domain%end' : 2.0*3.141592653589793E+00, 'm': 29, 'n': 29, 'p': 29,
@@ -212,32 +212,32 @@ def generate_cases() -> typing.List[TestCase]:
 
         cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
 
-        stack.push(f"Viscous", {
+        stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
             'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
-            }) 
+            })
 
-        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))             
+        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
         cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
-            stack.push(f"weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
+            stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
             cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
         stack.pop()
         stack.pop()
 
-    def alter_ppn(dimInfo, dimParams):
+    def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
-            cases.append(create_case(stack, f'2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
+            cases.append(create_case(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
         else:
-            cases.append(create_case(stack, f'2 MPI Ranks', {}, ppn=2))
+            cases.append(create_case(stack, '2 MPI Ranks', {}, ppn=2))
 
-    def alter_bubbles(dimInfo, dimParams):
+    def alter_bubbles(dimInfo):
         if len(dimInfo[0]) > 0:
-            stack.push(f"Bubbles", {"bubbles": 'T'})
+            stack.push("Bubbles", {"bubbles": 'T'})
 
-            stack.push(f'', {
+            stack.push('', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
                 'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
                 'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
@@ -249,7 +249,7 @@ def generate_cases() -> typing.List[TestCase]:
                 'patch_icpp(3)%pres': 1.0
             })
 
-            stack.push(f"Monopole", {"Monopole": 'T'})
+            stack.push("Monopole", {"Monopole": 'T'})
 
             if len(dimInfo[0]) >= 2:
                 stack.push("", {'Mono(1)%loc(2)': 0.5})
@@ -258,7 +258,7 @@ def generate_cases() -> typing.List[TestCase]:
                 stack.push("", {'Mono(1)%loc(3)': 0.5, 'Mono(1)%support': 3})
 
             for polytropic in ['T', 'F']:
-                stack.push(f"Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
+                stack.push("Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
 
                 for bubble_model in [3, 2]:
                     stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
@@ -273,11 +273,11 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
             cases.append(create_case(stack, 'nb=1', {'nb': 1}))
 
-            stack.push(f"QBMM", {'qbmm': 'T'})
+            stack.push("QBMM", {'qbmm': 'T'})
             cases.append(create_case(stack, '', {}))
 
 
-            stack.push(f"Non-polytropic", {'polytropic': 'F'})
+            stack.push("Non-polytropic", {'polytropic': 'F'})
             cases.append(create_case(stack, '', {}))
 
             stack.pop()
@@ -285,10 +285,10 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('bubble_model=3', {'bubble_model': 3, 'polytropic': 'T'})
             cases.append(create_case(stack, '', {}))
 
-            stack.push(f'Non-polytropic', { 'polytropic': 'F'})
+            stack.push('Non-polytropic', { 'polytropic': 'F'})
             cases.append(create_case(stack, '', {}))
 
-            for i in range(7):
+            for _ in range(7):
                 stack.pop()
 
             if len(dimInfo[0]) >= 2:
@@ -297,7 +297,7 @@ def generate_cases() -> typing.List[TestCase]:
             if len(dimInfo[0]) >= 3:
                 stack.pop()
 
-    def alter_hypoelasticity(dimInfo, dimParams):
+    def alter_hypoelasticity(dimInfo):
         # Hypoelasticity checks
         for num_fluids in [1,2]:
             stack.push(f"Hypoelasticity -> {num_fluids} Fluid(s)", {
@@ -346,16 +346,84 @@ def generate_cases() -> typing.List[TestCase]:
                 stack.pop()
 
             if len(dimInfo[0]) == 3:
-                for i in range(2):
+                for _ in range(2):
                     stack.pop()
 
-    def alter_viscosity(dimInfo, dimParams):
+    def alter_phasechange(dimInfo):
+        ndims = len(dimInfo[0])
+
+        # Phase Change checks
+        for relax_model in [5] + ([6] if ndims <= 2 else []):
+            for num_fluids in ([2] if ndims == 1 or relax_model == 5 else []) + [3]:
+                stack.push(f"Phase Change model {relax_model} -> {num_fluids} Fluid(s)", {
+                    "relax": 'T',
+                    "relax_model": relax_model,
+                    'model_eqns': 3,
+                    'palpha_eps': 1E-02,
+                    'ptgalpha_eps': 1E-02,                    
+                    "num_fluids": num_fluids,
+                    'riemann_solver':           2,
+                    'fluid_pp(1)%gamma':        0.7409,       'fluid_pp(1)%pi_inf':   1.7409E+09,
+                    'fluid_pp(1)%cv':           1816,         'fluid_pp(1)%qv':   -1167000,
+                    'fluid_pp(1)%qvp':          0.0,
+                    'fluid_pp(2)%gamma':        2.3266,       'fluid_pp(2)%pi_inf':   0.0E+00,
+                    'fluid_pp(2)%cv':           1040,         'fluid_pp(2)%qv':   2030000,
+                    'fluid_pp(2)%qvp':          -23400,
+                    'patch_icpp(1)%pres':       4.3755E+05,
+                    'patch_icpp(1)%alpha(1)':   8.7149E-06,    'patch_icpp(1)%alpha_rho(1)': 9.6457E+02 * 8.7149E-06,
+                    'patch_icpp(1)%alpha(2)':   1-8.7149E-06,  'patch_icpp(1)%alpha_rho(2)': 2.3132 * ( 1 - 8.7149E-06 ),
+                    'patch_icpp(2)%pres':       9.6602E+04,
+                    'patch_icpp(2)%alpha(1)':   3.6749E-05,   'patch_icpp(2)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                    'patch_icpp(2)%alpha(2)':   1-3.6749E-05, 'patch_icpp(2)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 ),
+                    'patch_icpp(3)%pres':       9.6602E+04,
+                    'patch_icpp(3)%alpha(1)':   3.6749E-05,   'patch_icpp(3)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                    'patch_icpp(3)%alpha(2)':   1-3.6749E-05, 'patch_icpp(3)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 )
+                })
+
+                if num_fluids == 3:
+                    stack.push("", {
+                        'fluid_pp(3)%gamma':        2.4870,        'fluid_pp(3)%pi_inf':   0.0E+00,
+                        'fluid_pp(3)%cv':           717.5,         'fluid_pp(3)%qv':   0.0E+00,
+                        'fluid_pp(3)%qvp':          0.0,
+                        'patch_icpp(1)%alpha(2)':   2.5893E-02,                 'patch_icpp(1)%alpha_rho(2)':   2.3132 * 2.5893E-02,
+                        'patch_icpp(2)%alpha(2)':   2.8728E-02,                 'patch_icpp(2)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                        'patch_icpp(3)%alpha(2)':   2.8728E-02,                 'patch_icpp(3)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                        'patch_icpp(1)%alpha(3)':   1-8.7149E-06-2.5893E-02,    'patch_icpp(1)%alpha_rho(3)':   3.5840 * ( 1-8.7149E-06-2.5893E-02 ),
+                        'patch_icpp(2)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(2)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 ),
+                        'patch_icpp(3)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(3)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 )
+                    })
+
+                if ndims == 1:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   606.15, 'patch_icpp(2)%vel(1)': 10.0, 'patch_icpp(3)%vel(1)': 10.0
+                    })
+                elif ndims == 2:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                        'patch_icpp(1)%vel(2)':   606.15, 'patch_icpp(2)%vel(2)': 10.0, 'patch_icpp(3)%vel(2)': 10.0
+                    })
+                elif ndims == 3:
+                    stack.push("", {
+                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                        'patch_icpp(1)%vel(2)':   0.0, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0,
+                        'patch_icpp(1)%vel(3)':   606.15, 'patch_icpp(2)%vel(3)': 10.0, 'patch_icpp(3)%vel(3)': 10.0
+                    })
+
+                cases.append(create_case(stack, '', {}))
+
+                stack.pop()
+                stack.pop()
+
+                if num_fluids == 3:
+                    stack.pop()
+
+    def alter_viscosity(dimInfo):
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
-            stack.push(f"Viscosity -> Bubbles", 
+            stack.push("Viscosity -> Bubbles",
                 {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
 
-            stack.push(f'', {
+            stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
                 'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
                 'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
@@ -368,7 +436,7 @@ def generate_cases() -> typing.List[TestCase]:
             })
 
             for polytropic in ['T', 'F']:
-                stack.push(f"Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
+                stack.push("Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
 
                 for bubble_model in [3, 2]:
                     stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
@@ -383,33 +451,34 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
             cases.append(create_case(stack, 'nb=1', {'nb': 1}))
 
-            stack.push(f"QBMM", {'qbmm': 'T'})
+            stack.push("QBMM", {'qbmm': 'T'})
             cases.append(create_case(stack, '', {}))
 
             stack.push('bubble_model=3', {'bubble_model': 3})
             cases.append(create_case(stack, '', {}))
 
-            for i in range(5):
+            for _ in range(5):
                 stack.pop()
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
-            alter_bcs (dimInfo, dimParams)
-            alter_weno(dimInfo, dimParams)
-            alter_num_fluids(dimInfo, dimParams)
+            alter_bcs(dimInfo)
+            alter_weno()
+            alter_num_fluids()
             if len(dimInfo[0]) == 2:
-                alter_2d(dimInfo, dimParams)
+                alter_2d()
             if len(dimInfo[0]) == 3:
-                alter_3d(dimInfo, dimParams)
-            alter_ppn(dimInfo, dimParams)
+                alter_3d()
+            alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
-            alter_bubbles(dimInfo, dimParams)
-            alter_hypoelasticity(dimInfo, dimParams)
-            alter_viscosity(dimInfo, dimParams)
+            alter_bubbles(dimInfo)
+            alter_hypoelasticity(dimInfo)
+            alter_phasechange(dimInfo)
+            alter_viscosity(dimInfo)
             stack.pop()
             stack.pop()
-        
+
     foreach_dimension()
 
     # Sanity Check 1

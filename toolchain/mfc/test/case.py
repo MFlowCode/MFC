@@ -52,7 +52,9 @@ BASE_CFG = {
 
     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
-
+    'fluid_pp(1)%cv'               : 0.0,
+    'fluid_pp(1)%qv'               : 0.0,
+    'fluid_pp(1)%qvp'              : 0.0,   
     'bubbles'                       : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,
@@ -107,15 +109,15 @@ class TestCase(case.Case):
             gpus_select = f"--gpus {' '.join([str(_) for _ in gpus])}"
         else:
             gpus_select = ""
-        
+
         filepath          = f'"{self.get_dirpath()}/case.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
         binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
         case_optimization =  "--case-optimization" if ARG("case_optimization") or self.opt else "--no-build"
-        
-        mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
-        
+
+        mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
+
         target_names = [ get_target(t).name for t in targets ]
 
         command: str = f'''\
@@ -126,7 +128,7 @@ class TestCase(case.Case):
 
         return subprocess.run(command, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True,
-                              shell=True)
+                              shell=True, check=False)
 
     def get_uuid(self) -> str:
         return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
@@ -188,7 +190,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
         'c_wrt'        : 'T',
     }}
-        
+
     if case['p'] != 0:
         mods['fd_order']  = 1
         mods['omega_wrt(1)'] = 'T'
@@ -206,6 +208,21 @@ print(json.dumps({{**case, **mods}}))
 
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
+
+    def compute_tolerance(self) -> float:
+        if self.params.get("qbmm", 'F') == 'T':
+            return 1e-10
+
+        if self.params.get("bubbles", 'F') == 'T':
+            return 1e-10
+
+        if self.params.get("hypoelasticity", 'F') == 'T':
+            return 1e-7
+
+        if self.params.get("relax", 'F') == 'T':
+            return 1e-10
+
+        return 1e-12
 
 
 @dataclasses.dataclass
@@ -230,8 +247,9 @@ class CaseGeneratorStack:
 def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None) -> TestCase:
     mods: dict = {}
 
-    for dict in stack.mods:
-        mods.update(dict)
+    for mod in stack.mods:
+        mods.update(mod)
+
     mods.update(newMods)
 
     if isinstance(newTrace, str):
