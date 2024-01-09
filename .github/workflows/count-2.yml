@@ -59,21 +59,5 @@ jobs:
         run: |
           BASE="$GITHUB_WORKSPACE/base"
           PR="$GITHUB_WORKSPACE/pr"
-          # echo "$BASE" >> "GITHUB_ENV"
-          # echo "$PR" >> "GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
           echo "loc_content<<EOF" >> "$GITHUB_ENV"
-          # pip install tabulate
-          # cp "$BASE/sz.py" .
-          # python sz.py "$BASE" "$PR" >> "$GITHUB_ENV"
-      # - name: Comment Code Line Diff
-      #   continue-on-error: false
-      #   uses: marocchino/sticky-pull-request-comment@v2
-      #   with:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     ignore_empty: true
-      #     skip_unchanged: true
-      #     recreate: true
-      #     message: ${{ env.loc_content }}
-
-
