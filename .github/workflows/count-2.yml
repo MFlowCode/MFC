@@ -63,10 +63,13 @@ jobs:
           echo "$EOF" >> "$GITHUB_ENV"
       - name: Comment Code Line Diff
         continue-on-error: false
-        uses: marocchino/sticky-pull-request-comment@v2
+      # - uses: jwalton/gh-find-current-pr@v1
+      #   id: finder
+      - uses: marocchino/sticky-pull-request-comment@v2
+        # number: ${{ steps.finder.outputs.pr }}
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ignore_empty: true
+          ignore_empty: false
           skip_unchanged: true
           recreate: true
           message: ${{ env.loc_content }}
