@@ -30,3 +30,48 @@ jobs:
           else
             echo "stat=false" >> "$GITHUB_OUTPUT"
           fi
+
+  szdiff:
+    name: Core MFC Line Difference
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    needs: checkbranch
+    if: needs.checkbranch.outputs.branchstat == 'false'
+    steps:
+      - name: Checkout code from PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+        # the base default to MFC master and cannot be other fork branch for security purpose
+      - name: Checkout code from MFC master
+        uses: actions/checkout@v4
+        with:
+          path: base
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Count Line Diff
+        run: |
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          echo "$BASE" >> "GITHUB_ENV"
+          echo "$PR" >> "GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+          # pip install tabulate
+          # cp "$BASE/sz.py" .
+          # echo "loc_content<<EOF" >> "$GITHUB_ENV"
+          # python sz.py "$BASE" "$PR" >> "$GITHUB_ENV"
+      - name: Comment Code Line Diff
+        continue-on-error: false
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ignore_empty: true
+          skip_unchanged: true
+          recreate: true
+          message: ${{ env.loc_content }}
