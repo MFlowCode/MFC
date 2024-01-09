@@ -64,19 +64,20 @@ jobs:
           echo "this is only a test" >> "GITHUB_ENV"
           echo "$EOF" >> "$GITHUB_ENV"
 
-    steps:
-      - uses: actions/checkout@v1
-      # Find the PR associated with this push, if there is one.
-      - uses: jwalton/gh-find-current-pr@v1
-        id: findPr
-        with:
-          # Can be "open", "closed", or "all".  Defaults to "open".
-          state: open
-      # This will echo "Your PR is 7", or be skipped if there is no current PR.
-      - run: echo "Your PR is ${PR}"
-        if: success() && steps.findPr.outputs.number
-        env:
-          PR: ${{ steps.findPr.outputs.pr }}
+      - name: PR finder
+        steps:
+          - uses: actions/checkout@v1
+          # Find the PR associated with this push, if there is one.
+          - uses: jwalton/gh-find-current-pr@v1
+            id: findPr
+            with:
+              # Can be "open", "closed", or "all".  Defaults to "open".
+              state: open
+          # This will echo "Your PR is 7", or be skipped if there is no current PR.
+          - run: echo "Your PR is ${PR}"
+            if: success() && steps.findPr.outputs.number
+            env:
+              PR: ${{ steps.findPr.outputs.pr }}
 
       # - name: Comment Code Line Diff
       #   continue-on-error: false
