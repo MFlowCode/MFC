@@ -72,5 +72,5 @@ jobs:
           ignore_empty: false
           skip_unchanged: false
           recreate: true
-          message: ${{ env.loc_content }}
+          message: ${{ env.test_result }}
 
