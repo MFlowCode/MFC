@@ -62,15 +62,16 @@ jobs:
           echo "test_result<<$EOF" >> "$GITHUB_ENV"
           echo "this is only a test" >> "GITHUB_ENV"
           echo "$EOF" >> "$GITHUB_ENV"
-
-      - name: Comment Code Line Diff
-        continue-on-error: false
-        uses: marocchino/sticky-pull-request-comment@v2
+      - uses: marocchino/sticky-pull-request-comment@v2
         with:
-          # number: ${{ steps.finder.outputs.pr }}
+          append: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ignore_empty: false
           skip_unchanged: false
           recreate: true
-          message: ${{ env.test_result }}
+          message: |
+            Test with ${{ github.sha }}.
+            ```
+            ${{ env.test_result }}
+            ```
 
