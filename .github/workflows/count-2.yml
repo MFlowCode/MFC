@@ -62,9 +62,9 @@ jobs:
           echo "$BASE" >> "GITHUB_ENV"
           echo "$PR" >> "GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
+          echo "loc_content<<EOF" >> "$GITHUB_ENV"
           # pip install tabulate
           # cp "$BASE/sz.py" .
-          # echo "loc_content<<EOF" >> "$GITHUB_ENV"
           # python sz.py "$BASE" "$PR" >> "$GITHUB_ENV"
       - name: Comment Code Line Diff
         continue-on-error: false
