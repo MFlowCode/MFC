@@ -1,6 +1,6 @@
 name: Check Line Counts
 on:
-  push:
+  pull request:
 
 jobs:
   checkbranch:
