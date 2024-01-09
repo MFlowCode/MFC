@@ -1,10 +1,5 @@
 name: Check Line Counts
-on:
-  push:
-
-  pull request:
-
-  workflow_dispatch:
+on: [pull_request]
 
 jobs:
   checkbranch:
