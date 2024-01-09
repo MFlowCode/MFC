@@ -66,7 +66,7 @@ jobs:
 
       - name: Comment Code Line Diff
         continue-on-error: false
-      - uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v2
         with:
           # number: ${{ steps.finder.outputs.pr }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
