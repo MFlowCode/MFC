@@ -59,8 +59,8 @@ jobs:
         run: |
           BASE="$GITHUB_WORKSPACE/base"
           PR="$GITHUB_WORKSPACE/pr"
-          echo "$BASE" >> "GITHUB_ENV"
-          echo "$PR" >> "GITHUB_ENV"
+          # echo "$BASE" >> "GITHUB_ENV"
+          # echo "$PR" >> "GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
           echo "loc_content<<EOF" >> "$GITHUB_ENV"
           # pip install tabulate
