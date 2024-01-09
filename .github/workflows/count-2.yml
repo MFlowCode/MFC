@@ -66,7 +66,6 @@ jobs:
 
       - name: Comment Code Line Diff
         continue-on-error: false
-        steps:
       - uses: marocchino/sticky-pull-request-comment@v2
         with:
           # number: ${{ steps.finder.outputs.pr }}
