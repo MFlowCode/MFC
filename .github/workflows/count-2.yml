@@ -60,7 +60,7 @@ jobs:
         run: |
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "test_result<<$EOF" >> "$GITHUB_ENV"
-          ./mfc.sh count >> "$GITHUB_ENV"
+          cd base && ./mfc.sh count >> "$GITHUB_ENV"
           echo "this is only a test" >> "GITHUB_ENV"
           echo "$EOF" >> "$GITHUB_ENV"
       - uses: marocchino/sticky-pull-request-comment@v2
