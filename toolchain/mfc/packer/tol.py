@@ -1,13 +1,9 @@
 import math, typing
 
-from ..common import MFCException
-
 from .pack   import Pack
 from .errors import compute_error, AverageError, Error
 
-class Tolerance(Error):
-    pass
-
+Tolerance = Error
 
 def is_close(error: Error, tolerance: Tolerance) -> bool:
     if error.absolute <= tolerance.absolute:
@@ -22,6 +18,7 @@ def is_close(error: Error, tolerance: Tolerance) -> bool:
     return False
 
 
+# pylint: disable=too-many-return-statements
 def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error, str]:
     # Keep track of the average error
     avg_err = AverageError()
@@ -35,7 +32,7 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         # Find the corresponding entry in the candidate's pack
         cEntry = candidate.find(gFilepath)
 
-        if cEntry == None:
+        if cEntry is None:
             return None, f"No reference to {gFilepath} in the candidate's pack."
 
         # Compare variable-count

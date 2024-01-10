@@ -82,6 +82,8 @@ module m_global_parameters
     !> @{
     integer :: model_eqns      !< Multicomponent flow model
     integer :: num_fluids      !< Number of different fluids present in the flow
+    logical :: relax           !< phase change
+    integer :: relax_model     !< Phase change relaxation model
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
@@ -111,6 +113,7 @@ module m_global_parameters
     !> @}
 
     logical :: parallel_io    !< Format of the data files
+    logical :: file_per_process !< output format
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -188,8 +191,8 @@ module m_global_parameters
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
     !! Amplitude coefficients of the numerical Schlieren function that are used
     !! to adjust the intensity of numerical Schlieren renderings for individual
-    !! fluids. This enables waves and interfaces of varying strenghts and in all
-    !! of the fluids to be made simulatenously visible on a single plot.
+    !! fluids. This enables waves and interfaces of varying strengths and in all
+    !! of the fluids to be made simultaneously visible on a single plot.
 
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
@@ -219,15 +222,14 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G,  pv, M_n, M_v
+    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: poly_sigma
-    real(kind(0d0)) :: sigR 
-    integer :: nmom 
-
+    real(kind(0d0)) :: sigR
+    integer :: nmom
 
     !> @}
 
@@ -269,6 +271,8 @@ contains
         weno_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
+        relax = .false.
+        relax_model = dflt_int
         hypoelasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
@@ -279,6 +283,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%cv = 0d0
+            fluid_pp(i)%qv = 0d0
+            fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = dflt_real
         end do
 
@@ -294,6 +301,7 @@ contains
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
+        file_per_process = .false.
         E_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
@@ -380,8 +388,8 @@ contains
                 alf_idx = 1
             end if
 
-            if(qbmm) then
-                    nmom = 6
+            if (qbmm) then
+                nmom = 6
             end if
 
             if (bubbles) then
@@ -398,14 +406,12 @@ contains
                 end if
                 sys_size = bub_idx%end
 
-                
-
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
                 allocate (weight(nb), R0(nb), V0(nb))
 
-                if(qbmm) then
-                    allocate(bub_idx%moms(nb, nmom))
+                if (qbmm) then
+                    allocate (bub_idx%moms(nb, nmom))
                     do i = 1, nb
                         do j = 1, nmom
                             bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
@@ -414,7 +420,7 @@ contains
                         bub_idx%vs(i) = bub_idx%moms(i, 3)
                     end do
                 else
-                  do i = 1, nb
+                    do i = 1, nb
                         if (polytropic .neqv. .true.) then
                             fac = 4
                         else
@@ -430,8 +436,6 @@ contains
                         end if
                     end do
                 end if
-
-
 
                 if (nb == 1) then
                     weight(:) = 1d0
@@ -451,7 +455,6 @@ contains
                     pref = 1.d0
                 end if
 
-                
             end if
 
             if (hypoelasticity) then
@@ -530,7 +533,7 @@ contains
                     stop 'Invalid value of nb'
                 end if
 
-                if (polytropic ) then
+                if (polytropic) then
                     rhoref = 1.d0
                     pref = 1.d0
                 end if
@@ -553,7 +556,7 @@ contains
 
 #ifdef MFC_MPI
         allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))                
+        allocate (MPI_IO_DATA%var(1:sys_size))
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
@@ -597,15 +600,15 @@ contains
         end if
 
         ! Allocating single precision grid variables if needed
-         if (precision == 1) then
-             allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
-             if (n > 0) then 
-                 allocate (y_cb_s(-1 - offset_x%beg:n + offset_x%end))
-                 if (p > 0) then
-                     allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end)) 
-                 end if
-             end if
-         end if
+        if (precision == 1) then
+            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
+            if (n > 0) then
+                allocate (y_cb_s(-1 - offset_x%beg:n + offset_x%end))
+                if (p > 0) then
+                    allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end))
+                end if
+            end if
+        end if
 
         ! Allocating the grid variables in the x-coordinate direction
         allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
@@ -716,6 +719,5 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! -----------------
-
 
 end module m_global_parameters

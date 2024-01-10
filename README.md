@@ -19,10 +19,11 @@
 <p align="justify">
   Welcome to the home of MFC!
   MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-  It scales ideally to tens of thousands of GPUs.
+  It scales ideally to tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like OLCF Summit and Frontier.
+  As such, it is an exascale CFD codebase.
   MFC is written in Fortran and makes use of metaprogramming to keep the codebase readable.
-  Please contact the developers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions.
-  We have an active Slack channel to help ease in new MFC users and support development.
+  Don't hesitate to get in touch with the developers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions.
+  We have an active Slack channel to help ease new MFC users and support development.
 
   MFC has API and high-level documentation on [its website](https://mflowcode.github.io/).
   The latter is also available [here](docs/documentation/readme.md).

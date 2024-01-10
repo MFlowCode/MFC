@@ -37,10 +37,10 @@ module m_riemann_solvers
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, &
-                        s_riemann_solver, &
-                        s_hll_riemann_solver, &
-                        s_hllc_riemann_solver, &
-                        s_finalize_riemann_solvers_module
+ s_riemann_solver, &
+ s_hll_riemann_solver, &
+ s_hllc_riemann_solver, &
+ s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
 
@@ -161,7 +161,6 @@ module m_riemann_solvers
     !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
     !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 
-
     !> The cell-boundary values of the geometrical source flux that are computed
     !! through the chosen Riemann problem solver by using the left and right
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
@@ -205,10 +204,9 @@ module m_riemann_solvers
     type(int_bounds_info) :: isx, isy, isz
     !> @}
     !$acc declare create(is1, is2, is3, isx, isy, isz)
- 
-    real(kind(0d0)), allocatable, dimension(:) ::  Gs
-    !$acc declare create(Gs)
 
+    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    !$acc declare create(Gs)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
@@ -257,6 +255,7 @@ contains
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
+        real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
         real(kind(0d0)) :: G_L, G_R
@@ -341,10 +340,12 @@ contains
                             rho_L = 0d0
                             gamma_L = 0d0
                             pi_inf_L = 0d0
+                            qv_L = 0d0
 
                             rho_R = 0d0
                             gamma_R = 0d0
                             pi_inf_R = 0d0
+                            qv_R = 0d0
 
                             alpha_L_sum = 0d0
                             alpha_R_sum = 0d0
@@ -374,10 +375,12 @@ contains
                                 rho_L = rho_L + alpha_rho_L(i)
                                 gamma_L = gamma_L + alpha_L(i)*gammas(i)
                                 pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
 
                                 rho_R = rho_R + alpha_rho_R(i)
                                 gamma_R = gamma_R + alpha_R(i)*gammas(i)
                                 pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                             end do
 
                             if (any(Re_size > 0)) then
@@ -413,8 +416,8 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
@@ -449,20 +452,20 @@ contains
                                     end if
                                 end do
                             end if
-                            
+
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, c_L)
+                                                          vel_L_rms, c_L)
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, c_R)
+                                                          vel_R_rms, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                            ! variables are placeholders to call the subroutine.
 
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                vel_avg_rms, c_avg)
+                                                          vel_avg_rms, c_avg)
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -793,6 +796,7 @@ contains
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
+        real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
@@ -856,8 +860,8 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -879,10 +883,12 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
@@ -918,10 +924,12 @@ contains
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                    qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
 
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
@@ -960,9 +968,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -970,16 +978,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, c_L)
+                                                              vel_L_rms, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, c_R)
+                                                              vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1021,7 +1029,7 @@ contains
                                 end if
 
                                 if (s_L >= 0d0) then
-                                    p_Star = pres_L ! Only usefull to recalculate the radial momentum geometric source flux
+                                    p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
@@ -1031,8 +1039,10 @@ contains
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*vel_L(dir_idx(1))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                            (gammas(i)*pres_L + pi_infs(i))*vel_L(dir_idx(1))
+                                            (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
+                                             (gammas(i)*pres_L + pi_infs(i)) + &
+                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
+                                             qvs(i))*vel_L(dir_idx(1))
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1040,7 +1050,7 @@ contains
                                             rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                       dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
+                                                                                    dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
@@ -1048,7 +1058,7 @@ contains
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
-                                    ! Only usefull to recalculate the radial momentum geometric source flux
+                                    ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
@@ -1058,8 +1068,10 @@ contains
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*vel_R(dir_idx(1))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                            (gammas(i)*pres_R + pi_infs(i))*vel_R(dir_idx(1))
+                                            (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
+                                             (gammas(i)*pres_R + pi_infs(i)) + &
+                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
+                                             qvs(i))*vel_R(dir_idx(1))
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1067,7 +1079,7 @@ contains
                                             rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                       dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
+                                                                                    dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
@@ -1091,8 +1103,10 @@ contains
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*xi_L*s_S
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                            (gammas(i)*p_K_Star + pi_infs(i))*s_S
+                                            (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
+                                             (gammas(i)*p_K_Star + pi_infs(i)) + &
+                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
+                                             qvs(i))*s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
@@ -1101,7 +1115,7 @@ contains
                                                           (1d0 - dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                  dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
+                                                                                    dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
@@ -1128,17 +1142,19 @@ contains
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*xi_R*s_S
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                            (gammas(i)*p_K_Star + pi_infs(i))*s_S
+                                            (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
+                                             (gammas(i)*p_K_Star + pi_infs(i)) + &
+                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
+                                             qvs(i))*s_S
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
-                                                       (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
-                                                                                                  dir_flg(dir_idx(i))*p_Star
+                                                                                             (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
+                                                                                             dir_flg(dir_idx(i))*p_Star
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                  dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
+                                                                                    dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
@@ -1159,7 +1175,7 @@ contains
                                     do i = intxb, intxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
-                                    ! Recalculating the radial momentum geometric source flux (substracting the pressure part)
+                                    ! Recalculating the radial momentum geometric source flux (subtracting the pressure part)
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
                                     ! Geometrical source of the void fraction(s) is zero
@@ -1210,26 +1226,30 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_L = rho_L + alpha_rho_L(i)
                                     gamma_L = gamma_L + alpha_L(i)*gammas(i)
                                     pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
                                 end do
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_R = rho_R + alpha_rho_R(i)
                                     gamma_R = gamma_R + alpha_R(i)*gammas(i)
                                     pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
+                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1237,16 +1257,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, c_L)
+                                                              vel_L_rms, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, c_R)
+                                                              vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1326,9 +1346,9 @@ contains
                                     ! Put p_tilde in
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) =     &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) + &
-                                              xi_M*(dir_flg(dir_idx(i))*(-1d0*ptilde_L))      &
+                                            xi_M*(dir_flg(dir_idx(i))*(-1d0*ptilde_L)) &
                                             + xi_P*(dir_flg(dir_idx(i))*(-1d0*ptilde_R))
                                     end do
                                 end if
@@ -1417,9 +1437,9 @@ contains
                             end do
                         end do
                     end do
-                
+
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, & 
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
                     !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1447,6 +1467,7 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
@@ -1454,6 +1475,7 @@ contains
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                         pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                        qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
@@ -1461,16 +1483,19 @@ contains
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                         gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                         pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                        qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                     end do
                                 else
                                     rho_L = qL_prim_rs${XYZ}$_vf(j, k, l, 1)
                                     gamma_L = gammas(1)
                                     pi_inf_L = pi_infs(1)
+                                    qv_L = qvs(1)
                                 end if
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
@@ -1478,6 +1503,7 @@ contains
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                         pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     !$acc loop seq
@@ -1485,11 +1511,13 @@ contains
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                         gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                         pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                        qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else
                                     rho_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, 1)
                                     gamma_R = gammas(1)
                                     pi_inf_R = pi_infs(1)
+                                    qv_R = qvs(1)
                                 end if
 
                                 if (any(Re_size > 0)) then
@@ -1502,8 +1530,8 @@ contains
 
                                             !$acc loop seq
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = (1d0-qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
-                                                        + Re_L(i)
+                                                Re_L(i) = (1d0 - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                          + Re_L(i)
                                             end do
 
                                             Re_L(i) = 1d0/max(Re_L(i), sgm_eps)
@@ -1518,15 +1546,15 @@ contains
 
                                             !$acc loop seq
                                             do q = 1, Re_size(i)
-                                                Re_R(i) = (1d0-qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
-                                                        + Re_R(i)
+                                                Re_R(i) = (1d0 - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res(i, q) &
+                                                          + Re_R(i)
                                             end do
 
                                             Re_R(i) = 1d0/max(Re_R(i), sgm_eps)
                                         end do
-                                    end if 
+                                    end if
                                 end if
-                                
+
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
 
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
@@ -1547,7 +1575,7 @@ contains
                                         end if
                                     end do
 
-                                    if(.not. qbmm) then
+                                    if (.not. qbmm) then
                                         nbub_L_denom = 0d0
                                         nbub_R_denom = 0d0
                                         !$acc loop seq
@@ -1556,7 +1584,7 @@ contains
                                             nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
                                         end do
                                         nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom                                        
+                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
                                     else
                                         !nb stored in 0th moment of first R0 bin in variable conversion module
                                         nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, bubxb)
@@ -1613,16 +1641,14 @@ contains
                                         ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*pres_L
                                     else
                                         ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
-                                                                                                           rho_L*R3V2Lbar/R3Lbar)
+                                                                                                      rho_L*R3V2Lbar/R3Lbar)
                                     end if
 
-
-
-                                     if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                    if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
                                         ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
                                     else
                                         ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
-                                                                                                              rho_R*R3V2Rbar/R3Rbar)
+                                                                                                          rho_R*R3V2Rbar/R3Rbar)
                                     end if
 
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
@@ -1641,16 +1667,16 @@ contains
                                 end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, c_L)
+                                                              vel_L_rms, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, c_R)
+                                                              vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1755,7 +1781,6 @@ contains
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
                                                         (s_R - vel_R(dir_idx(1))))) - E_R))
 
-                                   
                                 ! Volume fraction flux
 
                                 !$acc loop seq
@@ -1785,7 +1810,7 @@ contains
 
                                 ! Add advection flux for bubble variables
                                 !$acc loop seq
-                                do i = bubxb , bubxe
+                                do i = bubxb, bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                         *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
@@ -1793,12 +1818,12 @@ contains
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
-                                if(qbmm) then
+                                if (qbmm) then
                                     flux_rs${XYZ}$_vf(j, k, l, bubxb) = &
-                                            xi_M*nbub_L &
-                                            *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                            + xi_P*nbub_R &
-                                            *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        xi_M*nbub_L &
+                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*nbub_R &
+                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
@@ -1884,10 +1909,12 @@ contains
                                 rho_L = 0d0
                                 gamma_L = 0d0
                                 pi_inf_L = 0d0
+                                qv_L = 0d0
 
                                 rho_R = 0d0
                                 gamma_R = 0d0
                                 pi_inf_R = 0d0
+                                qv_R = 0d0
 
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
@@ -1896,25 +1923,25 @@ contains
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                   qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1d0)
                                         alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)/max(alpha_L_sum, sgm_eps)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                     qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-           qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1d0)
                                         alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
 
                                     !$acc loop seq
                                     do i = 1, num_fluids
-     qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
@@ -1923,10 +1950,12 @@ contains
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
+                                    qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
+                                    qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                 end do
 
                                 if (any(Re_size > 0)) then
@@ -1962,9 +1991,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1972,16 +2001,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                    vel_L_rms, c_L)
+                                                              vel_L_rms, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                    vel_R_rms, c_R)
+                                                              vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    ! variables are placeholders to call the subroutine.
+                                ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                    vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -2078,8 +2107,6 @@ contains
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
                                                         (s_R - vel_R(idx1)))) - E_R))
-
-
 
                                 ! Volume fraction flux
                                 !$acc loop seq
@@ -2198,7 +2225,6 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
@@ -2216,7 +2242,6 @@ contains
         end do
         !$acc update device(Gs)
 
-
         if (any(Re_size > 0)) then
             allocate (Res(1:2, 1:maxval(Re_size)))
         end if
@@ -2229,7 +2254,6 @@ contains
             end do
             !$acc update device(Res, Re_idx, Re_size)
         end if
-
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -2251,25 +2275,25 @@ contains
         is1%end = m; is2%end = n; is3%end = p
 
         allocate (flux_rsx_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsx_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsx_vf(is1%beg:is1%end, &
-                                        is2%beg:is2%end, &
-                                        is3%beg:is3%end, 1:sys_size))
         allocate (flux_src_rsx_vf(is1%beg:is1%end, &
-                                       is2%beg:is2%end, &
-                                       is3%beg:is3%end, advxb:sys_size))
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
         allocate (vel_src_rsx_vf(is1%beg:is1%end, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end, 1:num_dims))
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
         if (qbmm) then
             allocate (mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
             allocate (Re_avg_rsx_vf(is1%beg:is1%end, &
-                                         is2%beg:is2%end, &
-                                         is3%beg:is3%end, 1:2))
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
         if (n == 0) return
@@ -2278,17 +2302,17 @@ contains
         is1%end = n; is2%end = m; is3%end = p
 
         allocate (flux_rsy_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsy_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsy_vf(is1%beg:is1%end, &
-                                        is2%beg:is2%end, &
-                                        is3%beg:is3%end, 1:sys_size))
         allocate (flux_src_rsy_vf(is1%beg:is1%end, &
-                                       is2%beg:is2%end, &
-                                       is3%beg:is3%end, advxb:sys_size))
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
         allocate (vel_src_rsy_vf(is1%beg:is1%end, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end, 1:num_dims))
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
             allocate (mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
@@ -2296,8 +2320,8 @@ contains
 
         if (any(Re_size > 0)) then
             allocate (Re_avg_rsy_vf(is1%beg:is1%end, &
-                                         is2%beg:is2%end, &
-                                         is3%beg:is3%end, 1:2))
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
         if (p == 0) return
@@ -2306,17 +2330,17 @@ contains
         is1%end = p; is2%end = n; is3%end = m
 
         allocate (flux_rsz_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsz_vf(is1%beg:is1%end, &
                                    is2%beg:is2%end, &
                                    is3%beg:is3%end, 1:sys_size))
-        allocate (flux_gsrc_rsz_vf(is1%beg:is1%end, &
-                                        is2%beg:is2%end, &
-                                        is3%beg:is3%end, 1:sys_size))
         allocate (flux_src_rsz_vf(is1%beg:is1%end, &
-                                       is2%beg:is2%end, &
-                                       is3%beg:is3%end, advxb:sys_size))
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
         allocate (vel_src_rsz_vf(is1%beg:is1%end, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end, 1:num_dims))
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
             allocate (mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
@@ -2324,8 +2348,8 @@ contains
 
         if (any(Re_size > 0)) then
             allocate (Re_avg_rsz_vf(is1%beg:is1%end, &
-                                         is2%beg:is2%end, &
-                                         is3%beg:is3%end, 1:2))
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
     end subroutine s_initialize_riemann_solvers_module ! -------------------

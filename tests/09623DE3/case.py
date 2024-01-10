@@ -57,6 +57,9 @@ case = {
     "patch_icpp(3)%alpha(1)": 0.2,
     "fluid_pp(1)%gamma": 2.5000000000000004,
     "fluid_pp(1)%pi_inf": 0.0,
+    "fluid_pp(1)%cv": 0.0,
+    "fluid_pp(1)%qv": 0.0,
+    "fluid_pp(1)%qvp": 0.0,
     "bubbles": "F",
     "Ca": 0.9769178386380458,
     "Web": 13.927835051546392,
@@ -164,7 +167,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
         'c_wrt'        : 'T',
     }
-        
+
     if case['p'] != 0:
         mods['fd_order']  = 1
         mods['omega_wrt(1)'] = 'T'

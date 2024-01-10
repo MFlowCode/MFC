@@ -13,20 +13,20 @@ class MFCPrinter:
 
     def indent(self, msg: str = None):
         msg = msg if msg is not None else "  "
-        
+
         self.stack.append(msg)
 
     def unindent(self, times: int = None):
-        if times == None:
+        if times is None:
             times = 1
-        
+
         for _ in range(times):
             self.stack.pop()
 
-    def print(self, msg: typing.Any = None, no_indent: bool = False, *args, **kwargs):
+    def print(self, *args, msg: typing.Any = None, no_indent: bool = False, **kwargs):
         if msg is None:
             msg = ""
-        
+
         if no_indent:
             self.raw.print(str(msg), *args, **kwargs)
         else:
