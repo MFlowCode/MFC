@@ -3,5 +3,7 @@ fypp
 wheel
 typing
 PyYAML
+pylint
 argparse
+fprettify
 dataclasses

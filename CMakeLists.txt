@@ -65,7 +65,18 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
-        message(FATAL_ERROR "${__err_msg}ERROR: NVHPC v21.7 or newer is required to build MFC.")
+        message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, v21.7 or newer is required to build MFC.")
+    endif()
+    if (MAKE_BUILD_TYPE STREQUAL "Debug")
+        if (MFC_OpenACC)
+            if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.0)
+                message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, v23.0 or newer is required to build MFC with Debug and GPU options.")
+            endif()
+        else()
+            if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.8)
+                message(FATAL_ERROR "${__err_msg}ERROR: Debug is not working with NVHPC 23.X and older and CPU options at present.")
+            endif()
+        endif()
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
@@ -145,7 +156,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
     
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+        add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
     endif()
 endif()
 
@@ -229,6 +240,8 @@ macro(HANDLE_SOURCES target useCommon)
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
+    string(TOUPPER ${target} ${target}_UPPER)
+
     # Gather src/[<target>,common]/*.f90
     file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90")
     set(${target}_SRCs ${${target}_F90s})
@@ -245,9 +258,9 @@ macro(HANDLE_SOURCES target useCommon)
     endif()
 
     # Locate src/[<target>,common]/include/*.fpp
-    if (EXISTS "${${target}_DIR}/include")
-        file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp")
-    endif()
+    file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp"
+                                               "${CMAKE_CURRENT_BINARY_DIR}/include/*.fpp")
+
     if (${useCommon})
         file(GLOB common_incs CONFIGURE_DEPENDS "${common_DIR}/include/*.fpp")
         list(APPEND ${target}_incs ${common_incs})
@@ -261,11 +274,14 @@ macro(HANDLE_SOURCES target useCommon)
         add_custom_command(
             OUTPUT   ${f90}
             COMMAND  ${FYPP_EXE} -m re
-                                 -I "${common_DIR}"
-                                 -I "${common_DIR}/include"
+                                 -I "${CMAKE_CURRENT_BINARY_DIR}/include"
                                  -I "${${target}_DIR}/include"
+                                 -I "${common_DIR}/include"
+                                 -I "${common_DIR}"
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
+                                 -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
+                                 -D MFC_CASE_OPTIMIZATION=False
                                  --line-numbering
                                  --no-folding
                                  "${fpp}" "${f90}"
@@ -317,10 +333,10 @@ function(MFC_SETUP_TARGET)
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
     endif()
 
-    string(TOUPPER "${ARGS_TARGET}" ARGS_TARGET_UPPER)
+    string(TOUPPER "${ARGS_TARGET}" ${ARGS_TARGET}_UPPER)
     target_compile_definitions(
         ${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
-                               MFC_${ARGS_TARGET_UPPER}
+                               MFC_${${ARGS_TARGET}_UPPER}
     )
 
     if (MFC_MPI AND ARGS_MPI)
@@ -430,6 +446,20 @@ if (MFC_SYSCHECK)
 endif()
 
 if (MFC_DOCUMENTATION)
+    # Files in examples/ are used to generate docs/documentation/examples.md
+    file(GLOB_RECURSE examples_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/examples/*")
+
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh;${examples_DOCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating examples.md"
+        VERBATIM
+    )
+
+    file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
+
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
     # target, <target>_docs, that generates documentation for <target> using
     # Doxygen. It is then added as a dependency of the documentation target.
@@ -456,13 +486,20 @@ if (MFC_DOCUMENTATION)
             "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
             "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
 
+        set(opt_example_dependency "")
+        if (${target} STREQUAL documentation)
+            set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
+        endif()
+
+        file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
+        list(APPEND ${target}_DOCs "${common_DOCs}")
+
         add_custom_command(
             OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
-                    "${${target}_SRCs}"
-            COMMAND  "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
-                            "${CMAKE_CURRENT_SOURCE_DIR}" && 
-                    "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
+                    "${opt_example_dependency}"
+                    "${${target}_SRCs}" "${${target}_DOCs}"
+            COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             COMMENT "${target}: Generating documentation"
         )
@@ -487,7 +524,7 @@ if (MFC_DOCUMENTATION)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "df83fbf22cfff76b875c13d324baf584c74e96d0"
+        GIT_TAG           "df88fe4fdd97714fadfd3ef17de0b4401f804052"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""

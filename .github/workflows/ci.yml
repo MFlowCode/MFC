@@ -88,7 +88,10 @@ jobs:
           /bin/bash mfc.sh test -j $(nproc) $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          OPT2: ${{ matrix.debug == 'debug' && '-% 75' || '' }}
+          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+
+      - name: Ensure empty diff
+        run:  git diff --exit-code tests/
 
   docker:
     name:    Github | Docker
@@ -99,6 +102,9 @@ jobs:
 
     - name: Test
       run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
+
+    - name: Ensure empty diff
+      run:  git diff --exit-code tests/
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
@@ -125,8 +131,10 @@ jobs:
           mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
           sbatch run-phoenix-release-${{ matrix.device }}.sh
 
+      - name: Ensure empty diff
+        run:  exit $(git status --porcelain tests/ | wc -l)
+
       - name: Print
         if: always()
         run: |
           cat test.out
-

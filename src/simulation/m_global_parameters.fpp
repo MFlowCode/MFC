@@ -55,7 +55,7 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry
     !> @}
-!$acc declare create(cyl_coord, grid_geometry)
+    !$acc declare create(cyl_coord, grid_geometry)
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -72,10 +72,10 @@ module m_global_parameters
     !> @{
     real(kind(0d0)), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
-  
+
     real(kind(0d0)) :: dt !< Size of the time-step
 
-!$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+    !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -114,6 +114,10 @@ module m_global_parameters
     integer :: riemann_solver !< Riemann solver algorithm
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
+    logical :: relax          !< activate phase change
+    integer :: relax_model    !< Relaxation model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
@@ -126,7 +130,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order)
     #:endif
 
-!$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+    !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity, relax, palpha_eps,ptgalpha_eps)
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
@@ -134,6 +138,7 @@ module m_global_parameters
     !> @}
 
     logical :: parallel_io !< Format of the data files
+    logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
 
     integer, allocatable, dimension(:) :: proc_coords !<
@@ -168,7 +173,7 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     !> @}
 
-!$acc declare create(bub_idx)
+    !$acc declare create(bub_idx)
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -178,7 +183,7 @@ module m_global_parameters
     integer, allocatable, dimension(:, :) :: Re_idx
     !> @{
 
-!$acc declare create(Re_size, Re_idx)
+    !$acc declare create(Re_size, Re_idx)
 
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
     ! average spatial derivatives is carried out in each cell by utilizing the
@@ -186,11 +191,11 @@ module m_global_parameters
     ! values or simply, the unaltered left and right, WENO-reconstructed, cell-
     ! boundary values.
     !> @{
-    REAL(KIND(0d0)) :: wa_flg
+    real(kind(0d0)) :: wa_flg
     !> @{
 
-!$acc declare create(wa_flg)
-    
+    !$acc declare create(wa_flg)
+
     !> @name The coordinate direction indexes and flags (flg), respectively, for which
     !! the configurations will be determined with respect to a working direction
     !! and that will be used to isolate the contributions, in that direction, in
@@ -201,7 +206,7 @@ module m_global_parameters
     integer, dimension(3) :: dir_idx_tau !!used for hypoelasticity=true
     !> @}
 
-!$acc declare create(dir_idx, dir_flg, dir_idx_tau)
+    !$acc declare create(dir_idx, dir_flg, dir_idx_tau)
 
     integer :: buff_size !<
     !! The number of cells that are necessary to be able to store enough boundary
@@ -210,8 +215,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-
-!$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -245,7 +249,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: rhoref, pref
     !> @}
-!$acc declare create(rhoref, pref)
+    !$acc declare create(rhoref, pref)
 
     !> @name Bubble modeling
     !> @{
@@ -281,12 +285,12 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
     !> @}
-!$acc declare create(mom_sp, mom_3d)
+    !$acc declare create(mom_sp, mom_3d)
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
@@ -297,28 +301,25 @@ module m_global_parameters
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
-!$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     !> @name Acoustic monopole parameters
     !> @{
     logical :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
     integer :: num_mono !< Number of monopoles
     !> @}
-!$acc declare create(monopole, mono, num_mono)
+    !$acc declare create(monopole, mono, num_mono)
 
-    
+    integer :: momxb, momxe
+    integer :: advxb, advxe
+    integer :: contxb, contxe
+    integer :: intxb, intxe
+    integer :: bubxb, bubxe
+    integer :: strxb, strxe
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
-     integer :: momxb, momxe
-     integer :: advxb, advxe
-     integer :: contxb, contxe
-     integer :: intxb, intxe
-     integer :: bubxb, bubxe
-     integer :: strxb, strxe
-     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
-
-    real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
-    !$acc declare create(gammas, pi_infs)
-
+    real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
@@ -373,7 +374,12 @@ contains
         null_weights = .false.
         mixture_err = .false.
         parallel_io = .false.
+        file_per_process = .false.
         precision = 2
+        relax = .false.
+        relax_model = dflt_int
+        palpha_eps = dflt_real
+        ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
@@ -391,6 +397,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
+            fluid_pp(i)%cv = 0d0
+            fluid_pp(i)%qv = 0d0
+            fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real
@@ -478,7 +487,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module() ! -------------------
 
-        integer :: i, j, k 
+        integer :: i, j, k
         integer :: fac
 
         type(int_bounds_info) :: ix, iy, iz
@@ -486,8 +495,8 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-!$acc update device(weno_polyn)
-!$acc update device(nb)
+            !$acc update device(weno_polyn)
+            !$acc update device(nb)
         #:endif
 
         ! Initializing the number of fluids for which viscous effects will
@@ -496,7 +505,6 @@ contains
         ! of fluids for which the physical and geometric curvatures of the
         ! interfaces will be computed
         Re_size = 0
-
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
@@ -613,7 +621,7 @@ contains
                     end if
 
                     !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                    if(.not. qbmm) then
+                    if (.not. qbmm) then
                         if (polytropic) then
                             rhoref = 1.d0
                             pref = 1.d0
@@ -621,17 +629,17 @@ contains
                     end if
 
                     !Initialize pb0, pv, pref, rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                    if(qbmm) then
-                        if(polytropic) then
-                            pv = fluid_pp(1)%pv 
-                            pv = pv / pref
+                    if (qbmm) then
+                        if (polytropic) then
+                            pv = fluid_pp(1)%pv
+                            pv = pv/pref
                             @:ALLOCATE(pb0(nb))
-                            if(Web == dflt_real) then                            
+                            if (Web == dflt_real) then
                                 pb0 = pref
-                                pb0 = pb0 / pref
-                                pref = 1d0                  
+                                pb0 = pb0/pref
+                                pref = 1d0
                             end if
-                            rhoref = 1d0                           
+                            rhoref = 1d0
                         end if
                     end if
 
@@ -717,7 +725,7 @@ contains
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
-            
+
             !$acc update device(Re_size)
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
@@ -744,33 +752,32 @@ contains
 
         end if
         ! END: Volume Fraction Model =======================================
-        
-        if(qbmm .and. .not. polytropic) then
+
+        if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
-            allocate (MPI_IO_DATA%var(1:sys_size))                
+            allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
 
-
         ! Configuring the WENO average flag that will be used to regulate
-            ! whether any spatial derivatives are to computed in each cell by
-            ! using the arithmetic mean of left and right, WENO-reconstructed,
-            ! cell-boundary values or otherwise, the unaltered left and right,
-            ! WENO-reconstructed, cell-boundary values
-        wa_flg = 0d0; IF(weno_avg) wa_flg = 1d0
+        ! whether any spatial derivatives are to computed in each cell by
+        ! using the arithmetic mean of left and right, WENO-reconstructed,
+        ! cell-boundary values or otherwise, the unaltered left and right,
+        ! WENO-reconstructed, cell-boundary values
+        wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
         !$acc update device(wa_flg)
 
         ! Determining the number of cells that are needed in order to store
@@ -789,7 +796,7 @@ contains
         if (bubbles) then
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) then
-                iy%beg = -buff_size    
+                iy%beg = -buff_size
                 if (p > 0) then
                     iz%beg = -buff_size
                 end if
@@ -815,7 +822,7 @@ contains
             startz = -buff_size
         end if
 
-!$acc update device(startx, starty, startz)
+        !$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -838,22 +845,19 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-
-!$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return;
-        
+        if (n == 0) return; 
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return;
-        
+        if (p == 0) return; 
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -905,11 +909,11 @@ contains
 
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
-        
-        if (n == 0) return;
+
+        if (n == 0) return; 
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return;
+        if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
 
         deallocate (proc_coords)
@@ -924,7 +928,5 @@ contains
         end if
 
     end subroutine s_finalize_global_parameters_module ! -------------------
-
- 
 
 end module m_global_parameters
