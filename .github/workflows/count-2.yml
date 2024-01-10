@@ -53,11 +53,14 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
       - name: Count Line Diff
         run: |
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "test_result<<$EOF" >> "$GITHUB_ENV"
+          ./mfc.sh count >> "$GITHUB_ENV"
           echo "this is only a test" >> "GITHUB_ENV"
           echo "$EOF" >> "$GITHUB_ENV"
       - uses: marocchino/sticky-pull-request-comment@v2
