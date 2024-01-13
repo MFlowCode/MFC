@@ -135,8 +135,11 @@ class TestCase(case.Case):
     def delete_output(self):
         dirpath = self.get_dirpath()
 
-        exts = ["*.inp", "*.1", "*.dat", "*.inf"]
+        exts = ["*.inp", "*.1", "*.dat", "*.inf", "*.sh", "*.txt"]
         for f in list(itertools.chain.from_iterable(glob.glob(os.path.join(dirpath, ext)) for ext in exts)):
+            if "golden" in f:
+                continue
+
             common.delete_file(f)
 
         common.delete_directory(os.path.join(dirpath, "D"))
@@ -144,7 +147,7 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
 
-        for f in ["pre_process", "simulation", "post_process"]:
+        for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
 
     def create_directory(self):
@@ -194,12 +197,6 @@ if "post_process" in ARGS["dict"]["targets"]:
         mods['omega_wrt(3)'] = 'T'
 
 print(json.dumps({{**case, **mods}}))
-""")
-
-        common.file_write(f"{dirpath}/README.md", f"""\
-# tests/{self.get_uuid()}
-
-{self.trace}: [case.py](case.py).
 """)
 
     def __str__(self) -> str:
