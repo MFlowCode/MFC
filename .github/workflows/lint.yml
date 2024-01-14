@@ -1,0 +1,19 @@
+name: Lint
+
+on:
+  push:
+
+  pull_request:
+
+  workflow_dispatch:
+
+jobs:
+  docs:
+    name:    Lint Toolchain
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Lint the toolchain
+      run: ./mfc.sh lint
