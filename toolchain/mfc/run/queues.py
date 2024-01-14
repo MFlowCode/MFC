@@ -1,16 +1,15 @@
-import os, typing, dataclasses
+import typing, dataclasses
 
-from mfc import common
+from     mfc import common
 from ..state import ARG
+
 
 @dataclasses.dataclass
 class QueueSystem:
-    name:     str
-    template: str
+    name: str
 
-    def __init__(self, name: str, filename: str) -> None:
-        self.name     = name
-        self.template = common.file_read(os.sep.join(["toolchain", "templates", filename]))
+    def __init__(self, name: str) -> None:
+        self.name = name
 
     def is_active(self) -> bool:
         raise common.MFCException("QueueSystem::is_active: not implemented.")
@@ -19,9 +18,20 @@ class QueueSystem:
         raise common.MFCException("QueueSystem::gen_submit_cmd: not implemented.")
 
 
+class InteractiveSystem(QueueSystem):
+    def __init__(self) -> None:
+        super().__init__("Interactive")
+
+    def is_active(self) -> bool:
+        return True
+
+    def gen_submit_cmd(self, filepath: str) -> typing.List[str]:
+        return ["/bin/bash", filepath]
+
+
 class PBSSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("PBS", "pbs.sh")
+        super().__init__("PBS")
 
     def is_active(self) -> bool:
         return common.does_command_exist("qsub")
@@ -35,7 +45,7 @@ class PBSSystem(QueueSystem):
 
 class LSFSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("LSF", "lsf.sh")
+        super().__init__("LSF")
 
     def is_active(self) -> bool:
         return common.does_command_exist("bsub") and common.does_command_exist("bqueues")
@@ -51,7 +61,7 @@ class LSFSystem(QueueSystem):
 
 class SLURMSystem(QueueSystem):
     def __init__(self) -> None:
-        super().__init__("SLURM", "slurm.sh")
+        super().__init__("SLURM")
 
     def is_active(self) -> bool:
         return common.does_command_exist("sbatch")
@@ -65,11 +75,14 @@ class SLURMSystem(QueueSystem):
         return cmd + [filepath]
 
 
-QUEUE_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
+BATCH_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
 
 def get_system() -> QueueSystem:
-    for system in QUEUE_SYSTEMS:
+    if ARG("engine") == "interactive":
+        return InteractiveSystem()
+
+    for system in BATCH_SYSTEMS:
         if system.is_active():
             return system
 
-    raise common.MFCException("Failed to detect a queue system.")
+    raise common.MFCException(f"Failed to detect a queue system for engine [magenta]{ARG('engine')}[/magenta].")
