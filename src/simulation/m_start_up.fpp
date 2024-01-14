@@ -1147,7 +1147,21 @@ contains
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
             call s_check_input_file()
-            print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+
+            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")', &
+#:if not MFC_CASE_OPTIMIZATION
+                "regular", &
+#:else
+                "case-optimized", &
+#:endif
+                m, n, p, num_procs, &
+#ifdef MFC_OpenACC
+!&<
+                "with OpenACC offloading"
+!&>
+#else
+                "on CPUs"
+#endif
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the

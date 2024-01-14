@@ -1,14 +1,21 @@
-import re, typing
+import re, os, typing
 
-from ..build   import MFCTarget, get_target, build_targets
+from glob import glob
+
+from mako.lookup   import TemplateLookup
+from mako.template import Template
+
+from ..build   import get_targets, build
 from ..printer import cons
-from ..state   import ARG
-from ..common  import MFCException, isspace
+from ..state   import ARG, ARGS
+from ..common  import MFCException, isspace, file_read, does_command_exist
+from ..common  import MFC_TEMPLATEDIR, file_write, system, MFC_ROOTDIR
+from ..common  import format_list_to_string
 
-from .  import engines, input
+from . import queues, input
 
 
-def validate_job_options() -> None:
+def __validate_job_options() -> None:
     if not ARG("mpi") and any({ARG("nodes") > 1, ARG("tasks_per_node") > 1}):
         raise MFCException("RUN: Cannot run on more than one rank with --no-mpi.")
 
@@ -24,30 +31,73 @@ def validate_job_options() -> None:
             raise MFCException(f'RUN: {ARG("email")} is not a valid e-mail address.')
 
 
-def run_targets(targets: typing.List[MFCTarget]):
-    cons.print("[bold]Run[/bold]")
-    cons.indent()
+def __profiler_prepend() -> typing.List[str]:
+    if ARG("ncu") is not None:
+        if not does_command_exist("ncu"):
+            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
 
-    if len(targets) == 0:
-        cons.print(f"> No target selected.")
-        return
+        return ["ncu", "--nvtx", "--mode=launch-and-attach",
+                       "--cache-control=none", "--clock-control=none"] + ARG("ncu")
 
+    if ARG("nsys") is not None:
+        if not does_command_exist("nsys"):
+            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
+
+        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
+
+    return []
+
+
+def get_baked_templates() -> dict:
+    return {
+        os.path.splitext(os.path.basename(f))[0] : file_read(f)
+        for f in glob(os.path.join(MFC_TEMPLATEDIR, "*.mako"))
+    }
+
+
+def __job_script_filepath() -> str:
+    return os.path.abspath(os.sep.join([
+        os.path.dirname(ARG("input")),
+        f"{ARG('name')}.sh"
+    ]))
+
+
+def __get_template() -> Template:
+    computer = ARG("computer")
+    lookup   = TemplateLookup(directories=[MFC_TEMPLATEDIR, os.path.join(MFC_TEMPLATEDIR, "include")])
+    baked    = get_baked_templates()
+
+    if (content := baked.get(computer)) is not None:
+        cons.print(f"Using baked-in template for [magenta]{computer}[/magenta].")
+        return Template(content, lookup=lookup)
+
+    if os.path.isfile(computer):
+        cons.print(f"Using template from [magenta]{computer}[/magenta].")
+        return Template(file_read(computer), lookup=lookup)
+
+    raise MFCException(f"Failed to find a template for --computer '{computer}'. Baked-in templates are: {format_list_to_string(list(baked.keys()), 'magenta')}.")
+
+
+def __generate_job_script(targets):
+    env = {}
+    if ARG('gpus') is not None:
+        env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
+
+    content = __get_template().render(
+        **ARGS(),
+        ARG=ARG,
+        env=env,
+        rootdir=MFC_ROOTDIR,
+        qsystem=queues.get_system(),
+        binpaths=[target.get_install_binpath() for target in targets],
+        profiler=__profiler_prepend(),
+    )
+
+    file_write(__job_script_filepath(), content)
+
+
+def __generate_input_files(targets):
     input_file = input.load()
-
-    engine = engines.get_engine(ARG("engine"))
-    engine.init(input_file)
-
-    cons.print(f"Configuration:")
-    cons.indent()
-    cons.print(f"""\
-Input               {ARG('input')}
-Job Name      (-#)  {ARG('name')}
-Engine        (-e)  {ARG('engine')}
-{engine.get_args()}\
-""")
-    cons.unindent()
-
-    validate_job_options()
 
     for target in targets:
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
@@ -57,13 +107,31 @@ Engine        (-e)  {ARG('engine')}
         cons.print()
         cons.unindent()
 
-    build_targets(targets)
-    engine.run(targets)
+
+def __execute_job_script(qsystem: queues.QueueSystem):
+    # We CD to the case directory before executing the batch file so that
+    # any files the queue system generates (like .err and .out) are created
+    # in the correct directory.
+    cmd = qsystem.gen_submit_cmd(__job_script_filepath())
+
+    if system(cmd, cwd=os.path.dirname(ARG("input"))).returncode != 0:
+        raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
-def run_target(target: MFCTarget):
-    run_targets([target])
+def run(targets = None):
+    targets = get_targets(targets or ARG("targets"))
 
+    build(targets)
 
-def run() -> None:
-    run_targets([ get_target(_) for _ in ARG("targets")])
+    cons.print("[bold]Run[/bold]")
+    cons.indent()
+
+    qsystem = queues.get_system()
+    cons.print(f"Using queue system [magenta]{qsystem.name}[/magenta].")
+
+    __generate_job_script(targets)
+    __validate_job_options()
+    __generate_input_files(targets)
+
+    if not ARG("dry_run"):
+        __execute_job_script(qsystem)
