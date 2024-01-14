@@ -13,11 +13,12 @@ TABLE_HEADER="+-----------------------------------------------------------------
 TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
 TABLE_TITLE_FORMAT="| %-105s |\\n"
 TABLE_CONTENT=$(cat <<-END
-$(printf "$TABLE_FORMAT_LINE" "Start-time"   "$(date +%T)"    "Start-date" "$(date +%T)")
-$(printf "$TABLE_FORMAT_LINE" "Partition"    "${partition}"   "Walltime"   "${walltime}")
-$(printf "$TABLE_FORMAT_LINE" "Account"      "${account}"     "Nodes"      "${nodes}")
-$(printf "$TABLE_FORMAT_LINE" "Job Name"     "${name}"        "Engine"      "${engine}")
-$(printf "$TABLE_FORMAT_LINE" "Queue System" "{qsystem.name}" "Email"      "${email}")
+$(printf "$TABLE_FORMAT_LINE" "Start-time"   "$(date +%T)"                    "Start-date" "$(date +%T)")
+$(printf "$TABLE_FORMAT_LINE" "Partition"    "${partition or 'N/A'}"          "Walltime"   "${walltime}")
+$(printf "$TABLE_FORMAT_LINE" "Account"      "${account   or 'N/A'}"          "Nodes"      "${nodes}")
+$(printf "$TABLE_FORMAT_LINE" "Job Name"     "${name}"                        "Engine"     "${engine}")
+$(printf "$TABLE_FORMAT_LINE" "QoS"          "${quality_of_service or 'N/A'}" "Binary"     "${binary or 'N/A'}")
+$(printf "$TABLE_FORMAT_LINE" "Queue System" "${qsystem.name}"                "Email"      "${email or 'N/A'}")
 END
 )
 

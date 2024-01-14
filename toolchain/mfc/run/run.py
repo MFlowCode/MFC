@@ -88,6 +88,7 @@ def __generate_job_script(targets):
         ARG=ARG,
         env=env,
         rootdir=MFC_ROOTDIR,
+        qsystem=queues.get_system(),
         binpaths=[target.get_install_binpath() for target in targets],
         profiler=__profiler_prepend(),
     )
