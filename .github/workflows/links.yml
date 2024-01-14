@@ -10,3 +10,4 @@ jobs:
     - uses: gaurav-nelson/github-action-markdown-link-check@v1
       with:
         config-file: '.link_config.json'
+        use-verbose-mode: 'yes'
