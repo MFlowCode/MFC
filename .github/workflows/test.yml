@@ -114,18 +114,13 @@ jobs:
       - name: Clone
         uses: actions/checkout@v3
 
-      - name: Build
-        run:  |
-          . ./mfc.sh load -c p -m gpu
-          ./mfc.sh build -j 2 $(if [ '${{ matrix.device }}' == 'gpu' ]; then echo '--gpu'; fi)
+      - name: Build & Test
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
 
-      - name: Test
-        run: |
-          . ./mfc.sh load -c p -m gpu
-          mv misc/run-phoenix-release-${{ matrix.device }}.sh ./
-          sbatch run-phoenix-release-${{ matrix.device }}.sh
+      - name: Archive Logs
+        uses: actions/upload-artifact@v3
+        if:   always()
+        with:
+          name: logs
+          path: test-${{ matrix.device }}.out
 
-      - name: Print
-        if: always()
-        run: |
-          cat test.out
