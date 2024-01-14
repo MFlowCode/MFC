@@ -27,25 +27,31 @@
 
 <%include file="prologue.mako"/>
 
-echo -e ":) Loading modules:\n"
-cd "${rootdir}" && . ./mfc.sh load -c p -m ${'g' if gpu else 'c'} && cd -
+ok ":) Loading modules:\n"
+cd "${rootdir}"
+. ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
+cd - > /dev/null
 echo
 
 % for binpath in binpaths:
-    echo -e ":) Running ${binpath.split('/')[-1]}:\n"
+    ok ":) Running ${binpath.split('/')[-1]}:\n"
 
     % if not mpi:
         ${' '.join([f"'{x}'" for x in profiler ])} "${binpath}"
     % else:
-        mpirun -np ${nodes*tasks_per_node}             \
-            ${' '.join([f"'{x}'" for x in profiler ])} \
-            "${binpath}"
+        ${' '.join([f"'{x}'" for x in profiler ])}             \
+            mpirun -np ${nodes*tasks_per_node}                 \
+                   --bind-to none                              \
+                   ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+                   "${binpath}"
     % endif
 
     % if engine == 'interactive':
         code=$?
         if [ $code -ne 0 ]; then
-            echo -e "\n:( $MAGENTA${binpath}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET.\n"
+            echo
+            error ":( $MAGENTA${binpath}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
+            echo
             exit 1
         fi
     % endif

@@ -101,7 +101,6 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("input",                      metavar="INPUT",              type=str,                     help="Input file to run.")
     run.add_argument("arguments",                  metavar="ARGUMENTS", nargs="*", type=str, default=[],       help="Additional positional arguments to pass to the case file.")
     run.add_argument("-e", "--engine",             choices=["interactive", "batch"],              type=str, default="interactive", help="Job execution/submission engine choice.")
-    run.add_argument("--output-summary",                                     type=str, default=None,       help="(Interactive) Output a YAML summary file.")
     run.add_argument("-p", "--partition",          metavar="PARTITION",          type=str, default="",         help="(Batch) Partition for job submission.")
     run.add_argument("-q", "--quality_of_service", metavar="QOS",          type=str, default="",         help="(Batch) Quality of Service for job submission.")
     run.add_argument("-N", "--nodes",              metavar="NODES",              type=int, default=1,          help="(Batch) Number of nodes.")
@@ -111,13 +110,14 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("-@", "--email",              metavar="EMAIL",              type=str, default="",         help="(Batch) Email for job notification.")
     run.add_argument("-#", "--name",               metavar="NAME",               type=str, default="MFC",      help="(Batch) Job name.")
     run.add_argument("-s", "--scratch",            action="store_true",                    default=False,      help="Build from scratch.")
+    run.add_argument("-b", "--binary",             choices=["mpirun", "jsrun", "srun", "mpiexec"],             type=str, default=None,       help="(Interactive) Override MPI execution binary")
     run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
     run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
     run.add_argument(      "--dry-run",            action="store_true",                    default=False,      help="(Batch) Run without submitting batch file.")
     run.add_argument("--case-optimization",        action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",           action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
     run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
-    run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="(Interactive) Arguments to forward to the MPI invocation.")
+    run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="Arguments to forward to the MPI invocation.")
     run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
 
     # === BENCH ===
@@ -154,6 +154,9 @@ started, run ./mfc.sh build -h.""",
     if args["command"] == "build":
         if (args["input"] is not None) ^ args["case_optimization"] :
             raise MFCException("./mfc.sh build's --case-optimization and --input must be used together.")
+    if args["command"] == "run":
+        if args["binary"] is not None and args["engine"] != "interactive":
+            raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:

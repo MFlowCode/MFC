@@ -17,8 +17,8 @@ several supercomputer clusters, both interactively and through batch submission.
 >
 > Adding a new template file or modifying an existing one will most likely be required if:
 > - You are on a cluster that does not have a template yet.
-> - Your cluster is configured with SLURM and but fails when interactive jobs are
->   launched with `mpirun`.
+> - Your cluster is configured with SLURM but interactive job launches fail when
+>   using `srun`. You might need to invoke `mpirun` instead.
 > - Something in the existing default or computer template file is incompatible with
 >   your system or does not provide a feature you need.
 >
