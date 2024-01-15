@@ -1,3 +1,8 @@
+node_modules/
+package.json
+yarn.lock
+docker-compose.yml
+
 /build/
 .vscode/
 src/*/include/case.fpp
