@@ -67,16 +67,16 @@ jobs:
           cd $PR && ./mfc.sh count >> "$GITHUB_ENV"
           echo "this is only a test" >> "GITHUB_ENV"
           echo "$EOF" >> "$GITHUB_ENV"
-      - uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          append: true
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ignore_empty: false
-          skip_unchanged: false
-          recreate: true
-          message: |
-            Test with ${{ github.sha }}.
-            ```
-            ${{ env.test_result }}
-            ```
+      # - uses: marocchino/sticky-pull-request-comment@v2
+      #   with:
+      #     append: true
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     ignore_empty: false
+      #     skip_unchanged: false
+      #     recreate: true
+      #     message: |
+      #       Test with ${{ github.sha }}.
+      #       ```
+      #       ${{ env.test_result }}
+      #       ```
 
