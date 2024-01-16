@@ -26,32 +26,22 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Count Lines
+      - name: Setup MFCs
         run: |
           BASE="$GITHUB_WORKSPACE/base"
           PR="$GITHUB_WORKSPACE/pr"
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           cd $BASE
           ./mfc.sh count
           cd $PR
           ./mfc.sh count
 
-          # echo "test_result<<$EOF" >> "$GITHUB_ENV"
-          # cd $BASE && ./mfc.sh count >> "$GITHUB_ENV"
-          # echo "this is only a test" >> "GITHUB_ENV"
-          # cd $PR && ./mfc.sh count >> "$GITHUB_ENV"
-          # echo "this is only a test" >> "GITHUB_ENV"
-          # echo "$EOF" >> "$GITHUB_ENV"
-      # - uses: marocchino/sticky-pull-request-comment@v2
-      #   with:
-      #     append: true
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     ignore_empty: false
-      #     skip_unchanged: false
-      #     recreate: true
-      #     message: |
-      #       Test with ${{ github.sha }}.
-      #       ```
-      #       ${{ env.test_result }}
-      #       ```
-
+      - name: Counting Lines
+        run: |
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          cd $BASE
+          echo "___BASE______________"
+          ./mfc.sh count
+          cd $PR
+          echo "___PR________________"
+          ./mfc.sh count
