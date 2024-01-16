@@ -1,0 +1,15 @@
+name: Spell Check
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  run:
+    name: Spell Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Spell Check
+      uses: crate-ci/typos@master
