@@ -50,7 +50,7 @@ If you use MFC, consider citing it:
 
 ## License
  
-Copyright 2023.
+Copyright 2021-2024.
 MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 ## Acknowledgements
