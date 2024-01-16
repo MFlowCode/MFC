@@ -18,14 +18,15 @@ started, run ./mfc.sh build -h.""",
     )
 
     parsers = parser.add_subparsers(dest="command")
-    run     = parsers.add_parser(name="run",    help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test    = parsers.add_parser(name="test",   help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build   = parsers.add_parser(name="build",  help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean   = parsers.add_parser(name="clean",  help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench   = parsers.add_parser(name="bench",  help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count   = parsers.add_parser(name="count",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count_diff   = parsers.add_parser(name="count_diff",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    packer  = parsers.add_parser(name="packer", help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     packers = packer.add_subparsers(dest="packer")
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -120,9 +121,17 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
     run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="Arguments to forward to the MPI invocation.")
     run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
+    run.add_argument("-o", "--output-summary",     metavar="OUTPUT",             type=str, default=None,       help="Output file (YAML) for summary.")
 
     # === BENCH ===
-    add_common_arguments(bench, "t")
+    add_common_arguments(bench)
+    bench.add_argument("-o", "--output", metavar="OUTPUT", default=None, type=str, required="True", help="Path to the YAML output file to write the results to.")
+    bench.add_argument(metavar="FORWARDED", default=[], dest='--', nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
+
+    # === BENCH_DIFF ===
+    add_common_arguments(bench_diff, "t")
+    bench_diff.add_argument("lhs", metavar="LHS", type=str, help="Path to a benchmark result YAML file.")
+    bench_diff.add_argument("rhs", metavar="RHS", type=str, help="Path to a benchmark result YAML file.")
 
     # === COUNT ===
     add_common_arguments(count, "g")
@@ -135,8 +144,7 @@ started, run ./mfc.sh build -h.""",
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("bench", bench), ("count", count),
-                         ("count_diff", count_diff)]:
+                         ("clean",  clean), ("count", count), ("count_diff", count_diff)]:
         if args["command"] == name:
             continue
 

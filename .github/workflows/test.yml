@@ -117,6 +117,10 @@ jobs:
       - name: Build & Test
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
 
+      - name: Print Logs
+        if:   always()
+        run:  cat test-${{ matrix.device }}.out
+
       - name: Archive Logs
         uses: actions/upload-artifact@v3
         if:   always()
