@@ -31,7 +31,7 @@
 #SBATCH --ntasks-per-node={tasks_per_node}
 #SBATCH --cpus-per-task=1
 #SBATCH --gpu-bind=verbose,closest
-#SBATCH --gpus=v100-32:{(1 if gpu else 0)*tasks_per_node*nodes}
+#SBATCH --gres=gpu:v100-32:{(1 if gpu else 0)*tasks_per_node}
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
 #SBATCH --output="{name}.out"
@@ -74,21 +74,21 @@ for binpath in {MFC::BINARIES}; do
 
     echo -e ":) Running $binpath:"
 
-    if command -v srun > /dev/null 2>&1; then
-        srun                                   \
-            --nodes           {nodes}          \
-            --ntasks-per-node {tasks_per_node} \
-            {MFC::PROFILER} "$binpath"
+#>    if command -v srun > /dev/null 2>&1; then
+#>        srun                                   \
+#>            --nodes           {nodes}          \
+#>            --ntasks-per-node {tasks_per_node} \
+#>            {MFC::PROFILER} "$binpath"
 
         #>
         #> srun --mpi=pmix                 \
         #>      {MFC::PROFILER} "$binpath"
         #>
-    else
+#>    else
         mpirun                         \
             -np {nodes*tasks_per_node} \
             {MFC::PROFILER} "$binpath"
-    fi
+#>    fi
 
 done
 
