@@ -45,3 +45,11 @@ jobs:
           cd $PR
           echo "___PR________________"
           ./mfc.sh count
+
+      - name: Get Line Diff
+        run: |
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          cd $BASE
+          export MFC_PR=$PR
+          ./mfc.sh count_diff
