@@ -63,6 +63,8 @@ def count_diff():
     if MFC_COMPAREDIR is None:
         raise MFCException("MFC_PR is not in your environment.")
 
+    print('compare dir', MFC_COMPAREDIR)
+
     # MFC_COMPAREDIR="/Users/spencer/Downloads/MFC-shbfork"
     for codedir in ['common'] + ARG("targets"):
         dirfiles_root, dircount = handle_dir(os.path.join(MFC_ROOTDIR, 'src', codedir))
