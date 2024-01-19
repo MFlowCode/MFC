@@ -110,13 +110,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
     !> @}
 
-    ! junk test
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n10
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n11
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n12
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n13
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n14
-
     !> @name Additional field for capillary source terms
     !> @{
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf

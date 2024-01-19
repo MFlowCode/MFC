@@ -29,26 +29,6 @@ jobs:
           # ref:        master
           # path:       base
 
-      - name: Setup MFCs
-        run: |
-          BASE="$GITHUB_WORKSPACE/base"
-          PR="$GITHUB_WORKSPACE/pr"
-          cd $BASE
-          ./mfc.sh count
-          cd $PR
-          ./mfc.sh count
-
-      - name: Counting Lines
-        run: |
-          BASE="$GITHUB_WORKSPACE/base"
-          PR="$GITHUB_WORKSPACE/pr"
-          cd $BASE
-          echo "___BASE______________"
-          ./mfc.sh count
-          cd $PR
-          echo "___PR________________"
-          ./mfc.sh count
-
       - name: Get Line Diff
         run: |
           BASE="$GITHUB_WORKSPACE/base"
