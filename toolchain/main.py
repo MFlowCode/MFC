@@ -49,7 +49,7 @@ def __checks():
 def __run():
     {"test":   test.test,   "run":   run.run,    "build": build.build,
      "clean":  build.clean, "bench": bench.bench, "count": count.count,
-     "packer": packer.packer
+     "packer": packer.packer, "count_diff": count.count_diff
     }[ARG("command")]()
 
 
