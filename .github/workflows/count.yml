@@ -1,5 +1,5 @@
 name: Check Line Counts
-on: [push]
+on: [pull_request]
 
 jobs:
   sz:
@@ -16,10 +16,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           path: pr
         # the base default to MFC master and cannot be other fork branch for security purpose
-      - name: Checkout code from MFC master
+      - name: Checkout code from MFC base branch
         uses: actions/checkout@v4
         with:
-          path: base
+          repository: ${{ github.event.pull_request.repository }}
+          ref:        ${{ github.event.pull_request.base.ref }}
+          path:       base
 
       - name: Setup MFCs
         run: |
