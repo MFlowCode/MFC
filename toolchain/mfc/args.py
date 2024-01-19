@@ -24,6 +24,7 @@ started, run ./mfc.sh build -h.""",
     clean   = parsers.add_parser(name="clean",  help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench   = parsers.add_parser(name="bench",  help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count   = parsers.add_parser(name="count",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count_diff   = parsers.add_parser(name="count_diff",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer  = parsers.add_parser(name="packer", help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     packers = packer.add_subparsers(dest="packer")
@@ -126,12 +127,16 @@ started, run ./mfc.sh build -h.""",
     # === COUNT ===
     add_common_arguments(count, "g")
 
+    # === COUNT ===
+    add_common_arguments(count_diff, "g")
+
     args: dict = vars(parser.parse_args())
     args["--"] = args.get("--", [])
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("bench", bench), ("count", count)]:
+                         ("clean",  clean), ("bench", bench), ("count", count),
+                         ("count_diff", count_diff)]:
         if args["command"] == name:
             continue
 
