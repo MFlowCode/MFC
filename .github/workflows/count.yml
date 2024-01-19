@@ -13,16 +13,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pr
-      # the base default to MFC master and cannot be other fork branch for security purpose
+
       - name: Checkout code from MFC master
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.repository }}
-          ref:        ${{ github.event.pull_request.base.ref }}
+          repository: MFlowCode/MFC
+          ref:        master
           path:       base
-
-      - name: print ref
-        run: echo "${{ github.event.pull_request.base.ref }}"
 
       - name: Setup MFCs
         run: |
