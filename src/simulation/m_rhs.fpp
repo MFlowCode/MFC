@@ -311,6 +311,10 @@ contains
 
         end if
 
+        if (any(Re_size > 0)) then
+            print*, 'empty test'
+        end if
+
         ! Allocation of dq_prim_ds_qp ======================================
 
         if (any(Re_size > 0)) then
