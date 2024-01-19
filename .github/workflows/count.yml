@@ -44,12 +44,12 @@ jobs:
           echo "___PR________________"
           ./mfc.sh count
 
-      # - name: Get Line Diff
-      #   run: |
-      #     BASE="$GITHUB_WORKSPACE/base"
-      #     PR="$GITHUB_WORKSPACE/pr"
-      #     cd $BASE
-      #     export MFC_PR=$PR
-      #     pwd
-      #     ./mfc.sh count_diff
+      - name: Get Line Diff
+        run: |
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          cd $BASE
+          export MFC_PR=$PR
+          pwd
+          ./mfc.sh count_diff
 
