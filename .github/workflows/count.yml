@@ -21,6 +21,9 @@ jobs:
           ref:        ${{ github.event.pull_request.base.ref }}
           path:       base
 
+      - name: print ref
+        run: echo "${{ github.event.pull_request.base.ref }}"
+
       - name: Setup MFCs
         run: |
           BASE="$GITHUB_WORKSPACE/base"
