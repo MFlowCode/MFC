@@ -52,6 +52,7 @@ def count():
     cons.print()
     cons.unindent()
 
+# pylint: disable=too-many-locals
 def count_diff():
     target_str_list = format_list_to_string(ARG('targets'), 'magenta')
     cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace lines)")
@@ -59,7 +60,8 @@ def count_diff():
 
     total = 0
     MFC_COMPAREDIR=os.getenv('MFC_PR')
-    if MFC_COMPAREDIR is None: raise MFCException("MFC_PR is not in your enviroment.")
+    if MFC_COMPAREDIR is None:
+        raise MFCException("MFC_PR is not in your environment.")
 
     # MFC_COMPAREDIR="/Users/spencer/Downloads/MFC-shbfork"
     for codedir in ['common'] + ARG("targets"):
@@ -76,7 +78,7 @@ def count_diff():
         files_root = [os.path.basename(dirfiles_root[i][0]) for i in range(len(dirfiles_root))]
 
         for filepath, n in dirfiles_pr:
-            for filepath_root, q in dirfiles_root:
+            for filepath_root, _ in dirfiles_root:
                 if os.path.basename(dirfiles_pr[ii][0]) == os.path.basename(filepath_root):
                     diff_count = n - dirfiles_root[ii][1]
                     mycolor = "red" if diff_count > 0 else "green"

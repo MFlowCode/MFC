@@ -136,7 +136,7 @@ started, run ./mfc.sh build -h.""",
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("bench", bench), ("count", count), 
+                         ("clean",  clean), ("bench", bench), ("count", count),
                          ("count_diff", count_diff)]:
         if args["command"] == name:
             continue
