@@ -2,7 +2,31 @@
 
 MFC can be run using `mfc.sh`'s `run` command.
 It supports both interactive and batch execution, the latter being designed for multi-socket systems, namely supercomputers, equipped with a scheduler such as PBS, SLURM, and LSF.
-A full (and updated) list of available arguments can be acquired with `./mfc.sh run -h`. 
+A full (and updated) list of available arguments can be acquired with `./mfc.sh run -h`.
+
+MFC supports running simulations locally (Linux, MacOS, and Windows) as well as
+several supercomputer clusters, both interactively and through batch submission.
+
+> [!IMPORTANT]
+> Running simulations locally should work out of the box. On supported clusters,
+> you can append `-c <computer name>` on the command line to instruct the MFC toolchain
+> to make use of the template file `toolchain/templates/<computer name>.mako`. You can
+> browse that directory and contribute your own files. Since systems and their schedulers
+> do not have a standardized syntax to request certain resources, MFC can only provide
+> support for a restricted subset of common or user-contributed configuration options.
+>
+> Adding a new template file or modifying an existing one will most likely be required if:
+> - You are on a cluster that does not have a template yet.
+> - Your cluster is configured with SLURM but interactive job launches fail when
+>   using `srun`. You might need to invoke `mpirun` instead.
+> - Something in the existing default or computer template file is incompatible with
+>   your system or does not provide a feature you need.
+>
+> If `-c <computer name>` is left unspecified, it defaults to `-c default`.
+
+Additional flags can be appended to the MPI executable call using the `-f` (i.e `--flags`) option.
+
+Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
 ## Interactive Execution
 
@@ -32,24 +56,16 @@ using 4 cores:
 $ ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
-On some computer clusters, MFC might select the wrong MPI program to execute your application
-because it uses a general heuristic for its selection. Notably, `srun` is known to fail on some SLURM
-systems when using GPUs or MPI implementations from different vendors, whereas `mpirun` functions properly. To override and manually specify which
-MPI program you wish to run your application with, please use the `-b <program name>` option (i.e `--binary`).
-
-Additional flags can be appended to the MPI executable call using the `-f` (i.e `--flags`) option.
-
-Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
-
 ## Batch Execution
 
 The MFC detects which scheduler your system is using and handles the creation and execution of batch scripts.
-The batch engine is requested with the `-e batch` option.
-Whereas the interactive engine can execute all of MFC's codes in succession, the batch engine requires you to only specify one target with the `-t` option.
-The number of nodes and GPUs can, respectively be specified with the `-N` (i.e `--nodes`) and `-g` (i.e `--gpus-per-node`) options.
+The batch engine is requested via the `-e batch` option.
+The number of nodes can be specified with the `-N` (i.e `--nodes`) option.
+
+We provide a list of (baked-in) submission batch scripts in the `toolchain/templates` folder.
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -g 4 -t simulation
+$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -t simulation -c <computer name>
 ```
 
 Other useful arguments include:
@@ -60,25 +76,7 @@ Other useful arguments include:
 - `-a <account name>` to identify the account to be charged for the job. (i.e `--account`)
 - `-p <partition name>` to select the job's partition. (i.e `--partition`)
 
-Since some schedulers don't have a standardized syntax to request certain resources, MFC can only provide support for a restricted subset of common configuration options.
-If MFC fails to execute on your system, or if you wish to adjust how the program runs and resources are requested to be allocated, you are invited to modify the template batch script for your queue system.
-Upon execution of `./mfc.sh run`, MFC fills in the template with runtime parameters, to generate the batch file it will submit.
-These files are located in the [templates](https://github.com/MFlowCode/MFC/tree/master/toolchain/templates/) directory.
-To request GPUs, modification of the template will be required on most systems.
-
-- Lines that begin with `#>` are ignored and won't figure in the final batch script, not even as a comment.
-
-- Statements of the form `${expression}` are string-replaced to provide runtime parameters, most notably execution options.
-You can perform therein any Python operation recognized by the built-in `expr()` function.
-
 As an example, one might request GPUs on a SLURM system using the following:
-
-```
-#SBATCH --gpus=v100-32:{gpus_per_node*nodes}
-```
-
-- Statements of the form `{MFC::expression}` tell MFC where to place the common code, across all batch files, that is required for proper execution.
-They are not intended to be modified by users.
 
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource-sets in task and GPU count.
@@ -173,13 +171,6 @@ $ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch    \
-               -N 2 -n 4 -g 4 -t simulation -a <redacted>
-```
-
-- University of California, San Diego's [Expanse](https://www.sdsc.edu/services/hpc/expanse/):
-
-```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -p GPU -t simulation \
-               -N 2 -n 8 -g 8 -f="--gpus=v100-32:16" -b mpirun –w 00:30:00
+$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
+               -N 2 -n 4 -t simulation -a <redacted> -c summit
 ```

@@ -373,8 +373,6 @@ contains
             !$acc end kernels
         end if
 
-        !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
-
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &

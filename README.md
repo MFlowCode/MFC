@@ -9,7 +9,7 @@
     <img src="https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg" />
   </a>
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://github.com/MFlowCode/MFC/actions/workflows/ci.yml/badge.svg" />
+    <img src="https://github.com/MFlowCode/MFC/actions/workflows/test.yml/badge.svg" />
   </a>
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
@@ -50,7 +50,7 @@ If you use MFC, consider citing it:
 
 ## License
  
-Copyright 2023.
+Copyright 2021-2024.
 MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 ## Acknowledgements
