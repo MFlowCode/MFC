@@ -17,9 +17,12 @@ jobs:
       - name: Checkout code from MFC master
         uses: actions/checkout@v4
         with:
-          repository: MFlowCode/MFC
-          ref:        master
+          repository: ${{ github.event.pull_request.repository }}
+          ref:        ${{ github.event.pull_request.base.ref }}
           path:       base
+          # repository: MFlowCode/MFC
+          # ref:        master
+          # path:       base
 
       - name: Setup MFCs
         run: |
