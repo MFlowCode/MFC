@@ -1,5 +1,10 @@
 name: Check Line Counts
-on: [push]
+on:
+  push:
+
+  pull_request:
+
+  workflow_dispatch:
 
 jobs:
   sz:
@@ -24,32 +29,12 @@ jobs:
           # ref:        master
           # path:       base
 
-      - name: Setup MFCs
+      - name: Get Line Diff
         run: |
           BASE="$GITHUB_WORKSPACE/base"
           PR="$GITHUB_WORKSPACE/pr"
           cd $BASE
-          ./mfc.sh count
-          cd $PR
-          ./mfc.sh count
-
-      - name: Counting Lines
-        run: |
-          BASE="$GITHUB_WORKSPACE/base"
-          PR="$GITHUB_WORKSPACE/pr"
-          cd $BASE
-          echo "___BASE______________"
-          ./mfc.sh count
-          cd $PR
-          echo "___PR________________"
-          ./mfc.sh count
-
-      # - name: Get Line Diff
-      #   run: |
-      #     BASE="$GITHUB_WORKSPACE/base"
-      #     PR="$GITHUB_WORKSPACE/pr"
-      #     cd $BASE
-      #     export MFC_PR=$PR
-      #     pwd
-      #     ./mfc.sh count_diff
+          export MFC_PR=$PR
+          pwd
+          ./mfc.sh count_diff
 
