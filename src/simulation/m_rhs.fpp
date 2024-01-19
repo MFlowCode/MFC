@@ -60,6 +60,8 @@ module m_rhs
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
 
+    type(vector_field) :: TESTTEST
+
     type(vector_field) :: q_prim_qp !<
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
