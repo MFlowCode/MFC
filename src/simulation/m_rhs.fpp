@@ -60,8 +60,6 @@ module m_rhs
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
 
-    type(vector_field) :: TESTTEST
-
     type(vector_field) :: q_prim_qp !<
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
@@ -309,10 +307,6 @@ contains
             @:ALLOCATE(qR_rsz_vf(ix%beg:ix%end, &
                 iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
-        end if
-
-        if (any(Re_size > 0)) then
-            print*, 'empty test'
         end if
 
         ! Allocation of dq_prim_ds_qp ======================================
