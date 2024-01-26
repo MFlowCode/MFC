@@ -21,7 +21,7 @@ pwd
 source /tools/misc/.read_profile
 
 #Load NVHPC SDK, which includes the latest CUDA support
-module load nvhpc
+module load nvhpc cmake
 
 gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
 gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
