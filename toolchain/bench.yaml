@@ -1,0 +1,6 @@
+- slug: 3D_shockdroplet
+  path: examples/3D_shockdroplet/case.py
+  args: []
+- slug: 3D_turb_mixing
+  path: examples/3D_turb_mixing/case.py
+  args: []
