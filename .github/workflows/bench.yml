@@ -12,7 +12,7 @@ jobs:
         device: ['cpu', 'gpu']
     runs-on:
       group:  phoenix
-      labels: self-hosted
+      labels: gt
     steps:
       - name: Clone - PR
         uses: actions/checkout@v3
