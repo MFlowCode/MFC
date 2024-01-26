@@ -406,6 +406,11 @@ contains
                 end if
                 sys_size = bub_idx%end
 
+                if (adv_n) then
+                    n_idx = bub_idx%end + 1
+                    sys_size = n_idx
+                end if
+                
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
                 allocate (weight(nb), R0(nb), V0(nb))
