@@ -1,4 +1,3 @@
-from ..      import common
 from ..state import ARG
 
 
@@ -150,16 +149,11 @@ CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
 
 def get_input_dict_keys(target_name: str) -> list:
-    result = None
-    if target_name == "pre_process":
-        result = PRE_PROCESS.copy()
-    if target_name == "simulation":
-        result = SIMULATION.copy()
-    if target_name == "post_process":
-        result = POST_PROCESS.copy()
-
-    if result is None:
-        raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
+    result = {
+        "pre_process"  : PRE_PROCESS,
+        "simulation"   : SIMULATION,
+        "post_process" : POST_PROCESS
+    }.get(target_name, {}).copy()
 
     if not ARG("case_optimization") or target_name != "simulation":
         return result
