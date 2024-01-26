@@ -22,7 +22,7 @@ jobs:
       - name: Clone - Master
         uses: actions/checkout@v3
         with:
-          repository: henryleberre/MFC
+          repository: MFlowCode/MFC
           ref: master
           path: master
 
