@@ -5,8 +5,8 @@
 #SBATCH -t 02:00:00                     # Duration of the job (Ex: 30 mins)
 #SBATCH -p rg-nextgen-hpc               # Partition Name
 #SBATCH -o /projects/ci-runners/MFC/mfc-%j.out   # Combined output
-#SBATCH --nodelist quorra1	# Specify a specific node
-#SBATCH -G 2				# Request a GPU on that node
+#SBATCH --nodelist violet1	# Specify a specific node
+#SBATCH -G 1				# Request a GPU on that node
 #SBATCH -W                  # Do not exit until the submitted job terminates.
 
 # #SBATCH -o mfc-%j.out   # Combined output
@@ -26,4 +26,4 @@ module load nvhpc
 gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
 gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
 
-./mfc.sh test -j 2 --gpu -g $gpu_ids
+./mfc.sh test -j 1 --gpu -g $gpu_ids
