@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+<%namespace name="helpers" file="helpers.mako"/>
+
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
 #SBATCH --ntasks-per-node=${tasks_per_node}
@@ -25,38 +27,30 @@
 % endif
 % endif
 
-<%include file="prologue.mako"/>
+${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
-cd "${rootdir}"
+cd "${MFC_ROOTDIR}"
 . ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo
 
-% for binpath in binpaths:
-    ok ":) Running ${binpath.split('/')[-1]}:\n"
+% for target in targets:
+    ${helpers.run_prologue(target)}
 
     % if not mpi:
-        ${' '.join([f"'{x}'" for x in profiler ])} "${binpath}"
+        ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}"
     % else:
         ${' '.join([f"'{x}'" for x in profiler ])}             \
             mpirun -np ${nodes*tasks_per_node}                 \
                    --bind-to none                              \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                   "${binpath}"
+                   "${target.get_install_binpath()}"
     % endif
 
-    % if engine == 'interactive':
-        code=$?
-        if [ $code -ne 0 ]; then
-            echo
-            error ":( $MAGENTA${binpath}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
-            echo
-            exit 1
-        fi
-    % endif
+    ${helpers.run_epilogue(target)}
 
     echo
 % endfor
 
-<%include file="epilogue.mako"/>
+${helpers.template_epilogue()}

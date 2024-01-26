@@ -1,4 +1,114 @@
-from .common import MFCException
+import os, sys, uuid, subprocess, dataclasses
 
-def bench():
-    raise MFCException("Benchmarks are currently disabled.")
+import rich.table
+
+from .printer import cons
+from .state   import ARG, CFG
+from .build   import get_targets, DEFAULT_TARGETS
+from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
+from .common  import file_load_yaml, file_dump_yaml, create_directory
+
+
+@dataclasses.dataclass
+class BenchCase:
+    slug: str
+    path: str
+    args: list[str]
+
+
+def bench(targets = None):
+    if targets is None:
+        targets = ARG("targets")
+
+    targets = get_targets(targets)
+
+    bench_dirpath = os.path.join(MFC_SUBDIR, "benchmarks", str(uuid.uuid4())[:4])
+    create_directory(bench_dirpath)
+
+    cons.print()
+    cons.print(f"[bold]Benchmarking {format_list_to_string(ARG('targets'), 'magenta')} ([magenta]{os.path.relpath(bench_dirpath)}[/magenta]):[/bold]")
+    cons.indent()
+    cons.print()
+
+    CASES = [ BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH) ]
+
+    for case in CASES:
+        case.args = case.args + ARG("--")
+        case.path = os.path.abspath(case.path)
+
+    results = {
+        "metadata": {
+            "invocation": sys.argv[1:],
+            "lock":       dataclasses.asdict(CFG())
+        },
+        "cases": {},
+    }
+
+    for i, case in enumerate(CASES):
+        summary_filepath = os.path.join(bench_dirpath, f"{case.slug}.yaml")
+        log_filepath     = os.path.join(bench_dirpath, f"{case.slug}.out")
+
+        cons.print(f"{str(i+1).zfill(len(CASES) // 10 + 1)}/{len(CASES)}: {case.slug} @ [bold]{os.path.relpath(case.path)}[/bold]")
+        cons.indent()
+        cons.print()
+        cons.print(f"> Log:     [bold]{os.path.relpath(log_filepath)}[/bold]")
+        cons.print(f"> Summary: [bold]{os.path.relpath(summary_filepath)}[/bold]")
+
+        with open(log_filepath, "w") as log_file:
+            system(
+                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                ["--targets"] + [t.name for t in targets] +
+                ["--output-summary", summary_filepath] +
+                case.args,
+                stdout=log_file,
+                stderr=subprocess.STDOUT)
+
+        results["cases"][case.slug] = {
+            "description":    dataclasses.asdict(case),
+            "output_summary": file_load_yaml(summary_filepath),
+        }
+
+    file_dump_yaml(ARG("output"), results)
+
+    cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
+
+    cons.unindent()
+
+
+def diff():
+    lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
+
+    cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('rhs'))}[/magenta].[/bold]")
+
+    if lhs["metadata"] != rhs["metadata"]:
+        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata of lhs and rhs are not equal.")
+        quit(1)
+
+    slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
+    if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
+        cons.print(f"[bold yellow]Warning[/bold yellow]: Cases of lhs and rhs are not equal.[/bold yellow]")
+        cons.print(f"[bold yellow]lhs: {set(lhs['cases'].keys()) - slugs}[/bold yellow]")
+        cons.print(f"[bold yellow]rhs: {set(rhs['cases'].keys()) - slugs}[/bold yellow]")
+        cons.print(f"[bold yellow]Using intersection: {slugs}[/bold yellow]")
+
+    table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
+    table.add_column("[bold]Case[/bold]",    justify="left")
+    table.add_column("[bold]Pre Process[/bold]", justify="right")
+    table.add_column("[bold]Simulation[/bold]", justify="right")
+    table.add_column("[bold]Post Process[/bold]", justify="right")
+
+    for slug in slugs:
+        lhs_summary = lhs["cases"][slug]["output_summary"]
+        rhs_summary = rhs["cases"][slug]["output_summary"]
+
+        speedups = ['N/A', 'N/A', 'N/A']
+
+        for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
+            if target.name not in lhs_summary or target.name not in rhs_summary:
+                continue
+
+            speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
+
+        table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
+
+    cons.raw.print(table)
