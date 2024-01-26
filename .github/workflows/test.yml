@@ -11,6 +11,7 @@ on:
       - 'golden.txt'
       - 'CMakeLists.txt'
       - 'requirements.txt'
+      - '**.sh'
 
   pull_request:
 
