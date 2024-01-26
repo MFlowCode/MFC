@@ -6,7 +6,7 @@
 #  than you might expect to find or need. Note that any variable or symbol
 #  prefixed by CMAKE_ is reserved by CMake and has special meaning.
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
 
 # We include C as a language because - for some reason -
