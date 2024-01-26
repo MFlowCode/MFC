@@ -4,12 +4,12 @@
 #SBATCH --mem-per-cpu=4G                # Memory per core
 #SBATCH -t 02:00:00                     # Duration of the job (Ex: 30 mins)
 #SBATCH -p rg-nextgen-hpc               # Partition Name
-#SBATCH -o mfc-%j.out   # Combined output
+#SBATCH -o /projects/ci-runners/MFC/mfc-%j.out   # Combined output
 #SBATCH --nodelist quorra1	# Specify a specific node
 #SBATCH -G 2				# Request a GPU on that node
+#SBATCH -W                  # Do not exit until the submitted job terminates.
 
-# #SBATCH -W                  # Do not exit until the submitted job terminates.
-# #SBATCH -o /projects/ci-runners/MFC/mfc-%j.out   # Combined output
+# #SBATCH -o mfc-%j.out   # Combined output
 
 ##Add commands here to build and execute
 cd $GITHUB_WORKSPACE
