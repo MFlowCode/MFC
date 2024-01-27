@@ -61,12 +61,12 @@ contains
                     'Exiting ...')
             elseif (model_eqns == 4 .and. (num_fluids > 1)) then
                 call s_mpi_abort('Unsupported combination of values of '// &
-                    'model_eqns and num_fluids. '// &
-                    'Exiting ...')
+                                 'model_eqns and num_fluids. '// &
+                                 'Exiting ...')
             elseif ((.not. polytropic) .and. R0ref == dflt_real) then
                 call s_mpi_abort('Unsupported combination of values of '// &
-                    'polytropic and R0ref. '// &
-                    'Exiting ...')
+                                 'polytropic and R0ref. '// &
+                                 'Exiting ...')
             elseif (nb == dflt_int) then
                 call s_mpi_abort('unsupported combination of values of '// &
                     'bubbles and nb. '// &

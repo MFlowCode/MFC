@@ -427,7 +427,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        if (model_eqns == 3 .and. (.not. relax)) then
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
 
         if (adv_n .and. alter_alpha) then
             do l = 0, p
@@ -556,6 +558,7 @@ contains
         real(kind(0d0)), intent(IN) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
+        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: nR3bar
 

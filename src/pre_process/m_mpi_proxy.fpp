@@ -68,7 +68,7 @@ contains
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'Cpv', 'sigR', 'sigV', 'rhoRV',           &
-            & 'pi_fac', 'len_ratio' ]
+            & 'palpha_eps', 'ptgalpha_eps', 'pi_fac', 'len_ratio' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

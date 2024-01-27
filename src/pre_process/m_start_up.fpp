@@ -124,7 +124,8 @@ contains
             polytropic, thermal, Ca, Web, Re_inv, Cpv, &
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
-            file_per_process, adv_n, alter_alpha
+            file_per_process, relax, relax_model, &
+            palpha_eps, ptgalpha_eps, adv_n, alter_alpha
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
