@@ -1,8 +1,9 @@
 import time, typing, threading, dataclasses
+import rich, rich.progress
 
 from .printer import cons
 
-import rich, rich.progress
+
 
 
 class WorkerThread(threading.Thread):
@@ -43,10 +44,10 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
 
     def join_first_dead_thread(progress, complete_tracker) -> None:
         nonlocal threads, nAvailable
-        
+
         for threadID, threadHolder in enumerate(threads):
             if not threadHolder.thread.is_alive():
-                if threadHolder.thread.exc != None:
+                if threadHolder.thread.exc is not None:
                     raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
@@ -90,7 +91,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
                     device = min(sched.LOAD.items(), key=lambda x: x[1])[0]
                     sched.LOAD[device] += task.load / task.ppn
                     use_devices.add(device)
-            
+
             nAvailable -= task.ppn
 
             thread = WorkerThread(target=task.func, args=tuple(task.args) + (use_devices,))

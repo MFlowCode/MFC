@@ -1,8 +1,8 @@
 # Case Files
 
-Example Python case files, also referred to as *input files*, can be found in the [examples/](examples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
+Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [examples/3d_sphbubcollapse/](examples/3D_sphbubcollapse/case.py).
+can also be found in [examples/3d_sphbubcollapse/](https://github.com/MFlowCode/MFC/blob/master/examples/3D_sphbubcollapse/case.py).
 
 ## Basic Skeleton
 
@@ -78,8 +78,9 @@ There are multiple sets of parameters that must be specified in the python input
 7. [(Optional) Acoustic Source Parameters](#7-acoustic-source)
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
 9. [(Optional) Velocity Field Setup Parameters](#9-velocity-field-setup)
+10. [(Optional) Phase Change Parameters](#10-Phase-Change-Model)
 
-Items 7, 8, and 9 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, and initial velocity field setup, respectively.
+Items 7, 8, 9, and 10 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, and phase change, respectively.
 Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
@@ -276,10 +277,15 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 | `pi_inf`  | Real   | Stiffened-gas parameter $\Pi_\infty$ of fluid. |
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
+| `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
+| `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
+| `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 
 Fluid material's parameters. All parameters should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
 *: Parameters that work only with `model_eqns`=2.
+
+**: Parameters that work only with `model_eqns`=3.
 
 The table lists the fluid material's parameters.
 The parameters define material's property of compressible fluids that are used in simulation.
@@ -287,8 +293,11 @@ The parameters define material's property of compressible fluids that are used i
 - `fluid_pp(i)%gamma` and `fluid_pp(i)%pi_inf` define $\Gamma$ and $\Pi$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%Re(1)` and `fluid_pp(i)%Re(2)` define the shear and volume viscosities of $i$-th fluid, respectively.
+
 When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in [Coralic (2015)](references.md#Coralic15).
+
+- `fluid_pp(i)%cv`, `fluid_pp(i)%qv`, and `fluid_pp(i)%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 ### 5. Simulation Algorithm
 
@@ -578,6 +587,21 @@ The parameters are optionally used to define initial velocity profiles and pertu
 - `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile.
 This option only works for 2D and 3D cases, together with `vel_profile = TRUE`.
 
+### 10. Phase Change Model
+| Parameter              | Type    | Description                                    |
+| ---:                   | :----:  |          :---                                  |
+| `relax`                | Logical | Activates Phase Change model |
+| `relax_model`          | Integer | Phase change model: [5] pT-equilibrium; [6] pTg-equilibrium |
+| `palpha_eps`           | Real    | tolerance of the Newton Solver to activate pT-equilibrium  |
+| `ptgalpha_eps`	     | Real    | tolerance of the Newton Solver to activate pTg-equilibrium |
+
+- `relax` Activates the Phase Change model.
+
+- `relax_model` Specifies the phase change model to be used: [5] enables pT-equilibrium, while [6] activates pTg-equilibrium (if criteria are met).
+
+- `palpha_eps` Specifies the tolerance used for the Newton Solvers used in the pT-equilibrium model. 
+
+- `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model. 
 
 ## Enumerations
 

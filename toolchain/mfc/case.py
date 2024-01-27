@@ -6,12 +6,12 @@ class Case:
 
     def __init__(self, params: dict) -> None:
         self.params = copy.deepcopy(params)
-    
+
     def get_parameters(self) -> str:
         return self.params.keys()
 
     def get_cell_count(self) -> int:
-        return math.prod([max(1, int(self.params.get(dir, 0))) for dir in {"m", "n", "p"}])
+        return math.prod([max(1, int(self.params.get(dir, 0))) for dir in ["m", "n", "p"]])
 
     def has_parameter(self, key: str)-> bool:
         return key in self.get_parameters()

@@ -72,6 +72,10 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters ==========================================
     integer :: model_eqns      !< Multicomponent flow model
+    logical :: relax           !< activate phase change
+    integer :: relax_model     !< Relax Model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Alpha limiter
@@ -118,7 +122,6 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
-
 
 #ifdef MFC_MPI
 
@@ -244,6 +247,10 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
+        relax = .false.
+        relax_model = dflt_int
+        palpha_eps = dflt_real
+        ptgalpha_eps = dflt_real
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
@@ -271,10 +278,10 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model%scale(:)     = 1d0
+            patch_icpp(i)%model%scale(:) = 1d0
             patch_icpp(i)%model%translate(:) = 0d0
-            patch_icpp(i)%model%filepath(:)  = ' '
-            patch_icpp(i)%model%spc          = 10
+            patch_icpp(i)%model%filepath(:) = ' '
+            patch_icpp(i)%model%spc = 10
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
@@ -298,6 +305,9 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
+            patch_icpp(i)%cv = 0d0
+            patch_icpp(i)%qv = 0d0
+            patch_icpp(i)%qvp = 0d0
             patch_icpp(i)%tau_e = 0d0
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
@@ -360,6 +370,9 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+            fluid_pp(i)%cv = 0d0
+            fluid_pp(i)%qv = 0d0
+            fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = 0d0
         end do
 
@@ -490,21 +503,21 @@ contains
                 end if
 
                 !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                if(.not. qbmm) then
-                    if ( polytropic ) then
+                if (.not. qbmm) then
+                    if (polytropic) then
                         rhoref = 1.d0
                         pref = 1.d0
                     end if
                 end if
 
-                !Initialize pb0,pv,pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic) 
-                if(qbmm) then
-                    if(polytropic) then
-                        allocate(pb0(nb))
-                        if(Web == dflt_real) then                            
+                !Initialize pb0,pv,pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                if (qbmm) then
+                    if (polytropic) then
+                        allocate (pb0(nb))
+                        if (Web == dflt_real) then
                             pb0 = pref
-                            pb0 = pb0 / pref
-                            pref = 1d0                  
+                            pb0 = pb0/pref
+                            pref = 1d0
                         end if
                         rhoref = 1d0
                     end if
@@ -592,7 +605,6 @@ contains
                     pref = 1.d0
                 end if
 
-
             end if
         end if
 
@@ -613,19 +625,19 @@ contains
 
 #ifdef MFC_MPI
 
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
-            allocate (MPI_IO_DATA%var(1:sys_size))                
+            allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()

@@ -1,4 +1,3 @@
-from ..      import common
 from ..state import ARG
 
 
@@ -34,14 +33,14 @@ for f_id in range(1, 10+1):
     PRE_PROCESS.append(f'fluid_rho({f_id})')
 
     for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G"]:
+                      "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
         PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
 
 for p_id in range(1, 10+1):
     for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "hcid"]:
+                      "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp" ]:
         PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
 
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")
@@ -100,7 +99,7 @@ for probe_id in range(1,3+1):
 
 for f_id in range(1,10+1):
     for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "G"]:
+                      "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
         SIMULATION.append(f"fluid_pp({f_id})%{attribute}")
 
     for re_id in [1, 2]:
@@ -143,7 +142,8 @@ for fl_id in range(1,10+1):
     for append in ["schlieren_alpha", "alpha_rho_wrt", "alpha_wrt", "kappa_wrt"]:
         POST_PROCESS.append(f'{append}({fl_id})')
 
-    for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0"]:
+    for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0",
+                      "cv", "qv", "qvp" ]:
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
 ALL = list(set(PRE_PROCESS + SIMULATION + POST_PROCESS))
@@ -152,15 +152,13 @@ CASE_OPTIMIZATION = [ "nb", "weno_order" ]
 
 
 def get_input_dict_keys(target_name: str) -> list:
-    result = None
-    if target_name == "pre_process":  result = PRE_PROCESS.copy()
-    if target_name == "simulation":   result = SIMULATION.copy()
-    if target_name == "post_process": result = POST_PROCESS.copy()
-
-    if result == None:
-        raise common.MFCException(f"[INPUT DICTS] Target {target_name} doesn't have an input dict.")
+    result = {
+        "pre_process"  : PRE_PROCESS,
+        "simulation"   : SIMULATION,
+        "post_process" : POST_PROCESS
+    }.get(target_name, {}).copy()
 
     if not ARG("case_optimization") or target_name != "simulation":
         return result
-    
+
     return [ x for x in result if x not in CASE_OPTIMIZATION ]

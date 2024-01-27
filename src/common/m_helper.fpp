@@ -6,7 +6,7 @@
 module m_helper
 
     ! Dependencies =============================================================
-    
+
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -16,19 +16,19 @@ module m_helper
     implicit none
 
     private; public :: s_compute_finite_difference_coefficients, &
-        s_comp_n_from_prim, &
-        s_comp_n_from_cons, &
-        s_initialize_nonpoly, &
-        s_simpson, &
-        s_transcoeff, &
-        s_int_to_str, &
-        s_transform_vec, &
-        s_transform_triangle, &
-        s_transform_model, &
-        s_swap, &
-        f_cross, &
-        f_create_transform_matrix, &
-        f_create_bbox
+ s_comp_n_from_prim, &
+ s_comp_n_from_cons, &
+ s_initialize_nonpoly, &
+ s_simpson, &
+ s_transcoeff, &
+ s_int_to_str, &
+ s_transform_vec, &
+ s_transform_triangle, &
+ s_transform_model, &
+ s_swap, &
+ f_cross, &
+ f_create_transform_matrix, &
+ f_create_bbox
 
 contains
 
@@ -43,7 +43,7 @@ contains
         !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
         !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
-                                                                fd_number_in, fd_order_in, offset_s)
+                                                        fd_number_in, fd_order_in, offset_s)
 
         integer :: lB, lE !< loop bounds
         integer, intent(IN) :: q
@@ -63,9 +63,9 @@ contains
         else
             lB = 0
             lE = q
-        endif
+        end if
 
-        if (allocated(fd_coeff_s)) deallocate(fd_coeff_s)
+        if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
         allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
 
         ! Computing the 1st order finite-difference coefficients
@@ -119,7 +119,7 @@ contains
         !$acc routine seq
         real(kind(0.d0)), intent(IN) :: vftmp
         real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp  
+        real(kind(0.d0)), intent(OUT) :: ntmp
         real(kind(0.d0)) :: nR3
         real(kind(0.d0)), dimension(nb) :: weights
 
@@ -130,7 +130,6 @@ contains
         !print *, "nbub", ntmp
 
     end subroutine s_comp_n_from_cons
-
 
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
@@ -224,21 +223,21 @@ contains
 
         ! nondimensional properties
         !if(.not. qbmm) then
-            R_n = rhol0*R_n*temp/pl0
-            R_v = rhol0*R_v*temp/pl0
-            k_n = k_n/k_m0
-            k_v = k_v/k_m0
-            pb0 = pb0/pl0
-            pv = pv/pl0
-            Tw = 1.d0
-            pl0 = 1.d0
+        R_n = rhol0*R_n*temp/pl0
+        R_v = rhol0*R_v*temp/pl0
+        k_n = k_n/k_m0
+        k_v = k_v/k_m0
+        pb0 = pb0/pl0
+        pv = pv/pl0
+        Tw = 1.d0
+        pl0 = 1.d0
 
-            rhoref = 1.d0
-            pref = 1.d0
+        rhoref = 1.d0
+        pref = 1.d0
         !end if
 
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0   
+        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
@@ -246,11 +245,10 @@ contains
                               Re_trans_c(ir), Im_trans_c(ir))
         end do
         Im_trans_T = 0d0
- 
-        
+
     end subroutine s_initialize_nonpoly
 
-        !> Computes the transfer coefficient for the non-polytropic bubble compression process
+    !> Computes the transfer coefficient for the non-polytropic bubble compression process
         !! @param omega natural frqeuencies
         !! @param peclet Peclet number
         !! @param Re_trans Real part of the transport coefficients
@@ -277,12 +275,12 @@ contains
 
     subroutine s_int_to_str(i, res)
         character(len=*) :: res
-        integer,intent(in) :: i
-        write(res,'(I0)') i
+        integer, intent(in) :: i
+        write (res, '(I0)') i
         res = trim(res)
     end subroutine
 
-        !> Computes the Simpson weights for quadrature
+    !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
         integer :: ir
@@ -333,18 +331,18 @@ contains
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
-    
+
     !> This procedure computes the cross product of two vectors.
     !! @param a First vector.
     !! @param b Second vector.
     !! @return The cross product of the two vectors.
     function f_cross(a, b) result(c)
         real(kind(0d0)), dimension(3), intent(in) :: a, b
-        real(kind(0d0)), dimension(3)             :: c
+        real(kind(0d0)), dimension(3) :: c
 
-        c(1) = a(2) * b(3) - a(3) * b(2)
-        c(2) = a(3) * b(1) - a(1) * b(3)
-        c(3) = a(1) * b(2) - a(2) * b(1)
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
     end function f_cross
 
     !> This procedure swaps two real numbers.
@@ -352,11 +350,11 @@ contains
     !! @param rhs Right-hand side.
     subroutine s_swap(lhs, rhs)
         real(kind(0d0)), intent(inout) :: lhs, rhs
-        real(kind(0d0))                :: ltemp
+        real(kind(0d0)) :: ltemp
 
         ltemp = lhs
-        lhs   = rhs
-        rhs   = ltemp
+        lhs = rhs
+        rhs = ltemp
     end subroutine s_swap
 
     !> This procedure creates a transformation matrix.
@@ -369,34 +367,34 @@ contains
         t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
 
         sc = transpose(reshape([ &
-            p%scale(1), 0d0,        0d0,        0d0, &
-            0d0,        p%scale(2), 0d0,        0d0, &
-            0d0,        0d0,        p%scale(3), 0d0, &
-            0d0,        0d0,        0d0,        1d0  ], shape(sc)))
+                               p%scale(1), 0d0, 0d0, 0d0, &
+                               0d0, p%scale(2), 0d0, 0d0, &
+                               0d0, 0d0, p%scale(3), 0d0, &
+                               0d0, 0d0, 0d0, 1d0], shape(sc)))
 
         rz = transpose(reshape([ &
-            cos(p%rotate(3)), -sin(p%rotate(3)), 0d0, 0d0, &
-            sin(p%rotate(3)),  cos(p%rotate(3)), 0d0, 0d0, &
-            0d0,               0d0,              1d0, 0d0, &
-            0d0,               0d0,              0d0, 1d0  ], shape(rz)))
+                               cos(p%rotate(3)), -sin(p%rotate(3)), 0d0, 0d0, &
+                               sin(p%rotate(3)), cos(p%rotate(3)), 0d0, 0d0, &
+                               0d0, 0d0, 1d0, 0d0, &
+                               0d0, 0d0, 0d0, 1d0], shape(rz)))
 
         rx = transpose(reshape([ &
-            1d0, 0d0,               0d0,              0d0, &
-            0d0, cos(p%rotate(1)), -sin(p%rotate(1)), 0d0, &
-            0d0, sin(p%rotate(1)),  cos(p%rotate(1)), 0d0, &
-            0d0, 0d0,               0d0,              1d0  ], shape(rx)))
+                               1d0, 0d0, 0d0, 0d0, &
+                               0d0, cos(p%rotate(1)), -sin(p%rotate(1)), 0d0, &
+                               0d0, sin(p%rotate(1)), cos(p%rotate(1)), 0d0, &
+                               0d0, 0d0, 0d0, 1d0], shape(rx)))
 
         ry = transpose(reshape([ &
-            cos(p%rotate(2)),  0d0, sin(p%rotate(2)), 0d0, &
-            0d0,               1d0, 0d0,              0d0, &
-            -sin(p%rotate(2)), 0d0, cos(p%rotate(2)), 0d0, &
-            0d0,               0d0, 0d0,              1d0  ], shape(ry)))
+                               cos(p%rotate(2)), 0d0, sin(p%rotate(2)), 0d0, &
+                               0d0, 1d0, 0d0, 0d0, &
+                               -sin(p%rotate(2)), 0d0, cos(p%rotate(2)), 0d0, &
+                               0d0, 0d0, 0d0, 1d0], shape(ry)))
 
         tr = transpose(reshape([ &
-            1d0, 0d0, 0d0, p%translate(1), &
-            0d0, 1d0, 0d0, p%translate(2), &
-            0d0, 0d0, 1d0, p%translate(3), &
-            0d0, 0d0, 0d0, 1d0 ], shape(tr)))
+                               1d0, 0d0, 0d0, p%translate(1), &
+                               0d0, 1d0, 0d0, p%translate(2), &
+                               0d0, 0d0, 1d0, p%translate(3), &
+                               0d0, 0d0, 0d0, 1d0], shape(tr)))
 
         out_matrix = matmul(tr, matmul(ry, matmul(rx, matmul(rz, sc))))
 
@@ -407,12 +405,12 @@ contains
     !! @param matrix Transformation matrix.
     subroutine s_transform_vec(vec, matrix)
 
-        t_vec3,   intent(inout) :: vec
-        t_mat4x4, intent(in)    :: matrix
+        t_vec3, intent(inout) :: vec
+        t_mat4x4, intent(in) :: matrix
 
         real(kind(0d0)), dimension(1:4) :: tmp
 
-        tmp = matmul(matrix, [ vec(1), vec(2), vec(3), 1d0 ])
+        tmp = matmul(matrix, [vec(1), vec(2), vec(3), 1d0])
         vec = tmp(1:3)
 
     end subroutine s_transform_vec
@@ -430,7 +428,7 @@ contains
         real(kind(0d0)), dimension(1:4) :: tmp
 
         do i = 1, 3
-            call s_transform_vec(triangle%v(i,:), matrix)
+            call s_transform_vec(triangle%v(i, :), matrix)
         end do
 
     end subroutine s_transform_triangle
@@ -441,7 +439,7 @@ contains
     subroutine s_transform_model(model, matrix)
 
         type(t_model), intent(inout) :: model
-        t_mat4x4,      intent(in)    :: matrix
+        t_mat4x4, intent(in) :: matrix
 
         integer :: i
 
@@ -457,7 +455,7 @@ contains
     function f_create_bbox(model) result(bbox)
 
         type(t_model), intent(in) :: model
-        type(t_bbox)              :: bbox
+        type(t_bbox) :: bbox
 
         integer :: i, j
 
@@ -467,13 +465,13 @@ contains
             return
         end if
 
-        bbox%min = model%trs(1)%v(1,:)
-        bbox%max = model%trs(1)%v(1,:)
+        bbox%min = model%trs(1)%v(1, :)
+        bbox%max = model%trs(1)%v(1, :)
 
         do i = 1, size(model%trs)
             do j = 1, 3
-                bbox%min = min(bbox%min, model%trs(i)%v(j,:))
-                bbox%max = max(bbox%max, model%trs(i)%v(j,:))
+                bbox%min = min(bbox%min, model%trs(i)%v(j, :))
+                bbox%max = max(bbox%max, model%trs(i)%v(j, :))
             end do
         end do
 

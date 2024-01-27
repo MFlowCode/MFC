@@ -12,5 +12,4 @@ cd "$SLURM_SUBMIT_DIR"
 echo "Running in $(pwd):"
 
 . ./mfc.sh load -c p -m gpu
-./mfc.sh test -j $(nproc) -b mpirun -a
-
+./mfc.sh test -j $(nproc) -a -- -c phoenix
