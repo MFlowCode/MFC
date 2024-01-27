@@ -1,16 +1,16 @@
-import re, os, typing
+import re, os, sys, typing, dataclasses
 
 from glob import glob
 
 from mako.lookup   import TemplateLookup
 from mako.template import Template
 
-from ..build   import get_targets, build
+from ..build   import get_targets, build, REQUIRED_TARGETS
 from ..printer import cons
-from ..state   import ARG, ARGS
+from ..state   import ARG, ARGS, CFG
 from ..common  import MFCException, isspace, file_read, does_command_exist
 from ..common  import MFC_TEMPLATEDIR, file_write, system, MFC_ROOTDIR
-from ..common  import format_list_to_string
+from ..common  import format_list_to_string, file_dump_yaml
 
 from . import queues, input
 
@@ -84,12 +84,11 @@ def __generate_job_script(targets):
         env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
 
     content = __get_template().render(
-        **ARGS(),
+        **{**ARGS(), 'targets': targets},
         ARG=ARG,
         env=env,
-        rootdir=MFC_ROOTDIR,
+        MFC_ROOTDIR=MFC_ROOTDIR,
         qsystem=queues.get_system(),
-        binpaths=[target.get_install_binpath() for target in targets],
         profiler=__profiler_prepend(),
     )
 
@@ -119,7 +118,7 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
 
 def run(targets = None):
-    targets = get_targets(targets or ARG("targets"))
+    targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
 
     build(targets)
 
@@ -134,4 +133,9 @@ def run(targets = None):
     __generate_input_files(targets)
 
     if not ARG("dry_run"):
+        if ARG("output_summary") is not None:
+            file_dump_yaml(ARG("output_summary"), {
+                "invocation": sys.argv[1:],
+                "lock":       dataclasses.asdict(CFG())
+            })
         __execute_job_script(qsystem)
