@@ -127,7 +127,7 @@ on:
 
 jobs:
   self:
-    name: Georgia Tech | Rogues Gallery
+    name: GT | Rogues Gallery | Violet
     if: github.repository == 'MFlowCode/MFC'
     continue-on-error: true
     runs-on:
@@ -138,4 +138,18 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Build & Test
-        run:  cd misc && sbatch run-rg-gpu.sh
+        run:  cd misc && sbatch run-rg-violet-gpu.sh
+
+  self:
+    name: GT | Rogues Gallery | Quorra
+    if: github.repository == 'MFlowCode/MFC'
+    continue-on-error: true
+    runs-on:
+      group:  phoenix
+      labels: rg
+    steps:
+      - name: Clone
+        uses: actions/checkout@v3
+
+      - name: Build & Test
+        run:  cd misc && sbatch run-rg-quorra-gpu.sh
