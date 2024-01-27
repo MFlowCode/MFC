@@ -532,7 +532,7 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param f_bub_adv_src Source for bubble volume fraction 
         !!  @param f_divu Divergence of velocity
-    function f_rddot_G(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
+    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
         !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -592,7 +592,7 @@ contains
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
     function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
-!$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
         real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
 
