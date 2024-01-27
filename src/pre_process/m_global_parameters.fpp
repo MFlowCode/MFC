@@ -159,7 +159,7 @@ module m_global_parameters
     !> @{
     integer :: nb
     real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv, Cpv
+    real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
@@ -334,7 +334,6 @@ contains
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
-        Cpv = 1d0
         poly_sigma = dflt_real
 
         adv_n = .false.

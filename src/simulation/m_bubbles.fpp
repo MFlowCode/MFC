@@ -619,7 +619,7 @@ contains
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) + Cpv
+            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
                                               (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else

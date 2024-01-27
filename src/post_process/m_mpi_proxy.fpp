@@ -189,7 +189,7 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'Cpv' ]
+            & 'Re_inv' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

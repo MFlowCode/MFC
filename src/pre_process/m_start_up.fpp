@@ -123,7 +123,7 @@ contains
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
             rhoref, pref, bubbles, R0ref, nb, &
-            polytropic, thermal, Ca, Web, Re_inv, Cpv, &
+            polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &

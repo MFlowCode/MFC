@@ -264,7 +264,6 @@ module m_global_parameters
     real(kind(0d0)) :: Ca       !< Cavitation number
     real(kind(0d0)) :: Web      !< Weber number
     real(kind(0d0)) :: Re_inv   !< Inverse Reynolds number
-    real(kind(0d0)) :: Cpv      !< Nondimensional vapor pressure
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
     real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
@@ -292,7 +291,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, Cpv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -449,7 +448,6 @@ contains
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
-        Cpv = 1d0
         poly_sigma = dflt_real
 
         ! Monopole source

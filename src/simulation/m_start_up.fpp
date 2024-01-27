@@ -140,7 +140,7 @@ contains
 #:if not MFC_CASE_OPTIMIZATION
             nb, weno_order, &
 #:endif
-            Ca, Web, Re_inv, Cpv, &
+            Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
