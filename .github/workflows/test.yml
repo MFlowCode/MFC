@@ -126,7 +126,7 @@ on:
 #           path: test-${{ matrix.device }}.out
 
 jobs:
-  self:
+  selfrg1:
     name: GT | Rogues Gallery | Violet
     if: github.repository == 'MFlowCode/MFC'
     continue-on-error: true
@@ -140,7 +140,7 @@ jobs:
       - name: Build & Test
         run:  cd misc && sbatch run-rg-violet-gpu.sh
 
-  self:
+  selfrg2:
     name: GT | Rogues Gallery | Quorra
     if: github.repository == 'MFlowCode/MFC'
     continue-on-error: true
