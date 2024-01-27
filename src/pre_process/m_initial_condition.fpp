@@ -385,15 +385,17 @@ contains
 
         ! Superpose velocity perturbuations (instability waves) to the velocity field
         do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)
-                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)
-                    if (p > 0) then
-                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)
-                    end if
-                end do
-            end do
+        do j = 0, n
+        do i = 0, m
+            q_prim_vf(cont_idx%beg )%sf(i,j,k) = q_prim_vf(cont_idx%beg )%sf(i,j,k)+wave(1,i,j,k)       ! rho
+            q_prim_vf(mom_idx%beg  )%sf(i,j,k) = q_prim_vf(mom_idx%beg  )%sf(i,j,k)+wave(2,i,j,k)       ! u
+            q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = q_prim_vf(mom_idx%beg+1)%sf(i,j,k)+wave(5,i,j,k)       ! v
+            if (p .gt. 0) then
+                q_prim_vf(mom_idx%beg+2)%sf(i,j,k) = q_prim_vf(mom_idx%beg+2)%sf(i,j,k)+wave(4,i,j,k)   ! w
+            end if
+            q_prim_vf(E_idx)%sf(i,j,k) = q_prim_vf(E_idx)%sf(i,j,k)+wave(3,i,j,k)                       ! p
+        end do
+        end do
         end do
 
     end subroutine s_superposition_instability_wave ! ----------------------

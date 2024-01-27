@@ -70,9 +70,9 @@ contains
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
-            R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model
+            R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, Cpv, &
+            polydisperse, poly_sigma, file_per_process, relax, relax_model, &
+            adv_n, alter_alpha
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'

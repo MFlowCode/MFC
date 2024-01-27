@@ -134,12 +134,14 @@ contains
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax' ]
+            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',        &
+            & 'adv_n', 'alter_alpha', 'adap_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
-            & 'Re_inv','poly_sigma', 'palpha_eps', 'ptgalpha_eps' ]
+            & 'Re_inv', 'Cpv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps',     &
+            & 'pi_fac', 'len_ratio' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

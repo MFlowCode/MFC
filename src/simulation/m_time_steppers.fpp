@@ -397,6 +397,29 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
+
+        if (adv_n .and. alter_alpha) then
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        nR3bar = 0d0
+                        do i = 1, nb
+                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
+                                print *, j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                error stop "R < 0"
+                            end if
+                            if(polytropic) then
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            else
+                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            end if
+                        end do
+                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
+                    end do
+                end do
+            enddo
+        end if
+
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
@@ -480,7 +503,7 @@ contains
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
 
-        integer :: i, j, k, l, q
+        integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 

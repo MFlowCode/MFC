@@ -105,6 +105,9 @@ module m_global_parameters
     logical :: vel_profile !< Set hypertangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
+    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    real(kind(0d0)) :: len_ratio !< Bubble-background flow length scale ratio (= R0/x0)
+    
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -177,7 +180,6 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
-
     !> @}
 
     !> @name Index variables used for m_variables_conversion

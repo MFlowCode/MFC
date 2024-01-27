@@ -776,6 +776,15 @@ contains
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
                 end if
+                
+                if (adv_n) then
+                    iv%beg = n_idx; iv%end = n_idx
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+                end if
 
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
@@ -1046,7 +1055,7 @@ contains
 
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
-                        if (id == ndirs) then
+                        if (id == ndirs .and. (.not. adap_dt)) then
                             call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                                          q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                         end if
@@ -1282,7 +1291,7 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then
+                    if (id == ndirs .and. (.not. adap_dt)) then
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                                      q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
@@ -1762,7 +1771,7 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then
+                    if (id == ndirs .and. (.not. adap_dt)) then
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
                                                      q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if

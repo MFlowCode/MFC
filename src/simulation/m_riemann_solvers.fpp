@@ -1575,16 +1575,21 @@ contains
                                         end if
                                     end do
 
-                                    if (.not. qbmm) then
-                                        nbub_L_denom = 0d0
-                                        nbub_R_denom = 0d0
-                                        !$acc loop seq
-                                        do i = 1, nb
-                                            nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
-                                            nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
-                                        end do
-                                        nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
-                                        nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                    if(.not. qbmm) then
+                                        if (adv_n .and. alter_alpha) then
+                                            nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, n_idx)
+                                            nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, n_idx)
+                                        else
+                                            nbub_L_denom = 0d0
+                                            nbub_R_denom = 0d0
+                                            !$acc loop seq
+                                            do i = 1, nb
+                                                nbub_L_denom = nbub_L_denom + (R0_L(i)**3d0)*weight(i)
+                                                nbub_R_denom = nbub_R_denom + (R0_R(i)**3d0)*weight(i)
+                                            end do
+                                            nbub_L = (3.d0/(4.d0*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)/nbub_L_denom
+                                            nbub_R = (3.d0/(4.d0*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)/nbub_R_denom
+                                        end if
                                     else
                                         !nb stored in 0th moment of first R0 bin in variable conversion module
                                         nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, bubxb)
