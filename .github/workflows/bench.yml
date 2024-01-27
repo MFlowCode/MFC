@@ -34,6 +34,7 @@ jobs:
 
       - name: Generate Comment
         run: |
+          . ./mfc.sh load -c p -m g
           COMMENT_MSG=`./mfc.sh bench_diff master/bench-${{ matrix.device }}.yaml pr/bench-${{ matrix.device }}.yaml`
           echo "COMMENT_MSG=\"$COMMENT_MSG\"" >> $GITHUB_ENV
 
