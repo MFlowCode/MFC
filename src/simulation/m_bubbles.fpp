@@ -431,7 +431,7 @@ contains
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
     function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
-        !$acc routine seq
+!$acc routine seq
         real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
         real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
 

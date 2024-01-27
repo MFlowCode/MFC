@@ -607,8 +607,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
-                                     + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4d0
+                                     +  pb_ts(2)%sf(j, k, l, q, i) &
+                                    + dt_in*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -626,7 +626,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -667,8 +667,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
+                                    + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
+                                    + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -685,8 +685,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
+                                    + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
+                                    + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
