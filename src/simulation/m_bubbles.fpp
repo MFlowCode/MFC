@@ -404,7 +404,7 @@ contains
         real(kind(0d0)) :: f_cpbw
 
         if (polytropic) then
-            f_cpbw = (Ca + 2.d0/Web/(fR0*len_ratio))*((fR0*len_ratio/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
+            f_cpbw = (Ca + 2.d0/Web/fR0)*((fR0/fR)**(3.d0*gam)) - Ca - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         else
             f_cpbw = fpb - 1.d0 - 4.d0*Re_inv*fV/fR - 2.d0/(fR*Web)
         end if
@@ -498,8 +498,8 @@ contains
         real(kind(0d0)) :: f_Hdot
 
         if (polytropic) then
-            tmp1 = (fR0*len_ratio/fR)**(3.d0*gam)
-            tmp1 = -3.d0*gam*(Ca + 2d0/Web/(fR0*len_ratio))*tmp1*fV/fR
+            tmp1 = (fR0/fR)**(3.d0*gam)
+            tmp1 = -3.d0*gam*(Ca + 2d0/Web/fR0)*tmp1*fV/fR
         else
             tmp1 = fpbdot
         end if
@@ -619,9 +619,9 @@ contains
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = Ca*((fR0*len_ratio/fR)**(3.d0*gam)) + Cpv
+            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) + Cpv
             if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                                              (2.d0/(Web*(fR0*len_ratio)))*((fR0*len_ratio/fR)**(3.d0*gam))
+                                              (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
             f_cpbw_KM = fpb
         end if
@@ -648,9 +648,9 @@ contains
         real(kind(0d0)) :: f_rddot_KM
         
         if (polytropic) then
-            cdot_star = -3d0*gam*Ca*((fR0*len_ratio/fR)**(3d0*gam))*fV/fR
+            cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
             if (Web /= dflt_real) cdot_star = cdot_star - &
-                                              3d0*gam*(2d0/(Web*(fR0*len_ratio)))*((fR0*len_ratio/fR)**(3d0*gam))*fV/fR
+                                              3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
         else
             cdot_star = fpbdot
         end if
@@ -743,7 +743,7 @@ contains
         real(kind(0.d0)) :: f_bpres_dot
 
         if (thermal == 3) then
-            T_bar = Tw*(fpb/pb0(iR0))*(fR/(R0(iR0)*len_ratio))**3 &
+            T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &
                     *(mass_n0(iR0) + mass_v0(iR0))/(mass_n0(iR0) + fmass_v)
             grad_T = -Re_trans_T(iR0)*(T_bar - Tw)
             f_bpres_dot = 3.d0*gamma_m*(-fV*fpb + fvflux*R_v*Tw &

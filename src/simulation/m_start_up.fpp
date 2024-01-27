@@ -136,7 +136,7 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
-            R0ref, len_ratio, &
+            R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, weno_order, &
 #:endif

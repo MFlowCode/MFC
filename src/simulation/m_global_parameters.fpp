@@ -287,7 +287,6 @@ module m_global_parameters
     integer :: R0_type
 
     real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
-    real(kind(0d0)) :: len_ratio !< Bubble-background flow length scale ratio (= R0/x0)
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
@@ -443,7 +442,6 @@ contains
         adap_dt = .false.
 
         pi_fac = 1d0
-        len_ratio = 1d0
 
         ! User inputs for qbmm for simulation code
         qbmm = .false.
