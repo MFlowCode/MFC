@@ -167,7 +167,7 @@ contains
             & 'E_wrt', 'pres_wrt', 'gamma_wrt',                                &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
-            & 'polytropic', 'polydisperse', 'file_per_process', 'relax'        &
+            & 'polytropic', 'polydisperse', 'file_per_process', 'relax',       &
             & 'adv_n', 'alter_alpha' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
