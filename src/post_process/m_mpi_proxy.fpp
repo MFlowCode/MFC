@@ -48,7 +48,6 @@ module m_mpi_proxy
 
 contains
 
-
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     subroutine s_initialize_mpi_proxy_module() ! ------------------------------
@@ -159,7 +158,7 @@ contains
             & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb' ]
+            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -183,6 +182,9 @@ contains
         do i = 1, num_fluids_max
             call MPI_BCAST(fluid_pp(i)%gamma, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%pi_inf, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%cv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qvp, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
 
@@ -610,7 +612,7 @@ contains
         else
             offset_x%beg = 0
         end if
-        
+
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
             proc_coords(1) = proc_coords(1) + 1
@@ -931,13 +933,13 @@ contains
                                 r = sys_size*(j + buff_size) &
                                     + sys_size*buff_size*k + (i - 1) &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                             
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                                
+#endif
                             end do
                         end do
                     end do
@@ -1011,13 +1013,13 @@ contains
                                 r = (i - 1) + sys_size*(j - m - 1) &
                                     + sys_size*buff_size*k &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                                
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                                 
+#endif
                             end do
                         end do
                     end do
@@ -1107,11 +1109,11 @@ contains
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif            
+#endif
                             end do
                         end do
                     end do
@@ -1193,11 +1195,11 @@ contains
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif 
+#endif
                             end do
                         end do
                     end do
@@ -1292,11 +1294,11 @@ contains
                                     (n + 2*buff_size + 1)*(l + buff_size)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                           
+#endif
                             end do
                         end do
                     end do
@@ -1383,11 +1385,11 @@ contains
                                     (n + 2*buff_size + 1)*(l - p - 1)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif 
+#endif
                             end do
                         end do
                     end do
@@ -1402,7 +1404,6 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_cons_vars_buffer_regions ! ---------------
-
 
     !>  This subroutine gathers the Silo database metadata for
         !!      the spatial extents in order to boost the performance of
@@ -1639,6 +1640,5 @@ contains
 #endif
 
     end subroutine s_finalize_mpi_proxy_module ! -------------------------
-
 
 end module m_mpi_proxy

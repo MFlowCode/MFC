@@ -73,15 +73,15 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        if(qbmm .and. .not. polytropic) then
-        !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
-            allocate(pb%sf(0:m, &
-                  0:n, &
-                  0:p, 1:nnode, 1:nb))
+        if (qbmm .and. .not. polytropic) then
+            !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
+            allocate (pb%sf(0:m, &
+                            0:n, &
+                            0:p, 1:nnode, 1:nb))
 
-            allocate(mv%sf(0:m, &
-                  0:n, &
-                  0:p, 1:nnode, 1:nb))
+            allocate (mv%sf(0:m, &
+                            0:n, &
+                            0:p, 1:nnode, 1:nb))
         end if
         ! Setting default values for conservative and primitive variables so
         ! that in the case that the initial condition is wrongly laid out on
@@ -126,7 +126,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
                 ! Spherical patch
@@ -164,7 +164,7 @@ contains
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
- 
+
                 end if
 
             end do
@@ -177,7 +177,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
                 ! Circular patch
@@ -199,7 +199,7 @@ contains
                     ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                        'which no longer exists. See Examples. Exiting ...')
+                                     'which no longer exists. See Examples. Exiting ...')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
@@ -220,7 +220,7 @@ contains
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
- 
+
                 end if
 
             end do
@@ -233,7 +233,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
                 ! Line segment patch
@@ -262,12 +262,11 @@ contains
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
 
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
-
 
     end subroutine s_generate_initial_condition ! --------------------------
 
@@ -337,53 +336,53 @@ contains
 
     end subroutine s_perturb_surrounding_flow ! ----------------------------
 
-    !>  This subroutine computes velocity perturbations for a temporal mixing  
-        !!              layer with hypertangent mean streamwise velocity profile 
-        !!              obtained from linear stability analysis. For a 2D case, 
-        !!              instability waves with spatial wavenumbers, (4,0), (2,0), 
-        !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
+    !>  This subroutine computes velocity perturbations for a temporal mixing
+        !!              layer with hypertangent mean streamwise velocity profile
+        !!              obtained from linear stability analysis. For a 2D case,
+        !!              instability waves with spatial wavenumbers, (4,0), (2,0),
+        !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
-        real(kind(0d0)) :: tr,ti
-        real(kind(0d0)) :: Lx,Lz
-        integer :: i,j,k
-        
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
+        real(kind(0d0)) :: tr, ti
+        real(kind(0d0)) :: Lx, Lz
+        integer :: i, j, k
+
         Lx = x_domain%end - x_domain%beg
         if (p > 0) then
             Lz = z_domain%end - z_domain%beg
         end if
- 
+
         wave = 0d0
         wave1 = 0d0
         wave2 = 0d0
-        
+
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*4.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*2.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*1.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*13d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*17d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Lx,-2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, -2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*19d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx,-2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, -2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*23d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx,-2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, -2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*29d0/31d0)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
-        
+
         ! Superpose velocity perturbuations (instability waves) to the velocity field
         do k = 0, p
         do j = 0, n
@@ -398,7 +397,7 @@ contains
         end do
         end do
         end do
-    
+
     end subroutine s_superposition_instability_wave ! ----------------------
 
     !>  This subroutine computes instability waves for a given set of spatial
@@ -421,20 +420,20 @@ contains
         real(kind(0d0)),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
         real(kind(0d0)),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam,pi_inf,rho1,mach,c1
+        real(kind(0d0)) :: gam, pi_inf, rho1, mach, c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indices
 
         ! Set fluid flow properties
         gam = 1.+1./fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam-1.)/gam
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1.)/gam
         if (bubbles .and. num_fluids == 1) then
-            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0-patch_icpp(1)%alpha(1))
+            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
         else
             rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
         end if
-        c1 = sqrt((gam*(patch_icpp(1)%pres+pi_inf))/rho1)
+        c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/rho1)
         mach = 1./c1
 
         ! Assign mean profiles
@@ -466,7 +465,7 @@ contains
                 du_mean(j) = du_mean(j)+d(j,k)*u_mean(k)
             end do
         end do
-        
+
         ! Compute B and C, then A = B + C
         ! B includes terms without differential operator, and
         ! C includes terms with differential operator
@@ -523,43 +522,43 @@ contains
     end subroutine s_instability_wave
 
     !>  This subroutine generates an instability wave using the most unstable
-        !!              eigenvalue and corresponding eigenvector among the 
+        !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    subroutine s_generate_wave(nl,wr,wi,zr,zi,alpha,beta,wave,shift)
+    subroutine s_generate_wave(nl, wr, wi, zr, zi, alpha, beta, wave, shift)
         integer nl
-        real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave
-        real(kind(0d0)) :: alpha,beta,ang,shift
+        real(kind(0d0)), dimension(0:nl - 1) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:nl - 1, 0:nl - 1) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:nl - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave
+        real(kind(0d0)) :: alpha, beta, ang, shift
         real(kind(0d0)) :: norm
-        real(kind(0d0)) :: tr,ti,cr,ci !< temporary memory
+        real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
         integer idx
-        integer i,j,k
-        
+        integer i, j, k
+
         ! Find the most unstable eigenvalue and corresponding eigenvector
-        k=0
-        do i=1,nl-1
-            if (wi(i) .gt. wi(k)) then
+        k = 0
+        do i = 1, nl - 1
+            if (wi(i) > wi(k)) then
                 k = i
             end if
         end do
-        vr = zr(:,k)
-        vi = zi(:,k)
+        vr = zr(:, k)
+        vi = zi(:, k)
 
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0d0
-        do i=0,nl-1
-            if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
+        do i = 0, nl - 1
+            if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2+vi(i)**2)
+                norm = dsqrt(vr(i)**2 + vi(i)**2)
             end if
         end do
 
         tr = vr(idx)
         ti = vi(idx)
-        do i=0,nl-1
-            call cdiv(vr(i),vi(i),tr,ti,cr,ci)
+        do i = 0, nl - 1
+            call cdiv(vr(i), vi(i), tr, ti, cr, ci)
             vnr(i) = cr
             vni(i) = ci
         end do
@@ -585,7 +584,7 @@ contains
         end do
         end do
         end do
-    
+
     end subroutine s_generate_wave
 
     !>  Deallocation procedures for the module
