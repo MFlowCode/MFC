@@ -492,7 +492,7 @@ contains
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
                  + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
-   
+
         ! Set partial pressures to mixture pressure for the 6-eqn model
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end

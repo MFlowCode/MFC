@@ -698,8 +698,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
-                                     +  mv_ts(2)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_mv(j, k, l, q, i))/4d0
+                                     + mv_ts(2)%sf(j, k, l, q, i) &
+                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
