@@ -189,8 +189,8 @@ contains
 
         if (adv_n) then
             @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
-                            iy_t%beg:iy_t%end, &
-                            iz_t%beg:iz_t%end))
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
         end if
 
         if (hypoelasticity) then
@@ -234,7 +234,7 @@ contains
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: nR3bar
-        
+
         ! Stage 1 of 1 =====================================================
 
         call cpu_time(start)
@@ -319,13 +319,13 @@ contains
                         nR3bar = 0d0
                         do i = 1, nb
                             if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, j, k, l, i, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
                                 error stop "R < 0"
                             end if
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
@@ -437,19 +437,19 @@ contains
                         nR3bar = 0d0
                         do i = 1, nb
                             if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j,k,l,i,q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, j, k, l, i, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
                                 error stop "R < 0"
                             end if
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
                     end do
                 end do
-            enddo
+            end do
         end if
 
         ! ==================================================================
@@ -521,13 +521,13 @@ contains
                         nR3bar = 0d0
                         do i = 1, nb
                             if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j,k,l,i,q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
+                                print *, j, k, l, i, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
                                 error stop "R < 0"
                             end if
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
@@ -642,16 +642,16 @@ contains
                         nR3bar = 0d0
                         !$acc loop seq
                         do i = 1, nb
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
                     end do
                 end do
-            enddo
+            end do
         end if
 
         ! ==================================================================
@@ -683,8 +683,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
-                                     +  pb_ts(2)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_pb(j, k, l, q, i))/4d0
+                                     + pb_ts(2)%sf(j, k, l, q, i) &
+                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -724,16 +724,16 @@ contains
                         nR3bar = 0d0
                         !$acc loop seq
                         do i = 1, nb
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
                     end do
                 end do
-            enddo
+            end do
         end if
 
         ! ==================================================================
@@ -764,8 +764,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                    + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                    + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
+                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -782,8 +782,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                    + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                    + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
+                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -805,10 +805,10 @@ contains
                         nR3bar = 0d0
                         !$acc loop seq
                         do i = 1, nb
-                            if(polytropic) then
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                            if (polytropic) then
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             else
-                                nR3bar = nR3bar + weight(i) * (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)) ** 3d0
+                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                             end if
                         end do
                         q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
@@ -841,14 +841,14 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: bub_adv_src
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb ) :: bub_r_src, &
-                                                            bub_v_src, &
-                                                            bub_p_src, &
-                                                            bub_m_src
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb) :: bub_r_src, &
+                                                           bub_v_src, &
+                                                           bub_p_src, &
+                                                           bub_m_src
         type(scalar_field) :: divu
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
 
         integer :: j, k, l, q !< Generic loop iterator
         type(int_bounds_info) :: ix, iy, iz
@@ -863,14 +863,14 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
 
         call s_convert_conservative_to_primitive_variables( &
-        q_cons_ts(1)%vf, &
-        q_prim_vf, &
-        gm_alpha_qp%vf, &
-        ix, iy, iz)
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
 
         ! Compute bubble source
         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                    q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
+                                     q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
 
         ! Update bubble variables
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -879,9 +879,9 @@ contains
                 do j = ix%beg, ix%end
                     do q = 1, nb
                         q_cons_ts(1)%vf(bub_idx%rs(q))%sf(j, k, l) = &
-                                    bub_r_src(j, k, l, q)
+                            bub_r_src(j, k, l, q)
                         q_cons_ts(1)%vf(bub_idx%vs(q))%sf(j, k, l) = &
-                                    bub_v_src(j, k, l, q)
+                            bub_v_src(j, k, l, q)
                     end do
                 end do
             end do
@@ -890,7 +890,7 @@ contains
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
-        !!      the flux term and adaptive time stepping algorithm for 
+        !!      the flux term and adaptive time stepping algorithm for
         !!      the source term
         !! @param t_step Current time-step
     subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------

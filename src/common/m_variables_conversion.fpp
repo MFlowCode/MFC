@@ -1094,7 +1094,7 @@ contains
 
                         if (.not. qbmm) then
                             call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
-                            
+
                             if (adv_n) then
                                 q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
                                 if (alter_alpha) then

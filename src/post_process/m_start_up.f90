@@ -575,7 +575,7 @@ contains
                     varname(:) = ' '
                 end do
             end if
-            
+
             ! number density
             if (adv_n) then
                 q_sf = q_cons_vf(n_idx)%sf( &

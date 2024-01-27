@@ -229,8 +229,8 @@ contains
                             myR_tmp(1) = myR
                             myV_tmp(1) = myV
                             myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                 pb, pbdot, alf, n_tait, B_tait, &
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             !! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
                             d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
@@ -239,28 +239,28 @@ contains
                                 h0 = 1e-6
                             else
                                 h0 = 0.01*(d0/d1)
-                            end if 
+                            end if
 
                             !! Evaluate f(x0+h0,y0+h0*f(x0,y0))
                             myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
                             myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
                             myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                 pb, pbdot, alf, n_tait, B_tait, &
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             !! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2) /2) / h0
+                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2)/h0
 
                             !! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
                             !!      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-                            if (max(d1,d2) < 1e-15) then
+                            if (max(d1, d2) < 1e-15) then
                                 h1 = max(1e-6, h0*1e-3)
                             else
-                                h1 = (0.01/max(d1,d2))**(1/3d0)
+                                h1 = (0.01/max(d1, d2))**(1/3d0)
                             end if
 
                             !! Set h = min(100*h0,h1)
-                            h = min(100*h0,h1)
+                            h = min(100*h0, h1)
 
                             ! Advancing one step
                             t_new = 0d0
@@ -269,8 +269,8 @@ contains
                             do while (.true.)
                                 if (t_new + h > dt) then
                                     h = dt - t_new
-                                end if 
-                                                            
+                                end if
+
                                 ii = 1
                                 ! Advancing one sub-step
                                 do while (.true.)
@@ -281,55 +281,55 @@ contains
 
                                     ! Stage 1
                                     myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                         pb, pbdot, alf, n_tait, B_tait, &
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
                                     myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
                                     myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
 
                                     ! Stage 2
                                     myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                         pb, pbdot, alf, n_tait, B_tait, &
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
                                     myR_tmp(3) = myR_tmp(1) + (h/4)*(myV_tmp(1) + myV_tmp(2))
                                     myV_tmp(3) = myV_tmp(1) + (h/4)*(myA_tmp(1) + myA_tmp(2))
 
                                     ! Stage 3
                                     myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                         pb, pbdot, alf, n_tait, B_tait, &
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
                                     myR_tmp(4) = myR + (h/6)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
                                     myV_tmp(4) = myV + (h/6)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
 
                                     ! Stage 4
                                     myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
-                                                pb, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                                         pb, pbdot, alf, n_tait, B_tait, &
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Estimate error
                                     err_R = (-5*h/24)*(myV_tmp(2) + myV_tmp(3) - 2*myV_tmp(4)) &
-                                            / max(abs(myR_tmp(1)),abs(myR_tmp(4)))
+                                            /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
                                     err_V = (-5*h/24)*(myA_tmp(2) + myA_tmp(3) - 2*myA_tmp(4)) &
-                                            / max(abs(myV_tmp(1)),abs(myV_tmp(4)))
-                                    err = DSQRT((err_R**2 + err_V**2) / 2) / 1e-2 ! Rtol = 1e-2
+                                            /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
+                                    err = DSQRT((err_R**2 + err_V**2)/2)/1e-2 ! Rtol = 1e-2
 
                                     ! Determine acceptance/rejection and update step size
-                                    if ((err <= 1+1e-5) .and. myR_tmp(4) > 0) then
+                                    if ((err <= 1 + 1e-5) .and. myR_tmp(4) > 0) then
                                         ! Accepted. Finalize the sub-step
                                         myR = myR_tmp(4)
                                         myV = myV_tmp(4)
                                         t_new = t_new + h
 
                                         ! Update step size for the next sub-step
-                                        h = h * min(2d0,max(0.5d0,(1/err)**(1/3d0)))
+                                        h = h*min(2d0, max(0.5d0, (1/err)**(1/3d0)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
                                         if (myR_tmp(4) > 0) then
-                                            h = h * min(2d0,max(0.5d0,(1d0/err)**(1/3d0)))
+                                            h = h*min(2d0, max(0.5d0, (1d0/err)**(1/3d0)))
                                         else
-                                            h = 0.5 * h
-                                        end if 
+                                            h = 0.5*h
+                                        end if
                                     end if
                                     if (ii == 1000) then
                                         call s_mpi_abort('too many iteration (>1000) in bubbles')
@@ -350,11 +350,11 @@ contains
 
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
-                                    pb, pbdot, alf, n_tait, B_tait, &
-                                    bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                            pb, pbdot, alf, n_tait, B_tait, &
+                                            bub_adv_src(j, k, l), divu%sf(j, k, l))
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
                         end if
-                        
+
                         if (alf < 1.d-11) then
                             bub_adv_src(j, k, l) = 0d0
                             bub_r_src(j, k, l, q) = 0d0
@@ -390,7 +390,6 @@ contains
         end do
 
     end subroutine s_compute_bubble_source
-
 
     !>  Function that computes that bubble wall pressure for Gilmore bubbles
         !!  @param fR0 Equilibrium bubble radius
@@ -529,7 +528,7 @@ contains
         !!  @param alf bubble volume fraction
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-        !!  @param f_bub_adv_src Source for bubble volume fraction 
+        !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
     function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
         !$acc routine seq
@@ -646,7 +645,7 @@ contains
         real(kind(0d0)), intent(IN) :: fRho, fR, fV, fR0, fC
         real(kind(0d0)) :: tmp1, tmp2, cdot_star
         real(kind(0d0)) :: f_rddot_KM
-        
+
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
             if (Web /= dflt_real) cdot_star = cdot_star - &

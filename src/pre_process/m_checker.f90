@@ -82,13 +82,13 @@ contains
         if (adv_n) then
             if (bubbles .neqv. .true.) then
                 call s_mpi_abort('adv_n requires bubbles = true.'// &
-                    'Exiting ...')
+                                 'Exiting ...')
             else if (num_fluids > 1) then
                 call s_mpi_abort('adv_n requires num_fluids = 1. '// &
-                    'Exiting ...')
+                                 'Exiting ...')
             else if (qbmm .eqv. .true.) then
                 call s_mpi_abort('adv_n is incompatible with qbmm.'// &
-                    'Exiting ...')
+                                 'Exiting ...')
             end if
         end if
 

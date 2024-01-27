@@ -1575,7 +1575,7 @@ contains
                                         end if
                                     end do
 
-                                    if(.not. qbmm) then
+                                    if (.not. qbmm) then
                                         if (adv_n .and. alter_alpha) then
                                             nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, n_idx)
                                             nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, n_idx)
@@ -1838,7 +1838,7 @@ contains
                                         + xi_P*nbub_R &
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end if
-                                
+
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then

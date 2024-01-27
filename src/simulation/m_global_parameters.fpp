@@ -587,7 +587,7 @@ contains
                         n_idx = bub_idx%end + 1
                         sys_size = n_idx
                     end if
-                    
+
                     @:ALLOCATE(weight(nb), R0(nb), V0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
