@@ -776,7 +776,7 @@ contains
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
                 end if
-                
+
                 if (adv_n) then
                     iv%beg = n_idx; iv%end = n_idx
                     call s_reconstruct_cell_boundary_values( &

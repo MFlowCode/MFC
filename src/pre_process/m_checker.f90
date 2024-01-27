@@ -63,7 +63,7 @@ contains
                 call s_mpi_abort('Unsupported combination of values of '// &
                                  'model_eqns and num_fluids. '// &
                                  'Exiting ...')
-            elseif (R0ref == dflt_real) then
+            elseif ((.not. polytropic) .and. R0ref == dflt_real) then
                 call s_mpi_abort('Unsupported combination of values of '// &
                                  'bubbles and R0ref. '// &
                                  'Exiting ...')

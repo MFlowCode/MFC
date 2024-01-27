@@ -107,7 +107,7 @@ module m_global_parameters
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
     real(kind(0d0)) :: len_ratio !< Bubble-background flow length scale ratio (= R0/x0)
-    
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
