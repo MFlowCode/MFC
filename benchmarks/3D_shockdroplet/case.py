@@ -15,7 +15,8 @@ CtD = 0.06
 # cavity relative eccentricity (distance between radii)
 ecc = 0.564              
 
-# initial shock distance from the y axis. Note that the droplet center is located at y = 0. Thus, the distance from the shock to 
+# initial shock distance from the y axis. Note that the droplet center is located at y = 0. 
+# Thus, the distance from the shock to 
 # the droplet is about D0/8
 ISD = 5.0/8 * D0
 
