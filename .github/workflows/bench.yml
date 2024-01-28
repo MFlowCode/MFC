@@ -32,14 +32,10 @@ jobs:
           (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
-      - name: Generate Comment
+      - name: Generate & Post Comment
         run: |
           . ./mfc.sh load -c p -m g
-          COMMENT_MSG=`./mfc.sh bench_diff master/bench-${{ matrix.device }}.yaml pr/bench-${{ matrix.device }}.yaml`
-          echo "COMMENT_MSG=\"$COMMENT_MSG\"" >> $GITHUB_ENV
-
-      - name: Post Comment
-        run:  echo "$COMMENT_MSG"
+          ./mfc.sh bench_diff master/bench-${{ matrix.device }}.yaml pr/bench-${{ matrix.device }}.yaml
 
       - name: Archive Logs
         uses: actions/upload-artifact@v3
