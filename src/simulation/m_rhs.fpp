@@ -1474,7 +1474,7 @@ contains
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_z%end <= -5 .and. bc_z%beg >= -13) then
+                if (bc_z%end <= -5 .and. bc_z%end >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
