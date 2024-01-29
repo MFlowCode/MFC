@@ -15,11 +15,13 @@ fi
 
 sbatch_cpu_opts="\
 #SBATCH -p cpu-small               # partition
+#SBATCH -N1                        # Number of nodes required
 #SBATCH --ntasks-per-node=24       # Number of cores per node required
 #SBATCH --mem-per-cpu=2G           # Memory per core\
 "
 
 sbatch_gpu_opts="\
+#SBATCH -n4                        # Number of ranks required
 #SBATCH -CV100-16GB
 #SBATCH -G2\
 "
@@ -39,7 +41,6 @@ sbatch <<EOT
 #!/bin/bash
 #SBATCH -Jshb-$job_slug            # Job name
 #SBATCH --account=gts-sbryngelson3 # charge account
-#SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
 #SBATCH -t 04:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
