@@ -22,7 +22,7 @@ program p_main
     real(kind(0d0)), allocatable, dimension(:) :: proc_time
 
     call random_seed()
-    
+
     call s_initialize_mpi_domain()
 
     ! Initialization of the MPI environment
@@ -39,7 +39,7 @@ program p_main
 
     call s_save_data(proc_time, time_avg, time_final, file_exists)
 
-    deallocate(proc_time)
+    deallocate (proc_time)
 
     call s_finalize_modules()
 

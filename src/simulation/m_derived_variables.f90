@@ -97,14 +97,15 @@ contains
 
             ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
-                                                             fd_number, fd_order)
+                                                          fd_number, fd_order)
+
             if (n > 0) then
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
-                                                                 fd_number, fd_order)
+                                                              fd_number, fd_order)
             end if
             if (p > 0) then
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
-                                                                 fd_number, fd_order)
+                                                              fd_number, fd_order)
             end if
         end if
 
@@ -228,7 +229,7 @@ contains
                     end do
                 end do
             end do
-        ! Computing the acceleration component in the y-coordinate direction
+            ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
             do l = 0, p
                 do k = 0, n
@@ -268,7 +269,8 @@ contains
                     end do
                 end do
             end do
-        ! Computing the acceleration component in the z-coordinate direction
+
+            ! Computing the acceleration component in the z-coordinate direction
         else
             do l = 0, p
                 do k = 0, n
@@ -445,8 +447,7 @@ contains
                      c_m(i,4) = c_m(i,4)/c_m(i,1)
                end do
         end if                    
-
-                        
+                       
     end subroutine s_derive_center_of_mass ! ----------------------------------
 
     !> Deallocation procedures for the module
@@ -461,11 +462,11 @@ contains
         end if
 
         if (probe_wrt) then
-            deallocate(accel_mag, x_accel)
+            deallocate (accel_mag, x_accel)
             if (n > 0) then
-                deallocate(y_accel)
+                deallocate (y_accel)
                 if (p > 0) then
-                    deallocate(z_accel)
+                    deallocate (z_accel)
                 end if
             end if
         end if

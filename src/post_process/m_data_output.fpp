@@ -122,19 +122,19 @@ contains
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
-                allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, &
-                                   -offset_z%beg:p + offset_z%end, &
-                                   -offset_x%beg:m + offset_x%end))
+            allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, &
+                               -offset_z%beg:p + offset_z%end, &
+                               -offset_x%beg:m + offset_x%end))
         end if
 
         if (precision == 1) then
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
-                -offset_y%beg:n + offset_y%end, &
-                -offset_z%beg:p + offset_z%end))
+                             -offset_y%beg:n + offset_y%end, &
+                             -offset_z%beg:p + offset_z%end))
             if (grid_geometry == 3) then
                 allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, &
-                                    -offset_z%beg:p + offset_z%end, &
-                                    -offset_x%beg:m + offset_x%end))
+                                     -offset_z%beg:p + offset_z%end, &
+                                     -offset_x%beg:m + offset_x%end))
             end if
         end if
 
@@ -169,7 +169,7 @@ contains
 
         ! The size of the ghost zone layer in each of the active coordinate
         ! directions was set in the module m_mpi_proxy.f90. The results are
-        ! now transfered to the local variables of this module when they are
+        ! now transferred to the local variables of this module when they are
         ! required by the Silo-HDF5 format, for multidimensional data sets.
         ! With the same, latter, requirements, the variables bookkeeping the
         ! number of cell-boundaries in each active coordinate direction are
@@ -183,22 +183,22 @@ contains
                     lo_offset = (/offset_x%beg, offset_y%beg, offset_z%beg/)
                     hi_offset = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
-                
+
                 if (grid_geometry == 3) then
                     dims = (/n + offset_y%beg + offset_y%end + 2, &
-                                p + offset_z%beg + offset_z%end + 2, &
-                                m + offset_x%beg + offset_x%end + 2/)
+                             p + offset_z%beg + offset_z%end + 2, &
+                             m + offset_x%beg + offset_x%end + 2/)
                 else
                     dims = (/m + offset_x%beg + offset_x%end + 2, &
-                                n + offset_y%beg + offset_y%end + 2, &
-                                p + offset_z%beg + offset_z%end + 2/)
+                             n + offset_y%beg + offset_y%end + 2, &
+                             p + offset_z%beg + offset_z%end + 2/)
                 end if
             else
                 lo_offset = (/offset_x%beg, offset_y%beg/)
                 hi_offset = (/offset_x%end, offset_y%end/)
 
                 dims = (/m + offset_x%beg + offset_x%end + 2, &
-                            n + offset_y%beg + offset_y%end + 2/)
+                         n + offset_y%beg + offset_y%end + 2/)
             end if
         end if
 
@@ -450,8 +450,8 @@ contains
             ! is not the case, the post-process exits.
             if (dbfile == -1) then
                 call s_mpi_abort('Unable to create Silo-HDF5 database '// &
-                    'slave file '//trim(file_loc)//'. '// &
-                    'Exiting ...')
+                                 'slave file '//trim(file_loc)//'. '// &
+                                 'Exiting ...')
             end if
 
             ! Next, analogous steps to the ones above are carried out by the
@@ -468,8 +468,8 @@ contains
 
                 if (dbroot == -1) then
                     call s_mpi_abort('Unable to create Silo-HDF5 database '// &
-                        'master file '//trim(file_loc)//'. '// &
-                        'Exiting ...')
+                                     'master file '//trim(file_loc)//'. '// &
+                                     'Exiting ...')
                 end if
 
             end if
@@ -493,9 +493,9 @@ contains
             ! Verifying that the creation and setup process of the formatted
             ! database slave file has been performed without errors. If this
             ! is not the case, the post-process exits.
-            if (err /= 0) then 
+            if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave '// &
-                    'file '//trim(file_loc)//'. Exiting ...')
+                                 'file '//trim(file_loc)//'. Exiting ...')
             end if
 
             ! Further defining the structure of the formatted database slave
@@ -515,10 +515,10 @@ contains
                 open (dbroot, IOSTAT=err, FILE=trim(file_loc), &
                       FORM='unformatted', STATUS='replace')
 
-                if (err /= 0) then 
+                if (err /= 0) then
                     call s_mpi_abort('Unable to create Binary database '// &
-                    'master file '//trim(file_loc)// &
-                    '. Exiting ...')
+                                     'master file '//trim(file_loc)// &
+                                     '. Exiting ...')
                 end if
 
                 write (dbroot) m_root, 0, 0, dbvars
@@ -624,52 +624,52 @@ contains
 
             if (precision == 1) then
                 if (p > 0) then
-                    do i = -1-offset_z%beg,p + offset_z%end
-                        z_cb_s(i) = real(z_cb(i)) 
+                    do i = -1 - offset_z%beg, p + offset_z%end
+                        z_cb_s(i) = real(z_cb(i))
                     end do
                 else
-                    do i = -1-offset_x%beg,m + offset_x%end
-                        x_cb_s(i) = real(x_cb(i)) 
+                    do i = -1 - offset_x%beg, m + offset_x%end
+                        x_cb_s(i) = real(x_cb(i))
                     end do
 
-                    do i = -1-offset_y%beg,n + offset_y%end
-                        y_cb_s(i) = real(y_cb(i)) 
+                    do i = -1 - offset_y%beg, n + offset_y%end
+                        y_cb_s(i) = real(y_cb(i))
                     end do
                 end if
             end if
 
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-            if (precision == ${PRECISION}$) then
-                if (p > 0) then
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                    err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                    if (grid_geometry == 3) then
-                        err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                        'x', 1, 'y', 1, 'z', 1, &
-                                        y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
-                                        ${DBT}$, DB_COLLINEAR, &
-                                        optlist, ierr)
+                if (precision == ${PRECISION}$) then
+                    if (p > 0) then
+                        err = DBMKOPTLIST(2, optlist)
+                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
+                        if (grid_geometry == 3) then
+                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                          'x', 1, 'y', 1, 'z', 1, &
+                                          y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
+                                          ${DBT}$, DB_COLLINEAR, &
+                                          optlist, ierr)
+                        else
+                            err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
+                                          'x', 1, 'y', 1, 'z', 1, &
+                                          x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
+                                          ${DBT}$, DB_COLLINEAR, &
+                                          optlist, ierr)
+                        end if
+                        err = DBFREEOPTLIST(optlist)
                     else
+                        err = DBMKOPTLIST(2, optlist)
+                        err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
+                        err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
                         err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                        'x', 1, 'y', 1, 'z', 1, &
-                                        x_cb${SFX}$, y_cb${SFX}$, z_cb${SFX}$, dims, 3, &
-                                        ${DBT}$, DB_COLLINEAR, &
-                                        optlist, ierr)
+                                      'x', 1, 'y', 1, 'z', 1, &
+                                      x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
+                                      ${DBT}$, DB_COLLINEAR, &
+                                      optlist, ierr)
+                        err = DBFREEOPTLIST(optlist)
                     end if
-                    err = DBFREEOPTLIST(optlist)
-                else
-                    err = DBMKOPTLIST(2, optlist)
-                    err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
-                    err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
-                                'x', 1, 'y', 1, 'z', 1, &
-                                x_cb${SFX}$, y_cb${SFX}$, DB_F77NULL, dims, 2, &
-                                ${DBT}$, DB_COLLINEAR, &
-                                optlist, ierr)
-                    err = DBFREEOPTLIST(optlist)
                 end if
-            end if
             #:endfor
             ! END: Silo-HDF5 Database Format ===================================
 
@@ -851,7 +851,7 @@ contains
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i,j,k) = real(q_sf(i, j, k))
+                                q_sf_s(i, j, k) = real(q_sf(i, j, k))
                             end do
                         end do
                     end do
@@ -868,32 +868,32 @@ contains
                 end if
 
                 #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
-                if (precision == ${PRECISION}$) then
-                    if (p > 0) then
-                        if (grid_geometry == 3) then
-                            err = DBPUTQV1(dbfile, trim(varname), &
-                                            len_trim(varname), &
-                                            'rectilinear_grid', 16, &
-                                            cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                            0, ${DBT}$, DB_ZONECENT, &
-                                            DB_F77NULL, ierr)
+                    if (precision == ${PRECISION}$) then
+                        if (p > 0) then
+                            if (grid_geometry == 3) then
+                                err = DBPUTQV1(dbfile, trim(varname), &
+                                               len_trim(varname), &
+                                               'rectilinear_grid', 16, &
+                                               cyl_q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
+                                               0, ${DBT}$, DB_ZONECENT, &
+                                               DB_F77NULL, ierr)
+                            else
+                                err = DBPUTQV1(dbfile, trim(varname), &
+                                               len_trim(varname), &
+                                               'rectilinear_grid', 16, &
+                                               q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
+                                               0, ${DBT}$, DB_ZONECENT, &
+                                               DB_F77NULL, ierr)
+                            end if
                         else
                             err = DBPUTQV1(dbfile, trim(varname), &
-                                            len_trim(varname), &
-                                            'rectilinear_grid', 16, &
-                                            q_sf${SFX}$, dims - 1, 3, DB_F77NULL, &
-                                            0, ${DBT}$, DB_ZONECENT, &
-                                            DB_F77NULL, ierr)
+                                           len_trim(varname), &
+                                           'rectilinear_grid', 16, &
+                                           q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
+                                           0, ${DBT}$, DB_ZONECENT, &
+                                           DB_F77NULL, ierr)
                         end if
-                    else
-                        err = DBPUTQV1(dbfile, trim(varname), &
-                                        len_trim(varname), &
-                                        'rectilinear_grid', 16, &
-                                        q_sf${SFX}$, dims - 1, 2, DB_F77NULL, &
-                                        0, ${DBT}$, DB_ZONECENT, &
-                                        DB_F77NULL, ierr)
                     end if
-                end if
                 #:endfor
 
             end if

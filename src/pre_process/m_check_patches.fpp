@@ -33,7 +33,7 @@ contains
 
         ! integer, intent(in) :: i
 
-        integer :: i 
+        integer :: i
 
         do i = 1, num_patches_max
             if (i <= num_patches) then
@@ -52,8 +52,8 @@ contains
                     call s_check_ellipse_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('Unimplemented choice of geometry 6'// &
-                        ' (formerly "Vortex") of active patch '//trim(iStr)// &
-                        ' detected. Exiting ...')
+                                     ' (formerly "Vortex") of active patch '//trim(iStr)// &
+                                     ' detected. Exiting ...')
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_check_2D_analytical_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 8) then
@@ -86,20 +86,19 @@ contains
                     call s_check_model_geometry(i)
                 else
                     call s_mpi_abort('Unsupported choice of the '// &
-                            'geometry of active patch '//trim(iStr)//&
-                            ' detected. Exiting ...')
+                                     'geometry of active patch '//trim(iStr)// &
+                                     ' detected. Exiting ...')
                 end if
             else
                 if (patch_icpp(i)%geometry == dflt_int) then
                     call s_check_inactive_patch_geometry(i)
                 else
                     call s_mpi_abort('Unsupported choice of the '// &
-                        'geometry of inactive patch '//trim(iStr)//&
-                        ' detected. Exiting ...')
+                                     'geometry of inactive patch '//trim(iStr)// &
+                                     ' detected. Exiting ...')
                 end if
             end if
         end do
-
 
         ! Constraints on overwrite rights initial condition patch parameters
         do i = 1, num_patches
@@ -153,8 +152,8 @@ contains
             cyl_coord) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of line segment '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of line segment '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -175,10 +174,10 @@ contains
             patch_icpp(patch_id)%x_centroid == dflt_real &
             .or. &
             patch_icpp(patch_id)%y_centroid == dflt_real) then
- 
+
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of circle '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of circle '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -205,8 +204,8 @@ contains
             patch_icpp(patch_id)%length_y <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of rectangle '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of rectangle '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -235,8 +234,8 @@ contains
             patch_icpp(patch_id)%normal(3) /= dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of line sweep '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of line sweep '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -265,8 +264,8 @@ contains
             patch_icpp(patch_id)%radii(3) /= dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of ellipse '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of ellipse '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -292,11 +291,11 @@ contains
             .or. &
             patch_icpp(patch_id)%length_y <= 0d0 &
             .or. &
-            patch_icpp(patch_id)%vel(2)<= 0d0) then
+            patch_icpp(patch_id)%vel(2) <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-            'geometric parameters of Taylor Green '// &
-            'vortex patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of Taylor Green '// &
+                             'vortex patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -321,8 +320,8 @@ contains
             patch_icpp(patch_id)%length_x <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of 1D analytical '// &
-                'patch '//trim(iStr)//'. Exiting...')
+                             'geometric parameters of 1D analytical '// &
+                             'patch '//trim(iStr)//'. Exiting...')
         end if
     end subroutine s_check_1D_analytical_patch_geometry ! ---------------------
 
@@ -345,10 +344,10 @@ contains
             patch_icpp(patch_id)%length_x <= 0d0 &
             .or. &
             patch_icpp(patch_id)%length_y <= 0d0) then
- 
+
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of 2D analytical '// &
-                'patch '//trim(iStr)//'. Exiting...')
+                             'geometric parameters of 2D analytical '// &
+                             'patch '//trim(iStr)//'. Exiting...')
         end if
     end subroutine s_check_2D_analytical_patch_geometry ! ---------------------
 
@@ -377,8 +376,8 @@ contains
             patch_icpp(patch_id)%length_z <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of 3D analytical '// &
-                'patch '//trim(iStr)//'. Exiting...')
+                             'geometric parameters of 3D analytical '// &
+                             'patch '//trim(iStr)//'. Exiting...')
         end if
     end subroutine s_check_3D_analytical_patch_geometry ! ---------------------
 
@@ -403,8 +402,8 @@ contains
             patch_icpp(patch_id)%z_centroid == dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of sphere '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of sphere '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -437,8 +436,8 @@ contains
             patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of spherical '// &
-                'harmonic patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of spherical '// &
+                             'harmonic patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -470,8 +469,8 @@ contains
             patch_icpp(patch_id)%length_z <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of cuboid '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of cuboid '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -515,8 +514,8 @@ contains
             patch_icpp(patch_id)%radius <= 0d0) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of cylinder '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of cylinder '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -548,8 +547,8 @@ contains
             patch_icpp(patch_id)%normal(3) == dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of plane sweep '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of plane sweep '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -580,8 +579,8 @@ contains
             patch_icpp(patch_id)%radii(3) == dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of ellipsoid '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of ellipsoid '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -627,8 +626,8 @@ contains
             patch_icpp(patch_id)%radii(3) /= dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of inactive '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'geometric parameters of inactive '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -649,8 +648,8 @@ contains
             any(patch_icpp(patch_id)%alter_patch(patch_id:))) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'alteration rights of active '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'alteration rights of active '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -672,8 +671,8 @@ contains
             any(patch_icpp(patch_id)%alter_patch(1:))) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'alteration rights of inactive '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'alteration rights of inactive '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -704,8 +703,8 @@ contains
               patch_icpp(patch_id)%smooth_coeff /= dflt_real))) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'smoothing parameters of supported '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'smoothing parameters of supported '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -729,8 +728,8 @@ contains
             patch_icpp(patch_id)%smooth_coeff /= dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'smoothing parameters of unsupported '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'smoothing parameters of unsupported '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -769,11 +768,11 @@ contains
             .or. &
             (model_eqns == 2 &
              .and. &
-             (any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0d0) ))) then
+             (any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0d0)))) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'primitive variables of active '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'primitive variables of active '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -788,8 +787,8 @@ contains
                 (patch_icpp(patch_id)%alpha(num_fluids) == dflt_real)) then
 
                 call s_mpi_abort('Inconsistency(ies) detected in '// &
-                    'primitive variables of active '// &
-                    'patch '//trim(iStr)//'. Exiting ...')
+                                 'primitive variables of active '// &
+                                 'patch '//trim(iStr)//'. Exiting ...')
 
             end if
 
@@ -822,8 +821,8 @@ contains
             patch_icpp(patch_id)%pi_inf /= dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'primitive variables of inactive '// &
-                'patch '//trim(iStr)//'. Exiting ...')
+                             'primitive variables of inactive '// &
+                             'patch '//trim(iStr)//'. Exiting ...')
 
         end if
 
@@ -835,12 +834,12 @@ contains
 
         logical :: file_exists
 
-        inquire(file=patch_icpp(patch_id)%model%filepath, exist=file_exists)
+        inquire (file=patch_icpp(patch_id)%model%filepath, exist=file_exists)
 
         if (.not. file_exists) then
 
-            print '(A,I0,A)', 'Model file '//trim(patch_icpp(patch_id)%model%filepath)//&
-                ' requested by patch ', patch_id,' does not exist. Exiting ...'
+            print '(A,I0,A)', 'Model file '//trim(patch_icpp(patch_id)%model%filepath)// &
+                ' requested by patch ', patch_id, ' does not exist. Exiting ...'
 
             call s_mpi_abort()
 

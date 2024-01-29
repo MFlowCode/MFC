@@ -1,9 +1,13 @@
-import dataclasses, typing, os, re, math
+import dataclasses, typing, sys, os, re, math
+from datetime import datetime
+from pathlib import Path
 
 from ..       import common
-from ..common import MFCException
+from ..build  import get_configured_targets
+from ..state  import CFG
 
-from pathlib import Path
+
+
 
 # This class maps to the data contained in one file in D/
 @dataclasses.dataclass(repr=False)
@@ -20,12 +24,10 @@ class PackEntry:
 class Pack:
     entries: typing.Dict[str, PackEntry]
 
-    def __init__(self):
+    def __init__(self, entries: typing.List[PackEntry] = None):
         self.entries = {}
 
-    def __init__(self, entries: typing.List[PackEntry]):
-        self.entries = {}
-        for entry in entries:
+        for entry in entries or []:
             self.set(entry)
 
     def find(self, filepath: str) -> PackEntry:
@@ -37,16 +39,46 @@ class Pack:
     def save(self, filepath: str):
         if filepath.endswith(".py"):
             filepath = os.path.dirname(filepath)
-        
+
         if os.path.isdir(filepath):
             filepath = os.path.join(filepath, "pack.txt")
-        
+
         if not filepath.endswith(".txt"):
             filepath += ".txt"
-        
+
         common.file_write(filepath, '\n'.join([ str(e) for e in sorted(self.entries.values(), key=lambda x: x.filepath) ]))
 
-    def hash_NaNs(self) -> bool:
+        metadata = f"""\
+This file was created on {str(datetime.now())}.
+
+mfc.sh:
+
+    Invocation: {' '.join(sys.argv[1:])}
+    Lock:       {CFG()}
+
+"""
+
+        for target in get_configured_targets():
+            cfg = target.get_configuration_txt()
+
+            if cfg is None:
+                continue
+
+            metadata += f"""\
+{target.name}:
+
+    {'    '.join(cfg.splitlines(keepends=True))}
+"""
+
+        metadata += f"""\
+CPU:
+
+    {'    '.join(common.get_cpuinfo().splitlines(keepends=True))}
+"""
+
+        common.file_write(f"{filepath.rstrip('.txt')}-metadata.txt", metadata)
+
+    def has_NaNs(self) -> bool:
         for entry in self.entries.values():
             for double in entry.doubles:
                 if math.isnan(double):
@@ -58,7 +90,7 @@ class Pack:
 def load(filepath: str) -> Pack:
     if not os.path.isfile(filepath):
         filepath = os.path.join(filepath, "pack.txt")
-    
+
     entries: typing.List[PackEntry] = []
 
     for line in common.file_read(filepath).splitlines():
@@ -87,7 +119,7 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
         try:
             doubles = [ float(e) for e in re.sub(r"[\n\t\s]+", " ", common.file_read(filepath)).strip().split(' ') ]
         except ValueError:
-            None, f"Failed to interpret the content of [magenta]{filepath}[/magenta] as a list of floating point numbers."
+            return None, f"Failed to interpret the content of [magenta]{filepath}[/magenta] as a list of floating point numbers."
 
         entries.append(PackEntry(short_filepath,doubles))
 
