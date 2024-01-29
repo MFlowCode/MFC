@@ -39,7 +39,7 @@ job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
 sbatch <<EOT
 #!/bin/bash
-#SBATCH -Jshb-$job_slug            # Job name
+#SBATCH -JMFC-$job_slug            # Job name
 #SBATCH --account=gts-sbryngelson3 # charge account
 $sbatch_device_opts
 #SBATCH -t 04:00:00                # Duration of the job (Ex: 15 mins)
