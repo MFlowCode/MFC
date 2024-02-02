@@ -1,9 +1,10 @@
-import re, os, typing, hashlib, dataclasses
+import os, typing, hashlib, dataclasses
 
-from .common    import MFCException, system, delete_directory, create_directory
-from .state     import ARG, CFG
-from .printer   import cons
-from .run       import input
+from .printer import cons
+from .common  import MFCException, system, delete_directory, create_directory, \
+                     format_list_to_string
+from .state   import ARG, CFG
+from .run     import input
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -26,25 +27,24 @@ class MFCTarget:
     isRequired:   bool             # Should it always be built? (no matter what -t | --targets is)
     requires:     Dependencies     # Build dependencies of the target
     runOrder:     int              # For MFC Targets: Order in which targets should logically run
-    
+
     def __hash__(self) -> int:
         return hash(self.name)
-    
+
     # Get path to directory that will store the build files
     def get_build_dirpath(self) -> str:
-        subdir = 'dependencies' if self.isDependency else CFG().make_slug()
+        if self.isDependency:
+            slug = self.name
+        else:
+            slug = f"{CFG().make_slug()}-{self.name}"
 
-        if not self.isDependency and ARG("case_optimization"):
-            m = hashlib.sha256()
-            m.update(input.load().get_fpp(self).encode())
-            subdir = f"{subdir}-{m.hexdigest()[:6]}"
+            if ARG("case_optimization"):
+                m = hashlib.sha256()
+                m.update(input.load().get_fpp(self).encode())
 
-        return os.sep.join([
-            os.getcwd(),
-            "build",
-            subdir,
-            self.name
-        ])
+                slug = f"{slug}-{m.hexdigest()[:6]}"
+
+        return os.sep.join([os.getcwd(), "build", slug ])
 
     # Get the directory that contains the target's CMakeLists.txt
     def get_cmake_dirpath(self) -> str:
@@ -66,7 +66,7 @@ class MFCTarget:
             "install",
             'dependencies' if self.isDependency else CFG().make_slug()
         ])
-    
+
     def get_install_binpath(self) -> str:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(), "bin", self.name])
@@ -104,17 +104,21 @@ class MFCTarget:
         build_dirpath   = self.get_build_dirpath()
         cmake_dirpath   = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath()
-        
+
         install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath()])
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
             # See: https://cmake.org/cmake/help/latest/manual/cmake.1.html.
-            f"-Wno-dev",
+            "-Wno-dev",
+            # Disable warnings about unused command line arguments. This is
+            # useful for passing arguments to CMake that are not used by the
+            # current target.
+            "--no-warn-unused-cli",
             # Save a compile_commands.json file with the compile commands used to
             # build the configured targets. This is mostly useful for debugging.
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
-            f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             # Set build type (e.g Debug, Release, etc.).
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
             f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'Release'}",
@@ -135,45 +139,55 @@ class MFCTarget:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
             flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
 
-        configure = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
+        command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
         delete_directory(build_dirpath)
         create_directory(build_dirpath)
 
-        if system(configure, no_exception=True) != 0:
+        input.load({}).generate_fpp(self)
+
+        if system(command).returncode != 0:
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 
+        cons.print(no_indent=True)
 
     def build(self):
         input.load({}).generate_fpp(self)
 
-        build = ["cmake", "--build",  self.get_build_dirpath(),
-                          "--target", self.name,
-                          "-j",       ARG("jobs"),
-                          "--config", 'Debug' if ARG('debug') else 'Release']
+        command = ["cmake", "--build",    self.get_build_dirpath(),
+                            "--target",   self.name,
+                            "--parallel", ARG("jobs"),
+                            "--config",   'Debug' if ARG('debug') else 'Release']
         if ARG('verbose'):
-            build.append("--verbose")
+            command.append("--verbose")
 
-        system(build, exception_text=f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
+
+        cons.print(no_indent=True)
 
     def install(self):
-        install = ["cmake", "--install", self.get_build_dirpath()]
+        command = ["cmake", "--install", self.get_build_dirpath()]
 
-        system(install, exception_text=f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
-        
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
+
+        cons.print(no_indent=True)
+
     def clean(self):
         build_dirpath = self.get_build_dirpath()
 
         if not os.path.isdir(build_dirpath):
             return
 
-        clean = ["cmake", "--build",  build_dirpath, "--target", "clean",
-                          "--config", "Debug" if ARG("debug") else "Release" ]
+        command = ["cmake", "--build",  build_dirpath, "--target", "clean",
+                            "--config", "Debug" if ARG("debug") else "Release" ]
 
         if ARG("verbose"):
-            clean.append("--verbose")
+            command.append("--verbose")
 
-        system(clean, exception_text=f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
+        if system(command).returncode != 0:
+            raise MFCException(f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
 
 
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
@@ -196,11 +210,15 @@ TARGET_MAP = { target.name: target for target in TARGETS }
 def get_target(target: typing.Union[str, MFCTarget]) -> MFCTarget:
     if isinstance(target, MFCTarget):
         return target
-    
+
     if target in TARGET_MAP:
         return TARGET_MAP[target]
 
     raise MFCException(f"Target '{target}' does not exist.")
+
+
+def get_targets(targets: typing.List[typing.Union[str, MFCTarget]]) -> typing.List[MFCTarget]:
+    return [ get_target(t) for t in targets ]
 
 
 def get_dependency_install_dirpath() -> str:
@@ -213,65 +231,69 @@ def get_dependency_install_dirpath() -> str:
     raise MFCException("No dependency target found.")
 
 
-def build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] = None):
+def __build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] = None):
     if history is None:
         history = set()
 
-    t = get_target(target)
-    
-    if t.name in history or not t.is_buildable():
+    target = get_target(target)
+
+    if target.name in history or not target.is_buildable():
         return
 
-    history.add(t.name)
+    history.add(target.name)
 
-    build_targets(t.requires.compute(), history)
+    build(target.requires.compute(), history)
 
-    if not t.is_configured():
-        t.configure()
+    if not target.is_configured():
+        target.configure()
 
-    t.build()
-    t.install()
-
-def build_targets(targets: typing.Iterable[typing.Union[MFCTarget, str]], history: typing.Set[str] = None):
-    if history is None:
-        history = set()
- 
-    for target in list(REQUIRED_TARGETS) + targets:
-        build_target(target, history)
-
-
-def clean_target(target: typing.Union[MFCTarget, str], history: typing.Set[str] = None):
-    if history is None:
-        history = set()
-
-    t = get_target(target)
-    
-    if t.name in history or not t.is_buildable():
-        return
-
-    history.add(t.name)
-
-    t.clean()
-
-
-def clean_targets(targets: typing.Iterable[typing.Union[MFCTarget, str]], history: typing.Set[str] = None):
-    if history is None:
-        history = set()
-
-    for target in list(REQUIRED_TARGETS) + targets:
-        t = get_target(target)
-        if t.is_configured():
-            t.clean()
+    target.build()
+    target.install()
 
 
 def get_configured_targets() -> typing.List[MFCTarget]:
     return [ target for target in TARGETS if target.is_configured() ]
 
 
-def build():
-    build_targets(ARG("targets"))
+def __generate_header(step_name: str, targets: typing.List):
+    caseopt_info = "Generic Build"
+    if ARG("case_optimization"):
+        caseopt_info = f"Case Optimized for [magenta]{ARG('input')}[/magenta]"
+
+    targets     = get_targets(targets)
+    target_list = format_list_to_string([ t.name for t in targets ], 'magenta')
+
+    return f"[bold]{step_name} | {target_list} | {caseopt_info}[/bold]"
 
 
-def clean():
-    clean_targets(ARG("targets"))
+def build(targets = None, history: typing.Set[str] = None):
+    if history is None:
+        history = set()
+    if targets is None:
+        targets = ARG("targets")
 
+    targets = get_targets(list(REQUIRED_TARGETS) + targets)
+
+    if len(history) == 0:
+        cons.print(__generate_header("Build", targets))
+        cons.print(no_indent=True)
+
+    for target in targets:
+        __build_target(target, history)
+
+    if len(history) == 0:
+        cons.print(no_indent=True)
+
+
+def clean(targets = None):
+    targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
+
+    cons.print(__generate_header("Clean", targets))
+    cons.print(no_indent=True)
+
+    for target in targets:
+        if target.is_configured():
+            target.clean()
+
+    cons.print(no_indent=True)
+    cons.unindent()

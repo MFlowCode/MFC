@@ -52,7 +52,9 @@ BASE_CFG = {
 
     'fluid_pp(1)%gamma'            : 1.E+00/(1.4-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
-
+    'fluid_pp(1)%cv'               : 0.0,
+    'fluid_pp(1)%qv'               : 0.0,
+    'fluid_pp(1)%qvp'              : 0.0,   
     'bubbles'                       : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,
@@ -104,29 +106,25 @@ class TestCase(case.Case):
 
     def run(self, targets: typing.List[typing.Union[str, MFCTarget]], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
-            gpus_select = f"--gpus {' '.join([str(_) for _ in gpus])}"
+            gpus_select = ["--gpus"] + [str(_) for _ in gpus]
         else:
-            gpus_select = ""
-        
-        filepath          = f'"{self.get_dirpath()}/case.py"'
-        tasks             = f"-n {self.ppn}"
-        jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
-        binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
-        case_optimization =  "--case-optimization" if ARG("case_optimization") or self.opt else "--no-build"
-        
-        mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
-        
+            gpus_select = []
+
+        filepath          = f'{self.get_dirpath()}/case.py'
+        tasks             = ["-n", str(self.ppn)]
+        jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
+        case_optimization = ["--case-optimization"] if ARG("case_optimization") or self.opt else ["--no-build"]
+
+        mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
+
         target_names = [ get_target(t).name for t in targets ]
 
-        command: str = f'''\
-            {mfc_script} run {filepath} {tasks} {binary_option} \
-            {case_optimization} {jobs} -t {' '.join(target_names)} \
-            {gpus_select} 2>&1\
-            '''
+        command = [
+            mfc_script, "run", filepath, *tasks, *case_optimization,
+            *jobs, "-t", *target_names, *gpus_select, *ARG("--")
+        ]
 
-        return subprocess.run(command, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, universal_newlines=True,
-                              shell=True)
+        return common.system(command, print_cmd=False, text=True, capture_output=True)
 
     def get_uuid(self) -> str:
         return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
@@ -137,8 +135,11 @@ class TestCase(case.Case):
     def delete_output(self):
         dirpath = self.get_dirpath()
 
-        exts = ["*.inp", "*.1", "*.dat", "*.inf"]
+        exts = ["*.inp", "*.1", "*.dat", "*.inf", "*.sh", "*.txt"]
         for f in list(itertools.chain.from_iterable(glob.glob(os.path.join(dirpath, ext)) for ext in exts)):
+            if "golden" in f:
+                continue
+
             common.delete_file(f)
 
         common.delete_directory(os.path.join(dirpath, "D"))
@@ -146,7 +147,7 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
 
-        for f in ["pre_process", "simulation", "post_process"]:
+        for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
 
     def create_directory(self):
@@ -188,7 +189,7 @@ if "post_process" in ARGS["dict"]["targets"]:
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
         'c_wrt'        : 'T',
     }}
-        
+
     if case['p'] != 0:
         mods['fd_order']  = 1
         mods['omega_wrt(1)'] = 'T'
@@ -198,14 +199,23 @@ if "post_process" in ARGS["dict"]["targets"]:
 print(json.dumps({{**case, **mods}}))
 """)
 
-        common.file_write(f"{dirpath}/README.md", f"""\
-# tests/{self.get_uuid()}
-
-{self.trace}: [case.py](case.py).
-""")
-
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
+
+    def compute_tolerance(self) -> float:
+        if self.params.get("qbmm", 'F') == 'T':
+            return 1e-10
+
+        if self.params.get("bubbles", 'F') == 'T':
+            return 1e-10
+
+        if self.params.get("hypoelasticity", 'F') == 'T':
+            return 1e-7
+
+        if self.params.get("relax", 'F') == 'T':
+            return 1e-10
+
+        return 1e-12
 
 
 @dataclasses.dataclass
@@ -230,8 +240,9 @@ class CaseGeneratorStack:
 def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None) -> TestCase:
     mods: dict = {}
 
-    for dict in stack.mods:
-        mods.update(dict)
+    for mod in stack.mods:
+        mods.update(mod)
+
     mods.update(newMods)
 
     if isinstance(newTrace, str):

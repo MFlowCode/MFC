@@ -2,7 +2,7 @@
 #ifdef MFC_MPI
     if (rank == 0) then
 #endif
-    print *, ${','.join(args)}$
+        print *, ${','.join(args)}$
 #ifdef MFC_MPI
     end if
 #endif
@@ -13,7 +13,7 @@
     @:LOG("[TEST] MPI: ${','.join([ x.replace("'", '') for x in args ])}$")
     ${','.join([ x.replace("'", '') for x in args ])}$
     if (ierr /= MPI_SUCCESS) then
-        print*, " -> Error: ", ierr
+        print *, " -> Error: ", ierr
         stop ierr
     end if
 #else
@@ -71,7 +71,7 @@ program syscheck
     @:ACCC('!$acc enter data create(arr(1:N))')
     @:ACCC('!$acc parallel loop')
     @:ACC(do i = 1, N)
-        @:ACC(arr(i) = i)
+    @:ACC(arr(i) = i)
     @:ACC(end do)
     @:ACCC('!$acc update host(arr(1:N))')
     @:ACCC('!$acc exit data delete(arr)')
@@ -85,14 +85,14 @@ program syscheck
 end program syscheck
 
 subroutine assert(condition)
-    
+
     use iso_fortran_env, only: output_unit, error_unit
-    
+
     logical, intent(in) :: condition
-    
+
     if (.not. condition) then
-        call flush(int(output_unit))
-        call flush(int(error_unit))
+        call flush (int(output_unit))
+        call flush (int(error_unit))
         stop 1
     end if
 

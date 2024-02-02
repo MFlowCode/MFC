@@ -9,7 +9,7 @@
 module m_derived_types
 
     use m_constants !< Constants
-    
+
     implicit none
 
     !> Derived type adding the field position (fp) as an attribute
@@ -102,7 +102,7 @@ module m_derived_types
     end type t_bbox
 
     type :: t_model
-        integer                       :: ntrs   ! Number of triangles
+        integer :: ntrs   ! Number of triangles
         type(t_triangle), allocatable :: trs(:) ! Triangles
     end type t_model
 
@@ -158,7 +158,9 @@ module m_derived_types
         real(kind(0d0)), dimension(num_fluids_max) :: alpha
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf !<
-
+        real(kind(0d0)) :: cv !<
+        real(kind(0d0)) :: qv !<
+        real(kind(0d0)) :: qvp !<
 
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,
@@ -184,6 +186,9 @@ module m_derived_types
         real(kind(0d0)) :: gamma   !< Sp. heat ratio
         real(kind(0d0)) :: pi_inf  !< Liquid stiffness
         real(kind(0d0)), dimension(2) :: Re      !< Reynolds number
+        real(kind(0d0)) :: cv      !< heat capacity
+        real(kind(0d0)) :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
+        real(kind(0d0)) :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(kind(0d0)) :: mul0    !< Bubble viscosity
         real(kind(0d0)) :: ss      !< Bubble surface tension
         real(kind(0d0)) :: pv      !< Bubble vapour pressure

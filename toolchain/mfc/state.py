@@ -7,6 +7,7 @@ class MFCConfig:
     gpu:   bool = False
     debug: bool = False
 
+    @staticmethod
     def from_dict(d: dict):
         """ Create a MFCConfig object from a dictionary with the same keys
             as the fields of MFCConfig """
@@ -40,7 +41,7 @@ class MFCConfig:
 
     def __str__(self) -> str:
         """ Returns a string like "mpi=No & gpu=No & debug=No" """
-        
+
         return ' & '.join([ f"{k}={'Yes' if v else 'No'}" for k, v in self.items() ])
 
 
@@ -49,13 +50,16 @@ gARG: dict      = {}
 
 
 def ARG(arg: str) -> typing.Any:
+    # pylint: disable=global-variable-not-assigned
     global gARG
     return gARG[arg]
 
 def ARGS() -> dict:
+    # pylint: disable=global-variable-not-assigned
     global gARG
     return gARG
 
 def CFG() -> MFCConfig:
+    # pylint: disable=global-variable-not-assigned
     global gCFG
     return gCFG
