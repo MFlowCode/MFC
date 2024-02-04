@@ -669,7 +669,7 @@ contains
                 end do
             end do
         end do
-        
+
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -706,7 +706,7 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
-        
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 
