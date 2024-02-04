@@ -10,10 +10,10 @@ print(json.dumps({
     # ==========================================================
 
     # Computational Domain Parameters ==========================
-    'x_domain%beg'                 : 0.E+00,
-    'x_domain%end'                 : 1.E+00,
-    'y_domain%beg'                 : 0.E+00,
-    'y_domain%end'                 : 1.E+00,
+    'x_domain%beg'                 : 0.,
+    'x_domain%end'                 : 1.,
+    'y_domain%beg'                 : 0.,
+    'y_domain%end'                 : 1.,
     'm'                            : 499,
     'n'                            : 499,
     'p'                            : 0,
@@ -80,8 +80,8 @@ print(json.dumps({
     # ==========================================================
     # Patch 1: Base ============================================
     'patch_icpp(3)%geometry'       : 3,
-    'patch_icpp(3)%x_centroid'     : 0.9E+00,
-    'patch_icpp(3)%y_centroid'     : 0.4E+00,
+    'patch_icpp(3)%x_centroid'     : 0.9,
+    'patch_icpp(3)%y_centroid'     : 0.4,
     'patch_icpp(3)%length_x'       : 0.2,
     'patch_icpp(3)%length_y'       : 0.8,
     'patch_icpp(3)%vel(1)'         : 0,
@@ -92,8 +92,8 @@ print(json.dumps({
     # ==========================================================
     # Patch 1: Base ============================================
     'patch_icpp(4)%geometry'       : 3,
-    'patch_icpp(4)%x_centroid'     : 0.9E+00,
-    'patch_icpp(4)%y_centroid'     : 0.9E+00,
+    'patch_icpp(4)%x_centroid'     : 0.9,
+    'patch_icpp(4)%y_centroid'     : 0.9,
     'patch_icpp(4)%length_x'       : 0.2,
     'patch_icpp(4)%length_y'       : 0.2,
     'patch_icpp(4)%vel(1)'         : 0,
