@@ -227,6 +227,7 @@ contains
             length = abs(x_cb_glb(m_glb) - x_cb_glb(-1))
 
             x_cb_glb = x_cb_glb/length
+
             x_a = x_a/length
             x_b = x_b/length
 
@@ -240,6 +241,7 @@ contains
             end do
 
             x_cb_glb = x_cb_glb*length
+
         end if
 
         ! Grid generation in the y-direction
@@ -262,6 +264,7 @@ contains
                 length = abs(y_cb_glb(n_glb) - y_cb_glb(-1))
 
                 y_cb_glb = y_cb_glb/length
+
                 y_a = y_a/length
                 y_b = y_b/length
 
@@ -275,6 +278,7 @@ contains
                 end do
 
                 y_cb_glb = y_cb_glb*length
+
             end if
 
             ! Grid generation in the z-direction
@@ -301,6 +305,7 @@ contains
                     end do
 
                     z_cb_glb = z_cb_glb*length
+
                 end if
             end if
         end if
