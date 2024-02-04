@@ -28,60 +28,60 @@ contains
     subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_loc, bc_dir
 
         ! Population of Buffers in x-direction =============================
 
-        select case(bc_x%beg)
-            case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1)
-            case(-2)     ! Symmetry BC at beginning
-                call s_symmetry(q_prim_vf, pb, mv, 1, -1)
-            case(-1)     ! Periodic BC at beginning
-                call s_periodic(q_prim_vf, pb, mv, 1, -1)
-            case(-15)    ! Slip wall BC at beginning
-                call s_slip_wall(q_prim_vf, pb, mv, 1, -1)
-            case(-16)    ! No-slip wall BC at beginning
-                call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1)
-            case default ! Processor BC at beginning
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv, 1, -1)
+        select case (bc_x%beg)
+        case (-13:-3) ! Ghost-cell extrap. BC at beginning
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, -1)
+        case (-2)     ! Symmetry BC at beginning
+            call s_symmetry(q_prim_vf, pb, mv, 1, -1)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic(q_prim_vf, pb, mv, 1, -1)
+        case (-15)    ! Slip wall BC at beginning
+            call s_slip_wall(q_prim_vf, pb, mv, 1, -1)
+        case (-16)    ! No-slip wall BC at beginning
+            call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 1, -1)
         end select
 
-        select case(bc_x%end)
-            case(-13:-3) ! Ghost-cell extrap. BC at end   
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1)
-            case(-2)     ! Symmetry BC at end
-                call s_symmetry(q_prim_vf, pb, mv, 1, 1)
-            case(-1)     ! Periodic BC at end
-                call s_periodic(q_prim_vf, pb, mv, 1, 1)
-            case(-15)    ! Slip wall BC at end
-                call s_slip_wall(q_prim_vf, pb, mv, 1, 1)
-            case(-16)    ! No-slip wall bc at end
-                call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1)
-            case default ! Processor BC at end
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv,  1, 1)
+        select case (bc_x%end)
+        case (-13:-3) ! Ghost-cell extrap. BC at end
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 1, 1)
+        case (-2)     ! Symmetry BC at end
+            call s_symmetry(q_prim_vf, pb, mv, 1, 1)
+        case (-1)     ! Periodic BC at end
+            call s_periodic(q_prim_vf, pb, mv, 1, 1)
+        case (-15)    ! Slip wall BC at end
+            call s_slip_wall(q_prim_vf, pb, mv, 1, 1)
+        case (-16)    ! No-slip wall bc at end
+            call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 1, 1)
         end select
 
         if (qbmm .and. .not. polytropic) then
-            select case(bc_x%beg)
-                case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 1, -1)
-                case(-15)    ! Slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 1, -1)
-                case(-16)    ! No-slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 1, -1)
+            select case (bc_x%beg)
+            case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 1, -1)
+            case (-15)    ! Slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 1, -1)
+            case (-16)    ! No-slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 1, -1)
             end select
 
-            select case(bc_x%end)
-                case(-13:-3) ! Ghost-cell extrap. BC at end   
-                    call s_qbmm_extrapolation(pb, mv, 1,1 )
-                case(-15)    ! Slip wall BC at end
-                    call s_qbmm_extrapolation(pb, mv, 1,1 )
-                case(-16)    ! No-slip wall bc at end
-                    call s_qbmm_extrapolation(pb, mv, 1,1 )
+            select case (bc_x%end)
+            case (-13:-3) ! Ghost-cell extrap. BC at end
+                call s_qbmm_extrapolation(pb, mv, 1, 1)
+            case (-15)    ! Slip wall BC at end
+                call s_qbmm_extrapolation(pb, mv, 1, 1)
+            case (-16)    ! No-slip wall bc at end
+                call s_qbmm_extrapolation(pb, mv, 1, 1)
             end select
         end if
 
@@ -90,60 +90,59 @@ contains
         ! Population of Buffers in y-direction =============================
 
         if (n == 0) return
-        
-        select case(bc_y%beg)
-            case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1)
-            case(-14)    ! Axis BC at beginning
-                call s_axis(q_prim_vf, pb, mv, 2, -1)
-            case(-2)     ! Symmetry BC at beginning
-                call s_symmetry(q_prim_vf, pb, mv, 2, -1)
-            case(-1)     ! Periodic BC at beginning
-                call s_periodic(q_prim_vf, pb, mv, 2, -1)
-            case(-15)    ! Slip wall BC at beginning
-                call s_slip_wall(q_prim_vf, pb, mv, 2, -1)
-            case(-16)    ! No-slip wall BC at beginning
-                call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1)
-            case default ! Processor BC at beginning
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv,  2, -1)
+
+        select case (bc_y%beg)
+        case (-13:-3) ! Ghost-cell extrap. BC at beginning
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, -1)
+        case (-14)    ! Axis BC at beginning
+            call s_axis(q_prim_vf, pb, mv, 2, -1)
+        case (-2)     ! Symmetry BC at beginning
+            call s_symmetry(q_prim_vf, pb, mv, 2, -1)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic(q_prim_vf, pb, mv, 2, -1)
+        case (-15)    ! Slip wall BC at beginning
+            call s_slip_wall(q_prim_vf, pb, mv, 2, -1)
+        case (-16)    ! No-slip wall BC at beginning
+            call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 2, -1)
         end select
 
-
-        select case(bc_y%end)
-            case(-13:-3) ! Ghost-cell extrap. BC at end        
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1)
-            case(-2)     ! Symmetry BC at end
-                call s_symmetry(q_prim_vf, pb, mv, 2, 1)
-            case(-1)     ! Periodic BC at end            
-                call s_periodic(q_prim_vf, pb, mv, 2, 1)
-            case(-15)    ! Slip wall BC at end
-                call s_slip_wall(q_prim_vf, pb, mv, 2, 1)
-            case(-16)    ! No-slip wall BC at end
-                call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1)
-            case default ! Processor BC at end
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv,  2, 1)
+        select case (bc_y%end)
+        case (-13:-3) ! Ghost-cell extrap. BC at end
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 2, 1)
+        case (-2)     ! Symmetry BC at end
+            call s_symmetry(q_prim_vf, pb, mv, 2, 1)
+        case (-1)     ! Periodic BC at end
+            call s_periodic(q_prim_vf, pb, mv, 2, 1)
+        case (-15)    ! Slip wall BC at end
+            call s_slip_wall(q_prim_vf, pb, mv, 2, 1)
+        case (-16)    ! No-slip wall BC at end
+            call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 2, 1)
         end select
 
         if (qbmm .and. .not. polytropic) then
 
-            select case(bc_y%beg)
-                case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 2, -1)
-                case(-15)    ! Slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 2, -1)
-                case(-16)    ! No-slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 2, -1)
+            select case (bc_y%beg)
+            case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 2, -1)
+            case (-15)    ! Slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 2, -1)
+            case (-16)    ! No-slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 2, -1)
             end select
 
-            select case(bc_y%end)
-                case(-13:-3) ! Ghost-cell extrap. BC at end        
-                    call s_qbmm_extrapolation(pb, mv, 2, 1)
-                case(-15)    ! Slip wall BC at end
-                    call s_qbmm_extrapolation(pb, mv, 2, 1)
-                case(-16)    ! No-slip wall BC at end
-                    call s_qbmm_extrapolation(pb, mv, 2, 1)
+            select case (bc_y%end)
+            case (-13:-3) ! Ghost-cell extrap. BC at end
+                call s_qbmm_extrapolation(pb, mv, 2, 1)
+            case (-15)    ! Slip wall BC at end
+                call s_qbmm_extrapolation(pb, mv, 2, 1)
+            case (-16)    ! No-slip wall BC at end
+                call s_qbmm_extrapolation(pb, mv, 2, 1)
             end select
 
         end if
@@ -154,56 +153,56 @@ contains
 
         if (p == 0) return
 
-        select case(bc_z%beg)
-            case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1)
-            case(-2)     ! Symmetry BC at beginning
-                call s_symmetry(q_prim_vf, pb, mv, 3, -1)
-            case(-1)     ! Periodic BC at beginning
-                call s_periodic(q_prim_vf, pb, mv, 3, -1)
-            case(-15)    ! Slip wall BC at beginning
-                call s_slip_wall(q_prim_vf, pb, mv, 3, -1)
-            case(-16)    ! No-slip wall BC at beginning
-                call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1)
-            case default ! Processor BC at beginning
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv,  3, -1)
+        select case (bc_z%beg)
+        case (-13:-3) ! Ghost-cell extrap. BC at beginning
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, -1)
+        case (-2)     ! Symmetry BC at beginning
+            call s_symmetry(q_prim_vf, pb, mv, 3, -1)
+        case (-1)     ! Periodic BC at beginning
+            call s_periodic(q_prim_vf, pb, mv, 3, -1)
+        case (-15)    ! Slip wall BC at beginning
+            call s_slip_wall(q_prim_vf, pb, mv, 3, -1)
+        case (-16)    ! No-slip wall BC at beginning
+            call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1)
+        case default ! Processor BC at beginning
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 3, -1)
         end select
 
-        select case(bc_z%end)
-            case(-13:-3) ! Ghost-cell extrap. BC at end
-                call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1)
-            case(-2)     ! Symmetry BC at end
-                call s_symmetry(q_prim_vf, pb, mv, 3, 1)
-            case(-1)     ! Periodic BC at end
-                call s_periodic(q_prim_vf, pb, mv, 3, 1)
-            case(-15)    ! Slip wall BC at end
-                call s_slip_wall(q_prim_vf, pb, mv, 3, 1)
-            case(-16)    ! No-slip wall BC at end
-                call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1)
-            case default ! Processor BC at end
-                call s_mpi_sendrecv_conservative_variables_buffers( &
-                    q_prim_vf, pb, mv,  3, 1)
+        select case (bc_z%end)
+        case (-13:-3) ! Ghost-cell extrap. BC at end
+            call s_ghost_cell_extrapolation(q_prim_vf, pb, mv, 3, 1)
+        case (-2)     ! Symmetry BC at end
+            call s_symmetry(q_prim_vf, pb, mv, 3, 1)
+        case (-1)     ! Periodic BC at end
+            call s_periodic(q_prim_vf, pb, mv, 3, 1)
+        case (-15)    ! Slip wall BC at end
+            call s_slip_wall(q_prim_vf, pb, mv, 3, 1)
+        case (-16)    ! No-slip wall BC at end
+            call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1)
+        case default ! Processor BC at end
+            call s_mpi_sendrecv_conservative_variables_buffers( &
+                q_prim_vf, pb, mv, 3, 1)
         end select
 
         if (qbmm .and. .not. polytropic) then
 
-            select case(bc_z%beg)
-                case(-13:-3) ! Ghost-cell extrap. BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 3, -1)
-                case(-15)    ! Slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 3, -1)
-                case(-16)    ! No-slip wall BC at beginning
-                    call s_qbmm_extrapolation(pb, mv, 3, -1)
+            select case (bc_z%beg)
+            case (-13:-3) ! Ghost-cell extrap. BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 3, -1)
+            case (-15)    ! Slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 3, -1)
+            case (-16)    ! No-slip wall BC at beginning
+                call s_qbmm_extrapolation(pb, mv, 3, -1)
             end select
 
-            select case(bc_z%end)
-                case(-13:-3) ! Ghost-cell extrap. BC at end
-                    call s_qbmm_extrapolation(pb, mv, 3, 1)
-                case(-15)    ! Slip wall BC at end
-                    call s_qbmm_extrapolation(pb, mv, 3, 1)
-                case(-16)    ! No-slip wall BC at end
-                    call s_qbmm_extrapolation(pb, mv, 3, 1)
+            select case (bc_z%end)
+            case (-13:-3) ! Ghost-cell extrap. BC at end
+                call s_qbmm_extrapolation(pb, mv, 3, 1)
+            case (-15)    ! Slip wall BC at end
+                call s_qbmm_extrapolation(pb, mv, 3, 1)
+            case (-16)    ! No-slip wall BC at end
+                call s_qbmm_extrapolation(pb, mv, 3, 1)
             end select
 
         end if
@@ -215,7 +214,7 @@ contains
     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -281,7 +280,7 @@ contains
                             end do
                         end do
                     end do
-                end do  
+                end do
 
             end if
 
@@ -314,7 +313,7 @@ contains
                             end do
                         end do
                     end do
-                end do  
+                end do
 
             end if
 
@@ -326,7 +325,7 @@ contains
     subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -346,7 +345,7 @@ contains
                             end do
 
                             q_prim_vf(momxb)%sf(-j, k, l) = &
-                                - q_prim_vf(momxb)%sf(j - 1, k, l)
+                                -q_prim_vf(momxb)%sf(j - 1, k, l)
 
                             !$acc loop seq
                             do i = momxb + 1, sys_size
@@ -387,10 +386,10 @@ contains
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
-    
+
                             q_prim_vf(momxb)%sf(m + j, k, l) = &
                                 -q_prim_vf(momxb)%sf(m - (j - 1), k, l)
-    
+
                             !$acc loop seq
                             do i = momxb + 1, sys_size
                                 q_prim_vf(i)%sf(m + j, k, l) = &
@@ -437,7 +436,7 @@ contains
                             end do
 
                             q_prim_vf(momxb + 1)%sf(l, -j, k) = &
-                                - q_prim_vf(momxb + 1)%sf(l, j - 1, k)
+                                -q_prim_vf(momxb + 1)%sf(l, j - 1, k)
 
                             !$acc loop seq
                             do i = momxb + 2, sys_size
@@ -607,7 +606,7 @@ contains
     subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -826,7 +825,7 @@ contains
     subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -898,7 +897,7 @@ contains
     subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -913,8 +912,8 @@ contains
                         do k = 0, n
                             do j = 1, buff_size
                                 if (i == momxb) then
-                                    q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb1
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        -q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb1
                                 else
                                     q_prim_vf(i)%sf(-j, k, l) = &
                                         q_prim_vf(i)%sf(0, k, l)
@@ -932,10 +931,10 @@ contains
                         do k = 0, n
                             do j = 1, buff_size
                                 if (i == momxb) then
-                                    q_prim_vf(i)%sf(m+j,k,l) = &
-                                        - q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve1
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve1
                                 else
-                                    q_prim_vf(i)%sf(m+j, k, l) = &
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
                                         q_prim_vf(i)%sf(m, k, l)
                                 end if
                             end do
@@ -957,7 +956,7 @@ contains
                             do l = -buff_size, m + buff_size
                                 if (i == momxb + 1) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        - q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb2
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb2
                                 else
                                     q_prim_vf(i)%sf(l, -j, k) = &
                                         q_prim_vf(i)%sf(l, 0, k)
@@ -976,7 +975,7 @@ contains
                             do l = -buff_size, m + buff_size
                                 if (i == momxb + 1) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        - q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
                                 else
                                     q_prim_vf(i)%sf(l, n + j, k) = &
                                         q_prim_vf(i)%sf(l, n, k)
@@ -1000,7 +999,7 @@ contains
                             do k = -buff_size, m + buff_size
                                 if (i == momxe) then
                                     q_prim_vf(i)%sf(k, l, -j) = &
-                                        - q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb3
+                                        -q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb3
                                 else
                                     q_prim_vf(i)%sf(k, l, -j) = &
                                         q_prim_vf(i)%sf(k, l, 0)
@@ -1019,9 +1018,9 @@ contains
                             do k = -buff_size, m + buff_size
                                 if (i == momxe) then
                                     q_prim_vf(i)%sf(k, l, p + j) = &
-                                        - q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2d0*bc_z%ve3
+                                        -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2d0*bc_z%ve3
                                 else
-                                    q_prim_vf(i)%sf(k, l, p+j) = &
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
                                         q_prim_vf(i)%sf(k, l, p)
                                 end if
                             end do
@@ -1039,7 +1038,7 @@ contains
     subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -1054,14 +1053,14 @@ contains
                         do k = 0, n
                             do j = 1, buff_size
                                 if (i == momxb) then
-                                    q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb1
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        -q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
-                                    q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb2
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        -q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
-                                    q_prim_vf(i)%sf(-j,k,l) = &
-                                        - q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb3
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        -q_prim_vf(i)%sf(j - 1, k, l) + 2d0*bc_x%vb3
                                 else
                                     q_prim_vf(i)%sf(-j, k, l) = &
                                         q_prim_vf(i)%sf(0, k, l)
@@ -1079,16 +1078,16 @@ contains
                         do k = 0, n
                             do j = 1, buff_size
                                 if (i == momxb) then
-                                    q_prim_vf(i)%sf(m+j,k,l) = &
-                                        - q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve1
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
-                                    q_prim_vf(i)%sf(m+j,k,l) = &
-                                        - q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve2
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
-                                    q_prim_vf(i)%sf(m+j,k,l) = &
-                                        - q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve3
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2d0*bc_x%ve3
                                 else
-                                    q_prim_vf(i)%sf(m+j, k, l) = &
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
                                         q_prim_vf(i)%sf(m, k, l)
                                 end if
                             end do
@@ -1110,13 +1109,13 @@ contains
                             do l = -buff_size, m + buff_size
                                 if (i == momxb) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        - q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb1
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        - q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb2
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        - q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb3
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb3
                                 else
                                     q_prim_vf(i)%sf(l, -j, k) = &
                                         q_prim_vf(i)%sf(l, 0, k)
@@ -1135,13 +1134,13 @@ contains
                             do l = -buff_size, m + buff_size
                                 if (i == momxb) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        - q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve1
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        - q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        - q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve3
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve3
                                 else
                                     q_prim_vf(i)%sf(l, n + j, k) = &
                                         q_prim_vf(i)%sf(l, n, k)
@@ -1165,13 +1164,13 @@ contains
                             do k = -buff_size, m + buff_size
                                 if (i == momxb) then
                                     q_prim_vf(i)%sf(k, l, -j) = &
-                                        - q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb1
+                                        -q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(k, l, -j) = &
-                                        - q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb2
+                                        -q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(k, l, -j) = &
-                                        - q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb3
+                                        -q_prim_vf(i)%sf(k, l, j - 1) + 2d0*bc_z%vb3
                                 else
                                     q_prim_vf(i)%sf(k, l, -j) = &
                                         q_prim_vf(i)%sf(k, l, 0)
@@ -1189,22 +1188,22 @@ contains
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
                                 if (i == momxb) then
-                                    q_prim_vf(i)%sf(k, l, p+j) = &
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
                                         -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2d0*bc_z%ve1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
-                                    q_prim_vf(i)%sf(k, l, p+j) = &
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
                                         -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2d0*bc_z%ve2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
-                                    q_prim_vf(i)%sf(k, l, p+j) = &
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
                                         -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2d0*bc_z%ve3
                                 else
-                                    q_prim_vf(i)%sf(k, l, p+j) = &
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
                                         q_prim_vf(i)%sf(k, l, p)
                                 end if
                             end do
                         end do
                     end do
-                end do 
+                end do
 
             end if
 
@@ -1215,7 +1214,7 @@ contains
 
     subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
@@ -1260,7 +1259,7 @@ contains
 
             end if
 
-        !< y-direction =========================================================
+            !< y-direction =========================================================
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
@@ -1290,9 +1289,9 @@ contains
                             do j = 1, buff_size
                                 do l = -buff_size, m + buff_size
                                     pb(l, n + j, k, q, i) = &
-                                        pb(l, n , k, q, i)
+                                        pb(l, n, k, q, i)
                                     mv(l, n + j, k, q, i) = &
-                                        mv(l, n , k, q, i)
+                                        mv(l, n, k, q, i)
                                 end do
                             end do
                         end do
@@ -1300,8 +1299,8 @@ contains
                 end do
 
             end if
-        
-        !< z-direction =========================================================
+
+            !< z-direction =========================================================
         elseif (bc_dir == 3) then
 
             if (bc_loc == -1) then !< bc_z%beg
@@ -1330,9 +1329,9 @@ contains
                         do j = 1, buff_size
                             do l = -buff_size, n + buff_size
                                 do k = -buff_size, m + buff_size
-                                    pb(k, l, p+ j, q, i) = &
+                                    pb(k, l, p + j, q, i) = &
                                         pb(k, l, p, q, i)
-                                    mv(k, l, p+j, q, i) = &
+                                    mv(k, l, p + j, q, i) = &
                                         mv(k, l, p, q, i)
                                 end do
                             end do
@@ -1343,7 +1342,7 @@ contains
             end if
 
         end if
-        
+
     end subroutine
 
 end module m_boundary_conditions
