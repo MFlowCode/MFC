@@ -125,31 +125,31 @@ on:
 #           name: logs
 #           path: test-${{ matrix.device }}.out
 
-jobs:
-  selfrg1:
-    name: GT | Rogues Gallery | Violet
-    if: github.repository == 'MFlowCode/MFC'
-    continue-on-error: true
-    runs-on:
-      group:  phoenix
-      labels: rg
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+# jobs:
+#   selfrg1:
+#     name: GT | Rogues Gallery | Violet
+#     if: github.repository == 'MFlowCode/MFC'
+#     continue-on-error: true
+#     runs-on:
+#       group:  phoenix
+#       labels: rg
+#     steps:
+#       - name: Clone
+#         uses: actions/checkout@v3
 
-      - name: Build & Test
-        run:  cd misc && sbatch run-rg-violet-gpu.sh
+#       - name: Build & Test
+#         run:  cd misc && sbatch run-rg-violet-gpu.sh
 
-  selfrg2:
-    name: GT | Rogues Gallery | Quorra
-    if: github.repository == 'MFlowCode/MFC'
-    continue-on-error: true
-    runs-on:
-      group:  phoenix
-      labels: rg
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+#   selfrg2:
+#     name: GT | Rogues Gallery | Quorra
+#     if: github.repository == 'MFlowCode/MFC'
+#     continue-on-error: true
+#     runs-on:
+#       group:  phoenix
+#       labels: rg
+#     steps:
+#       - name: Clone
+#         uses: actions/checkout@v3
 
-      - name: Build & Test
-        run:  cd misc && sbatch run-rg-quorra-gpu.sh
+#       - name: Build & Test
+#         run:  cd misc && sbatch run-rg-quorra-gpu.sh

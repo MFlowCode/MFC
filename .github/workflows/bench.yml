@@ -5,14 +5,18 @@ on:
 
 jobs:
   self:
-    name: Georgia Tech | Phoenix (NVHPC)
+    name: Local Benchmarking
     if: github.repository == 'MFlowCode/MFC'
     strategy:
       matrix:
         device: ['cpu', 'gpu']
+        lbl: ['gt', 'rg']
+        exclude:
+          - lbl: rg
+            device: cpu
     runs-on:
       group:  phoenix
-      labels: gt
+      labels: ${{ matrix.lbl }}
     steps:
       - name: Clone - PR
         uses: actions/checkout@v3
@@ -27,9 +31,17 @@ jobs:
           path: master
 
       - name: Bench (Master v. PR)
+        if: matrix.lbl == 'gt'
         run: |
           (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
           (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
+          wait %1 && wait %2
+
+      - name: Bench (Master v. PR)
+        if: matrix.lbl == 'rg'
+        run: |
+          (cd pr     && bash .github/workflows/rg/submit.sh .github/workflows/rg/bench.sh ${{ matrix.device }}) &
+          (cd master && bash .github/workflows/rg/submit.sh .github/workflows/rg/bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
       - name: Generate & Post Comment
