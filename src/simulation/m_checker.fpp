@@ -410,7 +410,7 @@ contains
 
                 ! Moving Boundaries Checks: x boundaries
         if  (any((/bc_x%vb1, bc_x%vb2, bc_x%vb3/) .ne. 0d0))  then
-            if (bc_x%beg == 15) then
+            if (bc_x%beg == -15) then
                 if (any((/bc_x%vb2, bc_x%vb3/) .ne. 0d0)) then
                     call s_mpi_abort("Unsupported combination of bc_x%beg and" // &
                         "bc_x%vb2 or bc_x%vb3. Exiting ...")
@@ -422,7 +422,7 @@ contains
         end if
 
         if  (any((/bc_x%ve1, bc_x%ve2, bc_x%ve3/) .ne. 0d0))  then
-            if (bc_x%end == 15) then
+            if (bc_x%end == -15) then
                 if (any((/bc_x%ve2, bc_x%ve3/) .ne. 0d0)) then
                     call s_mpi_abort("Unsupported combination of bc_x%end and" // &
                         "bc_x%ve2 or bc_x%ve3. Exiting ...")
@@ -435,7 +435,7 @@ contains
 
         ! Moving Boundaries Checks: y boundaries
         if  (any((/bc_y%vb1, bc_y%vb2, bc_y%vb3/) .ne. 0d0))  then
-            if (bc_y%beg == 15) then
+            if (bc_y%beg == -15) then
                 if (any((/bc_y%vb1, bc_y%vb3/) .ne. 0d0)) then
                     call s_mpi_abort("Unsupported combination of bc_y%beg and" // &
                         "bc_y%vb1 or bc_y%vb3. Exiting ...")
@@ -460,7 +460,7 @@ contains
 
         ! Moving Boundaries Checks: z boundaries
         if  (any((/bc_z%vb1, bc_z%vb2, bc_z%vb3/) .ne. 0d0))  then
-            if (bc_z%beg == 15) then
+            if (bc_z%beg == -15) then
                 if (any((/bc_x%vb1, bc_x%vb2/) .ne. 0d0)) then
                     call s_mpi_abort("Unsupported combination of bc_z%beg and" // &
                         "bc_x%vb1 or bc_x%vb1. Exiting ...")
@@ -472,7 +472,7 @@ contains
         end if
 
         if  (any((/bc_z%ve1, bc_z%ve2, bc_z%ve3/) .ne. 0d0))  then
-            if (bc_z%end == 15) then
+            if (bc_z%end == -15) then
                 if (any((/bc_x%ve1, bc_x%ve2/) .ne. 0d0)) then
                     call s_mpi_abort("Unsupported combination of bc_z%end and" // &
                         "bc_z%ve2 or bc_z%ve3. Exiting ...")
