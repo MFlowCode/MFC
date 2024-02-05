@@ -646,7 +646,7 @@ contains
                 end if
             end if
 
-        endif
+        end if
 
     end subroutine
 

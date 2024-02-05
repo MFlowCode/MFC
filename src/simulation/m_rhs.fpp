@@ -125,7 +125,6 @@ module m_rhs
 
     type(int_bounds_info) :: ixt, iyt, izt
 
-
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: bub_mom_src
     !$acc declare create(bub_mom_src)
 
@@ -1036,14 +1035,14 @@ contains
                                                     flux_src_n(id)%vf)
             call nvtxEndRange()
 
-            ! RHS additions for hypoelasticity 
+            ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
             if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
-                                                                q_prim_qp%vf, &
-                                                                rhs_vf)
+                                                               q_prim_qp%vf, &
+                                                               rhs_vf)
             call nvtxEndRange
 
-            ! RHS additions for viscosity 
+            ! RHS additions for viscosity
             call nvtxStartRange("RHS_viscous")
             if (any(Re_size > 0d0)) call s_compute_viscous_rhs(id, &
                                                                 q_prim_qp%vf, &
@@ -1055,24 +1054,23 @@ contains
                                                                 ixt, iyt, izt)
             call nvtxEndRange
 
-            ! RHS additions for sub-grid bubbles 
+            ! RHS additions for sub-grid bubbles
             call nvtxStartRange("RHS_bubbles")
             if (bubbles) call s_compute_bubbles_rhs(id, &
-                                                        q_prim_qp%vf)
+                                                    q_prim_qp%vf)
             call nvtxEndRange
 
-
-            ! RHS additions for qbmm bubbles 
+            ! RHS additions for qbmm bubbles
             call nvtxStartRange("RHS_qbmm")
             if (qbmm) call s_compute_qbmm_rhs(id, &
-                                                q_cons_qp%vf, &
-                                                q_prim_qp%vf, &
-                                                rhs_vf, &
-                                                flux_n(id)%vf, &
-                                                pb, &
-                                                rhs_pb, &
-                                                mv, &
-                                                rhs_mv)
+                                              q_cons_qp%vf, &
+                                              q_prim_qp%vf, &
+                                              rhs_vf, &
+                                              flux_n(id)%vf, &
+                                              pb, &
+                                              rhs_pb, &
+                                              mv, &
+                                              rhs_mv)
             call nvtxEndRange
             ! END: Additional physics and source terms =========================
 
@@ -1080,27 +1078,26 @@ contains
         ! END: Dimensional Splitting Loop =================================
 
         ! Additional Physics and Source Temrs ==================================
-        ! Additions for monopole 
+        ! Additions for monopole
         call nvtxStartRange("RHS_monopole")
         if (monopole) call s_monopole_calculations(q_cons_qp%vf(1:sys_size), &
-                                                    q_prim_qp%vf(1:sys_size), &
-                                                    t_step, &
-                                                    num_dims, &
-                                                    rhs_vf)
-        call nvtxEndRange 
+                                                   q_prim_qp%vf(1:sys_size), &
+                                                   t_step, &
+                                                   num_dims, &
+                                                   rhs_vf)
+        call nvtxEndRange
 
-        ! Add bubles source term 
+        ! Add bubles source term
         call nvtxStartRange("RHS_bubbles")
         if (bubbles .and. (.not. qbmm)) call s_compute_bubble_source(nbub, &
-                                                                        q_cons_qp%vf(1:sys_size), &
-                                                                        q_prim_qp%vf(1:sys_size), &
-                                                                        t_step, &
-                                                                        num_dims, &
-                                                                        rhs_vf)
+                                                                     q_cons_qp%vf(1:sys_size), &
+                                                                     q_prim_qp%vf(1:sys_size), &
+                                                                     t_step, &
+                                                                     num_dims, &
+                                                                     rhs_vf)
         call nvtxEndRange
         ! END: Additional pphysics and source terms ============================
 
-        
         if (run_time_info .or. probe_wrt) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0

@@ -18,7 +18,7 @@ module m_monopole
     ! ==========================================================================
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations, &
-        s_compute_monopole_rhs
+ s_compute_monopole_rhs
 
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
@@ -69,8 +69,6 @@ contains
     end subroutine
 
     subroutine s_compute_monopole_rhs()
-
-        
 
     end subroutine s_compute_monopole_rhs
 
