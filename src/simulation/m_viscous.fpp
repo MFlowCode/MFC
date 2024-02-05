@@ -20,6 +20,7 @@ module m_viscous
  s_compute_viscous_stress_tensor, &
  s_initialize_viscous_module, &
  s_reconstruct_cell_boundary_values_visc_deriv, &
+ s_compute_viscous_rhs, &
  s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
@@ -960,6 +961,191 @@ contains
         end if
 
     end subroutine s_get_viscous
+
+    subroutine s_compute_viscous_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
+        dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, tau_Re_vf, ixt, iyt, izt)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
+                                                                flux_src_n, &
+                                                                dq_prim_dx_vf, &
+                                                                dq_prim_dy_vf, &
+                                                                dq_prim_dz_vf, &
+                                                                tau_Re_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        type(int_bounds_info) :: ixt, iyt, izt
+        integer, intent(IN) :: idir
+        integer :: i, j, k, l, q
+
+        if (idir == 1) then ! x-direction
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        !$acc loop seq
+                        do i = momxb, E_idx
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
+                                (flux_src_n(i)%sf(j - 1, k, l) &
+                                    - flux_src_n(i)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (idir == 2) then ! y-direction
+
+            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+                if (p > 0) then
+                    call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                            dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                            tau_Re_vf, &
+                                                            ixt, iyt, izt)
+                else
+                    call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                            dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            tau_Re_vf, &
+                                                            ixt, iyt, izt)
+                end if
+
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 1, n
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    (flux_src_n(i)%sf(j, k - 1, l) &
+                                        - flux_src_n(i)%sf(j, k, l))
+                            end do
+                        end do
+                    end do
+                end do
+
+                !$acc parallel loop collapse(2) gang vector default(present)
+                do l = 0, p
+                    do j = 0, m
+                        !$acc loop seq
+                        do i = momxb, E_idx
+                            rhs_vf(i)%sf(j, 0, l) = &
+                                rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
+                                (tau_Re_vf(i)%sf(j, -1, l) &
+                                    - tau_Re_vf(i)%sf(j, 1, l))
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    (flux_src_n(i)%sf(j, k - 1, l) &
+                                        - flux_src_n(i)%sf(j, k, l))
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Applying the geometrical viscous Riemann source fluxes calculated as average
+            ! of values at cell boundaries
+            if (cyl_coord) then
+                if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, n
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                            + flux_src_n(i)%sf(j, k, l))
+                                end do
+                            end do
+                        end do
+                    end do
+
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, 0, l) = &
+                                    rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
+                                    tau_Re_vf(i)%sf(j, 0, l)
+                            end do
+                        end do
+                    end do
+
+                else
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                            + flux_src_n(i)%sf(j, k, l))
+                                end do
+                            end do
+                        end do
+                    end do
+
+                end if
+            end if
+
+        elseif (idir == 3) then ! z-direction
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        !$acc loop seq
+                        do i = momxb, E_idx
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                (flux_src_n(i)%sf(j, k, l - 1) &
+                                    - flux_src_n(i)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end do
+
+            if (grid_geometry == 3) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(momxb + 1)%sf(j, k, l) = &
+                                rhs_vf(momxb + 1)%sf(j, k, l) + 5d-1* &
+                                (flux_src_n(momxe)%sf(j, k, l - 1) &
+                                    + flux_src_n(momxe)%sf(j, k, l))
+
+                            rhs_vf(momxe)%sf(j, k, l) = &
+                                rhs_vf(momxe)%sf(j, k, l) - 5d-1* &
+                                (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
+                                    + flux_src_n(momxb + 1)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_compute_viscous_rhs
 
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)

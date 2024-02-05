@@ -17,7 +17,8 @@ module m_monopole
     use m_variables_conversion !< State variables type conversion procedures
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_monopole_module, s_monopole_calculations
+    private; public :: s_initialize_monopole_module, s_monopole_calculations, &
+        s_compute_monopole_rhs
 
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
@@ -30,6 +31,13 @@ module m_monopole
 
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
+
+    !> @name Monopole source terms
+    !> @{
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
+    !> @}
+    !$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
 
 contains
 
@@ -54,9 +62,19 @@ contains
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono)
 
+        @:ALLOCATE(mono_mass_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
+        @:ALLOCATE(mono_E_src(0:m, 0:n, 0:p))
+
     end subroutine
 
-    subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, q_cons_vf, &
+    subroutine s_compute_monopole_rhs()
+
+        
+
+    end subroutine s_compute_monopole_rhs
+
+    subroutine s_monopole_calculations(q_cons_vf, &
                                        q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
@@ -70,11 +88,6 @@ contains
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        !> @name Monopole source terms
-        !> @{
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(inout) :: mono_mass_src, mono_e_src
-        real(kind(0d0)), dimension(1:num_dims, 0:m, 0:n, 0:p), intent(inout) :: mono_mom_src
-        !> @}
 
         integer, intent(IN) :: t_step, id
 
