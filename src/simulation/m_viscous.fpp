@@ -990,13 +990,13 @@ contains
     end subroutine s_get_viscous
 
     subroutine s_compute_viscous_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
-        dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
+                                     dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
-                                                                flux_src_n, &
-                                                                dq_prim_dx_vf, &
-                                                                dq_prim_dy_vf, &
-                                                                dq_prim_dz_vf
+                                                               flux_src_n, &
+                                                               dq_prim_dx_vf, &
+                                                               dq_prim_dy_vf, &
+                                                               dq_prim_dz_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         type(int_bounds_info) :: ixt, iyt, izt
         integer, intent(IN) :: idir

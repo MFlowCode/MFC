@@ -1029,10 +1029,10 @@ contains
             ! RHS addition for advection source
             call nvtxStartRange("RHS_advection_source")
             call s_compute_advection_source_term(id, &
-                                                    rhs_vf, &
-                                                    q_cons_qp%vf, &
-                                                    q_prim_qp%vf, &
-                                                    flux_src_n(id)%vf)
+                                                 rhs_vf, &
+                                                 q_cons_qp%vf, &
+                                                 q_prim_qp%vf, &
+                                                 flux_src_n(id)%vf)
             call nvtxEndRange()
 
             ! RHS additions for hypoelasticity
@@ -1045,13 +1045,13 @@ contains
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_viscous")
             if (any(Re_size > 0d0)) call s_compute_viscous_rhs(id, &
-                                                                q_prim_qp%vf, &
-                                                                rhs_vf, &
-                                                                flux_src_n(id)%vf, &
-                                                                dq_prim_dx_qp%vf, &
-                                                                dq_prim_dy_qp%vf, &
-                                                                dq_prim_dz_qp%vf, &
-                                                                ixt, iyt, izt)
+                                                               q_prim_qp%vf, &
+                                                               rhs_vf, &
+                                                               flux_src_n(id)%vf, &
+                                                               dq_prim_dx_qp%vf, &
+                                                               dq_prim_dy_qp%vf, &
+                                                               dq_prim_dz_qp%vf, &
+                                                               ixt, iyt, izt)
             call nvtxEndRange
 
             ! RHS additions for sub-grid bubbles
