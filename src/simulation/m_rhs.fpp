@@ -112,11 +112,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
     !> @}
 
-    !> @name Additional field for capillary source terms
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !> @}
-
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
@@ -153,7 +148,7 @@ module m_rhs
     !$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
     !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
     !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
-    !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,alf_sum, &
+    !$acc   qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,alf_sum, &
     !$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
     !$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
     !$acc   ixt, iyt, izt)
@@ -179,18 +174,6 @@ contains
         ! ==================================================================
 
         !$acc update device(ix, iy, iz)
-
-        if (any(Re_size > 0) .and. cyl_coord) then
-            @:ALLOCATE(tau_Re_vf(1:sys_size))
-            do i = 1, num_dims
-                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                       &  iy%beg:iy%end, &
-                                                       &  iz%beg:iz%end))
-            end do
-            @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-                                         & iy%beg:iy%end, &
-                                         & iz%beg:iz%end))
-        end if
 
         ixt = ix; iyt = iy; izt = iz
 
@@ -1050,8 +1033,7 @@ contains
                                                     rhs_vf, &
                                                     q_cons_qp%vf, &
                                                     q_prim_qp%vf, &
-                                                    flux_src_n(id)%vf, &
-                                                    Kterm)
+                                                    flux_src_n(id)%vf)
             call nvtxEndRange()
 
             ! RHS additions for hypoelasticity 
@@ -1070,7 +1052,6 @@ contains
                                                                 dq_prim_dx_qp%vf, &
                                                                 dq_prim_dy_qp%vf, &
                                                                 dq_prim_dz_qp%vf, &
-                                                                tau_Re_vf,&
                                                                 ixt, iyt, izt)
             call nvtxEndRange
 
@@ -1145,13 +1126,12 @@ contains
 
     end subroutine s_compute_rhs ! -----------------------------------------
 
-    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
+    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: flux_src_n_vf
-        real(kind(0d0)), dimension(0:m,0:n,0:p) :: Kterm
 
         integer :: idir
         integer :: i, j, k, l, q
@@ -1874,14 +1854,6 @@ contains
 
         @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
         @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-
-        if (any(Re_size > 0) .and. cyl_coord) then
-            do i = 1, num_dims
-                @:DEALLOCATE(tau_Re_vf(cont_idx%end + i)%sf)
-            end do
-            @:DEALLOCATE(tau_Re_vf(E_idx)%sf)
-            @:DEALLOCATE(tau_Re_vf)
-        end if
 
         do i = num_dims, 1, -1
             if (i /= 1) then

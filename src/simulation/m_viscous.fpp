@@ -30,10 +30,25 @@ module m_viscous
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
+    !> @name Additional field for capillary source terms
+    !> @{
+    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
+    !> @}
+
 contains
 
     subroutine s_initialize_viscous_module()
+
         integer :: i, j !< generic loop iterators
+        type(int_bounds_info) :: ix, iy, iz
+
+        ! Configuring Coordinate Direction Indexes =========================
+        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+
+        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ! ==================================================================
 
         @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
 
@@ -43,6 +58,18 @@ contains
             end do
         end do
         !$acc update device(Res, Re_idx, Re_size)
+
+        if (cyl_coord) then
+            @:ALLOCATE(tau_Re_vf(1:sys_size))
+            do i = 1, num_dims
+                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                                                       &  iy%beg:iy%end, &
+                                                       &  iz%beg:iz%end))
+            end do
+            @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+                                         & iy%beg:iy%end, &
+                                         & iz%beg:iz%end))
+        end if
 
     end subroutine s_initialize_viscous_module
 
@@ -963,14 +990,13 @@ contains
     end subroutine s_get_viscous
 
     subroutine s_compute_viscous_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
-        dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, tau_Re_vf, ixt, iyt, izt)
+        dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
                                                                 flux_src_n, &
                                                                 dq_prim_dx_vf, &
                                                                 dq_prim_dy_vf, &
-                                                                dq_prim_dz_vf, &
-                                                                tau_Re_vf
+                                                                dq_prim_dz_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         type(int_bounds_info) :: ixt, iyt, izt
         integer, intent(IN) :: idir
@@ -1664,7 +1690,18 @@ contains
     end subroutine s_compute_fd_gradient ! --------------------------------------
 
     subroutine s_finalize_viscous_module()
+
+        integer :: i
+
         @:DEALLOCATE(Res)
+
+        if (cyl_coord) then
+            do i = 1, num_dims
+                @:DEALLOCATE(tau_Re_vf(cont_idx%end + i)%sf)
+            end do
+            @:DEALLOCATE(tau_Re_vf(E_idx)%sf)
+            @:DEALLOCATE(tau_Re_vf)
+        end if
     end subroutine s_finalize_viscous_module
 
 end module m_viscous
