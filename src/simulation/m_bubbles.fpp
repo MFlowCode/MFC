@@ -91,7 +91,7 @@ contains
         integer :: i, j, k, l, q
 
         if (idir == 1) then
-            
+
             if (.not. qbmm) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -105,21 +105,21 @@ contains
                         end do
                     end do
                 end do
-            endif
+            end if
 
         elseif (idir == 2) then
 
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                               5d-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
-                                                           q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        divu%sf(j, k, l) = divu%sf(j, k, l) + &
+                                           5d-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                                       q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
-                        end do
                     end do
                 end do
+            end do
 
         elseif (idir == 3) then
 
@@ -128,13 +128,13 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                            5d-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
-                                                        q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                                           5d-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                                       q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do
                 end do
             end do
-            
+
         end if
 
     end subroutine
