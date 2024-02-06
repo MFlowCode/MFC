@@ -63,6 +63,8 @@ module m_start_up
 
     use m_nvtx
 
+    use m_ibm
+
     use m_helper
 
     use m_compile_specific
@@ -131,6 +133,7 @@ contains
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
+            ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -258,6 +261,14 @@ contains
 
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                end if
+            end do
+        end if
         ! ==================================================================
 
         ! Cell-boundary Locations in y-direction ===========================
@@ -376,6 +387,59 @@ contains
         end if
         ! ==================================================================
 
+        ! Read IBM Data ====================================================
+
+        if (ib) then
+            do i = 1, num_ibs
+                write (file_path, '(A,I0,A)') &
+                    trim(t_step_dir)//'/ib.dat'
+                inquire (FILE=trim(file_path), EXIST=file_exist)
+                if (file_exist) then
+                    open (2, FILE=trim(file_path), &
+                          FORM='unformatted', &
+                          ACTION='read', &
+                          STATUS='old')
+                    read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+                else
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                end if
+
+                if (patch_ib(i)%c > 0) then
+
+                    print *, "HERE Np", Np
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_u.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_u; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_l.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_l; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+                end if
+            end do
+
+        end if
+
     end subroutine s_read_serial_data_files ! -------------------------------------
 
         !! @param q_cons_vf Conservative variables
@@ -402,7 +466,7 @@ contains
 
         character(len=10) :: t_step_start_string
 
-        integer :: i
+        integer :: i, j
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -427,6 +491,16 @@ contains
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
+                    print *, "HERE Np", Np
+                end if
+            end do
+        end if
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
@@ -485,7 +559,11 @@ contains
 
                 ! Initialize MPI data I/O
 
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -529,6 +607,30 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
@@ -543,7 +645,11 @@ contains
 
                 ! Initialize MPI data I/O
 
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -600,9 +706,91 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
+
+        end if
+
+        if (ib) then
+
+            do j = 1, num_ibs
+                if (patch_ib(j)%c > 0) then
+
+                    print *, "HERE Np", Np
+
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_loc, '(A)') 'airfoil_l.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    end if
+
+                    write (file_loc, '(A)') 'airfoil_u.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end if
+
+                    do i = 1, Np
+                        airfoil_grid_l(i)%x = MPI_IO_airfoil_IB_DATA%var(i)%x
+                        airfoil_grid_l(i)%y = MPI_IO_airfoil_IB_DATA%var(i)%y
+                    end do
+
+                    do i = 1, Np
+                        airfoil_grid_u(i)%x = MPI_IO_airfoil_IB_DATA%var(Np + i)%x
+                        airfoil_grid_u(i)%y = MPI_IO_airfoil_IB_DATA%var(Np + i)%y
+                    end do
+
+                end if
+            end do
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
@@ -1042,8 +1230,8 @@ contains
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
 
-        if (bubbles) call s_initialize_bubbles_module()
-
+        if(bubbles) call s_initialize_bubbles_module()
+        if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
@@ -1084,6 +1272,7 @@ contains
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+        if (ib) call s_ibm_setup()
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
@@ -1191,6 +1380,12 @@ contains
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
+    
+        !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
+        !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
+        !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
+
+
         !$acc update device(relax)
         if (relax) then
             !$acc update device(palpha_eps, ptgalpha_eps)
@@ -1213,7 +1408,7 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
-        if (relax) call s_finalize_relaxation_solver_module()
+        if (relax) call s_finalize_relaxation_solver_module()      
 
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()

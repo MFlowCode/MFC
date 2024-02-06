@@ -115,7 +115,7 @@ def generate_cases() -> typing.List[TestCase]:
 
             stack.pop()
 
-    def alter_num_fluids():
+    def alter_num_fluids(dimInfo):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
 
@@ -129,13 +129,17 @@ def generate_cases() -> typing.List[TestCase]:
                 })
 
             alter_riemann_solvers(num_fluids)
+            alter_ib(dimInfo)
 
             if num_fluids == 1:
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
 
+                alter_ib(dimInfo, six_eqn_model=True)
+
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+
                 for weno_Re_flux in ['T']:
                     stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
                     cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
@@ -148,6 +152,8 @@ def generate_cases() -> typing.List[TestCase]:
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
                     'patch_icpp(1)%vel(1)': 1.0}) 
+
+                alter_ib(dimInfo, six_eqn_model=True)
 
                 cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
                 cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -168,7 +174,7 @@ def generate_cases() -> typing.List[TestCase]:
             'patch_icpp(1)%alpha(1)':     0.9,    'patch_icpp(1)%alpha_rho(2)': 0.19, 'patch_icpp(1)%alpha(2)':     0.1,
             'patch_icpp(2)%alpha_rho(1)': 0.25,   'patch_icpp(2)%alpha(1)':     0.5,  'patch_icpp(2)%alpha_rho(2)': 0.25,
             'patch_icpp(2)%alpha(2)':     0.5,    'patch_icpp(3)%alpha_rho(1)': 0.08, 'patch_icpp(3)%alpha(1)':     0.2,
-            'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8,  'patch_icpp(1)%vel(1)' :0.0
+            'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8,  'patch_icpp(1)%vel(1)': 0.0
         })
 
         cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
@@ -232,6 +238,27 @@ def generate_cases() -> typing.List[TestCase]:
             cases.append(create_case(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
         else:
             cases.append(create_case(stack, '2 MPI Ranks', {}, ppn=2))
+
+    def alter_ib(dimInfo, six_eqn_model=False):
+
+        stack.push(f'IBM', {
+            'ib': 'T', 'num_ibs': 1, 
+            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5, 
+            'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
+            'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
+        })
+
+        if len(dimInfo[0]) == 3:
+            cases.append(create_case(stack, f'', {
+                'patch_ib(1)%z_centroid': 0.5,
+                'patch_ib(1)%geometry': 8,
+            }))
+        elif len(dimInfo[0]) == 2:
+            cases.append(create_case(stack, f'', {'patch_ib(1)%geometry': 2 }))
+            if six_eqn_model:
+                cases.append(create_case(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
+
+        stack.pop()
 
     def alter_bubbles(dimInfo):
         if len(dimInfo[0]) > 0:
@@ -465,7 +492,7 @@ def generate_cases() -> typing.List[TestCase]:
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
             alter_weno()
-            alter_num_fluids()
+            alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
             if len(dimInfo[0]) == 3:
