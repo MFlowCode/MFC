@@ -14,8 +14,18 @@ PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps"
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
+    'ib', 'num_ibs'
 ]
+
+for ib_id in range(1, 10+1):
+    for attribute in ["geometry", "radius", "theta", "slip", "c", "p", "t", "m"]:
+        PRE_PROCESS.append(f"patch_ib({ib_id})%{attribute}")
+
+    for cmp_id, cmp in enumerate(["x", "y", "z"]):
+        cmp_id += 1
+        PRE_PROCESS.append(f'patch_ib({ib_id})%{cmp}_centroid')
+        PRE_PROCESS.append(f'patch_ib({ib_id})%length_{cmp}')
 
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
@@ -70,7 +80,6 @@ for p_id in range(1, 10+1):
         for alter_id in range(1, p_id):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
 
-
 SIMULATION = COMMON + [
     'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 'time_stepper', 'weno_eps',
@@ -79,8 +88,17 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', "palpha_eps", "ptgalpha_eps"
+    'num_integrals', 'cu_mpi', "palpha_eps", "ptgalpha_eps", 'ib', 'num_ibs'
 ]
+
+for ib_id in range(1, 10+1):
+    for attribute in ["geometry", "radius", "theta","slip", "c", "m", "t", "p"]:
+        SIMULATION.append(f"patch_ib({ib_id})%{attribute}")
+
+    for cmp_id, cmp in enumerate(["x", "y", "z"]):
+        cmp_id += 1
+        SIMULATION.append(f'patch_ib({ib_id})%{cmp}_centroid')
+        SIMULATION.append(f'patch_ib({ib_id})%length_{cmp}')
 
 for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')

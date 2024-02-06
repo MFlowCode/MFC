@@ -41,6 +41,10 @@ module m_start_up
 
     use m_check_patches
 
+    use m_check_ib_patches
+
+    use m_helper
+
     use m_checker
     ! ==========================================================================
 
@@ -67,14 +71,18 @@ module m_start_up
 
         end subroutine s_read_abstract_grid_data_files ! ---------------
 
-        subroutine s_read_abstract_ic_data_files(q_cons_vf) ! -----------
+        subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers) ! -----------
 
-            import :: scalar_field, sys_size, pres_field
+            import :: scalar_field, integer_field, sys_size, pres_field
 
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(INOUT) :: q_cons_vf
+
+            ! IB markers
+            type(integer_field), &
+                intent(INOUT) :: ib_markers
 
         end subroutine s_read_abstract_ic_data_files ! -----------------
 
@@ -127,7 +135,7 @@ contains
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
-            palpha_eps, ptgalpha_eps
+            palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -187,6 +195,8 @@ contains
 
         ! Check all the patch properties
         call s_check_patches()
+
+        if (ib) call s_check_ib_patches()
 
     end subroutine s_check_input_file ! ------------------------------------
 
@@ -383,11 +393,14 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_serial_ic_data_files(q_cons_vf) ! ---------------------------
+    subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers) ! ---------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+        type(integer_field), &
+            intent(INOUT) :: ib_markers
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -476,6 +489,25 @@ contains
                 end do
 
             end do
+        end if
+
+        ! Reading the IB markers
+        if (ib) then
+            write (file_num, '(I0)') i
+            file_loc = trim(t_step_dir)//'/ib.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_check)
+
+            ! If it exists, the data file is read
+            if (file_check) then
+                open (1, FILE=trim(file_loc), FORM='unformatted', &
+                      STATUS='old', ACTION='read')
+                read (1) ib_markers%sf(0:m, 0:n, 0:p)
+                close (1)
+            else
+                call s_mpi_abort('File ib.dat is missing in ' &
+                                 //trim(t_step_dir)// &
+                                 '. Exiting ...')
+            end if
         end if
 
         ! ==================================================================
@@ -598,11 +630,14 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_ic_data_files(q_cons_vf) ! ------------------
+    subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers) ! ------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+        type(integer_field), &
+            intent(INOUT) :: ib_markers
 
 #ifdef MFC_MPI
 
@@ -628,7 +663,11 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -676,6 +715,30 @@ contains
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
         end if
+
+        if (ib) then
+
+            write (file_loc, '(A)') 'ib.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                disp = 0
+
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                   MPI_INTEGER, status, ierr)
+
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+
+        end if
+
         call s_mpi_barrier()
 
 #endif
@@ -762,7 +825,7 @@ contains
         ! Setting up grid and initial condition
         call cpu_time(start)
 
-        if (old_ic) call s_read_ic_data_files(q_cons_vf)
+        if (old_ic) call s_read_ic_data_files(q_cons_vf, ib_markers)
 
         call s_generate_initial_condition()
 
@@ -775,7 +838,7 @@ contains
             call s_relaxation_solver(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf)
+        call s_write_data_files(q_cons_vf, ib_markers)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition

@@ -23,6 +23,8 @@ module m_time_steppers
 
     use m_bubbles              !< Bubble dynamics routines
 
+    use m_ibm
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_fftw
@@ -264,6 +266,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -302,6 +305,14 @@ contains
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
+        end if
 
         call nvtxEndRange
 
@@ -357,6 +368,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -396,6 +408,14 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
         end if
         ! ==================================================================
 
@@ -459,6 +479,14 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
+        end if
+
         call nvtxEndRange
 
         call cpu_time(finish)
@@ -514,6 +542,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -553,6 +582,14 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
         end if
 
         ! ==================================================================
@@ -610,10 +647,19 @@ contains
                 end do
             end do
         end if
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
         end if
 
         ! ==================================================================
@@ -675,6 +721,14 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        end if
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
         end if
 
         call nvtxEndRange

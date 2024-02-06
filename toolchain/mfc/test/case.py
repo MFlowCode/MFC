@@ -215,6 +215,9 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("relax", 'F') == 'T':
             return 1e-10
 
+        if self.params.get("ib", 'F') == 'T':
+            return 1e-10
+
         return 1e-12
 
 
