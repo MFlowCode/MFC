@@ -225,7 +225,7 @@ contains
         !!      of conservative or primitive variables to their scalar
         !!      counterparts. Specifically designed for when subgrid bubbles
         !!      must be included.
-        !! @param qK_vf primitive variables
+        !! @param q_vf primitive variables
         !! @param rho_K density
         !! @param gamma_K specific heat ratio
         !! @param pi_inf_K liquid stiffness
@@ -304,9 +304,9 @@ contains
                     pi_inf = pi_inf + q_vf(i + E_idx)%sf(j, k, l)*fluid_pp(i)%pi_inf
                     qv = qv + q_vf(i)%sf(j, k, l)*fluid_pp(i)%qv
                 end do
-                !rho    = qK_vf(1)%sf(j,k,l)
-                !gamma_K  = fluid_pp(1)%gamma
-                !pi_inf_K = fluid_pp(1)%pi_inf
+                ! rho    = qK_vf(1)%sf(j,k,l)
+                ! gamma_K  = fluid_pp(1)%gamma
+                ! pi_inf_K = fluid_pp(1)%pi_inf
             else
                 rho = q_vf(1)%sf(j, k, l)
                 gamma = fluid_pp(1)%gamma
@@ -1099,6 +1099,7 @@ contains
                         end if
 
                         if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
+
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
                             ! IF( j==0 .and. k==0 .and. l==0) THEN

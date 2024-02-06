@@ -28,6 +28,8 @@ module m_data_output
     use m_helper
 
     use m_delay_file_access
+
+    use m_ibm
     ! ==========================================================================
 
     implicit none
@@ -542,6 +544,17 @@ contains
             end do
         end if
 
+        ! Writing the IB markers
+        if (ib) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) ib_markers%sf; close (2)
+        end if
+
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
         pi_inf = fluid_pp(1)%pi_inf
@@ -824,6 +837,14 @@ contains
 
             call s_int_to_str(t_step, t_step_string)
 
+            ! Initialize MPI data I/O
+
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
+
             if (proc_rank == 0) then
                 file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)
                 call my_inquire(file_loc, dir_check)
@@ -958,6 +979,20 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
+
+        if (ib) then
+            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+
+            ! Initial displacement to skip at beginning of file
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                    MPI_DOUBLE_PRECISION, status, ierr)
+        end if
+
+        call MPI_FILE_CLOSE(ifile, ierr)
 
 #endif
 
