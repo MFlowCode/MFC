@@ -34,6 +34,7 @@ module m_global_parameters
     integer :: num_procs             !< Number of processors
     character(LEN=path_len) :: case_dir              !< Case folder location
     logical :: run_time_info         !< Run-time output flag
+    logical :: sim_data                !< Simulation data output flag
     integer :: t_step_old            !< Existing IC/grid folder
     ! ==========================================================================
 
@@ -343,6 +344,7 @@ contains
         ! Logistics
         case_dir = '.'
         run_time_info = .false.
+        sim_data = .false.
         t_step_old = dflt_int
 
         ! Computational domain parameters

@@ -13,7 +13,7 @@ from .common  import file_load_yaml, file_dump_yaml, create_directory
 class BenchCase:
     slug: str
     path: str
-    args: list[str]
+    #args: list[str]
 
 
 def bench(targets = None):

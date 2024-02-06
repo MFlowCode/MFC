@@ -1852,7 +1852,7 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
-        if (run_time_info .or. probe_wrt) then
+        if (run_time_info .or. probe_wrt .or. sim_data) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; 

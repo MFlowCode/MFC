@@ -204,6 +204,10 @@ contains
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_2D_analytical(i, patch_id_fp, q_prim_vf)
+                    
+                    ! Spherical Harmonic Patch
+                elseif (patch_icpp(i)%geometry == 14) then
+                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)   
 
                     ! Spiral patch
                 elseif (patch_icpp(i)%geometry == 17) then

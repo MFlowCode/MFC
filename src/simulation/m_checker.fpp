@@ -409,5 +409,4 @@ contains
         ! END: Fluids Physical Parameters ==================================
 
     end subroutine s_check_inputs
-
 end module m_checker

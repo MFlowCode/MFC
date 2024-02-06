@@ -22,7 +22,7 @@ module m_global_parameters
     integer :: num_procs            !< Number of processors
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
-    logical :: old_ic               !< Use existing IC data
+    logical :: old_ic, non_axis_sym               !< Use existing IC data
     integer :: t_step_old, t_step_start           !< Existing IC/grid folder
     ! ==========================================================================
 
@@ -210,6 +210,7 @@ contains
         old_ic = .false.
         t_step_old = dflt_int
         t_step_start = dflt_int
+        
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
@@ -304,6 +305,18 @@ contains
             patch_icpp(i)%qv = 0d0
             patch_icpp(i)%qvp = 0d0
             patch_icpp(i)%tau_e = 0d0
+            patch_icpp(i)%a2 = dflt_real
+            patch_icpp(i)%a3 = dflt_real
+            patch_icpp(i)%a4 = dflt_real
+            patch_icpp(i)%a5 = dflt_real
+            patch_icpp(i)%a6 = dflt_real
+            patch_icpp(i)%a8 = dflt_real
+            patch_icpp(i)%a9 = dflt_real
+            patch_icpp(i)%a10 = dflt_real
+            patch_icpp(i)%a11 = dflt_real
+            patch_icpp(i)%a12 = dflt_real
+            patch_icpp(i)%non_axis_sym = .false.
+
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
