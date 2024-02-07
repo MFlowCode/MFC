@@ -331,9 +331,6 @@ contains
                                             h = 0.5*h
                                         end if
                                     end if
-                                    if (ii == 1000) then
-                                        call s_mpi_abort('too many iteration (>1000) in bubbles')
-                                    end if
                                     ii = ii + 1
                                     if (h < h_min) h_min = h
                                 end do
