@@ -23,6 +23,8 @@ module m_time_steppers
 
     use m_bubbles              !< Bubble dynamics routines
 
+    use m_ibm
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_boundary_conditions
@@ -273,6 +275,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -332,6 +335,13 @@ contains
                     end do
                 end do
             end do
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
         end if
 
         call nvtxEndRange
@@ -389,6 +399,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -452,6 +463,13 @@ contains
             end do
         end if
 
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
+        end if
         ! ==================================================================
 
         ! Stage 2 of 2 =====================================================
@@ -534,6 +552,13 @@ contains
                     end do
                 end do
             end do
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
         end if
 
         call nvtxEndRange
@@ -593,6 +618,7 @@ contains
                 end do
             end do
         end do
+
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -652,6 +678,13 @@ contains
                     end do
                 end do
             end do
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
         end if
 
         ! ==================================================================
@@ -734,6 +767,13 @@ contains
                     end do
                 end do
             end do
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+            end if
         end if
 
         ! ==================================================================
@@ -815,6 +855,13 @@ contains
                     end do
                 end do
             end do
+
+        if (ib) then
+            if (qbmm .and. .not. polytropic) then
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            else
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+            end if
         end if
 
         call nvtxEndRange

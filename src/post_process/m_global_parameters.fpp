@@ -282,6 +282,13 @@ contains
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0d0
+                bc_${DIM}$%ve${DIR}$ = 0d0
+            #:endfor
+        #:endfor
+
         ! Fluids physical parameters
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real

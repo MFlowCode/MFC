@@ -623,6 +623,22 @@ contains
                              'instability_wave and n. Exiting ...')
         end if
 
+        ! Constraints on Immersed Boundary Method
+        if (ib) then
+            if (n <= 0) then
+                call s_mpi_abort('Unsupported choices of the combination of values for '// &
+                                 'ib and n. Immersed Boundaries do not work in 1D. Exiting ...')
+            else if (num_ibs <= 0 .or. num_ibs > num_patches_max) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'num_ibs. Exiting ...')
+            end if
+        end if
+
+        if (num_ibs > 0 .and. .not. ib) then
+            call s_mpi_abort('Unsupported choices of the combination of values for '// &
+                             'num_ibs and ib. Exiting ...')
+        end if
+
         ! Constraints on the stiffened equation of state fluids parameters
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
@@ -675,6 +691,81 @@ contains
             end if
 
         end do
+
+        ! Moving Boundaries Checks: x boundaries
+        if (any((/bc_x%vb1, bc_x%vb2, bc_x%vb3/) /= 0d0)) then
+            if (bc_x%beg == 15) then
+                if (any((/bc_x%vb2, bc_x%vb3/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_x%beg and"// &
+                                     "bc_x%vb2 or bc_x%vb3. Exiting ...")
+                end if
+            elseif (bc_x%beg /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_x%beg and"// &
+                                 "bc_x%vb1, bc_x%vb2, or bc_x%vb3. Exiting...")
+            end if
+        end if
+
+        if (any((/bc_x%ve1, bc_x%ve2, bc_x%ve3/) /= 0d0)) then
+            if (bc_x%end == 15) then
+                if (any((/bc_x%ve2, bc_x%ve3/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_x%end and"// &
+                                     "bc_x%ve2 or bc_x%ve3. Exiting ...")
+                end if
+            elseif (bc_x%end /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_x%end and"// &
+                                 "bc_x%ve1, bc_x%ve2, or bc_x%ve3. Exiting...")
+            end if
+        end if
+
+        ! Moving Boundaries Checks: y boundaries
+        if (any((/bc_y%vb1, bc_y%vb2, bc_y%vb3/) /= 0d0)) then
+            if (bc_y%beg == 15) then
+                if (any((/bc_y%vb1, bc_y%vb3/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_y%beg and"// &
+                                     "bc_y%vb1 or bc_y%vb3. Exiting ...")
+                end if
+            elseif (bc_y%beg /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_y%beg and"// &
+                                 "bc_y%vb1, bc_y%vb2, or bc_y%vb3. Exiting...")
+            end if
+        end if
+
+        if (any((/bc_y%ve1, bc_y%ve2, bc_y%ve3/) /= 0d0)) then
+            if (bc_y%end == 15) then
+                if (any((/bc_y%ve1, bc_y%ve3/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_y%end and"// &
+                                     "bc_y%ve1 or bc_y%ve3. Exiting ...")
+                end if
+            elseif (bc_y%end /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_y%end and"// &
+                                 "bc_y%ve1, bc_y%ve2, or bc_y%ve3. Exiting...")
+            end if
+        end if
+
+        ! Moving Boundaries Checks: z boundaries
+        if (any((/bc_z%vb1, bc_z%vb2, bc_z%vb3/) /= 0d0)) then
+            if (bc_z%beg == 15) then
+                if (any((/bc_x%vb1, bc_x%vb2/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_z%beg and"// &
+                                     "bc_x%vb1 or bc_x%vb1. Exiting ...")
+                end if
+            elseif (bc_z%beg /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_z%beg and"// &
+                                 "bc_z%vb1, bc_z%vb2, or bc_z%vb3. Exiting...")
+            end if
+        end if
+
+        if (any((/bc_z%ve1, bc_z%ve2, bc_z%ve3/) /= 0d0)) then
+            if (bc_z%end == 15) then
+                if (any((/bc_x%ve1, bc_x%ve2/) /= 0d0)) then
+                    call s_mpi_abort("Unsupported combination of bc_z%end and"// &
+                                     "bc_z%ve2 or bc_z%ve3. Exiting ...")
+                end if
+            elseif (bc_z%end /= -16) then
+                call s_mpi_abort("Unsupported combination of bc_z%end and"// &
+                                 "bc_z%ve1, bc_z%ve2, or bc_z%ve3. Exiting...")
+            end if
+        end if
 
     end subroutine s_check_inputs
 
