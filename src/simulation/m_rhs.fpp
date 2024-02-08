@@ -46,6 +46,8 @@ module m_rhs
     use m_nvtx
 
     use m_boundary_conditions
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -668,10 +670,6 @@ contains
             end do
         end do
 
-        call nvtxStartRange("RHS-MPI")
-        call s_populate_conservative_variables_buffers(Q_CONS_QP%VF, pb, mv)
-        call nvtxEndRange
-
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -703,6 +701,10 @@ contains
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
             ix, iy, iz)
+        call nvtxEndRange
+
+        call nvtxStartRange("RHS-MPI")
+        call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
         if (t_step == t_step_stop) return

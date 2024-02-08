@@ -172,7 +172,10 @@ contains
         #:endfor
 
         #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
-            & 'Re_inv','poly_sigma', 'palpha_eps', 'ptgalpha_eps' ]
+            & 'Re_inv','poly_sigma','bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1',&
+            & 'bc_x%ve2','bc_x%ve2','bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1',  &
+            & 'bc_y%ve2','bc_y%ve3','bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1',  &
+            & 'bc_z%ve2','bc_z%ve3', 'palpha_eps', 'ptgalpha_eps' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

@@ -227,6 +227,10 @@ module m_global_parameters
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
+    !$acc declare create(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
+    !$acc declare create(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
+    !$acc declare create(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
+
     ! ==========================================================================
 
     integer :: fd_order !<
@@ -390,6 +394,13 @@ contains
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0d0
+                bc_${DIM}$%ve${DIR}$ = 0d0
+            #:endfor
+        #:endfor
 
         ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
         ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;

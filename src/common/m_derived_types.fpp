@@ -41,6 +41,12 @@ module m_derived_types
     type int_bounds_info
         integer :: beg
         integer :: end
+        real(kind(0d0)) :: vb1
+        real(kind(0d0)) :: vb2
+        real(kind(0d0)) :: vb3
+        real(kind(0d0)) :: ve1
+        real(kind(0d0)) :: ve2
+        real(kind(0d0)) :: ve3
     end type int_bounds_info
 
     !> Derived type adding beginning (beg) and end bounds info as attributes
