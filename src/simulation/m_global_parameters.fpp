@@ -491,6 +491,7 @@ contains
             mono(j)%support = 1
             mono(j)%foc_length = dflt_real
             mono(j)%aperture = dflt_real
+            mono(j)%support_width = 2.5d0
         end do
 
         fd_order = dflt_int
