@@ -610,6 +610,22 @@ contains
                              'instability_wave and n. Exiting ...')
         end if
 
+        ! Constraints on Immersed Boundary Method
+        if (ib) then
+            if (n <= 0) then
+                call s_mpi_abort('Unsupported choices of the combination of values for '// &
+                                 'ib and n. Immersed Boundaries do not work in 1D. Exiting ...')
+            else if (num_ibs <= 0 .or. num_ibs > num_patches_max) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'num_ibs. Exiting ...')
+            end if
+        end if
+
+        if (num_ibs > 0 .and. .not. ib) then
+            call s_mpi_abort('Unsupported choices of the combination of values for '// &
+                             'num_ibs and ib. Exiting ...')
+        end if
+
         ! Constraints on the stiffened equation of state fluids parameters
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
