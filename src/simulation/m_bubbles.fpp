@@ -83,8 +83,6 @@ contains
                                                                           bub_p_src, &
                                                                           bub_m_src
 
-        !< Bubble number density
-
         real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
                            Cpbw, Cpinf, Cpinf_dot, &
@@ -104,12 +102,11 @@ contains
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
-        real(kind(0d0)) :: err_R, err_V, err
-        real(kind(0d0)) :: t_new
-        real(kind(0d0)) :: h, h0, h1, h_min
-        real(kind(0d0)) :: d0, d1, d2
-        real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp
-        integer :: ii_max
+        real(kind(0d0)) :: err_R, err_V, err !< Error estimates for adaptive time stepping
+        real(kind(0d0)) :: t_new !< Updated time step size
+        real(kind(0d0)) :: h, h0, h1, h_min !< Time step size
+        real(kind(0d0)) :: d0, d1, d2 !< norms 
+        real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -225,14 +222,14 @@ contains
                         ! Adaptive time stepping
                         if (adap_dt) then
                             ! Determine the starting time step
-                            !! Evaluate f(x0,y0)
+                            ! Evaluate f(x0,y0)
                             myR_tmp(1) = myR
                             myV_tmp(1) = myV
                             myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
                                                  pb, pbdot, alf, n_tait, B_tait, &
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
-                            !! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
+                            ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
                             d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
                             d1 = DSQRT((myV_tmp(1)**2 + myA_tmp(1)**2)/2)
                             if (d0 < 1e-5 .or. d1 < 1e-5) then
@@ -241,31 +238,30 @@ contains
                                 h0 = 0.01*(d0/d1)
                             end if
 
-                            !! Evaluate f(x0+h0,y0+h0*f(x0,y0))
+                            ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
                             myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
                             myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
                             myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
                                                  pb, pbdot, alf, n_tait, B_tait, &
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
-                            !! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
+                            ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
                             d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2)/h0
 
-                            !! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
-                            !!      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
+                            ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
+                            !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
                             if (max(d1, d2) < 1e-15) then
                                 h1 = max(1e-6, h0*1e-3)
                             else
                                 h1 = (0.01/max(d1, d2))**(1/3d0)
                             end if
 
-                            !! Set h = min(100*h0,h1)
+                            ! Set h = min(100*h0,h1)
                             h = min(100*h0, h1)
 
                             ! Advancing one step
                             t_new = 0d0
                             h_min = h
-                            ii_max = 1
                             do while (.true.)
                                 if (t_new + h > dt) then
                                     h = dt - t_new
@@ -334,8 +330,6 @@ contains
                                     ii = ii + 1
                                     if (h < h_min) h_min = h
                                 end do
-
-                                if (ii > ii_max) ii_max = ii
 
                                 ! Exit the loop if the final time reached dt
                                 if (t_new == dt) exit
