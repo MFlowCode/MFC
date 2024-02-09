@@ -520,8 +520,8 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fR0 Equilibrium bubble radius
-        !!  @param fpb
-        !!  @param fpbdot
+        !!  @param fpb Internal bubble pressure
+        !!  @param fpbdot Time-derivative of internal bubble pressure
         !!  @param alf bubble volume fraction
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
