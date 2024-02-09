@@ -111,7 +111,7 @@ contains
         real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp
         integer :: ii_max
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -161,7 +161,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

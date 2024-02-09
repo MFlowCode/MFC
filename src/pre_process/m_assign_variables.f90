@@ -572,7 +572,7 @@ contains
             do i = 1, nb
                 if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
-                    print *, 'setting to pb0'
+                    ! print *, 'setting to pb0'
                 end if
                 if (q_prim_vf(bub_idx%ms(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
