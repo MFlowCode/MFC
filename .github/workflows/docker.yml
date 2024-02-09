@@ -27,4 +27,3 @@ jobs:
         file: toolchain/Dockerfile
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/mfc:latest
-
