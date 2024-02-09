@@ -105,7 +105,7 @@ contains
         real(kind(0d0)) :: err_R, err_V, err !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
         real(kind(0d0)) :: h, h0, h1, h_min !< Time step size
-        real(kind(0d0)) :: d0, d1, d2 !< norms 
+        real(kind(0d0)) :: d0, d1, d2 !< norms
         real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
