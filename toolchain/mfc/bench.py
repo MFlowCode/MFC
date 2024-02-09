@@ -1,6 +1,6 @@
 import os, sys, uuid, subprocess, dataclasses
 
-import rich.table
+import rich.table, typing
 
 from .printer import cons
 from .state   import ARG, CFG
@@ -13,7 +13,7 @@ from .common  import file_load_yaml, file_dump_yaml, create_directory
 class BenchCase:
     slug: str
     path: str
-    args: list[str]
+    args: typing.List[str]
 
 
 def bench(targets = None):
