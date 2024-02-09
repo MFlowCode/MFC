@@ -1,6 +1,6 @@
-import os, sys, uuid, subprocess, dataclasses
+import os, sys, uuid, subprocess, dataclasses, typing
 
-import rich.table, typing
+import rich.table
 
 from .printer import cons
 from .state   import ARG, CFG
