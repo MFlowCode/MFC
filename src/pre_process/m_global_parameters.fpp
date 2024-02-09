@@ -122,6 +122,8 @@ module m_global_parameters
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
+    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
+    type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
@@ -162,6 +164,23 @@ module m_global_parameters
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    !> @}
+
+    !> @name Immersed Boundaries
+    !> @{
+    logical :: ib           !< Turn immersed boundaries on
+    integer :: num_ibs      !< Number of immersed boundaries
+    integer :: Np
+
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+
+    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    !! Database of the immersed boundary patch parameters for each of the
+    !! patches employed in the configuration of the initial condition. Note that
+    !! the maximum allowable number of patches, num_patches_max, may be changed
+    !! in the module m_derived_types.f90.
+    ! ==========================================================================
+
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -256,6 +275,13 @@ contains
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0d0
+                bc_${DIM}$%ve${DIR}$ = 0d0
+            #:endfor
+        #:endfor
+
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
@@ -346,6 +372,27 @@ contains
         phi_nv = dflt_real
         Pe_c = dflt_real
         Tw = dflt_real
+
+        ! Immersed Boundaries
+        ib = .false.
+        num_ibs = dflt_int
+
+        do i = 1, num_patches_max
+            patch_ib(i)%geometry = dflt_int
+            patch_ib(i)%x_centroid = dflt_real
+            patch_ib(i)%y_centroid = dflt_real
+            patch_ib(i)%z_centroid = dflt_real
+            patch_ib(i)%length_x = dflt_real
+            patch_ib(i)%length_y = dflt_real
+            patch_ib(i)%length_z = dflt_real
+            patch_ib(i)%radius = dflt_real
+            patch_ib(i)%theta = dflt_real
+            patch_ib(i)%c = dflt_real
+            patch_ib(i)%t = dflt_real
+            patch_ib(i)%m = dflt_real
+            patch_ib(i)%p = dflt_real
+            patch_ib(i)%slip = .false.
+        end do
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -627,6 +674,8 @@ contains
             end do
         end if
 
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
+
 #endif
 
         ! Allocating grid variables for the x-direction
@@ -705,6 +754,8 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
+
+        if (ib) deallocate (MPI_IO_IB_DATA%var%sf)
 
 #endif
 

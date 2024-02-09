@@ -5,9 +5,10 @@ from os.path import abspath, normpath, dirname, realpath
 from .printer import cons
 
 
-MFC_ROOTDIR        = normpath(f"{dirname(realpath(__file__))}/../..")
+MFC_ROOTDIR        = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
 MFC_TESTDIR        = abspath(f"{MFC_ROOTDIR}/tests")
 MFC_SUBDIR         = abspath(f"{MFC_ROOTDIR}/build")
+MFC_TEMPLATEDIR    = abspath(f"{MFC_ROOTDIR}/toolchain/templates")
 MFC_LOCK_FILEPATH  = abspath(f"{MFC_SUBDIR}/lock.yaml")
 MFC_BENCH_FILEPATH = abspath(f"{MFC_ROOTDIR}/toolchain/bench.yaml")
 
@@ -28,33 +29,14 @@ class MFCException(Exception):
     pass
 
 
-# pylint: disable=too-many-arguments
-def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, env: dict = None) -> int:
+def system(command: typing.List[str], print_cmd = None, **kwargs) -> subprocess.CompletedProcess:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
 
-    if env is None:
-        env = os.environ.copy()
-
-    if stdout != subprocess.DEVNULL:
+    if print_cmd in [True, None]:
+        cons.print(f"$ {' '.join(cmd)}")
         cons.print(no_indent=True)
 
-    cons.print(f"$ {' '.join(cmd)}")
-
-    if stdout != subprocess.DEVNULL:
-        cons.print(no_indent=True)
-
-    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr, env=env, check=False)
-
-    if r.returncode != 0:
-        on_error()
-
-        if not no_exception:
-            if exception_text is None:
-                exception_text = f'Failed to execute command "{command}".'
-
-            raise MFCException(exception_text)
-
-    return r.returncode
+    return subprocess.run(cmd, **kwargs, check=False)
 
 
 def file_write(filepath: str, content: str):
@@ -196,14 +178,6 @@ def does_system_use_modules() -> bool:
     """
 
     return does_command_exist("module")
-
-
-def get_loaded_modules() -> typing.List[str]:
-    """
-    Returns a list of loaded modules.
-    """
-
-    return [ l for l in subprocess.getoutput("module -t list").splitlines() if ' ' not in l ]
 
 
 def is_number(x: str) -> bool:

@@ -1,8 +1,8 @@
 # Case Files
 
-Example Python case files, also referred to as *input files*, can be found in the [examples/](examples/) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
+Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented
 in the user manual. A commented, tutorial script
-can also be found in [examples/3d_sphbubcollapse/](examples/3D_sphbubcollapse/case.py).
+can also be found in [examples/3d_sphbubcollapse/](https://github.com/MFlowCode/MFC/blob/master/examples/3D_sphbubcollapse/case.py).
 
 ## Basic Skeleton
 
@@ -304,6 +304,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `bc_[x,y,z]\%beg[end]` | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `bc_[x,y,z]\%vb[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%beg` |
+| `bc_[x,y,z]\%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation\\%;%[4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
@@ -323,6 +325,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 
 - \* Options that work only with `model_eqns` $=2$.
 - † Options that work only with `cyl_coord` $=$ `False`.
+- ‡ Options that work only with `bc_[x,y,z]%[beg,end] = -15` and/or `bc_[x,y,z]%[beg,end] = -16`
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
@@ -331,6 +334,12 @@ Details of the simulation algorithms and implementation of the WENO scheme can b
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
 See table [Boundary Conditions](#boundary-conditions) for details.
+
+- `bc_[x,y,z]\%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%beg = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
+
+- `bc_[x,y,z]\%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%end = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]\%end = 16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3. 
 `model_eqns` $=$ 1, 2, and 3 correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md#Johnsen08)), 5-equation model ([Allaire et al., 2002](references.md#Allaire02)), and 6-equation model ([Saurel et al., 2009](references.md#Saurel09)), respectively.

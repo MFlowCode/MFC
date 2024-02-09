@@ -1,12 +1,11 @@
 import re, os.path, argparse, dataclasses
 
-from .build     import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
-from .common    import MFCException, format_list_to_string
-from .test.cases import generate_cases
-from .run.engines  import ENGINES
-from .run.mpi_bins import BINARIES
+from .run.run      import get_baked_templates
+from .build        import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
+from .common       import MFCException, format_list_to_string
+from .test.cases   import generate_cases
 
-# pylint: disable=too-many-locals, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config):
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
@@ -19,13 +18,15 @@ started, run ./mfc.sh build -h.""",
     )
 
     parsers = parser.add_subparsers(dest="command")
-    run     = parsers.add_parser(name="run",    help="Run a case with MFC.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test    = parsers.add_parser(name="test",   help="Run MFC's test suite.",           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build   = parsers.add_parser(name="build",  help="Build MFC and its dependencies.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean   = parsers.add_parser(name="clean",  help="Clean build artifacts.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench   = parsers.add_parser(name="bench",  help="Benchmark MFC (for CI).",         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count   = parsers.add_parser(name="count",  help="Count LOC in MFC.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    packer  = parsers.add_parser(name="packer", help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     packers = packer.add_subparsers(dest="packer")
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -75,8 +76,6 @@ started, run ./mfc.sh build -h.""",
     # === CLEAN ===
     add_common_arguments(clean, "jg")
 
-    binaries = [ b.bin for b in BINARIES ]
-
     # === TEST ===
     test_cases = generate_cases()
 
@@ -85,7 +84,6 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
-    test.add_argument("-b", "--binary",       choices=binaries, type=str, default=None, help="(Serial) Override MPI execution binary")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
@@ -98,41 +96,55 @@ started, run ./mfc.sh build -h.""",
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
     test_meg.add_argument("--remove-old-tests",  action="store_true", default=False, help="(Test Generation) Delete tests directories that are no longer.")
 
-    # === RUN ===
-    engines = [ e.slug for e in ENGINES ]
+    test.add_argument(metavar="FORWARDED", default=[], dest="--", nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
 
+    # === RUN ===
     add_common_arguments(run)
-    run.add_argument("input",                  metavar="INPUT",                 type=str,                     help="Input file to run.")
-    run.add_argument("arguments",              metavar="ARGUMENTS", nargs='*',  type=str, default=[],         help="Additional arguments to pass to the case file.")
-    run.add_argument("-e", "--engine",         choices=engines,                 type=str, default=engines[0], help="Job execution/submission engine choice.")
-    run.add_argument("-p", "--partition",      metavar="PARTITION",             type=str, default="",         help="(Batch) Partition for job submission.")
-    run.add_argument("-N", "--nodes",          metavar="NODES",                 type=int, default=1,          help="(Batch) Number of nodes.")
-    run.add_argument("-n", "--tasks-per-node", metavar="TASKS",                 type=int, default=1,          help="Number of tasks per node.")
-    run.add_argument("-w", "--walltime",       metavar="WALLTIME",              type=str, default="01:00:00", help="(Batch) Walltime.")
-    run.add_argument("-a", "--account",        metavar="ACCOUNT",               type=str, default="",         help="(Batch) Account to charge.")
-    run.add_argument("-@", "--email",          metavar="EMAIL",                 type=str, default="",         help="(Batch) Email for job notification.")
-    run.add_argument("-#", "--name",           metavar="NAME",                  type=str, default="MFC",      help="(Batch) Job name.")
-    run.add_argument("-f", "--flags",          metavar="FLAGS",     nargs='+',  type=str, default=[],         help="(Batch) Additional batch options.")
-    run.add_argument("-b", "--binary",         choices=binaries,                type=str, default=None,       help="(Interactive) Override MPI execution binary")
-    run.add_argument("-s", "--scratch",        action="store_true",                       default=False,      help="Build from scratch.")
-    run.add_argument("--ncu",                  nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Compute.")
-    run.add_argument("--nsys",                 nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
-    run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-    run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
-    run.add_argument("--wait",                 action="store_true",                       default=False,      help="(Batch) Wait for the job to finish.")
+    run.add_argument("input",                      metavar="INPUT",              type=str,                     help="Input file to run.")
+    run.add_argument("arguments",                  metavar="ARGUMENTS", nargs="*", type=str, default=[],       help="Additional positional arguments to pass to the case file.")
+    run.add_argument("-e", "--engine",             choices=["interactive", "batch"],              type=str, default="interactive", help="Job execution/submission engine choice.")
+    run.add_argument("-p", "--partition",          metavar="PARTITION",          type=str, default="",         help="(Batch) Partition for job submission.")
+    run.add_argument("-q", "--quality_of_service", metavar="QOS",          type=str, default="",         help="(Batch) Quality of Service for job submission.")
+    run.add_argument("-N", "--nodes",              metavar="NODES",              type=int, default=1,          help="(Batch) Number of nodes.")
+    run.add_argument("-n", "--tasks-per-node",     metavar="TASKS",              type=int, default=1,          help="Number of tasks per node.")
+    run.add_argument("-w", "--walltime",           metavar="WALLTIME",           type=str, default="01:00:00", help="(Batch) Walltime.")
+    run.add_argument("-a", "--account",            metavar="ACCOUNT",            type=str, default="",         help="(Batch) Account to charge.")
+    run.add_argument("-@", "--email",              metavar="EMAIL",              type=str, default="",         help="(Batch) Email for job notification.")
+    run.add_argument("-#", "--name",               metavar="NAME",               type=str, default="MFC",      help="(Batch) Job name.")
+    run.add_argument("-s", "--scratch",            action="store_true",                    default=False,      help="Build from scratch.")
+    run.add_argument("-b", "--binary",             choices=["mpirun", "jsrun", "srun", "mpiexec"],             type=str, default=None,       help="(Interactive) Override MPI execution binary")
+    run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
+    run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
+    run.add_argument(      "--dry-run",            action="store_true",                    default=False,      help="(Batch) Run without submitting batch file.")
+    run.add_argument("--case-optimization",        action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    run.add_argument(      "--no-build",           action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
+    run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
+    run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="Arguments to forward to the MPI invocation.")
+    run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
+    run.add_argument("-o", "--output-summary",     metavar="OUTPUT",             type=str, default=None,       help="Output file (YAML) for summary.")
 
     # === BENCH ===
-    add_common_arguments(bench, "t")
+    add_common_arguments(bench)
+    bench.add_argument("-o", "--output", metavar="OUTPUT", default=None, type=str, required="True", help="Path to the YAML output file to write the results to.")
+    bench.add_argument(metavar="FORWARDED", default=[], dest='--', nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
+
+    # === BENCH_DIFF ===
+    add_common_arguments(bench_diff, "t")
+    bench_diff.add_argument("lhs", metavar="LHS", type=str, help="Path to a benchmark result YAML file.")
+    bench_diff.add_argument("rhs", metavar="RHS", type=str, help="Path to a benchmark result YAML file.")
 
     # === COUNT ===
     add_common_arguments(count, "g")
 
+    # === COUNT ===
+    add_common_arguments(count_diff, "g")
+
     args: dict = vars(parser.parse_args())
+    args["--"] = args.get("--", [])
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("bench", bench), ("count", count)]:
+                         ("clean",  clean), ("count", count), ("count_diff", count_diff)]:
         if args["command"] == name:
             continue
 
@@ -150,10 +162,14 @@ started, run ./mfc.sh build -h.""",
     # "Slugify" the name of the job
     args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
-    # build's --case-optimization and --input depend on each other
+    # We need to check for some invalid combinations of arguments because of
+    # the limitations of argparse.
     if args["command"] == "build":
         if (args["input"] is not None) ^ args["case_optimization"] :
-            raise MFCException("./mfc.sh build's --case-optimization requires --input")
+            raise MFCException("./mfc.sh build's --case-optimization and --input must be used together.")
+    if args["command"] == "run":
+        if args["binary"] is not None and args["engine"] != "interactive":
+            raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:

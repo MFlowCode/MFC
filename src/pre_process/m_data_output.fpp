@@ -45,14 +45,18 @@ module m_data_output
 
         !>  Interface for the conservative data
         !! @param q_cons_vf The conservative variables
-        subroutine s_write_abstract_data_files(q_cons_vf)
+        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers)
 
-            import :: scalar_field, sys_size, pres_field
+            import :: scalar_field, integer_field, sys_size, m, n, p, pres_field
 
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(IN) :: q_cons_vf
+
+            ! IB markers
+            type(integer_field), &
+                intent(IN) :: ib_markers
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -70,10 +74,14 @@ contains
     !>  Writes grid and initial condition data files to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
-    subroutine s_write_serial_data_files(q_cons_vf) ! -----------
+    subroutine s_write_serial_data_files(q_cons_vf, ib_markers) ! -----------
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+        ! IB markers
+        type(integer_field), &
+            intent(IN) :: ib_markers
 
         logical :: file_exist !< checks if file exists
 
@@ -133,6 +141,34 @@ contains
                 write (1) z_cb(-1:p)
                 close (1)
             end if
+        end if
+
+        ! ==================================================================
+
+        ! Outputting IB Markers ================================
+        file_loc = trim(t_step_dir)//'/ib.dat'
+
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        write (1) ib_markers%sf
+        close (1)
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%geometry == 4) then
+
+                    file_loc = trim(t_step_dir)//'/airfoil_u.dat'
+
+                    open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+                    write (1) airfoil_grid_u(1:Np)
+                    close (1)
+
+                    file_loc = trim(t_step_dir)//'/airfoil_l.dat'
+
+                    open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+                    write (1) airfoil_grid_l(1:Np)
+                    close (1)
+                end if
+            end do
         end if
         ! ==================================================================
 
@@ -376,17 +412,66 @@ contains
             end if
         end if
 
+        if (ib) then
+
+            do i = 1, num_ibs
+
+                write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
+                open (2, FILE=trim(file_loc))
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            if (p > 0) then
+                                write (2, FMT) x_cc(j), y_cc(k), z_cc(l), real(ib_markers%sf(j, k, l))
+                            else
+                                write (2, FMT) x_cc(j), y_cc(k), real(ib_markers%sf(j, k, l))
+                            end if
+                        end do
+                    end do
+                end do
+
+                close (2)
+            end do
+        end if
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%geometry == 4) then
+
+                    write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/airfoil_u.', proc_rank, '.dat'
+                    open (2, FILE=trim(file_loc))
+                    do j = 1, Np
+                        write (2, FMT) airfoil_grid_u(j)%x, airfoil_grid_u(j)%y
+                    end do
+                    close (2)
+
+                    write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/airfoil_l.', proc_rank, '.dat'
+                    open (2, FILE=trim(file_loc))
+                    do j = 1, Np
+                        write (2, FMT) airfoil_grid_l(j)%x, airfoil_grid_l(j)%y
+                    end do
+                    close (2)
+
+                    print *, "Np", Np
+                end if
+            end do
+        end if
+
     end subroutine s_write_serial_data_files ! ------------------------------------
 
     !> Writes grid and initial condition data files in parallel to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf The conservative variables
-    subroutine s_write_parallel_data_files(q_cons_vf) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers) ! --
 
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
+
+        ! IB markers
+        type(integer_field), &
+            intent(IN) :: ib_markers
 
 #ifdef MFC_MPI
 
@@ -415,8 +500,13 @@ contains
             end if
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
+
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
@@ -472,7 +562,11 @@ contains
 
         else
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step_start, '.dat'
@@ -539,6 +633,76 @@ contains
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        if (ib) then
+
+            write (file_loc, '(A)') 'ib.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Initial displacement to skip at beginning of file
+            disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                    MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        if (ib) then
+
+            do i = 1, num_ibs
+
+                if (patch_ib(i)%geometry == 4) then
+
+                    write (file_loc, '(A)') 'airfoil_l.dat'
+                    file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist .and. proc_rank == 0) then
+                        call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+                    end if
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                                       mpi_info_int, ifile, ierr)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = 0
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                                           'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+
+                    call MPI_FILE_CLOSE(ifile, ierr)
+
+                    write (file_loc, '(A)') 'airfoil_u.dat'
+                    file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist .and. proc_rank == 0) then
+                        call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+                    end if
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                                       mpi_info_int, ifile, ierr)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = 0
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                                           'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
+                                            MPI_DOUBLE_PRECISION, status, ierr)
+
+                    call MPI_FILE_CLOSE(ifile, ierr)
+                end if
+            end do
+
         end if
 #endif
 

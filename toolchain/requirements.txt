@@ -1,5 +1,6 @@
 rich
 fypp
+mako
 wheel
 typing
 PyYAML

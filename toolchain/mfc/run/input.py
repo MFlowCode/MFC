@@ -30,6 +30,8 @@ class MFCInputFile:
         return False
 
     def generate_inp(self, target) -> None:
+        target = build.get_target(target)
+
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
         cons.indent()
 
@@ -72,10 +74,10 @@ class MFCInputFile:
 
             return lhs == rhs
 
-        inc_dir = os.path.join(target.get_build_dirpath(), "include")
+        inc_dir = os.path.join(target.get_build_dirpath(), "include", target.name)
         common.create_directory(inc_dir)
 
-        fpp_path = os.path.join(inc_dir, f"case.fpp")
+        fpp_path = os.path.join(inc_dir, "case.fpp")
         opt_fpp  = common.file_read(fpp_path) if os.path.exists(fpp_path) else ""
 
         if __contents_equal(contents, opt_fpp):
@@ -210,7 +212,10 @@ class MFCInputFile:
         return result
 
     def generate_fpp(self, target) -> None:
-        cons.print(f"Generating [magenta]{build.get_target(target).name}/include/case.fpp[/magenta].")
+        if target.isDependency:
+            return
+
+        cons.print(f"Generating [magenta]case.fpp[/magenta].")
         cons.indent()
 
         self.__save_fpp(target, self.get_fpp(target))
