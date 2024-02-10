@@ -28,6 +28,8 @@ module m_data_output
     use m_helper
 
     use m_delay_file_access
+
+    use m_ibm
     ! ==========================================================================
 
     implicit none
@@ -71,14 +73,14 @@ module m_data_output
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
 
-!$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
 
-!$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+    !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -247,7 +249,7 @@ contains
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
-!$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -330,7 +332,7 @@ contains
                         !2D
                         icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                                   dy(k)/(abs(vel(2)) + c))
-                        
+
                         if (any(Re_size > 0)) then
 
                             vcfl_sf(j, k, l) = maxval(dt/Re/rho)/min(dx(j), dy(k))**2d0
@@ -373,8 +375,6 @@ contains
             !$acc end kernels
         end if
 
-        !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
-
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
@@ -415,14 +415,14 @@ contains
                 call s_mpi_abort('ICFL is NaN. Exiting ...')
             elseif (icfl_max_glb > 1d0) then
                 print *, 'icfl', icfl_max_glb
-                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')           
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
             if (vcfl_max_glb /= vcfl_max_glb) then
                 call s_mpi_abort('VCFL is NaN. Exiting ...')
             elseif (vcfl_max_glb > 1d0) then
                 print *, 'vcfl', vcfl_max_glb
-                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')           
+                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
             end if
         end if
 
@@ -452,7 +452,7 @@ contains
 
         character(LEN=15) :: FMT
 
-        integer :: i, j, k, l, ii , r!< Generic loop iterators
+        integer :: i, j, k, l, ii, r!< Generic loop iterators
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
@@ -516,11 +516,11 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/pb', &
-                        sys_size + (i-1)*nnode + r, '.dat'
+                        sys_size + (i - 1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -533,7 +533,7 @@ contains
             do i = 1, nb
                 do r = 1, nnode
                     write (file_path, '(A,I0,A)') trim(t_step_dir)//'/mv', &
-                        sys_size + (i-1)*nnode + r, '.dat'
+                        sys_size + (i - 1)*nnode + r, '.dat'
 
                     open (2, FILE=trim(file_path), &
                           FORM='unformatted', &
@@ -544,10 +544,21 @@ contains
             end do
         end if
 
+        ! Writing the IB markers
+        if (ib) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) ib_markers%sf; close (2)
+        end if
+
         gamma = fluid_pp(1)%gamma
         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
         pi_inf = fluid_pp(1)%pi_inf
-        qv =  fluid_pp(1)%qv
+        qv = fluid_pp(1)%qv
 
         if (precision == 1) then
             FMT = "(2F30.3)"
@@ -569,7 +580,7 @@ contains
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
             ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1d0)
-            if(qbmm) then
+            if (qbmm) then
                 q_prim_vf(bubxb)%sf = 1d0
             end if
         end if
@@ -606,10 +617,10 @@ contains
                 close (2)
             end do
 
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -620,7 +631,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -652,10 +663,10 @@ contains
                 close (2)
             end do
 
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -668,7 +679,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -728,10 +739,10 @@ contains
                 close (2)
             end do
 
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -746,7 +757,7 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.',  proc_rank, '.', t_step, '.dat'
+                        write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -776,7 +787,7 @@ contains
                                     ) then
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)  
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)
                                 end if
                             end do
                             write (2, *)
@@ -818,13 +829,21 @@ contains
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist, dir_check
-        character(len = 10) :: t_step_string
+        character(len=10) :: t_step_string
 
         integer :: i !< Generic loop iterator
 
         if (file_per_process) then
 
             call s_int_to_str(t_step, t_step_string)
+
+            ! Initialize MPI data I/O
+
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             if (proc_rank == 0) then
                 file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)
@@ -835,7 +854,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess (proc_rank)
+            call DelayFileAccess(proc_rank)
 
             ! Initialize MPI data I/O
 
@@ -849,7 +868,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                            mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -872,14 +891,14 @@ contains
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                 MPI_DOUBLE_PRECISION, status, ierr)
                     end do
-                end if           
+                end if
             else
                 do i = 1, sys_size !TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -903,7 +922,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                            mpi_info_int, ifile, ierr)
+                               mpi_info_int, ifile, ierr)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -926,12 +945,12 @@ contains
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                           'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -939,11 +958,11 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                            'native', mpi_info_int, ierr)
+                                               'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                 MPI_DOUBLE_PRECISION, status, ierr)
                     end do
-                end if           
+                end if
             else
                 do i = 1, sys_size !TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -952,7 +971,7 @@ contains
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                           'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
@@ -961,10 +980,23 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
+        if (ib) then
+            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+
+            ! Initial displacement to skip at beginning of file
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                    MPI_DOUBLE_PRECISION, status, ierr)
+        end if
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+
 #endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------
-
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
@@ -1074,7 +1106,7 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    if(hypoelasticity) then
+                    if (hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
@@ -1086,7 +1118,7 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    if(hypoelasticity) then
+                    if (hypoelasticity) then
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
@@ -1157,7 +1189,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1179,7 +1211,7 @@ contains
                         l = 0
 
                         ! Computing/Sharing necessary state variables
-                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, & 
+                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
                         do s = 1, num_dims
@@ -1224,7 +1256,7 @@ contains
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                        ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1261,11 +1293,11 @@ contains
                             end do
 
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
-                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, qv, pres)
+                                                    0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, qv, pres)
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1616,17 +1648,16 @@ contains
 
         integer :: i !< Generic loop iterator
 
-
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
-        
+
         if (any(Re_size > 0)) then
             @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
-            
+
             vcfl_max = 0d0
-            Rc_min   = 1d3
+            Rc_min = 1d3
         end if
 
         ! Associating the procedural pointer to the appropriate subroutine

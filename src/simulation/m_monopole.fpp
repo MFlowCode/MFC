@@ -31,7 +31,6 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
 
-
 contains
 
     subroutine s_initialize_monopole_module()
@@ -55,11 +54,10 @@ contains
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono)
 
-    
     end subroutine
 
-    subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src,  q_cons_vf, &
-                                         q_prim_vf, t_step, id, rhs_vf)
+    subroutine s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, q_cons_vf, &
+                                       q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -84,182 +82,179 @@ contains
 
         integer :: i, j, k, l, q, ii !< generic loop variables
         integer :: term_index
-        
+
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
         real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
 
-
         integer :: ndirs
-        
+
         real(kind(0d0)) :: the_time, sound
         real(kind(0d0)) :: s2, const_sos, s1
 
-
-!$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        mono_mass_src(j, k, l) = 0d0; mono_mom_src(1, j, k, l) = 0d0; mono_e_src(j, k, l) = 0d0; 
-                        if (n > 0) then
-                            mono_mom_src(2, j, k, l) = 0d0
-                        end if
-                        if (p > 0) then
-                            mono_mom_src(3, j, k, l) = 0d0
-                        end if
-                    end do
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    mono_mass_src(j, k, l) = 0d0; mono_mom_src(1, j, k, l) = 0d0; mono_e_src(j, k, l) = 0d0; 
+                    if (n > 0) then
+                        mono_mom_src(2, j, k, l) = 0d0
+                    end if
+                    if (p > 0) then
+                        mono_mom_src(3, j, k, l) = 0d0
+                    end if
                 end do
             end do
+        end do
 
+        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    !$acc loop seq
+                    do q = 1, num_mono
 
-!$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-!$acc loop seq
-                        do q = 1, num_mono
+                        the_time = t_step*dt
+                        if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
+                            !$acc loop seq
+                            do ii = 1, num_fluids
+                                myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
+                                myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
+                            end do
 
-                            the_time = t_step*dt
-                            if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
-!$acc loop seq
-                                do ii = 1, num_fluids
-                                    myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
-                                    myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
-                                end do
+                            myRho = 0d0
+                            n_tait = 0d0
+                            B_tait = 0d0
 
-                                myRho = 0d0
-                                n_tait = 0d0
-                                B_tait = 0d0
-
-                                if (bubbles) then
-                                    if (mpp_lim .and. (num_fluids > 2)) then
-                                        !$acc loop seq
-                                        do ii = 1, num_fluids
-                                            myRho = myRho + myalpha_rho(ii)
-                                            n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                            B_tait = B_tait + myalpha(ii)*pi_infs(ii)
-                                        end do
-                                    else if (num_fluids > 2) then
-                                        !$acc loop seq
-                                        do ii = 1, num_fluids - 1
-                                            myRho = myRho + myalpha_rho(ii)
-                                            n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                            B_tait = B_tait + myalpha(ii)*pi_infs(ii)
-                                        end do
-                                    else
-                                        myRho = myalpha_rho(1)
-                                        n_tait = gammas(1)
-                                        B_tait = pi_infs(1)
-                                    end if
-                                else
+                            if (bubbles) then
+                                if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
                                     do ii = 1, num_fluids
                                         myRho = myRho + myalpha_rho(ii)
                                         n_tait = n_tait + myalpha(ii)*gammas(ii)
                                         B_tait = B_tait + myalpha(ii)*pi_infs(ii)
                                     end do
+                                else if (num_fluids > 2) then
+                                    !$acc loop seq
+                                    do ii = 1, num_fluids - 1
+                                        myRho = myRho + myalpha_rho(ii)
+                                        n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                        B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                    end do
+                                else
+                                    myRho = myalpha_rho(1)
+                                    n_tait = gammas(1)
+                                    B_tait = pi_infs(1)
                                 end if
-                                n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                            else
+                                !$acc loop seq
+                                do ii = 1, num_fluids
+                                    myRho = myRho + myalpha_rho(ii)
+                                    n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                    B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                end do
+                            end if
+                            n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
 
-                                sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
-                                sound = dsqrt(sound)
+                            sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                            sound = dsqrt(sound)
 !                                            const_sos = dsqrt(n_tait)
-                                const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
-                                const_sos = dsqrt(const_sos)
-                                !TODO: does const_sos need to be changed?
+                            const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
+                            const_sos = dsqrt(const_sos)
+                            !TODO: does const_sos need to be changed?
 
-                                term_index = 2
+                            term_index = 2
 
-                                angle = 0.d0
-                                angle_z = 0.d0
+                            angle = 0.d0
+                            angle_z = 0.d0
 
-                                s2 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                        f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
-                                !s2 = 1d0
+                            s2 = f_g(the_time, sound, const_sos, q, term_index)* &
+                                 f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                            !s2 = 1d0
 
-                                if (support(q) == 5) then
-                                    term_index = 1
-                                    s1 = f_g(the_time, sound, const_sos, q, term_index)* &
-                                            f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
-                                end if
+                            if (support(q) == 5) then
+                                term_index = 1
+                                s1 = f_g(the_time, sound, const_sos, q, term_index)* &
+                                     f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                            end if
 
-                                mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
+                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
 !                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
 
-                                if (n == 0) then
+                            if (n == 0) then
 
-                                    ! 1D
-                                    if (dir(q) < -0.1d0) then
-                                        !left-going wave
-                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
-                                    else
-                                        !right-going wave
-                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
-                                    end if
-                                else if (p == 0) then
-                                    ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                                    !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
-                                    if (dir(q) /= dflt_real) then
-                                        ! 2d
-                                        !mono_mom_src(1,j,k,l) = s2
-                                        !mono_mom_src(2,j,k,l) = s2
-                                        if (support(q) == 5) then
-                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
-                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
-                                        else
-                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
-                                        end if
-                                    end if
+                                ! 1D
+                                if (dir(q) < -0.1d0) then
+                                    !left-going wave
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2
                                 else
-                                    ! 3D
-                                    if (dir(q) /= dflt_real) then
-                                        if (support(q) == 5) then
-                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
-                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
-                                        else if (support(q) == 6) then
-                                            ! Cylindrical Coordinate
-                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l)
-                                        else
-                                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
-                                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
-                                        end if
-                                    end if
+                                    !right-going wave
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
                                 end if
-
-                                if (model_eqns /= 4) then
+                            else if (p == 0) then
+                                ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
+                                !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
+                                if (dir(q) /= dflt_real) then
+                                    ! 2d
+                                    !mono_mom_src(1,j,k,l) = s2
+                                    !mono_mom_src(2,j,k,l) = s2
                                     if (support(q) == 5) then
-!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
-                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
                                     else
-                                        mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
                                     end if
                                 end if
-
+                            else
+                                ! 3D
+                                if (dir(q) /= dflt_real) then
+                                    if (support(q) == 5) then
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                    else if (support(q) == 6) then
+                                        ! Cylindrical Coordinate
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l)
+                                    else
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
+                                    end if
+                                end if
                             end if
-                        end do
-                    end do
-                end do
-            end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-!$acc loop seq
-                        do q = contxb, contxe
-                            rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mass_src(j, k, l)
-                        end do
-!$acc loop seq
-                        do q = momxb, momxe
-                            rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mom_src(q - contxe, j, k, l)
-                        end do
-                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + mono_e_src(j, k, l)
+                            if (model_eqns /= 4) then
+                                if (support(q) == 5) then
+!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
+                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                else
+                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
+                                end if
+                            end if
+
+                        end if
                     end do
                 end do
             end do
- 
+        end do
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    !$acc loop seq
+                    do q = contxb, contxe
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mass_src(j, k, l)
+                    end do
+                    !$acc loop seq
+                    do q = momxb, momxe
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mom_src(q - contxe, j, k, l)
+                    end do
+                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + mono_e_src(j, k, l)
+                end do
+            end do
+        end do
+
     end subroutine
 
     !> This function gives the temporally varying amplitude of the pulse
@@ -267,7 +262,7 @@ contains
         !! @param sos Sound speed
         !! @param mysos Alternative speed of sound for testing
     function f_g(the_time, sos, mysos, nm, term_index)
-!$acc routine seq
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: the_time, sos, mysos
         integer, intent(IN) :: nm
         real(kind(0d0)) :: period, t0, sigt, pa
@@ -284,7 +279,7 @@ contains
             f_g = 0d0
             if (term_index == 1) then
                 f_g = mag(nm)*sin((the_time)*2.d0*pi/period)/mysos &
-                        + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((the_time)*2.d0*pi/period) &
+                      + mag(nm)/foc_length(nm)*(1.d0/(2.d0*pi/period)*cos((the_time)*2.d0*pi/period) &
                                                 - 1.d0/(2.d0*pi/period))
             elseif (the_time <= (npulse(nm)*period + offset)) then
                 f_g = mag(nm)*sin((the_time + offset)*2.d0*pi/period)
@@ -294,7 +289,7 @@ contains
             sigt = length(nm)/sos/7.d0
             t0 = 3.5d0*sigt
             f_g = mag(nm)/(dsqrt(2.d0*pi)*sigt)* &
-                    dexp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
+                  dexp(-0.5d0*((the_time - t0)**2.d0)/(sigt**2.d0))
         else if (pulse(nm) == 3) then
             ! Square wave
             sigt = length(nm)/sos
@@ -314,8 +309,8 @@ contains
         !! @param mono_loc Nominal source term location
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
-!$acc routine seq
-         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
+        !$acc routine seq
+        real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
         integer, intent(IN) :: nm
         real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
@@ -347,7 +342,7 @@ contains
                 hx = abs(mono_loc(1) - x_cc(j))
 
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                            dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                          dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
             else if (support(nm) == 0) then
                 ! Support for all x
                 f_delta = 1.d0
@@ -361,12 +356,12 @@ contains
                 h = dsqrt(hx**2.d0 + hy**2.d0)
 
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                            dexp(-0.5d0*((h/(sig/2.d0))**2.d0))
+                          dexp(-0.5d0*((h/(sig/2.d0))**2.d0))
             else if (support(nm) == 2) then
                 !only support for y \pm some value
                 if (abs(hy) < length(nm)) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
+                              dexp(-0.5d0*(hx/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
@@ -380,14 +375,14 @@ contains
                 hynew = -1.d0*sin(dir(nm))*hx + cos(dir(nm))*hy
                 if (abs(hynew) < mono_loc(3)/2.d0) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
             else if (support(nm) == 4) then
                 ! Support for all y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
-                            dexp(-0.5d0*(hx/sig)**2.d0)
+                          dexp(-0.5d0*(hx/sig)**2.d0)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
@@ -396,7 +391,7 @@ contains
                 hxnew = foc_length(nm) - dsqrt(hy**2.d0 + (foc_length(nm) - hx)**2.d0)
                 if ((abs(hy) < aperture(nm)/2.d0) .and. (hx < foc_length(nm))) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                     angle = -atan(hy/(foc_length(nm) - hx))
                 else
                     f_delta = 0d0
@@ -416,14 +411,14 @@ contains
                 if (abs(hynew) < length(nm)/2. .and. &
                     abs(hz) < length(nm)/2.) then
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
                 else
                     f_delta = 0d0
                 end if
             else if (support(nm) == 4) then
                 ! Support for all x,y
                 f_delta = 1.d0/(dsqrt(2.d0*pi)*sig)* &
-                            dexp(-0.5d0*(hz/sig)**2.d0)
+                          dexp(-0.5d0*(hz/sig)**2.d0)
             else if (support(nm) == 5) then
                 ! Support along 'transducer'
                 hx = x_cc(j) - mono_loc(1)
@@ -435,7 +430,7 @@ contains
                     (hx < foc_length(nm))) then
 
                     f_delta = 1.d0/(dsqrt(2.d0*pi)*sig/2.d0)* &
-                                dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
+                              dexp(-0.5d0*(hxnew/(sig/2.d0))**2.d0)
 
                     angle = -atan(hy/(foc_length(nm) - hx))
                     angle_z = -atan(hz/(foc_length(nm) - hx))

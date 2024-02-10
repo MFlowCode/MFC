@@ -13,12 +13,12 @@ def load(packpath: str) -> _pack.Pack:
 def pack(casepath: str, packpath: str = None) -> typing.Tuple[_pack.Pack, str]:
     if packpath is None:
         packpath = casepath
-    
+
     p, err = _pack.compile(casepath)
-    
+
     if err is not None:
         return None, err
-    
+
     p.save(packpath)
 
     return p, None
@@ -35,19 +35,19 @@ def packer():
     if ARG("packer") == "pack":
         if not os.path.isdir(ARG("input")):
             ARGS()["input"] = os.path.dirname(ARG("input"))
-        
+
         out_dir = os.path.sep.join([ARG("input"), ARG("output")]) if ARG("output") is not None else None
-        p, err = pack(ARG("input"), out_dir)
+        _, err = pack(ARG("input"), out_dir)
         if err is not None:
             raise MFCException(err)
-    elif ARG("packer") == "compare":        
-        cons.print(f"Comparing [magenta]{os.path.relpath(ARG('input1'), os.getcwd())}[/magenta] to [magenta]{os.path.relpath(ARG('input1'), os.getcwd())}[/magenta]:")
-        
+    elif ARG("packer") == "compare":
+        cons.print(f"Comparing [magenta]{os.path.relpath(ARG('input1'))}[/magenta] to [magenta]{os.path.relpath(ARG('input1'))}[/magenta]:")
+
         cons.indent()
         cons.print()
-        
+
         tol = packtol.Tolerance(ARG("abstol"), ARG("reltol"))
-        
+
         err, msg = compare(ARG("input1"), ARG("input2"), tol)
         if msg is not None:
             cons.print(f"[bold red]ERROR[/bold red]: The two packs are not within tolerance ({tol}).")
@@ -58,6 +58,5 @@ def packer():
 
         cons.print()
         cons.unindent()
-    
     else:
         raise MFCException(f"Unknown packer command: {ARG('packer')}")

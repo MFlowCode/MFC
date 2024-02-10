@@ -53,6 +53,11 @@ module m_initial_condition
     !! with each of the cells in the computational domain. Note that only one
     !! patch identity may be associated with any one cell.
 
+    type(integer_field) :: ib_markers !<
+    !! Bookkepping variable used to track whether a given cell is within an
+    !! immersed boundary. The default is 0, otherwise the value is assigned
+    !! to the patch ID of the immersed boundary.
+
 contains
 
     !> Computation of parameters, allocation procedures, and/or
@@ -73,16 +78,18 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        if(qbmm .and. .not. polytropic) then
-        !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
-            allocate(pb%sf(0:m, &
-                  0:n, &
-                  0:p, 1:nnode, 1:nb))
+        allocate (ib_markers%sf(0:m, 0:n, 0:p))
 
-            allocate(mv%sf(0:m, &
-                  0:n, &
-                  0:p, 1:nnode, 1:nb))
+        if (qbmm .and. .not. polytropic) then
+            !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
+            allocate (pb%sf(0:m, &
+                            0:n, &
+                            0:p, 1:nnode, 1:nb))
+            allocate (mv%sf(0:m, &
+                            0:n, &
+                            0:p, 1:nnode, 1:nb))
         end if
+
         ! Setting default values for conservative and primitive variables so
         ! that in the case that the initial condition is wrongly laid out on
         ! the grid the simulation component will catch the problem on start-
@@ -98,6 +105,7 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
+        ib_markers%sf = 0
 
     end subroutine s_initialize_initial_condition_module ! -----------------
 
@@ -126,12 +134,28 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
+                !> IB Patches
+                !> @{
+                ! Spherical patch
+                if (patch_ib(i)%geometry == 8) then
+                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
+                    ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 10) then
+                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 11) then
+                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+                !> @}
+
+                !> ICPP Patches
+                !> @{
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
-                    call s_sphere(i, patch_id_fp, q_prim_vf)
+                    call s_sphere(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Cuboidal patch
                 elseif (patch_icpp(i)%geometry == 9) then
@@ -139,7 +163,7 @@ contains
 
                     ! Cylindrical patch
                 elseif (patch_icpp(i)%geometry == 10) then
-                    call s_cylinder(i, patch_id_fp, q_prim_vf)
+                    call s_cylinder(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Swept plane patch
                 elseif (patch_icpp(i)%geometry == 11) then
@@ -164,10 +188,11 @@ contains
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
- 
+
                 end if
 
             end do
+            !> @}
 
             ! ==================================================================
 
@@ -177,16 +202,33 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
+                !> IB Patches
+                !> @{
+                ! Circular patch
+                if (patch_ib(i)%geometry == 2) then
+                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                    ! Rectangular patch
+                elseif (patch_ib(i)%geometry == 3) then
+                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 4) then
+                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+                !> @}
+
+                !> ICPP Patches
+                !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf)
+                    call s_circle(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Rectangular patch
                 elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf)
+                    call s_rectangle(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Swept line patch
                 elseif (patch_icpp(i)%geometry == 4) then
@@ -199,7 +241,7 @@ contains
                     ! Unimplemented patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                        'which no longer exists. See Examples. Exiting ...')
+                                     'which no longer exists. See Examples. Exiting ...')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == 7) then
@@ -220,9 +262,9 @@ contains
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
- 
-                end if
 
+                end if
+                !> @}
             end do
 
             ! ==================================================================
@@ -233,7 +275,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print*, 'Processing patch', i
+                    print *, 'Processing patch', i
                 end if
 
                 ! Line segment patch
@@ -262,12 +304,11 @@ contains
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
 
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
-
 
     end subroutine s_generate_initial_condition ! --------------------------
 
@@ -337,66 +378,66 @@ contains
 
     end subroutine s_perturb_surrounding_flow ! ----------------------------
 
-    !>  This subroutine computes velocity perturbations for a temporal mixing  
-        !!              layer with hypertangent mean streamwise velocity profile 
-        !!              obtained from linear stability analysis. For a 2D case, 
-        !!              instability waves with spatial wavenumbers, (4,0), (2,0), 
-        !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4), 
+    !>  This subroutine computes velocity perturbations for a temporal mixing
+        !!              layer with hypertangent mean streamwise velocity profile
+        !!              obtained from linear stability analysis. For a 2D case,
+        !!              instability waves with spatial wavenumbers, (4,0), (2,0),
+        !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave,wave1,wave2,wave_tmp
-        real(kind(0d0)) :: tr,ti
-        real(kind(0d0)) :: Lx,Lz
-        integer :: i,j,k
-        
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
+        real(kind(0d0)) :: tr, ti
+        real(kind(0d0)) :: Lx, Lz
+        integer :: i, j, k
+
         Lx = x_domain%end - x_domain%beg
         if (p > 0) then
             Lz = z_domain%end - z_domain%beg
         end if
- 
+
         wave = 0d0
         wave1 = 0d0
         wave2 = 0d0
-        
+
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*4.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*2.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Lx,0d0,tr,ti,wave_tmp,0d0)
+        call s_instability_wave(2*pi*1.0/Lx, 0d0, tr, ti, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*13d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*17d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Lx,-2*pi*4.0/Lz,tr,ti,wave_tmp,2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, -2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*19d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx,-2*pi*2.0/Lz,tr,ti,wave_tmp,2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, -2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*23d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx,-2*pi*1.0/Lz,tr,ti,wave_tmp,2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, -2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*29d0/31d0)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
-        
+
         ! Superpose velocity perturbuations (instability waves) to the velocity field
         do k = 0, p
-        do j = 0, n
-        do i = 0, m
-            q_prim_vf(mom_idx%beg  )%sf(i,j,k) = q_prim_vf(mom_idx%beg  )%sf(i,j,k)+wave(2,i,j,k)
-            q_prim_vf(mom_idx%beg+1)%sf(i,j,k) = q_prim_vf(mom_idx%beg+1)%sf(i,j,k)+wave(3,i,j,k)
-            if (p .gt. 0) then
-                q_prim_vf(mom_idx%beg+2)%sf(i,j,k) = q_prim_vf(mom_idx%beg+2)%sf(i,j,k)+wave(4,i,j,k)
-            end if
+            do j = 0, n
+                do i = 0, m
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)
+                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)
+                    if (p > 0) then
+                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)
+                    end if
+                end do
+            end do
         end do
-        end do
-        end do
-    
+
     end subroutine s_superposition_instability_wave ! ----------------------
 
     !>  This subroutine computes instability waves for a given set of spatial
@@ -404,178 +445,173 @@ contains
         !!              The eigenvalue problem is derived from the linearized
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
-    subroutine s_instability_wave(alpha,beta,tr,ti,wave,shift)
-        real(kind(0d0)),intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)),dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
-        real(kind(0d0)),dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
-        real(kind(0d0)),dimension(0:n,0:n) :: d !< differential operator in y dir
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: ar,ai,br,bi,ci !< matrices for eigenvalue problem
-        real(kind(0d0)),dimension(0:5*(n+1)-1,0:5*(n+1)-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: fv1,fv2,fv3 !< temporary memory
-        real(kind(0d0)) :: tr,ti !< most unstable eigenvalue
-        real(kind(0d0)),dimension(0:5*(n+1)-1) :: vr,vi,vnr,vni !< most unstable eigenvector and normalized one
-        real(kind(0d0)),dimension(5,0:m,0:n,0:p) :: wave !< instability wave
+    subroutine s_instability_wave(alpha, beta, tr, ti, wave, shift)
+        real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(kind(0d0)), dimension(0:n) :: rho_mean, u_mean, t_mean !<  mean profiles
+        real(kind(0d0)), dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
+        real(kind(0d0)), dimension(0:n, 0:n) :: d !< differential operator in y dir
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1, 0:5*(n + 1) - 1) :: ar, ai, br, bi, ci !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1, 0:5*(n + 1) - 1) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: fv1, fv2, fv3 !< temporary memory
+        real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: vr, vi, vnr, vni !< most unstable eigenvector and normalized one
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam,pi_inf,rho1,mach,c1
+        real(kind(0d0)) :: gam, pi_inf, rho1, mach, c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indices
 
         ! Set fluid flow properties
         gam = 1.+1./fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam-1.)/gam
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1.)/gam
         if (bubbles .and. num_fluids == 1) then
-            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0-patch_icpp(1)%alpha(1))
+            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
         else
             rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
         end if
-        c1 = sqrt((gam*(patch_icpp(1)%pres+pi_inf))/rho1)
+        c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/rho1)
         mach = 1./c1
 
         ! Assign mean profiles
-        do j=0,n
-            u_mean(j)=tanh(y_cc(j))
-            t_mean(j)=1+0.5*(gam-1)*mach**2*(1-u_mean(j)**2)
-            rho_mean(j)=1/T_mean(j)
+        do j = 0, n
+            u_mean(j) = tanh(y_cc(j))
+            t_mean(j) = 1 + 0.5*(gam - 1)*mach**2*(1 - u_mean(j)**2)
+            rho_mean(j) = 1/T_mean(j)
         end do
-        
+
         ! Compute differential operator in y-dir
         ! based on 4th order central difference (inner)
         ! and 2nd order central difference (near boundaries)
-        dy = y_cc(1)-y_cc(0)
-        d=0d0
-        d(1,0)=-1/(2*dy)
-        d(1,2)= 1/(2*dy)
-        do j=2,n-2
-            d(j,j-2)= 1/(12*dy)
-            d(j,j-1)=-8/(12*dy)
-            d(j,j+1)= 8/(12*dy)
-            d(j,j+2)=-1/(12*dy)
+        dy = y_cc(1) - y_cc(0)
+        d = 0d0
+        d(1, 0) = -1/(2*dy)
+        d(1, 2) = 1/(2*dy)
+        do j = 2, n - 2
+            d(j, j - 2) = 1/(12*dy)
+            d(j, j - 1) = -8/(12*dy)
+            d(j, j + 1) = 8/(12*dy)
+            d(j, j + 2) = -1/(12*dy)
         end do
-        d(n-1,n-2)=-1/(2*dy)
-        d(n-1,n)  = 1/(2*dy)
-        
+        d(n - 1, n - 2) = -1/(2*dy)
+        d(n - 1, n) = 1/(2*dy)
+
         ! Compute y-derivatives of rho, u, T
-        do j=0,n
-            drho_mean(j)=0
-            du_mean(j)=0
-            dt_mean(j)=0
-            do k=0,n
-                drho_mean(j) = drho_mean(j)+d(j,k)*rho_mean(k)
-                du_mean(j) = du_mean(j)+d(j,k)*u_mean(k)
-                dt_mean(j) = dt_mean(j)+d(j,k)*t_mean(k)
+        do j = 0, n
+            drho_mean(j) = 0
+            du_mean(j) = 0
+            dt_mean(j) = 0
+            do k = 0, n
+                drho_mean(j) = drho_mean(j) + d(j, k)*rho_mean(k)
+                du_mean(j) = du_mean(j) + d(j, k)*u_mean(k)
+                dt_mean(j) = dt_mean(j) + d(j, k)*t_mean(k)
             end do
         end do
-        
+
         ! Compute B and C, then A = B + C
         ! B includes terms without differential operator, and
         ! C includes terms with differential operator
-        br=0d0
-        bi=0d0
-        ci=0d0
-        do j=0,n
-            ii = 1; jj = 1; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j); 
-            ii = 1; jj = 2; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*rho_mean(j);
-            ii = 1; jj = 3; bi((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = -drho_mean(j);
-            ii = 1; jj = 4; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = beta*rho_mean(j);
-        
-            ii = 2; jj = 1; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*t_mean(j)/(rho_mean(j)*gam*mach**2);
-            ii = 2; jj = 2; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j);
-            ii = 2; jj = 3; bi((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = -du_mean(j);
-            ii = 2; jj = 5; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha/(gam*mach**2);
-        
-            ii = 3; jj = 1; bi((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = -dt_mean(j)/(rho_mean(j)*gam*mach**2);
-            ii = 3; jj = 3; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j);
-            ii = 3; jj = 5; bi((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = -drho_mean(j)/(rho_mean(j)*gam*mach**2);
-        
-            ii = 4; jj = 1; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = beta*t_mean(j)/(rho_mean(j)*gam*mach**2);
-            ii = 4; jj = 4; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j);
-            ii = 4; jj = 5; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = beta/(gam*mach**2);
-        
-            ii = 5; jj = 2; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = (gam-1)*alpha/rho_mean(j);
-            ii = 5; jj = 3; bi((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = -dt_mean(j);
-            ii = 5; jj = 4; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = (gam-1)*beta/rho_mean(j);
-            ii = 5; jj = 5; br((ii-1)*(n+1)+j,(jj-1)*(n+1)+j) = alpha*u_mean(j);
-        
-            do k=0,n
-                ii = 1; jj = 3; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -rho_mean(j)*d(j,k);
-                ii = 3; jj = 1; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -t_mean(j)*d(j,k)/(rho_mean(j)*gam*mach**2);
-                ii = 3; jj = 5; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -d(j,k)/(gam*mach**2);
-                ii = 5; jj = 3; ci((ii-1)*(n+1)+j,(jj-1)*(n+1)+k) = -(gam-1)*d(j,k)/rho_mean(j);
+        br = 0d0
+        bi = 0d0
+        ci = 0d0
+        do j = 0, n
+            ii = 1; jj = 1; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*u_mean(j); 
+            ii = 1; jj = 2; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*rho_mean(j); 
+            ii = 1; jj = 3; bi((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = -drho_mean(j); 
+            ii = 1; jj = 4; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = beta*rho_mean(j); 
+            ii = 2; jj = 1; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*t_mean(j)/(rho_mean(j)*gam*mach**2); 
+            ii = 2; jj = 2; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*u_mean(j); 
+            ii = 2; jj = 3; bi((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = -du_mean(j); 
+            ii = 2; jj = 5; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha/(gam*mach**2); 
+            ii = 3; jj = 1; bi((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = -dt_mean(j)/(rho_mean(j)*gam*mach**2); 
+            ii = 3; jj = 3; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*u_mean(j); 
+            ii = 3; jj = 5; bi((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = -drho_mean(j)/(rho_mean(j)*gam*mach**2); 
+            ii = 4; jj = 1; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = beta*t_mean(j)/(rho_mean(j)*gam*mach**2); 
+            ii = 4; jj = 4; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*u_mean(j); 
+            ii = 4; jj = 5; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = beta/(gam*mach**2); 
+            ii = 5; jj = 2; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = (gam - 1)*alpha/rho_mean(j); 
+            ii = 5; jj = 3; bi((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = -dt_mean(j); 
+            ii = 5; jj = 4; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = (gam - 1)*beta/rho_mean(j); 
+            ii = 5; jj = 5; br((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + j) = alpha*u_mean(j); 
+            do k = 0, n
+                ii = 1; jj = 3; ci((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + k) = -rho_mean(j)*d(j, k); 
+                ii = 3; jj = 1; ci((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + k) = -t_mean(j)*d(j, k)/(rho_mean(j)*gam*mach**2); 
+                ii = 3; jj = 5; ci((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + k) = -d(j, k)/(gam*mach**2); 
+                ii = 5; jj = 3; ci((ii - 1)*(n + 1) + j, (jj - 1)*(n + 1) + k) = -(gam - 1)*d(j, k)/rho_mean(j); 
             end do
         end do
         ar = br
-        ai = bi+ci
-        
+        ai = bi + ci
+
         ! Compute eigenvalues and eigenvectors
-        call cg(5*(n+1),5*(n+1),ar,ai,wr,wi,zr,zi,fv1,fv2,fv3,ierr)
+        call cg(5*(n + 1), 5*(n + 1), ar, ai, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
-        call s_generate_wave(5*(n+1),wr,wi,zr,zi,alpha,beta,wave,shift)
+        call s_generate_wave(5*(n + 1), wr, wi, zr, zi, alpha, beta, wave, shift)
 
     end subroutine s_instability_wave
 
     !>  This subroutine generates an instability wave using the most unstable
-        !!              eigenvalue and corresponding eigenvector among the 
+        !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    subroutine s_generate_wave(nl,wr,wi,zr,zi,alpha,beta,wave,shift)
+    subroutine s_generate_wave(nl, wr, wi, zr, zi, alpha, beta, wave, shift)
         integer nl
-        real(kind(0d0)), dimension(0:nl-1) :: wr,wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nl-1,0:nl-1) :: zr,zi !< eigenvectors
-        real(kind(0d0)), dimension(0:nl-1) :: vr,vi,vnr,vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(5,0:m,0:n,0:p) :: wave
-        real(kind(0d0)) :: alpha,beta,ang,shift
+        real(kind(0d0)), dimension(0:nl - 1) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:nl - 1, 0:nl - 1) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:nl - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave
+        real(kind(0d0)) :: alpha, beta, ang, shift
         real(kind(0d0)) :: norm
-        real(kind(0d0)) :: tr,ti,cr,ci !< temporary memory
+        real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
         integer idx
-        integer i,j,k
-        
+        integer i, j, k
+
         ! Find the most unstable eigenvalue and corresponding eigenvector
-        k=0
-        do i=1,nl-1
-            if (wi(i) .gt. wi(k)) then
+        k = 0
+        do i = 1, nl - 1
+            if (wi(i) > wi(k)) then
                 k = i
             end if
         end do
-        vr = zr(:,k)
-        vi = zi(:,k)
+        vr = zr(:, k)
+        vi = zi(:, k)
 
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0d0
-        do i=0,nl-1
-            if (dsqrt(vr(i)**2+vi(i)**2) .gt. norm) then
+        do i = 0, nl - 1
+            if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2+vi(i)**2)
+                norm = dsqrt(vr(i)**2 + vi(i)**2)
             end if
         end do
 
         tr = vr(idx)
         ti = vi(idx)
-        do i=0,nl-1
-            call cdiv(vr(i),vi(i),tr,ti,cr,ci)
+        do i = 0, nl - 1
+            call cdiv(vr(i), vi(i), tr, ti, cr, ci)
             vnr(i) = cr
             vni(i) = ci
         end do
 
         ! Generate an instability wave
-        do i=0,m
-        do j=0,n
-        do k=0,p
-            if (beta .eq. 0) then
-                ang = alpha*x_cc(i)
-            else 
-                ang = alpha*x_cc(i)+beta*z_cc(k)+shift
-            end if
-            wave(1,i,j,k) = vnr(j)*cos(ang)-vni(j)*sin(ang)                 ! rho
-            wave(2,i,j,k) = vnr((n+1)+j)*cos(ang)-vni((n+1)+j)*sin(ang)     ! u
-            wave(3,i,j,k) = vnr(2*(n+1)+j)*cos(ang)-vni(2*(n+1)+j)*sin(ang) ! v
-            wave(4,i,j,k) = vnr(3*(n+1)+j)*cos(ang)-vni(3*(n+1)+j)*sin(ang) ! w
-            wave(5,i,j,k) = vnr(4*(n+1)+j)*cos(ang)-vni(4*(n+1)+j)*sin(ang) ! T
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+                    if (beta == 0) then
+                        ang = alpha*x_cc(i)
+                    else
+                        ang = alpha*x_cc(i) + beta*z_cc(k) + shift
+                    end if
+                    wave(1, i, j, k) = vnr(j)*cos(ang) - vni(j)*sin(ang)                 ! rho
+                    wave(2, i, j, k) = vnr((n + 1) + j)*cos(ang) - vni((n + 1) + j)*sin(ang)     ! u
+                    wave(3, i, j, k) = vnr(2*(n + 1) + j)*cos(ang) - vni(2*(n + 1) + j)*sin(ang) ! v
+                    wave(4, i, j, k) = vnr(3*(n + 1) + j)*cos(ang) - vni(3*(n + 1) + j)*sin(ang) ! w
+                    wave(5, i, j, k) = vnr(4*(n + 1) + j)*cos(ang) - vni(4*(n + 1) + j)*sin(ang) ! T
+                end do
+            end do
         end do
-        end do
-        end do
-    
+
     end subroutine s_generate_wave
 
     !>  Deallocation procedures for the module
@@ -594,6 +630,7 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
+        deallocate (ib_markers%sf)
 
     end subroutine s_finalize_initial_condition_module ! -------------------
 

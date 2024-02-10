@@ -10,10 +10,6 @@ AttributeIDSupressMenu = "AttributeIDSupressMenu"
 INOUT = "INOUT"
 WRONLY = "WRONLY"
 nd = "nd"
-# Childs = "Childs"
-# myu = "myu"
-
-
 
 [files]
 extend-exclude = ["docs/documentation/references*", "tests/"]
