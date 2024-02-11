@@ -175,6 +175,7 @@ To restart simulation from $k$-th time step, set `t_step_start`=k.
 | `model%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
 | `model%translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
 | `model%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
+| `model%threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
@@ -451,17 +452,18 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 ### 7. Acoustic Source
 
-| Parameter         | Type    | Description |
-| ---:              | :----:  | :--- |
-| `Monopole`        | Logical | Acoustic source |
-| `num_mono`        | Integer | Number of acoustic sources |
-| `Mono(i)%pulse`   | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
-| `Mono(i)%npulse`  | Integer | Number of pulse cycles |
-| `Mono(i)%support` | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
-| `Mono(i)%loc(j)`  | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
-| `Mono(i)%dir`     | Real    | Direction of acoustic propagation	|
-| `Mono(i)%mag`     | Real    | Pulse magnitude	|
-| `Mono(i)%length`  | Real    | Spatial pulse length |
+| Parameter                | Type    | Description |
+| ---:                     | :----:  | :--- |
+| `Monopole`               | Logical | Acoustic source |
+| `num_mono`               | Integer | Number of acoustic sources |
+| `Mono(i)%pulse`          | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `Mono(i)%npulse`         | Integer | Number of pulse cycles |
+| `Mono(i)%support`        | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
+| `Mono(i)%support_width`  | Real    | The width of the monopole support in terms of cell width |
+| `Mono(i)%loc(j)`         | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
+| `Mono(i)%dir`            | Real    | Direction of acoustic propagation	|
+| `Mono(i)%mag`            | Real    | Pulse magnitude	|
+| `Mono(i)%length`         | Real    | Spatial pulse length |
 
 The table lists acoustic source parameters.
 The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source).
@@ -489,6 +491,9 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
 There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
+
+- `Mono(i)%support_width` defines how many cell width the monopole support function extended by.
+Large `Mono(i)%support_width` is preferred when `Mono(i)%mag` is large.
 
 ### 8. Ensemble-Averaged Bubble Model
 

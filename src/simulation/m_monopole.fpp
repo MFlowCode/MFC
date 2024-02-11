@@ -25,8 +25,8 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
     !$acc declare create(loc_mono)
 
-    real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
-    !$acc declare create(foc_length, aperture)
+    real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture, support_width
+    !$acc declare create(foc_length, aperture, support_width)
 
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, npulse, dir, delay
     !$acc declare create(mag, length, npulse, dir, delay)
@@ -36,7 +36,7 @@ contains
     subroutine s_initialize_monopole_module()
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono))
+        @:ALLOCATE(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
         do i = 1, num_mono
             mag(i) = mono(i)%mag
@@ -48,11 +48,12 @@ contains
             delay(i) = mono(i)%delay
             foc_length(i) = mono(i)%foc_length
             aperture(i) = mono(i)%aperture
+            support_width(i) = mono(i)%support_width
             do j = 1, 3
                 loc_mono(j, i) = mono(i)%loc(j)
             end do
         end do
-        !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono)
+        !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono, support_width)
 
     end subroutine
 
@@ -327,13 +328,13 @@ contains
 
         if (n == 0) then
             sig = dx(j)
-            sig = sig*2.5d0
+            sig = sig*support_width(nm)
         else if (p == 0) then
             sig = maxval((/dx(j), dy(k)/))
-            sig = sig*2.5d0
+            sig = sig*support_width(nm)
         else
             sig = maxval((/dx(j), dy(k), dz(l)/))
-            sig = sig*2.5d0
+            sig = sig*support_width(nm)
         end if
 
         if (n == 0) then      !1D
@@ -441,7 +442,7 @@ contains
                 ! Support for cylindrical coordinate system
                 !sig = maxval((/dx(j), dy(k)*sin(dz(l)), dz(l)*cos(dz(l))/))
                 sig = dx(j)
-                sig = sig*2.5d0
+                sig = sig*support_width(nm)
                 hx_cyl = x_cc(j) - mono_loc(1)
                 hy_cyl = y_cc(k)*sin(z_cc(l)) - mono_loc(2)
                 hz_cyl = y_cc(k)*cos(z_cc(l)) - mono_loc(3)
