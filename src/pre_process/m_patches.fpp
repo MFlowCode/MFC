@@ -1942,6 +1942,18 @@ contains
 
                     eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
 
+                    if (patch_icpp(patch_id)%smoothen) then
+                        if (eta > patch_icpp(patch_id)%model%threshold) then
+                            eta = 1d0
+                        end if
+                    else
+                        if (eta > patch_icpp(patch_id)%model%threshold) then
+                            eta = 1d0
+                        else
+                            eta = 0d0
+                        end if
+                    end if
+
                     call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                             eta, q_prim_vf, patch_id_fp)
 
