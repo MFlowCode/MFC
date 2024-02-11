@@ -303,7 +303,7 @@ contains
             patch_icpp(i)%model%translate(:) = 0d0
             patch_icpp(i)%model%filepath(:) = ' '
             patch_icpp(i)%model%spc = 10
-            patch_icpp(i)%model%threshold = 10
+            patch_icpp(i)%model%threshold = 0.9d0
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
