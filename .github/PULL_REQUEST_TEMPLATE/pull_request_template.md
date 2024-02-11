@@ -1,11 +1,11 @@
-# Description
+## Description
 
 Please include a summary of the changes and the related issue(s) if they exist.
 Please also include relevant motivation and context.
 
 Fixes #(issue) [optional]
 
-## Type of change
+### Type of change
 
 Please delete options that are not relevant.
 
@@ -13,7 +13,7 @@ Please delete options that are not relevant.
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Something else
 
-# How Has This Been Tested?
+## How Has This Been Tested?
 
 Please describe the tests that you ran to verify your changes. 
 Provide instructions so we can reproduce. 
@@ -26,7 +26,7 @@ Please also list any relevant details for your test configuration
 
 * What computers and compilers did you use to test this:
 
-# Checklist:
+## Checklist:
 
 - [ ] I have added comments for new code
 - [ ] I added Doxygen docstrings to new code
@@ -37,7 +37,7 @@ Please also list any relevant details for your test configuration
 - [ ] This PR does not introduce any repeated code (it follows the [DRY](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself) principle)
 - [ ] I cannot think of a way to condense this code and reduce any introduced additional line count
 
-## If your code changes any code source files (anything in `src/`)
+### If your code changes any code source files (anything in `src/`)
 
 To make sure the code is performing as expected on GPU devices, I have:
 - [ ] Checked that the code compiles using NVHPC compilers
