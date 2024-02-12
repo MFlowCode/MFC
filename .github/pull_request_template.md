@@ -32,7 +32,7 @@ Please also list any relevant details for your test configuration
 
 * What computers and compilers did you use to test this:
 
-## Checklist:
+## Checklist
 
 - [ ] I have added comments for the new code
 - [ ] I added Doxygen docstrings to the new code
