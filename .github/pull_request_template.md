@@ -13,6 +13,12 @@ Please delete options that are not relevant.
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Something else
 
+### Scope
+
+- [ ] This PR comprises a set of related changes with a common goal
+
+If you cannot check the above box, please split your PR into multiple PRs that each have a common goal.
+
 ## How Has This Been Tested?
 
 Please describe the tests that you ran to verify your changes. 
