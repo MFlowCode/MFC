@@ -98,7 +98,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Test
-      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
+      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a -r
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
