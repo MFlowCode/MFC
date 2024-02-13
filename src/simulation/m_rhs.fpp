@@ -872,9 +872,9 @@ contains
                                 do k = 0, m
                                     rhs_vf(j)%sf(k, l, q) = &
                                         rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
-                                        q_prim_qp%vf(contxe + id)%sf(k, l, q)* &
-                                        (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
-                                         - flux_src_n(1)%vf(j)%sf(k, l, q))
+                                        q_prim_vf(contxe + idir)%sf(k, l, q)* &
+                                        (flux_src_n_vf(j)%sf(k - 1, l, q) &
+                                         - flux_src_n_vf(j)%sf(k, l, q))
                                 end do
                             end do
                         end do
@@ -889,9 +889,9 @@ contains
                                         do k = 0, m
                                             rhs_vf(j)%sf(k, l, q) = &
                                                 rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
-                                                (q_cons_qp%vf(j)%sf(k, l, q) - Kterm(k, l, q))* &
-                                                (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                                 - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
+                                                (q_cons_vf(j)%sf(k, l, q) - Kterm(k, l, q))* &
+                                                (flux_src_n_vf(j)%sf(k, l, q) &
+                                                 - flux_src_n_vf(j)%sf(k - 1, l, q))
                                         end do
                                     end do
                                 end do
@@ -902,9 +902,9 @@ contains
                                         do k = 0, m
                                             rhs_vf(j)%sf(k, l, q) = &
                                                 rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
-                                                (q_cons_qp%vf(j)%sf(k, l, q) + Kterm(k, l, q))* &
-                                                (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                                 - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
+                                                (q_cons_vf(j)%sf(k, l, q) + Kterm(k, l, q))* &
+                                                (flux_src_n_vf(j)%sf(k, l, q) &
+                                                 - flux_src_n_vf(j)%sf(k - 1, l, q))
                                         end do
                                     end do
                                 end do
@@ -918,9 +918,9 @@ contains
                                     do k = 0, m
                                         rhs_vf(j)%sf(k, l, q) = &
                                             rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
-                                            q_cons_qp%vf(j)%sf(k, l, q)* &
-                                            (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                             - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
+                                            q_cons_vf(j)%sf(k, l, q)* &
+                                            (flux_src_n_vf(j)%sf(k, l, q) &
+                                             - flux_src_n_vf(j)%sf(k - 1, l, q))
                                     end do
                                 end do
                             end do
@@ -1016,15 +1016,15 @@ contains
                                 do q = 0, m
                                     rhs_vf(j)%sf(q, k, l) = &
                                         rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                        q_prim_qp%vf(contxe + id)%sf(q, k, l)* &
-                                        (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
-                                         - flux_src_n(2)%vf(j)%sf(q, k, l))
+                                        q_prim_vf(contxe + idir)%sf(q, k, l)* &
+                                        (flux_src_n_vf(j)%sf(q, k - 1, l) &
+                                         - flux_src_n_vf(j)%sf(q, k, l))
                                 end do
                             end do
                         end do
                     end do
                 else
-
+    
                     if (alt_soundspeed) then
                         do j = advxb, advxe
                             if ((j == advxe) .and. (bubbles .neqv. .true.)) then
@@ -1034,9 +1034,9 @@ contains
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
                                                 rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                                (q_cons_qp%vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
-                                                (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                 - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                                (q_cons_vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
+                                                (flux_src_n_vf(j)%sf(q, k, l) &
+                                                 - flux_src_n_vf(j)%sf(q, k - 1, l))
                                         end do
                                     end do
                                 end do
@@ -1048,8 +1048,8 @@ contains
                                                 rhs_vf(j)%sf(q, k, l) = &
                                                     rhs_vf(j)%sf(q, k, l) - &
                                                     (Kterm(q, k, l)/2d0/y_cc(k))* &
-                                                    (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                     + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                                    (flux_src_n_vf(j)%sf(q, k, l) &
+                                                     + flux_src_n_vf(j)%sf(q, k - 1, l))
                                             end do
                                         end do
                                     end do
@@ -1061,9 +1061,9 @@ contains
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
                                                 rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                                (q_cons_qp%vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
-                                                (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                 - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                                (q_cons_vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
+                                                (flux_src_n_vf(j)%sf(q, k, l) &
+                                                 - flux_src_n_vf(j)%sf(q, k - 1, l))
                                         end do
                                     end do
                                 end do
@@ -1075,8 +1075,8 @@ contains
                                                 rhs_vf(j)%sf(q, k, l) = &
                                                     rhs_vf(j)%sf(q, k, l) + &
                                                     (Kterm(q, k, l)/2d0/y_cc(k))* &
-                                                    (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                     + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                                    (flux_src_n_vf(j)%sf(q, k, l) &
+                                                     + flux_src_n_vf(j)%sf(q, k - 1, l))
                                             end do
                                         end do
                                     end do
@@ -1091,9 +1091,9 @@ contains
                                     do q = 0, m
                                         rhs_vf(j)%sf(q, k, l) = &
                                             rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                            q_cons_qp%vf(j)%sf(q, k, l)* &
-                                            (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                             - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                            q_cons_vf(j)%sf(q, k, l)* &
+                                            (flux_src_n_vf(j)%sf(q, k, l) &
+                                             - flux_src_n_vf(j)%sf(q, k - 1, l))
                                     end do
                                 end do
                             end do
@@ -1182,16 +1182,15 @@ contains
 
                 if (grid_geometry == 3) then
                     if (riemann_solver == 1) then
-                        !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
-                            do l = 0, p
-                                do k = 0, n
-                                    do q = 0, m
-                                        rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                            q_prim_qp%vf(contxe + id)%sf(q, k, l)* &
-                                            (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
-                                             - flux_src_n(2)%vf(j)%sf(q, k, l))
+                            do k = 0, p
+                                do q = 0, n
+                                    do l = 0, m
+                                        rhs_vf(j)%sf(l, q, k) = &
+                                            rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
+                                            q_prim_vf(contxe + idir)%sf(l, q, k)* &
+                                            (flux_src_n_vf(j)%sf(l, q, k - 1) &
+                                             - flux_src_n_vf(j)%sf(l, q, k))
                                     end do
                                 end do
                             end do
@@ -1202,71 +1201,43 @@ contains
                             do j = advxb, advxe
                                 if ((j == advxe) .and. (bubbles .neqv. .true.)) then
                                     !$acc parallel loop collapse(3) gang vector default(present)
-                                    do l = 0, p
-                                        do k = 0, n
-                                            do q = 0, m
-                                                rhs_vf(j)%sf(q, k, l) = &
-                                                    rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                                    (q_cons_qp%vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
-                                                    (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                     - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                    do k = 0, p
+                                        do q = 0, n
+                                            do l = 0, m
+                                                rhs_vf(j)%sf(l, q, k) = &
+                                                    rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
+                                                    (q_cons_vf(j)%sf(l, q, k) - Kterm(l, q, k))* &
+                                                    (flux_src_n_vf(j)%sf(l, q, k) &
+                                                     - flux_src_n_vf(j)%sf(l, q, k - 1))
                                             end do
                                         end do
                                     end do
-                                    if (cyl_coord) then
-                                        !$acc parallel loop collapse(3) gang vector default(present)
-                                        do l = 0, p
-                                            do k = 0, n
-                                                do q = 0, m
-                                                    rhs_vf(j)%sf(q, k, l) = &
-                                                        rhs_vf(j)%sf(q, k, l) - &
-                                                        (Kterm(q, k, l)/2d0/y_cc(k))* &
-                                                        (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                         + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                                end do
-                                            end do
-                                        end do
-                                    end if
                                 else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
                                     !$acc parallel loop collapse(3) gang vector default(present)
-                                    do l = 0, p
-                                        do k = 0, n
-                                            do q = 0, m
-                                                rhs_vf(j)%sf(q, k, l) = &
-                                                    rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                                    (q_cons_qp%vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
-                                                    (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                     - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                    do k = 0, p
+                                        do q = 0, n
+                                            do l = 0, m
+                                                rhs_vf(j)%sf(l, q, k) = &
+                                                    rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
+                                                    (q_cons_vf(j)%sf(l, q, k) + Kterm(l, q, k))* &
+                                                    (flux_src_n_vf(j)%sf(l, q, k) &
+                                                     - flux_src_n_vf(j)%sf(l, q, k - 1))
                                             end do
                                         end do
                                     end do
-                                    if (cyl_coord) then
-                                        !$acc parallel loop collapse(3) gang vector default(present)
-                                        do l = 0, p
-                                            do k = 0, n
-                                                do q = 0, m
-                                                    rhs_vf(j)%sf(q, k, l) = &
-                                                        rhs_vf(j)%sf(q, k, l) + &
-                                                        (Kterm(q, k, l)/2d0/y_cc(k))* &
-                                                        (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                         + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                                end do
-                                            end do
-                                        end do
-                                    end if
                                 end if
                             end do
                         else
                             !$acc parallel loop collapse(4) gang vector default(present)
                             do j = advxb, advxe
-                                do l = 0, p
-                                    do k = 0, n
-                                        do q = 0, m
-                                            rhs_vf(j)%sf(q, k, l) = &
-                                                rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
-                                                q_cons_qp%vf(j)%sf(q, k, l)* &
-                                                (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                 - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
+                                do k = 0, p
+                                    do q = 0, n
+                                        do l = 0, m
+                                            rhs_vf(j)%sf(l, q, k) = &
+                                                rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
+                                                q_cons_vf(j)%sf(l, q, k)* &
+                                                (flux_src_n_vf(j)%sf(l, q, k) &
+                                                 - flux_src_n_vf(j)%sf(l, q, k - 1))
                                         end do
                                     end do
                                 end do
@@ -1282,15 +1253,15 @@ contains
                                     do l = 0, m
                                         rhs_vf(j)%sf(l, q, k) = &
                                             rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
-                                            q_prim_qp%vf(contxe + id)%sf(l, q, k)* &
-                                            (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
-                                             - flux_src_n(3)%vf(j)%sf(l, q, k))
+                                            q_prim_vf(contxe + idir)%sf(l, q, k)* &
+                                            (flux_src_n_vf(j)%sf(l, q, k - 1) &
+                                             - flux_src_n_vf(j)%sf(l, q, k))
                                     end do
                                 end do
                             end do
                         end do
                     else
-
+    
                         if (alt_soundspeed) then
                             do j = advxb, advxe
                                 if ((j == advxe) .and. (bubbles .neqv. .true.)) then
@@ -1300,9 +1271,9 @@ contains
                                             do l = 0, m
                                                 rhs_vf(j)%sf(l, q, k) = &
                                                     rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
-                                                    (q_cons_qp%vf(j)%sf(l, q, k) - Kterm(l, q, k))* &
-                                                    (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                                     - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                                                    (q_cons_vf(j)%sf(l, q, k) - Kterm(l, q, k))* &
+                                                    (flux_src_n_vf(j)%sf(l, q, k) &
+                                                     - flux_src_n_vf(j)%sf(l, q, k - 1))
                                             end do
                                         end do
                                     end do
@@ -1313,9 +1284,9 @@ contains
                                             do l = 0, m
                                                 rhs_vf(j)%sf(l, q, k) = &
                                                     rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
-                                                    (q_cons_qp%vf(j)%sf(l, q, k) + Kterm(l, q, k))* &
-                                                    (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                                     - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                                                    (q_cons_vf(j)%sf(l, q, k) + Kterm(l, q, k))* &
+                                                    (flux_src_n_vf(j)%sf(l, q, k) &
+                                                     - flux_src_n_vf(j)%sf(l, q, k - 1))
                                             end do
                                         end do
                                     end do
@@ -1329,9 +1300,9 @@ contains
                                         do l = 0, m
                                             rhs_vf(j)%sf(l, q, k) = &
                                                 rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
-                                                q_cons_qp%vf(j)%sf(l, q, k)* &
-                                                (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                                 - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
+                                                q_cons_vf(j)%sf(l, q, k)* &
+                                                (flux_src_n_vf(j)%sf(l, q, k) &
+                                                 - flux_src_n_vf(j)%sf(l, q, k - 1))
                                         end do
                                     end do
                                 end do
@@ -1458,21 +1429,21 @@ contains
 
     end subroutine s_compute_rhs ! -----------------------------------------
 
-    ! subroutine s_compute_advection_source_term(id, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
+    ! subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
     !     type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
     !     type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
     !     type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
     !     type(scalar_field), dimension(sys_size), intent(INOUT) :: flux_src_n_vf
 
-    !     integer :: id
+    !     integer :: idir
     !     integer :: i, j, k, l, q
 
-    !     if (id == 1) then
+    !     if (idir == 1) then
 
-    !     elseif (id == 2) then
+    !     elseif (idir == 2) then
            
-    !     elseif (id == 3) then
+    !     elseif (idir == 3) then
             
     !     end if
 
