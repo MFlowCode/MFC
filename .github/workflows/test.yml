@@ -85,7 +85,7 @@ jobs:
       - name: Test
         run:  |
           if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
-          /bin/bash mfc.sh test -j $(nproc) -r $OPT1 $OPT2
+          /bin/bash mfc.sh test -j $(nproc) -r -v $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
@@ -98,7 +98,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Test
-      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a -r
+      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a -r -v
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)

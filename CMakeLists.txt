@@ -33,6 +33,8 @@ if (MFC_ALL)
     set(MFC_DOCUMENTATION ON FORCE)
 endif()
 
+# Overwrite CMAKE's optimization levels if specified
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # CMake Library Imports
 
