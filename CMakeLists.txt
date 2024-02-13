@@ -33,9 +33,6 @@ if (MFC_ALL)
     set(MFC_DOCUMENTATION ON FORCE)
 endif()
 
-# Overwrite CMAKE's optimization levels if specified
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 # CMake Library Imports
 
 include(GNUInstallDirs)
@@ -139,7 +136,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
         $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
     )
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
-    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O2>)
+    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1>)
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
