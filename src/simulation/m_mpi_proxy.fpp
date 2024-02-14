@@ -184,7 +184,7 @@ contains
             end do
 
             #:for VAR in [ 'mag', 'length', 'delay', 'dir', 'npulse', 'pulse',  &
-                'support', 'foc_length', 'aperture' ]
+                'support', 'foc_length', 'aperture', 'support_width' ]
                 call MPI_BCAST(mono(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
