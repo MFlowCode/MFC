@@ -58,6 +58,7 @@ for p_id in range(1, 10+1):
             PRE_PROCESS.append(f"patch_icpp({p_id})%model%{attribute}({j})")
 
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%spc")
+    PRE_PROCESS.append(f"patch_icpp({p_id})%model%threshold")
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -128,7 +129,7 @@ for f_id in range(1,10+1):
 
     for mono_id in range(1,4+1):
         for attribute in ["mag", "length", "dir", "npulse", "pulse", "support",
-                          "delay", "foc_length", "aperture"]:
+                          "delay", "foc_length", "aperture", "support_width"]:
             SIMULATION.append(f"Mono({mono_id})%{attribute}")
 
         for cmp_id in range(1,3+1):

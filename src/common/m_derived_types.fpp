@@ -94,6 +94,9 @@ module m_derived_types
 
         integer :: spc !<
         !! Number of samples per cell to use when discretizing the STL object.
+
+        real(kind(0d0)) :: threshold !<
+        !! Threshold to turn on smoothen STL patch.
     end type ic_model_parameters
 
     type :: t_triangle
@@ -261,6 +264,7 @@ module m_derived_types
         integer :: support
         real(kind(0d0)) :: aperture
         real(kind(0d0)) :: foc_length
+        real(kind(0d0)) :: support_width
     end type mono_parameters
 
     !> Ghost Point for Immersed Boundaries
