@@ -46,3 +46,8 @@ c-all cmake/3.23.2 cray-fftw/3.3.10.2 hdf5/1.12.1 cray-python/3.9.13.1
 c-all ninja/1.10.2 cray-mpich/8.1.23
 c-cpu
 c-gpu rocm/5.1.0 craype-accel-amd-gfx90a
+
+d     NCSA Delta
+d-all python/3.11.6 openmpi
+d-cpu gcc/11.4.0
+d-gpu nvhpc/22.11
