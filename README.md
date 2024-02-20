@@ -27,6 +27,15 @@
   MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 </p>
 
+## An example
+
+Examples are in the `examples/` directory.
+For example, MFC can execute high-fidelity simulations of shock-droplet interactions.
+
+<p align="center">
+    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
+</p>
+
 ## Getting started
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
@@ -51,23 +60,13 @@ then build and test!
 And... you're done!
 
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
-Also, see below.
 
-## Run an example
-
-Examples are in the `examples/` directory.
-For example, MFC can execute high-fidelity simulations of shock-droplet interactions.
-Try
+The shock-droplet interaction case above was run via
 ```console
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
 You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
-The result looks something like the below!
-
-<p align="center">
-    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
-</p>
 
 ## Citation
 
