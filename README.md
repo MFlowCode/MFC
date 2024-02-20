@@ -60,7 +60,12 @@ Try
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
+You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
+The result looks something like the below!
 
+<p align="center">
+    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="500"/>
+</p>
 
 ## Citation
 
