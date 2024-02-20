@@ -41,7 +41,7 @@ echo
         ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}"
     % else:
         ${' '.join([f"'{x}'" for x in profiler ])}             \
-            mpirun -np {nodes*tasks_per_node} \
+            mpirun -np ${nodes*tasks_per_node} \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath()}"
     % endif
