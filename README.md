@@ -30,9 +30,9 @@
 ## Getting started
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
-Its rather straightforward.
+It's rather straightforward.
 On MacOS, you can use [Homebrew](https://brew.sh) to install MFC's modest set of dependencies.
-From a new command line, issue
+From a command line, issue
 ```console
 brew install wget make python make cmake coreutils gcc openmpi
 ```
@@ -49,6 +49,17 @@ then build and test!
 ```
 And you're done!
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
+Also, see below.
+
+## Run an example
+
+Examples are in the `examples/` directory.
+For example, MFC can execute high-fidelity simulations of shock-droplet interactions.
+Try
+```console
+./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
+```
+where `8` is the number of cores the example will run on.
 
 
 ## Citation
