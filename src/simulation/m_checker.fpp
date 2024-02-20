@@ -500,5 +500,4 @@ contains
         end if
 
     end subroutine s_check_inputs
-
 end module m_checker

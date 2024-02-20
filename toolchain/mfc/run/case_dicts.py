@@ -44,8 +44,9 @@ for f_id in range(1, 10+1):
                       "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
         PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
 
-for p_id in range(1, 10+1):
-    for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
+for p_id in range(1, 10+4):
+    for attribute in ["geometry", "radius", "radii", "epsilon", "beta", "a2",
+                      "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp" ]:
@@ -82,7 +83,7 @@ for p_id in range(1, 10+1):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
 
 SIMULATION = COMMON + [
-    'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
+    'run_time_info', 'sim_data', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 'time_stepper', 'weno_eps',
     'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
     'riemann_solver', 'wave_speeds', 'avg_state', 'prim_vars_wrt',

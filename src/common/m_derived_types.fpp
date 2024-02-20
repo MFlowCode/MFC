@@ -142,8 +142,14 @@ module m_derived_types
         type(ic_model_parameters) :: model !< Model parameters
 
         real(kind(0d0)) :: epsilon, beta !<
-        !! The spherical harmonics eccentricity parameters.
+        !! The isentropic vortex parameters administrating, respectively, both
+        !! the amplitude of the disturbance as well as its domain of influence.
+       
+        real(kind(0d0)) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12 !<
+        !! The parameters needed for the spherical harmonic patch
 
+        logical :: non_axis_sym
+        
         real(kind(0d0)), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
         !! through its x-, y- and z-components, respectively.

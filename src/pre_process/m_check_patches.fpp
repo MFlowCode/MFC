@@ -419,26 +419,32 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the spherical harmonic patch
-        if (p == 0 &
-            .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
-            .or. &
-            patch_icpp(patch_id)%x_centroid == dflt_real &
-            .or. &
-            patch_icpp(patch_id)%y_centroid == dflt_real &
-            .or. &
-            patch_icpp(patch_id)%z_centroid == dflt_real &
-            .or. &
-            all(patch_icpp(patch_id)%epsilon /= (/1d0, 2d0, 3d0, 4d0, 5d0/)) &
-            .or. &
-            patch_icpp(patch_id)%beta < 0d0 &
-            .or. &
-            patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon) then
+
+         if (p > 0) then
+            if (n == 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+             .or. &
+             patch_icpp(patch_id)%x_centroid == dflt_real &
+             .or. &
+             patch_icpp(patch_id)%y_centroid == dflt_real &
+             .or. &
+             patch_icpp(patch_id)%z_centroid == dflt_real) then
 
             call s_mpi_abort('Inconsistency(ies) detected in '// &
                              'geometric parameters of spherical '// &
                              'harmonic patch '//trim(iStr)//'. Exiting ...')
 
+           end if
+        else if (p == 0) then
+             if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+             .or. &
+             patch_icpp(patch_id)%x_centroid == dflt_real &
+             .or. &
+             patch_icpp(patch_id)%y_centroid == dflt_real) then
+
+            call s_mpi_abort('Inconsistency(ies) detected in '// &
+                'geometric parameters of spherical '// &
+                'harmonic patch '//trim(iStr)//'. Exiting ...')
+          end if
         end if
 
     end subroutine s_check_spherical_harmonic_patch_geometry ! -------------

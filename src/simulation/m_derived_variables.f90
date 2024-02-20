@@ -94,7 +94,6 @@ contains
                 call s_open_probe_files()
                 call s_open_com_files()
             end if
-
             ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                           fd_number, fd_order)
@@ -108,14 +107,21 @@ contains
                                                               fd_number, fd_order)
             end if
         end if
+       
+        if (sim_data .and. proc_rank == 0) then
+                call s_open_sim_data_file()
+        end if
+
 
     end subroutine s_initialize_derived_variables ! -----------------------------
 
     !> Writes coherent body information, communication files, and probes.
         !!  @param t_step Current time-step
-    subroutine s_compute_derived_variables(t_step) ! -----------------------
+    subroutine s_compute_derived_variables(q_prim_vf, t_step) ! -----------------------
 
         integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+
         integer :: i, j, k !< Generic loop iterators
           
         if (probe_wrt) then
@@ -159,6 +165,9 @@ contains
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
             call s_write_com_files(t_step,c_mass)        
         end if
+        if (sim_data) then
+                call s_write_sim_data_file(q_prim_vf, t_step)
+        endif
 
     end subroutine s_compute_derived_variables ! ---------------------------
 
@@ -460,6 +469,13 @@ contains
                 call s_close_probe_files()
             end if
         end if
+
+        if (proc_rank == 0) then
+            if (sim_data) then
+                call s_close_sim_data_file()
+            end if
+        end if
+
 
         if (probe_wrt) then
             deallocate (accel_mag, x_accel)

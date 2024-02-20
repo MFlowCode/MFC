@@ -15,7 +15,6 @@ class BenchCase:
     path: str
     args: typing.List[str]
 
-
 def bench(targets = None):
     if targets is None:
         targets = ARG("targets")

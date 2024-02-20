@@ -124,7 +124,7 @@ contains
         character(len=1000) :: line
 
         ! Namelist of the global parameters which may be specified by user
-        namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
+        namelist /user_inputs/ case_dir, run_time_info, sim_data, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
@@ -1083,7 +1083,7 @@ contains
             end do
         end if
 
-        call s_compute_derived_variables(t_step)
+        call s_compute_derived_variables(q_prim_vf,t_step)
 
 #ifdef DEBUG
         print *, 'Computed derived vars'
@@ -1103,7 +1103,7 @@ contains
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
-
+        
     end subroutine s_perform_time_step
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
