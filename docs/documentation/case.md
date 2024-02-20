@@ -175,6 +175,7 @@ To restart simulation from $k$-th time step, set `t_step_start`=k.
 | `model%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
 | `model%translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
 | `model%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
+| `model%threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
@@ -304,6 +305,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `bc_[x,y,z]\%beg[end]` | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `bc_[x,y,z]\%vb[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%beg` |
+| `bc_[x,y,z]\%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation\\%;%[4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
@@ -323,6 +326,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 
 - \* Options that work only with `model_eqns` $=2$.
 - † Options that work only with `cyl_coord` $=$ `False`.
+- ‡ Options that work only with `bc_[x,y,z]%[beg,end] = -15` and/or `bc_[x,y,z]%[beg,end] = -16`
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
@@ -331,6 +335,12 @@ Details of the simulation algorithms and implementation of the WENO scheme can b
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
 See table [Boundary Conditions](#boundary-conditions) for details.
+
+- `bc_[x,y,z]\%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%beg = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
+
+- `bc_[x,y,z]\%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%beg` when using `bc_[x,y,z]%end = -16`.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]\%end = 16` to work properly. Normal velocities require `bc_[x,y,z]\%end = -15` or `\bc_[x,y,z]\%end = -16` to work properly.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3. 
 `model_eqns` $=$ 1, 2, and 3 correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md#Johnsen08)), 5-equation model ([Allaire et al., 2002](references.md#Allaire02)), and 6-equation model ([Saurel et al., 2009](references.md#Saurel09)), respectively.
@@ -442,17 +452,18 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 ### 7. Acoustic Source
 
-| Parameter         | Type    | Description |
-| ---:              | :----:  | :--- |
-| `Monopole`        | Logical | Acoustic source |
-| `num_mono`        | Integer | Number of acoustic sources |
-| `Mono(i)%pulse`   | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
-| `Mono(i)%npulse`  | Integer | Number of pulse cycles |
-| `Mono(i)%support` | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
-| `Mono(i)%loc(j)`  | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
-| `Mono(i)%dir`     | Real    | Direction of acoustic propagation	|
-| `Mono(i)%mag`     | Real    | Pulse magnitude	|
-| `Mono(i)%length`  | Real    | Spatial pulse length |
+| Parameter                | Type    | Description |
+| ---:                     | :----:  | :--- |
+| `Monopole`               | Logical | Acoustic source |
+| `num_mono`               | Integer | Number of acoustic sources |
+| `Mono(i)%pulse`          | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `Mono(i)%npulse`         | Integer | Number of pulse cycles |
+| `Mono(i)%support`        | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
+| `Mono(i)%support_width`  | Real    | The width of the monopole support in terms of cell width |
+| `Mono(i)%loc(j)`         | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
+| `Mono(i)%dir`            | Real    | Direction of acoustic propagation	|
+| `Mono(i)%mag`            | Real    | Pulse magnitude	|
+| `Mono(i)%length`         | Real    | Spatial pulse length |
 
 The table lists acoustic source parameters.
 The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source).
@@ -480,6 +491,9 @@ The source plane is defined in the finite region of the domain: $x\in[-\infty,\i
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
 The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
 There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
+
+- `Mono(i)%support_width` defines how many cell width the monopole support function extended by.
+Large `Mono(i)%support_width` is preferred when `Mono(i)%mag` is large.
 
 ### 8. Ensemble-Averaged Bubble Model
 

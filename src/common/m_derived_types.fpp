@@ -27,10 +27,20 @@ module m_derived_types
         real(kind(0d0)), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type pres_field
 
+    !> Derived type annexing an integer scalar field (SF)
+    type integer_field
+        integer, pointer, dimension(:, :, :) :: sf => null()
+    end type integer_field
+
     type mpi_io_var
         integer, allocatable, dimension(:) :: view
         type(scalar_field), allocatable, dimension(:) :: var
     end type mpi_io_var
+
+    type mpi_io_ib_var
+        integer :: view
+        type(integer_field) :: var
+    end type mpi_io_ib_var
 
     !> Derived type annexing a vector field (VF)
     type vector_field
@@ -41,6 +51,12 @@ module m_derived_types
     type int_bounds_info
         integer :: beg
         integer :: end
+        real(kind(0d0)) :: vb1
+        real(kind(0d0)) :: vb2
+        real(kind(0d0)) :: vb3
+        real(kind(0d0)) :: ve1
+        real(kind(0d0)) :: ve2
+        real(kind(0d0)) :: ve3
     end type int_bounds_info
 
     !> Derived type adding beginning (beg) and end bounds info as attributes
@@ -78,6 +94,9 @@ module m_derived_types
 
         integer :: spc !<
         !! Number of samples per cell to use when discretizing the STL object.
+
+        real(kind(0d0)) :: threshold !<
+        !! Threshold to turn on smoothen STL patch.
     end type ic_model_parameters
 
     type :: t_triangle
@@ -174,6 +193,24 @@ module m_derived_types
 
     end type ic_patch_parameters
 
+    type ib_patch_parameters
+
+        integer :: geometry !< Type of geometry for the patch
+
+        real(kind(0d0)) :: x_centroid, y_centroid, z_centroid !<
+        !! Location of the geometric center, i.e. the centroid, of the patch. It
+        !! is specified through its x-, y- and z-coordinates, respectively.
+
+        real(kind(0d0)) :: c, p, t, m
+
+        real(kind(0d0)) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
+        real(kind(0d0)) :: radius !< Dimensions of the patch. radius.
+        real(kind(0d0)) :: theta
+
+        logical :: slip
+
+    end type ib_patch_parameters
+
     !> Derived type annexing the physical parameters (PP) of the fluids. These
     !! include the specific heat ratio function and liquid stiffness function.
     type physical_parameters
@@ -200,6 +237,11 @@ module m_derived_types
         real(kind(0d0)) :: z !< Third coordinate location
     end type probe_parameters
 
+    type mpi_io_airfoil_ib_var
+        integer, dimension(2) :: view
+        type(probe_parameters), allocatable, dimension(:) :: var
+    end type mpi_io_airfoil_ib_var
+
     !> Derived type annexing integral regions
     type integral_parameters
         real(kind(0d0)) :: xmin !< Min. boundary first coordinate direction
@@ -222,6 +264,19 @@ module m_derived_types
         integer :: support
         real(kind(0d0)) :: aperture
         real(kind(0d0)) :: foc_length
+        real(kind(0d0)) :: support_width
     end type mono_parameters
+
+    !> Ghost Point for Immersed Boundaries
+    type ghost_point
+
+        real(kind(0d0)), dimension(3) :: loc !< Physical location of the ghost point
+        real(kind(0d0)), dimension(3) :: ip_loc !< Physical location of the image point
+        real(kind(0d0)), dimension(3) :: ip_grid !< Top left grid point of IP
+        real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
+        integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
+        logical :: slip
+
+    end type ghost_point
 
 end module m_derived_types

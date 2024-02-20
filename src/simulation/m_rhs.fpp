@@ -43,9 +43,13 @@ module m_rhs
 
     use m_viscous
 
+    use m_ibm
+
     use m_nvtx
 
     use m_boundary_conditions
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -668,10 +672,6 @@ contains
             end do
         end do
 
-        call nvtxStartRange("RHS-MPI")
-        call s_populate_conservative_variables_buffers(Q_CONS_QP%VF, pb, mv)
-        call nvtxEndRange
-
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -703,6 +703,10 @@ contains
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
             ix, iy, iz)
+        call nvtxEndRange
+
+        call nvtxStartRange("RHS-MPI")
+        call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
         if (t_step == t_step_stop) return
@@ -1850,9 +1854,25 @@ contains
             end if
             call nvtxEndRange
         end do
+
+        if (ib) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ib_markers%sf(j, k, l) /= 0) then
+                            do i = 1, sys_size
+                                rhs_vf(i)%sf(j, k, l) = 0d0
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        end if
+
         ! END: Dimensional Splitting Loop =================================
 
-        if (run_time_info .or. probe_wrt) then
+        if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; 

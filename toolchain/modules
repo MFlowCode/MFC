@@ -47,11 +47,7 @@ c-all ninja/1.10.2 cray-mpich/8.1.23
 c-cpu
 c-gpu rocm/5.1.0 craype-accel-amd-gfx90a
 
-o     Brown
-o-all python/3.9.0 cmake/3.20.0 
-o-cpu gcc/10.2 mpi/openmpi_4.1.1_gcc_10.2_slurm22 hdf5/1.10.0
-
-d     Delta
-d-all python/3.11.6
-d-cpu openmpi/5.0.1+cuda
-d-gpu gcc-runtime/8.5.0 nvhpc/22.11 cuda/11.8.0 openmpi/4.1.5+cuda 
+d     NCSA Delta
+d-all python/3.11.6 openmpi
+d-cpu gcc/11.4.0
+d-gpu nvhpc/22.11
