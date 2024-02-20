@@ -64,7 +64,7 @@ You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf
 The result looks something like the below!
 
 <p align="center">
-    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="500"/>
+    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
 ## Citation
