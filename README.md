@@ -69,6 +69,64 @@ The shock-droplet interaction case above was run via
 where `8` is the number of cores the example will run on.
 You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
 
+## What else can this thing do
+
+MFC has many features.
+They are organized below, just click the drop-downs!
+
+<details>
+<summary>Physics</summary>
+
+* 1-3D
+* Compressible
+* Multi- and single-component
+	* 4, 5, and 6 equation models for multi-component/phase features
+* Multi- and single-phase 
+	* Phase change via p, pT, and pTg schemes
+* Grids
+	* 1-3D Cartesian, Cylindrical, Axi-symmetric. 
+	* Arbitrary grid stretching for multiple domain regions available.
+	* Complex/arbitrary geometries via immersed boundary methods 
+	* STL geometry files supported
+* Sub-grid Euler-Euler multiphase models for bubble dynamics and similar
+* Viscous effects (high-order accurate representations)
+* Ideal and stiffened gas equations of state
+* Acoustic wave generation (one- and two-way sound sources)
+</details>
+
+<details>
+<summary>Numerics</summary>
+
+* Shock and interface capturing schemes
+	* First-order upwinding, WENO3 and 5. 
+	* Reliable handling of high density ratios.
+* Exact and approximate (e.g., HLL, HLLC) Riemann solvers
+* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more.
+* Runge-Kutta orders 1-3 (SSP TVD)
+* Interface sharpening (THINC-like)
+</details>
+
+<details>
+<summary>Large-scale and accelerated simulation</summary>
+
+* GPU compatible on NVIDIA (P/V/A/H100, etc.) and AMD (MI200+) hardware
+* Ideal weak scaling to 100% of leadership class machines
+	* \>10K GPUs on [OLCF Summit](https://www.olcf.ornl.gov/summit/) (V100-based)
+	* \>60K GPUs on world's first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X-based)
+* Near roofline behavior
+</details>
+
+<details>
+<summary>Software robustness and other features</summary>
+
+* [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
+* Continuous Integration (CI)
+	* Regression test cases on CPU and GPU hardware with each PR. Performed with GNU, Intel, and NVIDIA compilers.
+	* Benchmarking to avoid performance regressions and identify speed-ups
+* Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
+</details>
+
+
 ## Citation
 
 If you use MFC, consider citing it:
