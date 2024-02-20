@@ -285,7 +285,7 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 | `p`                    | Real    |
 | `slip`                 | Logical | Apply a slip boundary |
 
-*: These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
+These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
 
 #### Parameter Descriptions
 
