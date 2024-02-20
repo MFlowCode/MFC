@@ -44,10 +44,14 @@ cd MFC
 ```
 then build and test!
 ```console
+export CC=gcc-13
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
-And you're done!
+where `export CC=gcc-13` assumes installation of `gcc` version `13` and avoids the use of AppleClang.
+It can be moved to your `.bashrc` or similar.
+And... you're done!
+
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
 Also, see below.
 
