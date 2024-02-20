@@ -29,8 +29,9 @@
 
 ## An example
 
-Examples are in the `examples/` directory.
-For example, MFC can execute high-fidelity simulations of shock-droplet interactions.
+We keep many examples.
+Here's one!
+MFC can execute high-fidelity simulations of shock-droplet interaction (see `examples/3d_shockdroplet`)
 
 <p align="center">
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
