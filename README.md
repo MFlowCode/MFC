@@ -19,15 +19,57 @@
 <p align="justify">
   Welcome to the home of MFC!
   MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-  It scales ideally to tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like OLCF Summit and Frontier.
-  As such, it is an exascale CFD codebase.
-  MFC is written in Fortran and makes use of metaprogramming to keep the codebase readable.
-  Don't hesitate to get in touch with the developers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions.
-  We have an active Slack channel to help ease new MFC users and support development.
-
-  MFC has API and high-level documentation on [its website](https://mflowcode.github.io/).
-  The latter is also available [here](docs/documentation/readme.md).
+  It scales <b>ideally to exascale</b>; tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like Oak Ridge Summit and Frontier.
+  MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
+  
+  Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
+  We have an active Slack channel and development team.
+  MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 </p>
+
+## An example
+
+We keep many examples.
+Here's one!
+MFC can execute high-fidelity simulations of shock-droplet interaction (see `examples/3d_shockdroplet`)
+
+<p align="center">
+    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
+</p>
+
+## Getting started
+
+You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
+It's rather straightforward.
+
+We'll give a brief intro. here for MacOS.
+Using [brew](https://brew.sh), install MFC's modest set of dependencies:
+```console
+brew install wget make python make cmake coreutils gcc openmpi
+```
+You're now ready to build and test MFC!
+Clone it to a convenient directory via
+```console
+git clone https://github.com/mflowcode/MFC.git
+cd MFC
+```
+then build and test!
+```console
+./mfc.sh build -j 8
+./mfc.sh test -j 8
+```
+And... you're done!
+
+You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
+
+The shock-droplet interaction case above was run via
+```console
+./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
+```
+where `8` is the number of cores the example will run on.
+You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
+
+## Citation
 
 If you use MFC, consider citing it:
 
@@ -56,6 +98,6 @@ MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 ## Acknowledgements
  
 <p align="justify">
-  MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), the US Department of Energy, and the US National Science Foundation (NSF).
-  MFC computations use ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson).
+  MFC development was supported by multiple current and past grants from the US Department of Defense, National Institute of Health (NIH), Department of Energy (DOE), and the National Science Foundation (NSF).
+  MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
 </p>
