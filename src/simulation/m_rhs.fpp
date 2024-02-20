@@ -1215,7 +1215,9 @@ contains
                     end do
                 end if
             end if
-        elseif (idir == 2) then
+        endif
+
+        if (idir == 2) then
             if (riemann_solver == 1) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
@@ -1308,7 +1310,9 @@ contains
                     end do
                 end if
             end if
-        elseif (idir == 3) then
+        endif
+
+        if (idir == 3) then
             if (grid_geometry == 3) then
                 if (riemann_solver == 1) then
                     do j = advxb, advxe
@@ -1325,7 +1329,6 @@ contains
                         end do
                     end do
                 else
-
                     if (alt_soundspeed) then
                         do j = advxb, advxe
                             if ((j == advxe) .and. (bubbles .neqv. .true.)) then
