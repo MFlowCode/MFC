@@ -213,9 +213,9 @@ contains
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
-            call s_open_run_time_information_file() 
+            call s_open_run_time_information_file()
         end if
-        
+
     end subroutine s_initialize_time_steppers_module ! ---------------------
 
     !> 1st order TVD RK time-stepping algorithm

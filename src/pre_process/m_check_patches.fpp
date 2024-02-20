@@ -420,31 +420,31 @@ contains
 
         ! Constraints on the geometric parameters of the spherical harmonic patch
 
-         if (p > 0) then
+        if (p > 0) then
             if (n == 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
-             .or. &
-             patch_icpp(patch_id)%x_centroid == dflt_real &
-             .or. &
-             patch_icpp(patch_id)%y_centroid == dflt_real &
-             .or. &
-             patch_icpp(patch_id)%z_centroid == dflt_real) then
+                .or. &
+                patch_icpp(patch_id)%x_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%y_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%z_centroid == dflt_real) then
 
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of spherical '// &
-                             'harmonic patch '//trim(iStr)//'. Exiting ...')
+                call s_mpi_abort('Inconsistency(ies) detected in '// &
+                                 'geometric parameters of spherical '// &
+                                 'harmonic patch '//trim(iStr)//'. Exiting ...')
 
-           end if
+            end if
         else if (p == 0) then
-             if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
-             .or. &
-             patch_icpp(patch_id)%x_centroid == dflt_real &
-             .or. &
-             patch_icpp(patch_id)%y_centroid == dflt_real) then
+            if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+                .or. &
+                patch_icpp(patch_id)%x_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%y_centroid == dflt_real) then
 
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                'geometric parameters of spherical '// &
-                'harmonic patch '//trim(iStr)//'. Exiting ...')
-          end if
+                call s_mpi_abort('Inconsistency(ies) detected in '// &
+                                 'geometric parameters of spherical '// &
+                                 'harmonic patch '//trim(iStr)//'. Exiting ...')
+            end if
         end if
 
     end subroutine s_check_spherical_harmonic_patch_geometry ! -------------

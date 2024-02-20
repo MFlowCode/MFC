@@ -28,9 +28,9 @@ module m_derived_variables
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
-                       s_initialize_derived_variables, &
-                       s_compute_derived_variables, &
-                       s_finalize_derived_variables_module
+ s_initialize_derived_variables, &
+ s_compute_derived_variables, &
+ s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
     !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
@@ -82,7 +82,7 @@ contains
                 end if
             end if
         end if
-        
+
     end subroutine s_initialize_derived_variables_module ! --------------------
 
     !> Allocate and open derived variables. Computing FD coefficients.
@@ -107,11 +107,10 @@ contains
                                                               fd_number, fd_order)
             end if
         end if
-       
-        if (sim_data .and. proc_rank == 0) then
-                call s_open_sim_data_file()
-        end if
 
+        if (sim_data .and. proc_rank == 0) then
+            call s_open_sim_data_file()
+        end if
 
     end subroutine s_initialize_derived_variables ! -----------------------------
 
@@ -123,7 +122,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
-          
+
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts(0)%vf, &
                                                  q_prim_ts(1)%vf, &
@@ -160,14 +159,14 @@ contains
                     end do
                 end do
             end do
-            call s_derive_center_of_mass(q_prim_ts(3)%vf,c_mass)
+            call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
 
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
-            call s_write_com_files(t_step,c_mass)        
+            call s_write_com_files(t_step, c_mass)
         end if
         if (sim_data) then
-                call s_write_sim_data_file(q_prim_vf, t_step)
-        endif
+            call s_write_sim_data_file(q_prim_vf, t_step)
+        end if
 
     end subroutine s_compute_derived_variables ! ---------------------------
 
@@ -319,144 +318,144 @@ contains
 
     !> This subroutine is used together with the volume fraction
     !!      model and when called upon, it computes the location of
-    !!      of the center of mass for each fluid from the inputted 
+    !!      of the center of mass for each fluid from the inputted
     !!      primitive variables, q_prim_vf. The computed location
     !!      is then written to a formatted data file by the root process.
     !!  @param q_prim_vf Primitive variables
     !!  @param c_m Mass,x-location,y-location,z-location
-    subroutine s_derive_center_of_mass(q_vf,c_m)           
-       type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
-       real(kind(0d0)), dimension(1:num_fluids,1:5), intent(INOUT) :: c_m
-       integer :: i,j,k,l !< Generic loop iterators
-       real(kind(0d0)) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
-       real(kind(0d0)) :: dV !< Discrete cell volume
-      
-       do i = 1, num_fluids
-          do j = 1,5
-             c_m(i,j) = 0.0d0
-          end do 
-       end do
+    subroutine s_derive_center_of_mass(q_vf, c_m)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
+        real(kind(0d0)), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
+        integer :: i, j, k, l !< Generic loop iterators
+        real(kind(0d0)) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
+        real(kind(0d0)) :: dV !< Discrete cell volume
 
-       if (n == 0)  then !1D simulation
-                do i = 1,num_fluids !Loop over individual fluids
-                        do l = 0, p !Loop over grid
-                            do k = 0, n
-                                do j = 0, m
-                                    dV = dx(j)
-                                    ! Mass
-                                    c_m(i,1) = c_m(i,1) + q_vf(i)%sf(j,k,l)*dV
-                                    ! x-location weighted
-                                    c_m(i,2) = c_m(i,2) + q_vf(i)%sf(j,k,l)*dV*x_cc(j)
-                                    ! Volume fraction
-                                    c_m(i,5) = c_m(i,5) + q_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
-                                end do
-                            end do
+        do i = 1, num_fluids
+            do j = 1, 5
+                c_m(i, j) = 0.0d0
+            end do
+        end do
+
+        if (n == 0) then !1D simulation
+            do i = 1, num_fluids !Loop over individual fluids
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            dV = dx(j)
+                            ! Mass
+                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                            ! x-location weighted
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            ! Volume fraction
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
                         end do
+                    end do
                 end do
+            end do
         elseif (p == 0) then !2D simulation
-                do i = 1,num_fluids !Loop over individual fluids
-                        do l = 0, p !Loop over grid
-                            do k = 0, n
-                                do j = 0, m
-                                    dV = dx(j)*dy(k)
-                                    ! Mass
-                                    c_m(i,1) = c_m(i,1) + q_vf(i)%sf(j,k,l)*dV
-                                    ! x-location weighted
-                                    c_m(i,2) = c_m(i,2) + q_vf(i)%sf(j,k,l)*dV*x_cc(j)
-                                    ! y-location weighted
-                                    c_m(i,3) = c_m(i,3) + q_vf(i)%sf(j,k,l)*dV*y_cc(k)
-                                    ! Volume fraction
-                                    c_m(i,5) = c_m(i,5) + q_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
-                                end do
-                            end do
+            do i = 1, num_fluids !Loop over individual fluids
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            dV = dx(j)*dy(k)
+                            ! Mass
+                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                            ! x-location weighted
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            ! y-location weighted
+                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                            ! Volume fraction
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
                         end do
+                    end do
                 end do
+            end do
         else !3D simulation
-                do i = 1, num_fluids !Loop over individual fluids
-                     do l = 0, p !Loop over grid
-                        do k = 0, n
-                           do j = 0, m
-                              dV = dx(j)*dy(k)*dz(l)
-                              ! Mass
-                              c_m(i,1) = c_m(i,1) + q_vf(i)%sf(j,k,l)*dV
-                              ! x-location weighted
-                              c_m(i,2) = c_m(i,2) + q_vf(i)%sf(j,k,l)*dV*x_cc(j)
-                              ! y-location weighted
-                              c_m(i,3) = c_m(i,3) + q_vf(i)%sf(j,k,l)*dV*y_cc(k)
-                              ! z-location weighted
-                              c_m(i,4) = c_m(i,4) + q_vf(i)%sf(j,k,l)*dV*z_cc(l)
-                              ! Volume fraction
-                              c_m(i,5) = c_m(i,5) + q_vf(i+adv_idx%beg-1)%sf(j,k,l)*dV
-                           end do
+            do i = 1, num_fluids !Loop over individual fluids
+                do l = 0, p !Loop over grid
+                    do k = 0, n
+                        do j = 0, m
+                            dV = dx(j)*dy(k)*dz(l)
+                            ! Mass
+                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
+                            ! x-location weighted
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            ! y-location weighted
+                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                            ! z-location weighted
+                            c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
+                            ! Volume fraction
+                            c_m(i, 5) = c_m(i, 5) + q_vf(i + adv_idx%beg - 1)%sf(j, k, l)*dV
                         end do
-                     end do
-               end do
-        end if       
-        if (n == 0)  then !1D simulation
-                do i = 1,num_fluids !Loop over individual fluids
-                        ! Sum all components across all processors using MPI_ALLREDUCE
-                        if (num_procs > 1) then
-                            tmp = c_m(i,1)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,1) = tmp_out
-                            tmp = c_m(i,2)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,2) = tmp_out                              
-                            tmp = c_m(i,5)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,5) = tmp_out                              
-                        end if
-                        ! Compute quotients
-                        c_m(i,2) = c_m(i,2)/c_m(i,1)
+                    end do
                 end do
-         elseif (p == 0) then !2D simulation
-                do i = 1,num_fluids !Loop over individual fluids
-                        ! Sum all components across all processors using MPI_ALLREDUCE
-                        if (num_procs > 1) then
-                            tmp = c_m(i,1)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,1) = tmp_out                              
-                            tmp = c_m(i,2)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,2) = tmp_out                              
-                            tmp = c_m(i,3)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,3) = tmp_out                              
-                            tmp = c_m(i,5)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,5) = tmp_out                              
-                        end if
-                        ! Compute quotients
-                        c_m(i,2) = c_m(i,2)/c_m(i,1)
-                        c_m(i,3) = c_m(i,3)/c_m(i,1)
-                end do
-         else !3D simulation
-                do i = 1, num_fluids !Loop over individual fluids
-                     ! Sum all components across all processors using MPI_ALLREDUCE
-                     if (num_procs > 1) then
-                            tmp = c_m(i,1)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,1) = tmp_out                              
-                            tmp = c_m(i,2)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,2) = tmp_out                              
-                            tmp = c_m(i,3)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,3) = tmp_out                              
-                            tmp = c_m(i,4)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,4) = tmp_out                              
-                            tmp = c_m(i,5)
-                            call s_mpi_allreduce_sum(tmp,tmp_out)
-                            c_m(i,5) = tmp_out                              
-                     end if
-                     ! Compute quotients
-                     c_m(i,2) = c_m(i,2)/c_m(i,1)
-                     c_m(i,3) = c_m(i,3)/c_m(i,1)
-                     c_m(i,4) = c_m(i,4)/c_m(i,1)
-               end do
-        end if                    
-                       
+            end do
+        end if
+        if (n == 0) then !1D simulation
+            do i = 1, num_fluids !Loop over individual fluids
+                ! Sum all components across all processors using MPI_ALLREDUCE
+                if (num_procs > 1) then
+                    tmp = c_m(i, 1)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 1) = tmp_out
+                    tmp = c_m(i, 2)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 2) = tmp_out
+                    tmp = c_m(i, 5)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 5) = tmp_out
+                end if
+                ! Compute quotients
+                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
+            end do
+        elseif (p == 0) then !2D simulation
+            do i = 1, num_fluids !Loop over individual fluids
+                ! Sum all components across all processors using MPI_ALLREDUCE
+                if (num_procs > 1) then
+                    tmp = c_m(i, 1)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 1) = tmp_out
+                    tmp = c_m(i, 2)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 2) = tmp_out
+                    tmp = c_m(i, 3)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 3) = tmp_out
+                    tmp = c_m(i, 5)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 5) = tmp_out
+                end if
+                ! Compute quotients
+                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
+                c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
+            end do
+        else !3D simulation
+            do i = 1, num_fluids !Loop over individual fluids
+                ! Sum all components across all processors using MPI_ALLREDUCE
+                if (num_procs > 1) then
+                    tmp = c_m(i, 1)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 1) = tmp_out
+                    tmp = c_m(i, 2)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 2) = tmp_out
+                    tmp = c_m(i, 3)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 3) = tmp_out
+                    tmp = c_m(i, 4)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 4) = tmp_out
+                    tmp = c_m(i, 5)
+                    call s_mpi_allreduce_sum(tmp, tmp_out)
+                    c_m(i, 5) = tmp_out
+                end if
+                ! Compute quotients
+                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
+                c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
+                c_m(i, 4) = c_m(i, 4)/c_m(i, 1)
+            end do
+        end if
+
     end subroutine s_derive_center_of_mass ! ----------------------------------
 
     !> Deallocation procedures for the module
@@ -475,7 +474,6 @@ contains
                 call s_close_sim_data_file()
             end if
         end if
-
 
         if (probe_wrt) then
             deallocate (accel_mag, x_accel)

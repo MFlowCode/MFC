@@ -229,7 +229,6 @@ contains
         old_ic = .false.
         t_step_old = dflt_int
         t_step_start = dflt_int
-        
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0

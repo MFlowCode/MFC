@@ -760,7 +760,7 @@ contains
                                      ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
                 end if
-                PRINT *,"a :",a, "b :",b
+                print *, "a :", a, "b :", b
                 if ((((x_cc(i) - x_centroid)/a)**2 + &
                      ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
                      .and. &
@@ -1358,18 +1358,17 @@ contains
         !!      as a perturbation to a perfect sphere
         !!      @param patch_id is the patch identifier
     subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
-         
-         integer, intent(IN) :: patch_id
-         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-         real(kind(0d0)) :: r, x_p, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, eps, phi
-         real(kind(0d0)) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12 
-         real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid
-         logical :: non_axis_sym
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-         integer :: i, j, k !< generic loop iterators
+        real(kind(0d0)) :: r, x_p, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, eps, phi
+        real(kind(0d0)) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
+        real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid
+        logical :: non_axis_sym
 
+        integer :: i, j, k !< generic loop iterators
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1396,128 +1395,126 @@ contains
         eta = 1d0
         eps = 1.d-32
 
-
         ! Checking whether the patch covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
         if (p > 0) then
-         do k = 0, p
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        if (grid_geometry == 3) then
+                            call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        else
+                            cart_y = y_cc(j)
+                            cart_z = z_cc(k)
+                        end if
+
+                        r = dsqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) + eps
+                        x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        P2 = unassociated_legendre(x_p, 2)
+                        P3 = unassociated_legendre(x_p, 3)
+                        P4 = unassociated_legendre(x_p, 4)
+                        P5 = unassociated_legendre(x_p, 5)
+                        P6 = unassociated_legendre(x_p, 6)
+                        P7 = unassociated_legendre(x_p, 7)
+
+                        if (x_cc(i) - x_centroid >= 0 &
+                            .and. &
+                            r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7 <= radius &
+                            .and. &
+                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                            then
+                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                    eta, q_prim_vf, patch_id_fp)
+
+                        elseif (x_cc(i) - x_centroid < 0 &
+                                .and. &
+                                r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7 <= radius &
+                                .and. &
+                                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                            then
+                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                    eta, q_prim_vf, patch_id_fp)
+                        end if
+                    end do
+                end do
+            end do
+
+        else if (p == 0) then
             do j = 0, n
                 do i = 0, m
-                         if (grid_geometry == 3) then
-                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                         else
-                         cart_y = y_cc(j)
-                         cart_z = z_cc(k)
-                         end if
-                        
-                         r = dsqrt((x_cc(i)-x_centroid)**2+(cart_y-y_centroid)**2+(cart_z-z_centroid)**2)+eps
-                         x_p = dabs(x_cc(i)-x_centroid+eps)/r
-                         P2 = unassociated_legendre(x_p,2)
-                         P3 = unassociated_legendre(x_p,3)
-                         P4 = unassociated_legendre(x_p,4)
-                         P5 = unassociated_legendre(x_p,5)
-                         P6 = unassociated_legendre(x_p,6)
-                         P7 = unassociated_legendre(x_p,7)
 
+                    if (non_axis_sym) then
+                        phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
+                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        x_p = (eps)/r
+                        P2 = spherical_harmonic_func(x_p, phi, 2, 2)
+                        P3 = spherical_harmonic_func(x_p, phi, 3, 3)
+                        P4 = spherical_harmonic_func(x_p, phi, 4, 4)
+                        P5 = spherical_harmonic_func(x_p, phi, 5, 5)
+                        P6 = spherical_harmonic_func(x_p, phi, 6, 6)
+                        P7 = spherical_harmonic_func(x_p, phi, 7, 7)
+                        P8 = spherical_harmonic_func(x_p, phi, 8, 8)
+                        P9 = spherical_harmonic_func(x_p, phi, 9, 9)
+                        !  P10 = spherical_harmonic_func(x_p, phi, 10, 10)
+                        !  P11 = spherical_harmonic_func(x_p, phi, 11, 11)
+                        !  P12 = spherical_harmonic_func(x_p, phi, 12, 12)
+                    else
+                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        P2 = unassociated_legendre(x_p, 2)
+                        P3 = unassociated_legendre(x_p, 3)
+                        P4 = unassociated_legendre(x_p, 4)
+                        P5 = unassociated_legendre(x_p, 5)
+                        P6 = unassociated_legendre(x_p, 6)
+                        P7 = unassociated_legendre(x_p, 7)
+                    end if
 
-                        if (x_cc(i)-x_centroid >= 0 &
-                                .and. &
-                                r-a2*P2-a3*P3-a4*P4-a5*P5-a6*P6-a7*P7 <= radius &
-                                .and. &
-                                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                                then
-                                call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                        eta, q_prim_vf, patch_id_fp)
+                    if (x_cc(i) - x_centroid >= 0 &
+                        .and. &
+                        r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7 - a8*P8 - a9*P9 <= radius .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                        then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
 
-                        elseif (x_cc(i)-x_centroid < 0 &
-                                .and. &
-                                r-a2*P2+a3*P3-a4*P4+a5*P5-a6*P6+a7*P7 <= radius &
-                                .and. &
-                                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                                then
-                                call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                             eta, q_prim_vf, patch_id_fp)
-                        endif
-                 end do
-            end do
-        end do 
+                    elseif (x_cc(i) - x_centroid < 0 &
+                            .and. &
+                            r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7 - a8*P8 + a9*P9 <= radius &
+                            .and. &
+                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                        then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
 
-        else if ( p == 0) then
-        do j = 0, n
-               do i = 0, m
-                       
-                       if (non_axis_sym) then 
-                           phi = atan(((y_cc(j)-y_centroid)+eps)/((x_cc(i)-x_centroid)+eps))
-                           r = dsqrt((x_cc(i)-x_centroid)**2d0+(y_cc(j)-y_centroid)**2d0)+eps
-                           x_p = (eps)/r 
-                           P2 = spherical_harmonic_func(x_p, phi, 2, 2)
-                           P3 = spherical_harmonic_func(x_p, phi, 3, 3)
-                           P4 = spherical_harmonic_func(x_p, phi, 4, 4)
-                           P5 = spherical_harmonic_func(x_p, phi, 5, 5)
-                           P6 = spherical_harmonic_func(x_p, phi, 6, 6)
-                           P7 = spherical_harmonic_func(x_p, phi, 7, 7)
-                           P8 = spherical_harmonic_func(x_p, phi, 8, 8)
-                           P9 = spherical_harmonic_func(x_p, phi, 9, 9)
-                         !  P10 = spherical_harmonic_func(x_p, phi, 10, 10)
-                         !  P11 = spherical_harmonic_func(x_p, phi, 11, 11)
-                         !  P12 = spherical_harmonic_func(x_p, phi, 12, 12)
-                       else
-                          r = dsqrt((x_cc(i)-x_centroid)**2d0+(y_cc(j)-y_centroid)**2d0)+eps
-                          x_p = dabs(x_cc(i)-x_centroid+eps)/r
-                          P2 = unassociated_legendre(x_p,2)
-                          P3 = unassociated_legendre(x_p,3)
-                          P4 = unassociated_legendre(x_p,4)
-                          P5 = unassociated_legendre(x_p,5)
-                          P6 = unassociated_legendre(x_p,6)
-                          P7 = unassociated_legendre(x_p,7)
-                       end if
-
-                        if (x_cc(i)-x_centroid >= 0 &       
-                                .and. &
-                             r-a2*P2-a3*P3-a4*P4-a5*P5-a6*P6-a7*P7-a8*P8-a9*P9 <= radius .and. & 
-                               patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) & 
-                               then     
-                               call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                   eta, q_prim_vf, patch_id_fp)
-
-                        elseif (x_cc(i)-x_centroid < 0 &
-                                .and. &
-                              r-a2*P2+a3*P3-a4*P4+a5*P5-a6*P6+a7*P7-a8*P8+a9*P9 <= radius & 
-                                .and. &
-                                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                                then
-                                call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                     eta, q_prim_vf, patch_id_fp)
-
-                        endif                        
+                    end if
                 end do
-         end do
-        end if 
-        
+            end do
+        end if
+
     end subroutine s_spherical_harmonic ! ----------------------------------
 
         !! This function generates the unassociated legendre poynomials with input
-        ! mode number and evaluates them at input x
+    ! mode number and evaluates them at input x
 
-    recursive function unassociated_legendre(x,l) result(P)
+    recursive function unassociated_legendre(x, l) result(P)
         integer, intent(in) :: l
         real(kind(0d0)), intent(in) :: x
         real(kind(0d0)) :: P
 
         if (l == 0) then
-                P = 1d0
+            P = 1d0
         else if (l == 1) then
-                P = x
+            P = x
         else
-                P = ((2*l-1)*x*unassociated_legendre(x,l-1)-(l-1)*unassociated_legendre(x,l-2))/l
-        end if 
+            P = ((2*l - 1)*x*unassociated_legendre(x, l - 1) - (l - 1)*unassociated_legendre(x, l - 2))/l
+        end if
 
     end function unassociated_legendre
 
         !! This function generated the spherical harmonic function valu, Y,
-        !based on inputs of x, phi, l and m
+    !based on inputs of x, phi, l and m
 
     recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
         integer, intent(in) :: l, m
@@ -1525,71 +1522,69 @@ contains
         real(kind(0d0)) :: Y, prefactor, pi
 
         pi = acos(-1d0)
-        prefactor = sqrt((2*l+1)/(4*pi)*factorial(l-m)/factorial(l+m));
+        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
         if (m == 0) then
-           Y = prefactor*associated_legendre(x, l, m);
-        elseif (m .gt. 0) then
-           Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi);
-        endif
+            Y = prefactor*associated_legendre(x, l, m); 
+        elseif (m > 0) then
+            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+        end if
     end function spherical_harmonic_func
 
         !! This function generates the associated legendre polynomials evaluated
-        !at x with inputs l and m
+    !at x with inputs l and m
 
     recursive function associated_legendre(x, l, m) result(P)
-      integer, intent(in) :: l, m
-      real(kind(0d0)), intent(in) :: x
-      real(kind(0d0)) :: P
+        integer, intent(in) :: l, m
+        real(kind(0d0)), intent(in) :: x
+        real(kind(0d0)) :: P
 
-      if (m <= 0 .and. l <= 0) then
-           P = 1;
-      elseif (l == 1 .and. m <= 0) then
-           P = x;
-      elseif (l == 1 .and. m == 1) then
-           P = -(1-x**2)**(1/2);
-      elseif (m == l) then
-           P = (-1)**l*double_factorial(2*l-1)*(1-x**2)**(l/2);
-      elseif (m == l-1) then
-           P = x*(2*l-1)*associated_legendre(x, l-1, l-1);
-      else
-           P = ((2*l-1)*x*associated_legendre(x, l-1, m)-(l+m-1)*associated_legendre(x, l-2, m))/(l-m);
-    endif
+        if (m <= 0 .and. l <= 0) then
+            P = 1; 
+        elseif (l == 1 .and. m <= 0) then
+            P = x; 
+        elseif (l == 1 .and. m == 1) then
+            P = -(1 - x**2)**(1/2); 
+        elseif (m == l) then
+            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+        elseif (m == l - 1) then
+            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+        else
+            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m); 
+        end if
 
-   end function associated_legendre
+    end function associated_legendre
 
         !! This function calculates the double factorial value of an integer
 
-   recursive function double_factorial(n) result(R)
-     integer, intent (in) :: n
-     integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
-     integer(kind=int64_kind) :: R
+    recursive function double_factorial(n) result(R)
+        integer, intent(in) :: n
+        integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer(kind=int64_kind) :: R
 
-     if (n <= 0) then
-        R = 1
-     else if (n == 1) then
-        R = 1
-     else
-        R = n * double_factorial(n - 2)
-     end if
+        if (n <= 0) then
+            R = 1
+        else if (n == 1) then
+            R = 1
+        else
+            R = n*double_factorial(n - 2)
+        end if
 
-   end function double_factorial
+    end function double_factorial
 
         !! The following function calculates the factorial value of an integer
 
-   recursive function factorial(n) result(R)
-     integer, intent(in) :: n
-     integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
-     integer(kind=int64_kind) :: R
+    recursive function factorial(n) result(R)
+        integer, intent(in) :: n
+        integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer(kind=int64_kind) :: R
 
-     if (n == 0) then
-         R = 1
-     else
-         R = n * factorial(n - 1)
-     end if
+        if (n == 0) then
+            R = 1
+        else
+            R = n*factorial(n - 1)
+        end if
 
-   end function factorial
-
-
+    end function factorial
 
     !>          The spherical patch is a 3D geometry that may be used,
         !!              for example, in creating a bubble or a droplet. The patch
@@ -2090,7 +2085,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
 
-   function f_convert_cyl_to_cart(cyl) result(cart)
+    function f_convert_cyl_to_cart(cyl) result(cart)
 
         !$acc routine seq
 

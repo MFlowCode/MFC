@@ -35,23 +35,23 @@ module m_data_output
     implicit none
 
     private; public :: s_initialize_data_output_module, &
-                       s_open_run_time_information_file, &
-                       s_open_com_files, &
-                       s_open_probe_files, &
-                       s_write_run_time_information, &
-                       s_write_data_files, &
-                       s_write_serial_data_files, &
-                       s_write_parallel_data_files, &
-                       s_write_com_files, &
-                       s_write_probe_files, &
-                       s_close_run_time_information_file, &
-                       s_close_com_files, &
-                       s_close_probe_files, &
-                       s_finalize_data_output_module, &
-                       s_open_sim_data_file, &
-                       s_write_sim_data_file, &
-                       s_close_sim_data_file
-     abstract interface ! ===================================================
+ s_open_run_time_information_file, &
+ s_open_com_files, &
+ s_open_probe_files, &
+ s_write_run_time_information, &
+ s_write_data_files, &
+ s_write_serial_data_files, &
+ s_write_parallel_data_files, &
+ s_write_com_files, &
+ s_write_probe_files, &
+ s_close_run_time_information_file, &
+ s_close_com_files, &
+ s_close_probe_files, &
+ s_finalize_data_output_module, &
+ s_open_sim_data_file, &
+ s_write_sim_data_file, &
+ s_close_sim_data_file
+    abstract interface ! ===================================================
 
         !> Write data files
         !! @param q_cons_vf Conservative variables
@@ -166,45 +166,44 @@ contains
         end if
 
     end subroutine s_open_run_time_information_file ! ----------------------
-    
-            !>  This opens a formatted data file where the root processor
-        !!      can write out the CoM information        
-    subroutine s_open_com_files() ! ----------------------------------------
-            character(len = path_len  + 3*name_len) :: file_path !<
-            !! Relative path to the CoM file in the case directory 
-            integer :: i !< Generic loop iterator
-            do i = 1, num_fluids
-                    ! Generating the relative path to the CoM data file
-                    write(file_path,'(A,I0,A)') '/fluid',i,'_com.dat'
-                    file_path = trim(case_dir) // trim(file_path)
-                    ! Creating the formatted data file and setting up its
-                    ! structure
-                    open(i+120, file = trim(file_path), &
-                        form = 'formatted', &
-                        position = 'append', &
-                        status   = 'unknown')
-                    if (n == 0) then
-                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
-                                     '=== Total Mass ' // &
-                                     '=== x-loc ' // &
-                                     '=== Total Volume ==='
-                    elseif (p == 0) then
-                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
-                                     '=== Total Mass ' // &
-                                     '=== x-loc ' // &
-                                     '=== y-loc ' // &
-                                     '=== Total Volume ==='
-                    else
-                            write(i+120,'(A)') '=== Non-Dimensional Time ' // &
-                                     '=== Total Mass ' // &
-                                     '=== x-loc ' // &
-                                     '=== y-loc ' // &
-                                     '=== z-loc ' // &
-                                     '=== Total Volume ==='
-                    end if
-            end do
-    end subroutine s_open_com_files ! --------------------------------------
 
+    !>  This opens a formatted data file where the root processor
+        !!      can write out the CoM information
+    subroutine s_open_com_files() ! ----------------------------------------
+        character(len=path_len + 3*name_len) :: file_path !<
+            !! Relative path to the CoM file in the case directory
+        integer :: i !< Generic loop iterator
+        do i = 1, num_fluids
+            ! Generating the relative path to the CoM data file
+            write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
+            file_path = trim(case_dir)//trim(file_path)
+            ! Creating the formatted data file and setting up its
+            ! structure
+            open (i + 120, file=trim(file_path), &
+                  form='formatted', &
+                  position='append', &
+                  status='unknown')
+            if (n == 0) then
+                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
+                    '=== Total Mass '// &
+                    '=== x-loc '// &
+                    '=== Total Volume ==='
+            elseif (p == 0) then
+                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
+                    '=== Total Mass '// &
+                    '=== x-loc '// &
+                    '=== y-loc '// &
+                    '=== Total Volume ==='
+            else
+                write (i + 120, '(A)') '=== Non-Dimensional Time '// &
+                    '=== Total Mass '// &
+                    '=== x-loc '// &
+                    '=== y-loc '// &
+                    '=== z-loc '// &
+                    '=== Total Volume ==='
+            end if
+        end do
+    end subroutine s_open_com_files ! --------------------------------------
 
     subroutine s_open_sim_data_file() ! ------------------------
 
@@ -214,26 +213,20 @@ contains
              !! Creation date of the run-time information file
 
         write (file_path, '(A)') '/sim_data.txt'
-              file_path = trim(case_dir)//trim(file_path)
+        file_path = trim(case_dir)//trim(file_path)
 
-         ! Opening the simulation data file   
+        ! Opening the simulation data file
         open (21519, FILE=trim(file_path), &
-               FORM='formatted', &
-               POSITION='append', &
-               STATUS='unknown')
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
 !         call date_and_time(DATE=file_date)
-  
+
 !         write (21519, '(A)') 'Date: '//file_date(5:6)//'/'// &
 !                file_date(7:8)//'/'// &
 !                file_date(3:4)
 
-
-     end subroutine s_open_sim_data_file ! ----------------------------------------
-
-
-
-
-
+    end subroutine s_open_sim_data_file ! ----------------------------------------
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -327,7 +320,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    
+
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -435,7 +428,7 @@ contains
             end do
         end do
         ! end: Computing Stability Criteria at Current Time-step ===========
-        
+
         ! Determining local stability criteria extrema at current time-step
 
         !$acc kernels
@@ -480,7 +473,7 @@ contains
                     t_step, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
-                
+
             else
                 write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
                     t_step, t_step*dt, icfl_max_glb
@@ -506,98 +499,97 @@ contains
     end subroutine s_write_run_time_information ! --------------------------
 
     subroutine s_write_sim_data_file(q_prim_vf, t_step)
-        
+
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
         integer :: i, j, k, l, w !< Generic loop iterators
         integer :: ierr, counter, counter2, counter3, root !< number of data points extracted to fit shape to SH perturbations
 
         real(kind(0d0)) :: u, m_a_x, m_a_y, m_a_z, eps
-        real(kind(0d0)), dimension(0:m,0:n) :: d_alpha_x, d_magdalphax, d_magdalphay, f_NS, rho, alpha_rhob
-        real(kind(0d0)), dimension(0:m,0:n) :: d_alpha_y, mag_d_alpha, d_rho_x, d_rho_y, mag_d_rho, alpha_b
-        real(kind(0d0)), dimension(0:m,0:n,0:p) :: d_alph_mpi_barrier_x3, d_alpha_y3, d_alpha_z3
-        real(kind(0d0)) ::  xdv, ydv, mag_d_alpha3, nondim_time, alphaxm, alphaxp, alphaym, alphayp
+        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_x, d_magdalphax, d_magdalphay, f_NS, rho, alpha_rhob
+        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_y, mag_d_alpha, d_rho_x, d_rho_y, mag_d_rho, alpha_b
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: d_alph_mpi_barrier_x3, d_alpha_y3, d_alpha_z3
+        real(kind(0d0)) :: xdv, ydv, mag_d_alpha3, nondim_time, alphaxm, alphaxp, alphaym, alphayp
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind(0d0)) :: alpha_t, concavity_x_prior, concavity_x_post, concavity_y_prior, concavity_y_post
         real(kind(0d0)), allocatable :: q(:), maxdalphy(:), maxdalphx(:)
-        real(kind=8),parameter :: pi=4.D0*datan(1.D0)
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
         real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_tdf(:), y_tdf(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-       
-         real(kind(0d0)) :: axp, axm, ayp, aym
- 
+
+        real(kind(0d0)) :: axp, axm, ayp, aym
+
         call s_calculate_COM(q_prim_vf, xcom, ycom, vol_fluid)
-        
+
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, kind(0d0))*dt
         else
             nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
         end if
         root = 0
-        allocate(x_d1(m*n))
-        allocate(y_d1(m*n))
+        allocate (x_d1(m*n))
+        allocate (y_d1(m*n))
         counter = 0
-        do k = 0,n
-          OLoop:  do j = 0,m
-                   axp = q_prim_vf(E_idx + 2)%sf(j+1,k,0)
-                   axm = q_prim_vf(E_idx + 2)%sf(j-1,k,0)
-                   ayp = q_prim_vf(E_idx + 2)%sf(j,k+1,0)
-                   aym = q_prim_vf(E_idx + 2)%sf(j,k-1,0)
- 
-                        if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9)&
-                           .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
-                               if (counter == 0) then
-                                  counter = counter + 1
-                                  x_d1(counter) = x_cc(j)
-                                  y_d1(counter) = y_cc(k)
-                               else
-                                 do i = 1, counter
-                                     if (sqrt((x_cc(j)-x_d1(i))**2+(y_cc(k)-&
-                                        y_d1(i))**2) <= 2*sqrt(dx(j)**2&
-                                        +dy(k)**2)) then
-                                           cycle OLoop
-                                     elseif (sqrt((x_cc(j)-x_d1(i))**2+(y_cc(k)-&
-                                            y_d1(i))**2) > 2*sqrt(dx(j)**2&
-                                            +dy(k)**2) .and. i == counter) then
-                                               counter = counter + 1
-                                               x_d1(counter) = x_cc(j)
-                                               y_d1(counter) = y_cc(k)
-                                     end if
-                                 end do
-                               end if
-                         end if
-                end do OLoop
-         end do
+        do k = 0, n
+            OLoop: do j = 0, m
+                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
+                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
+                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
+                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
 
-        allocate(y_d(counter))
-        allocate(x_d(counter))
-        do i = 1,counter
-                y_d(i) = y_d1(i)
-                x_d(i) = x_d1(i)
+                if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
+                    .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
+                    if (counter == 0) then
+                        counter = counter + 1
+                        x_d1(counter) = x_cc(j)
+                        y_d1(counter) = y_cc(k)
+                    else
+                        do i = 1, counter
+                            if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                                               y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
+                                                                                      + dy(k)**2)) then
+                                cycle OLoop
+                            elseif (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                                                   y_d1(i))**2) > 2*sqrt(dx(j)**2 &
+                                                                                         + dy(k)**2) .and. i == counter) then
+                                counter = counter + 1
+                                x_d1(counter) = x_cc(j)
+                                y_d1(counter) = y_cc(k)
+                            end if
+                        end do
+                    end if
+                end if
+            end do OLoop
+        end do
+
+        allocate (y_d(counter))
+        allocate (x_d(counter))
+        do i = 1, counter
+            y_d(i) = y_d1(i)
+            x_d(i) = x_d1(i)
         end do
         if (num_procs > 1) then
             call s_mpi_gather_data(x_d, counter, x_td, root)
             call s_mpi_gather_data(y_d, counter, y_td, root)
-           if (proc_rank == 0) then
+            if (proc_rank == 0) then
                 do i = 1, size(x_td)
-                       if (i == size(x_td)) then
-                                write(21519,'(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
-                                       x_td(i), y_td(i), size(x_td), xcom(2), nondim_time
-                       else
-                                write(21519,'(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
-                                       x_td(i), y_td(i), 0d0, 0d0, 0d0
-                       end if
-                 end do
-           end if
-         end if
+                    if (i == size(x_td)) then
+                        write (21519, '(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
+                            x_td(i), y_td(i), size(x_td), xcom(2), nondim_time
+                    else
+                        write (21519, '(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
+                            x_td(i), y_td(i), 0d0, 0d0, 0d0
+                    end if
+                end do
+            end if
+        end if
 
     end subroutine s_write_sim_data_file ! -----------------------------------
-
 
     subroutine s_calculate_numerical_schlieran(q_prim_vf, f_NS)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l
-        real(kind(0d0)), dimension(0:m,0:n), intent(OUT) :: f_NS
-        real(kind(0d0)), dimension(0:m,0:n) :: d_rho_mag, a, b, c, d, d_a_mag
+        real(kind(0d0)), dimension(0:m, 0:n), intent(OUT) :: f_NS
+        real(kind(0d0)), dimension(0:m, 0:n) :: d_rho_mag, a, b, c, d, d_a_mag
         real(kind(0d0)) :: rhoxp, rhoxm, rhoyp, rhoym, rhop, d_rhox, d_rhoy, mag_max
         real(kind(0d0)) :: axp, axm, ayp, aym, ap, d_ax, d_ay, maga_max
 
@@ -611,43 +603,42 @@ contains
         axm = 0d0
         ayp = 0d0
         aym = 0d0
-        
 
-        do k = 0,n
-               do j = 0, m
-                   do i = 1, num_fluids
-                       rhop = rhop + q_prim_vf(i)%sf(j,k,0)
-                       rhoxp = rhoxp + q_prim_vf(i)%sf(j+1,k,0)
-                       rhoxm = rhoxm + q_prim_vf(i)%sf(j-1,k,0)
-                       rhoyp = rhoyp + q_prim_vf(i)%sf(j,k+1,0)
-                       rhoym =  rhoym + q_prim_vf(i)%sf(j,k-1,0)
-                  end do
-                   ap = q_prim_vf(E_idx + 2)%sf(j,k,0) 
-                   axp = q_prim_vf(E_idx + 2)%sf(j+1,k,0)
-                   axm = q_prim_vf(E_idx + 2)%sf(j-1,k,0)
-                   ayp = q_prim_vf(E_idx + 2)%sf(j,k+1,0)
-                   aym = q_prim_vf(E_idx + 2)%sf(j,k-1,0)
-                   if (j == m) then
-                            d_rhox = dabs((rhop-rhoxm)/(x_cc(j)-x_cc(j-1)))
-                            d_ax = dabs((ap-axm)/(x_cc(j)-x_cc(j-1)))
-                   else if (k == n) then
-                            d_rhoy = dabs((rhop-rhoym)/(y_cc(k)-y_cc(k-1)))
-                            d_ay = dabs((ap-aym)/(y_cc(k)-y_cc(k-1)))
-                   else if (j == 0) then
-                           d_rhox = dabs((rhoxp-rhop)/(x_cc(j+1)-x_cc(j)))
-                           d_ax = dabs((axp-ap)/(x_cc(j+1)-x_cc(j)))
-                   else if (k == 0) then
-                           d_rhoy = dabs((rhoyp-rhop)/(y_cc(k+1)-y_cc(k)))
-                           d_ay = dabs((ayp-ap)/(y_cc(k+1)-y_cc(k)))
-                   else
-                   d_rhox = dabs((rhoxp-rhoxm)/(x_cc(j+1)-x_cc(j-1)))
-                   d_rhoy = dabs((rhoyp-rhoym)/(y_cc(k+1)-y_cc(k-1)))
-                   d_ax = dabs((axp-axm)/(x_cc(j+1)-x_cc(j-1)))
-                   d_ay = dabs((ayp-aym)/(y_cc(k+1)-y_cc(k-1)))
+        do k = 0, n
+            do j = 0, m
+                do i = 1, num_fluids
+                    rhop = rhop + q_prim_vf(i)%sf(j, k, 0)
+                    rhoxp = rhoxp + q_prim_vf(i)%sf(j + 1, k, 0)
+                    rhoxm = rhoxm + q_prim_vf(i)%sf(j - 1, k, 0)
+                    rhoyp = rhoyp + q_prim_vf(i)%sf(j, k + 1, 0)
+                    rhoym = rhoym + q_prim_vf(i)%sf(j, k - 1, 0)
+                end do
+                ap = q_prim_vf(E_idx + 2)%sf(j, k, 0)
+                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
+                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
+                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
+                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
+                if (j == m) then
+                    d_rhox = dabs((rhop - rhoxm)/(x_cc(j) - x_cc(j - 1)))
+                    d_ax = dabs((ap - axm)/(x_cc(j) - x_cc(j - 1)))
+                else if (k == n) then
+                    d_rhoy = dabs((rhop - rhoym)/(y_cc(k) - y_cc(k - 1)))
+                    d_ay = dabs((ap - aym)/(y_cc(k) - y_cc(k - 1)))
+                else if (j == 0) then
+                    d_rhox = dabs((rhoxp - rhop)/(x_cc(j + 1) - x_cc(j)))
+                    d_ax = dabs((axp - ap)/(x_cc(j + 1) - x_cc(j)))
+                else if (k == 0) then
+                    d_rhoy = dabs((rhoyp - rhop)/(y_cc(k + 1) - y_cc(k)))
+                    d_ay = dabs((ayp - ap)/(y_cc(k + 1) - y_cc(k)))
+                else
+                    d_rhox = dabs((rhoxp - rhoxm)/(x_cc(j + 1) - x_cc(j - 1)))
+                    d_rhoy = dabs((rhoyp - rhoym)/(y_cc(k + 1) - y_cc(k - 1)))
+                    d_ax = dabs((axp - axm)/(x_cc(j + 1) - x_cc(j - 1)))
+                    d_ay = dabs((ayp - aym)/(y_cc(k + 1) - y_cc(k - 1)))
 
-                   end if
-                d_rho_mag(j,k) = dsqrt((d_rhox**2+d_rhoy**2))
-                d_a_mag(j,k) = dsqrt((d_ax**2+d_ay**2))
+                end if
+                d_rho_mag(j, k) = dsqrt((d_rhox**2 + d_rhoy**2))
+                d_a_mag(j, k) = dsqrt((d_ax**2 + d_ay**2))
                 rhop = 0d0
                 rhoxp = 0d0
                 rhoxm = 0d0
@@ -658,133 +649,129 @@ contains
                 axm = 0d0
                 ayp = 0d0
                 aym = 0d0
-               end do
-             end do
-                
+            end do
+        end do
 
-!       if (maxval(d_rho_mag) < 1/(100*maxval(dx)) .or. maxval(d_rho_mag) < 1/(100*maxval(dy))) then 
+!       if (maxval(d_rho_mag) < 1/(100*maxval(dx)) .or. maxval(d_rho_mag) < 1/(100*maxval(dy))) then
 !                d_rho_mag(0:m,0:n) = 0d0
 !        else
 !                d_rho_mag(0:m,0:n) = d_rho_mag(0:m,0:n)/maxval(d_rho_mag)
 !        end if
-           call s_mpi_allreduce_max(maxval(d_rho_mag),mag_max)
-           call s_mpi_allreduce_max(maxval(d_a_mag),maga_max)
-           !        print *, "d_rho_max =", mag_max
-             !      print*, "d_rho_mag =", d_rho_mag
-           d_rho_mag(0:m,0:n) = d_rho_mag(0:m,0:n)/mag_max
-           d_a_mag(0:m,0:n) = d_a_mag(0:m,0:n)/maga_max
-!                print*, d_rho_mag                
-           a = 0.5
-           b = 9
-           c = 0.65
-           d = 1 
-          ! f_NS(0:m,0:n) = d_a_mag(0:m,0:n)*(EXP(-b**2*(d_rho_mag(0:m,0:n)&
-          !                -d_a_mag(0:m,0:n))**2/(d_a_mag(0:m,0:n))**2)+ &
-          !                 c*EXP(-b**2*(d_rho_mag(0:m,0:n)-(d_a_mag(0:m,0:n)-a))**2/&
-          !                (d_a_mag(0:m,0:n))**2)+d*d_rho_mag(0:m,0:n)/d_a_mag(0:m,0:n)*&
-          !                 EXP(-b**2*(d_rho_mag(0:m,0:n)-(0.9))**2/(25**2*(d_a_mag(0:m,0:n))**2))) 
+        call s_mpi_allreduce_max(maxval(d_rho_mag), mag_max)
+        call s_mpi_allreduce_max(maxval(d_a_mag), maga_max)
+        !        print *, "d_rho_max =", mag_max
+        !      print*, "d_rho_mag =", d_rho_mag
+        d_rho_mag(0:m, 0:n) = d_rho_mag(0:m, 0:n)/mag_max
+        d_a_mag(0:m, 0:n) = d_a_mag(0:m, 0:n)/maga_max
+!                print*, d_rho_mag
+        a = 0.5
+        b = 9
+        c = 0.65
+        d = 1
+        ! f_NS(0:m,0:n) = d_a_mag(0:m,0:n)*(EXP(-b**2*(d_rho_mag(0:m,0:n)&
+        !                -d_a_mag(0:m,0:n))**2/(d_a_mag(0:m,0:n))**2)+ &
+        !                 c*EXP(-b**2*(d_rho_mag(0:m,0:n)-(d_a_mag(0:m,0:n)-a))**2/&
+        !                (d_a_mag(0:m,0:n))**2)+d*d_rho_mag(0:m,0:n)/d_a_mag(0:m,0:n)*&
+        !                 EXP(-b**2*(d_rho_mag(0:m,0:n)-(0.9))**2/(25**2*(d_a_mag(0:m,0:n))**2)))
 
-           f_NS(0:m,0:n) = q_prim_vf(E_idx + 2)%sf(0:m,0:n,0)*(EXP(-b**2*(d_rho_mag(0:m,0:n)&
-                          -q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2/(q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2)+ &
-                           c*EXP(-b**2*(d_rho_mag(0:m,0:n)-(q_prim_vf(E_idx + 2)%sf(0:m,0:n,0)-a))**2/&
-                          (q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2)+d*d_rho_mag(0:m,0:n)/q_prim_vf(E_idx + 2)%sf(0:m,0:n,0)*&
-                           EXP(-b**2*(d_rho_mag(0:m,0:n)-(0.9))**2/(25**2*(q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2)))  
+        f_NS(0:m, 0:n) = q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0)*(exp(-b**2*(d_rho_mag(0:m, 0:n) &
+                                                                          - q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0))**2/(q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0))**2) + &
+                                                               c*exp(-b**2*(d_rho_mag(0:m, 0:n) - (q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0) - a))**2/ &
+                                                                     (q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0))**2) + d*d_rho_mag(0:m, 0:n)/q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0)* &
+                                                               exp(-b**2*(d_rho_mag(0:m, 0:n) - (0.9))**2/(25**2*(q_prim_vf(E_idx + 2)%sf(0:m, 0:n, 0))**2)))
 
-          ! f_NS(0:m,0:n) = d*dsqrt(d_rho_mag(0:m,0:n))*&
-!                           EXP(-b**2*(d_rho_mag(0:m,0:n)-(0.9))**2/(25**2*(q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2))  
+        ! f_NS(0:m,0:n) = d*dsqrt(d_rho_mag(0:m,0:n))*&
+!                           EXP(-b**2*(d_rho_mag(0:m,0:n)-(0.9))**2/(25**2*(q_prim_vf(E_idx + 2)%sf(0:m,0:n,0))**2))
 !            f_NS(0:m,0:n) = d*(d_rho_mag(0:m,0:n)+d_a_mag(0:m,0:n))*&
-!                           EXP(-b**2*(d_rho_mag(0:m,0:n)-(1+d_a_mag(0:m,0:n)))**2/(30**2*(d_a_mag(0:m,0:n))**2))  
- 
- 
-!1-EXP(-(0.1+0.9*q_prim_vf(E_idx + 2)%sf(0:m,0:n, 0))*dsqrt(d_rho_mag(0:m,0:n))*q_prim_vf(E_idx + 2)%sf(0:m,0:n, 0))
+!                           EXP(-b**2*(d_rho_mag(0:m,0:n)-(1+d_a_mag(0:m,0:n)))**2/(30**2*(d_a_mag(0:m,0:n))**2))
 
+!1-EXP(-(0.1+0.9*q_prim_vf(E_idx + 2)%sf(0:m,0:n, 0))*dsqrt(d_rho_mag(0:m,0:n))*q_prim_vf(E_idx + 2)%sf(0:m,0:n, 0))
 
     end subroutine s_calculate_numerical_schlieran
 
-
     subroutine s_calculate_COM(q_prim_vf, xcom, ycom, vol_fluid)
-         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-         integer :: i, j, k, l !< Generic loop iterators
-         real(kind(0d0)), dimension(num_fluids), intent(OUT) :: vol_fluid
-         real(kind(0d0)), dimension(num_fluids) ::  ms, ym, xm, zm
-         real(kind(0d0)), dimension(num_fluids), intent(OUT) ::  xcom, ycom
-         real(kind(0d0)) :: ybeg, xend, xbeg, zbeg, zend, tmp, dV, yend
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer :: i, j, k, l !< Generic loop iterators
+        real(kind(0d0)), dimension(num_fluids), intent(OUT) :: vol_fluid
+        real(kind(0d0)), dimension(num_fluids) :: ms, ym, xm, zm
+        real(kind(0d0)), dimension(num_fluids), intent(OUT) :: xcom, ycom
+        real(kind(0d0)) :: ybeg, xend, xbeg, zbeg, zend, tmp, dV, yend
 
-          xm = 0d0
-          ms = 0d0
-          ym = 0d0
-  !        zm = 0d0
- 
-                   do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                   if (p > 0) then
-                                          dV = dx(j)*dy(k)*dz(l)
-                                   else if (p == 0) then
-                                           dV = dx(j)*dy(k)
-                                   else if (n == 0) then
-                                           dV = dx(j)
-                                   end if
-                                   do i = 1, num_fluids
-                                      if (q_prim_vf(E_idx + i)%sf(j,k,l) .gt. 0.6) then
-                                             vol_fluid(i) = vol_fluid(i)+q_prim_vf(E_idx + i)%sf(j,k,l)*dV
-                                      end if
-                                             if (p > 0) then
-                                                ms(i) = ms(i) + q_prim_vf(i)%sf(j,k,l)*dV
-                                                xm(i) = xm(i) + q_prim_vf(i)%sf(j,k,l)*dV*x_cc(j)
-                                                ym(i) = ym(i) + q_prim_vf(i)%sf(j,k,l)*dV*y_cc(k)
- !                                               zm(i) = zm(i) + q_prim_vf(i)%sf(j,k,l)*dV*z_cc(l)
-                                             else if (p == 0 .and.&
-                                                      q_prim_vf(E_idx + 2)%sf(j,k,l) > 0.9) then
-                                                ms(i) = ms(i) + q_prim_vf(i)%sf(j,k,l)*dV
-                                                xm(i) = xm(i) + q_prim_vf(i)%sf(j,k,l)*dV*x_cc(j)
-                                                ym(i) = ym(i) + q_prim_vf(i)%sf(j,k,l)*dV*y_cc(k)
-                                             end if
-                                   end do 
-                                end do
-                           end do
-                      end do
-        do i = 1,num_fluids
-          if (num_procs > 1) then
+        xm = 0d0
+        ms = 0d0
+        ym = 0d0
+        !        zm = 0d0
+
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (p > 0) then
+                        dV = dx(j)*dy(k)*dz(l)
+                    else if (p == 0) then
+                        dV = dx(j)*dy(k)
+                    else if (n == 0) then
+                        dV = dx(j)
+                    end if
+                    do i = 1, num_fluids
+                        if (q_prim_vf(E_idx + i)%sf(j, k, l) > 0.6) then
+                            vol_fluid(i) = vol_fluid(i) + q_prim_vf(E_idx + i)%sf(j, k, l)*dV
+                        end if
+                        if (p > 0) then
+                            ms(i) = ms(i) + q_prim_vf(i)%sf(j, k, l)*dV
+                            xm(i) = xm(i) + q_prim_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            ym(i) = ym(i) + q_prim_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                            !                                               zm(i) = zm(i) + q_prim_vf(i)%sf(j,k,l)*dV*z_cc(l)
+                        else if (p == 0 .and. &
+                                 q_prim_vf(E_idx + 2)%sf(j, k, l) > 0.9) then
+                            ms(i) = ms(i) + q_prim_vf(i)%sf(j, k, l)*dV
+                            xm(i) = xm(i) + q_prim_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            ym(i) = ym(i) + q_prim_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        do i = 1, num_fluids
+            if (num_procs > 1) then
                 tmp = vol_fluid(i)
                 call s_mpi_allreduce_sum(tmp, vol_fluid(i))
-                  if (p > 0) then
-                     tmp = xm(i)
-                     call s_mpi_allreduce_sum(tmp, xm(i))
-                     tmp = ym(i)
-      !               call s_mpi_allreduce_sum(tmp, ym(i))
-   !                  tmp = zm(i)
-   !                  call s_mpi_allreduce_sum(tmp,zm(i))
-                     tmp = ms(i)
-                     call s_mpi_allreduce_sum(tmp, ms(i))
-     !                call s_mpi_allreduce_min(minval(x_cb(-1:m)), xbeg)
-     !                call s_mpi_allreduce_max(maxval(x_cb(-1:m)), xend)
-     !                call s_mpi_allreduce_min(minval(y_cb(-1:n)), ybeg)
-     !                call s_mpi_allreduce_max(maxval(y_cb(-1:n)), yend)
-     !                call s_mpi_allreduce_min(minval(z_cb(-1:p)), zbeg)
-    !                 call s_mpi_allreduce_max(maxval(z_cb(-1:p)), zend)
-                  else if (p == 0) then
-                     tmp = xm(i)
-                     call s_mpi_allreduce_sum(tmp, xm(i))
-                     tmp = ym(i)
-      !               call s_mpi_allreduce_sum(tmp, ym(i))
-                      tmp = ms(i)
-                     call s_mpi_allreduce_sum(tmp, ms(i))
-     !                call s_mpi_allreduce_min(minval(x_cb(-1:m)), xbeg)
-     !                call s_mpi_allreduce_max(maxval(x_cb(-1:m)), xend)
-     !                call s_mpi_allreduce_min(minval(y_cb(-1:n)), ybeg)
-     !                call s_mpi_allreduce_max(maxval(y_cb(-1:n)), yend)
-                  end if
-          end if
- 
-  !        if (p > 1) then
-  !           xcom(i) = xm(i)/ms(i)
-             ycom(i) = 0d0
-      !       zcom(i) = zm(i)/ms(i)
-   !          if (bc_x_glb%beg == -2) then
+                if (p > 0) then
+                    tmp = xm(i)
+                    call s_mpi_allreduce_sum(tmp, xm(i))
+                    tmp = ym(i)
+                    !               call s_mpi_allreduce_sum(tmp, ym(i))
+                    !                  tmp = zm(i)
+                    !                  call s_mpi_allreduce_sum(tmp,zm(i))
+                    tmp = ms(i)
+                    call s_mpi_allreduce_sum(tmp, ms(i))
+                    !                call s_mpi_allreduce_min(minval(x_cb(-1:m)), xbeg)
+                    !                call s_mpi_allreduce_max(maxval(x_cb(-1:m)), xend)
+                    !                call s_mpi_allreduce_min(minval(y_cb(-1:n)), ybeg)
+                    !                call s_mpi_allreduce_max(maxval(y_cb(-1:n)), yend)
+                    !                call s_mpi_allreduce_min(minval(z_cb(-1:p)), zbeg)
+                    !                 call s_mpi_allreduce_max(maxval(z_cb(-1:p)), zend)
+                else if (p == 0) then
+                    tmp = xm(i)
+                    call s_mpi_allreduce_sum(tmp, xm(i))
+                    tmp = ym(i)
+                    !               call s_mpi_allreduce_sum(tmp, ym(i))
+                    tmp = ms(i)
+                    call s_mpi_allreduce_sum(tmp, ms(i))
+                    !                call s_mpi_allreduce_min(minval(x_cb(-1:m)), xbeg)
+                    !                call s_mpi_allreduce_max(maxval(x_cb(-1:m)), xend)
+                    !                call s_mpi_allreduce_min(minval(y_cb(-1:n)), ybeg)
+                    !                call s_mpi_allreduce_max(maxval(y_cb(-1:n)), yend)
+                end if
+            end if
+
+            !        if (p > 1) then
+            !           xcom(i) = xm(i)/ms(i)
+            ycom(i) = 0d0
+            !       zcom(i) = zm(i)/ms(i)
+            !          if (bc_x_glb%beg == -2) then
 !                   ms(i) = 2*ms(i)
-  !                 xcom(i) = xbeg
- !            else if (bc_x_glb%end == -2) then
+            !                 xcom(i) = xbeg
+            !            else if (bc_x_glb%end == -2) then
 !                   ms(i) = 2*ms(i)
 !                  xcom(i) = xend
 !             else if (bc_y_glb%beg == -2) then
@@ -793,35 +780,33 @@ contains
 !             else if (bc_y_glb%end == -2) then
 !                   ms(i) = 2*ms(i)
 !                   ycom(i) = yend
-     !        else if (bc_z_glb%beg == -2) then
-     !             ms(i) = 2*ms(i)
-     !             zcom(i) = zbeg
-     !        else if (bc_z_glb%end == -2) then
-     !             ms(i) = 2*ms(i)
-     !             zcom(i) = zend
- !           end if
- !          else if (p == 0) then
-             xcom(i) = xm(i)/ms(i)
- !            ycom(i) = ym(i)/ms(i)
- !            if (bc_x_glb%beg == -2) then
- !                  ms(i) = 2*ms(i)
- !                  xcom(i) = xbeg
- !            else if (bc_x_glb%end == -2) then
- !                  ms(i) = 2*ms(i)
- !                  xcom(i) = xend
- !            else if (bc_y_glb%beg == -2) then
- !                  ms(i) = 2*ms(i)
- !                  ycom(i) = ybeg
- !            else if (bc_y_glb%end == -2) then
- !                  ms(i) = 2*ms(i)
- !                  ycom(i) = yend
- !            end if
- !         end if
-       end do
+            !        else if (bc_z_glb%beg == -2) then
+            !             ms(i) = 2*ms(i)
+            !             zcom(i) = zbeg
+            !        else if (bc_z_glb%end == -2) then
+            !             ms(i) = 2*ms(i)
+            !             zcom(i) = zend
+            !           end if
+            !          else if (p == 0) then
+            xcom(i) = xm(i)/ms(i)
+            !            ycom(i) = ym(i)/ms(i)
+            !            if (bc_x_glb%beg == -2) then
+            !                  ms(i) = 2*ms(i)
+            !                  xcom(i) = xbeg
+            !            else if (bc_x_glb%end == -2) then
+            !                  ms(i) = 2*ms(i)
+            !                  xcom(i) = xend
+            !            else if (bc_y_glb%beg == -2) then
+            !                  ms(i) = 2*ms(i)
+            !                  ycom(i) = ybeg
+            !            else if (bc_y_glb%end == -2) then
+            !                  ms(i) = 2*ms(i)
+            !                  ycom(i) = yend
+            !            end if
+            !         end if
+        end do
 
     end subroutine s_calculate_COM
-
-
 
     !>  The goal of this subroutine is to output the grid and
     !!      conservative variables data files for given time-step.
@@ -1391,52 +1376,52 @@ contains
     end subroutine s_write_parallel_data_files ! ---------------------------
 
     !>  This writes a formatted data file where the root processor
-    !!      can write out the CoM information    
+    !!      can write out the CoM information
     !!  @param t_step Current time-step
     !!  @param q_com Center of mass information
     !!  @param moments Higher moment information
-    subroutine s_write_com_files(t_step,c_mass) ! -------------------
+    subroutine s_write_com_files(t_step, c_mass) ! -------------------
 
-         integer, intent(in) :: t_step
-         real(kind(0d0)), dimension(num_fluids,5), intent(in) :: c_mass
-         integer :: i,j !< Generic loop iterator
-         real(kind(0d0)) :: nondim_time !< Non-dimensional time
+        integer, intent(in) :: t_step
+        real(kind(0d0)), dimension(num_fluids, 5), intent(in) :: c_mass
+        integer :: i, j !< Generic loop iterator
+        real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
-         ! Non-dimensional time calculation
-         if (t_step_old /= dflt_int) then
-              nondim_time = real(t_step + t_step_old,kind(0d0))*dt
-         else
-              nondim_time = real(t_step,kind(0d0))*dt
-         end if
+        ! Non-dimensional time calculation
+        if (t_step_old /= dflt_int) then
+            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+        else
+            nondim_time = real(t_step, kind(0d0))*dt
+        end if
 
-        if (proc_rank == 0) then   
+        if (proc_rank == 0) then
             if (n == 0) then ! 1D simulation
-                    do i = 1, num_fluids ! Loop through fluids
-                        write(i+120, '(6X,4F24.12)') &
-                          nondim_time, &
-                          c_mass(i,1), &
-                          c_mass(i,2), &
-                          c_mass(i,5) 
-                    end do
+                do i = 1, num_fluids ! Loop through fluids
+                    write (i + 120, '(6X,4F24.12)') &
+                        nondim_time, &
+                        c_mass(i, 1), &
+                        c_mass(i, 2), &
+                        c_mass(i, 5)
+                end do
             elseif (p == 0) then ! 2D simulation
-                    do i = 1, num_fluids ! Loop through fluids
-                        write(i+120, '(6X,5F24.12)') &
-                          nondim_time, &
-                          c_mass(i,1), &
-                          c_mass(i,2), &
-                          c_mass(i,3), &
-                          c_mass(i,5)
-                    end do
+                do i = 1, num_fluids ! Loop through fluids
+                    write (i + 120, '(6X,5F24.12)') &
+                        nondim_time, &
+                        c_mass(i, 1), &
+                        c_mass(i, 2), &
+                        c_mass(i, 3), &
+                        c_mass(i, 5)
+                end do
             else ! 3D simulation
-                    do i = 1, num_fluids ! Loop through fluids
-                        write(i+120, '(6X,6F24.12)') &
-                          nondim_time, &
-                          c_mass(i,1), &
-                          c_mass(i,2), &
-                          c_mass(i,3), &
-                          c_mass(i,4), &
-                          c_mass(i,5)
-                    end do
+                do i = 1, num_fluids ! Loop through fluids
+                    write (i + 120, '(6X,6F24.12)') &
+                        nondim_time, &
+                        c_mass(i, 1), &
+                        c_mass(i, 2), &
+                        c_mass(i, 3), &
+                        c_mass(i, 4), &
+                        c_mass(i, 5)
+                end do
             end if
         end if
     end subroutine s_write_com_files ! -------------------------------------
@@ -1498,7 +1483,7 @@ contains
         logical :: trigger !< For integral quantities
 
         ! Non-dimensional time calculation
-       if (time_stepper == 23) then
+        if (time_stepper == 23) then
             nondim_time = mytime
         else
             if (t_step_old /= dflt_int) then
@@ -1657,7 +1642,7 @@ contains
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
-                                               do s = 1, num_dims
+                        do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
@@ -1698,7 +1683,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                    ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                     end if
                 end if
@@ -1777,7 +1762,7 @@ contains
                     end do
                 end if
             end if
-           if (proc_rank == 0) then
+            if (proc_rank == 0) then
                 if (n == 0) then
                     if (bubbles .and. (num_fluids <= 2)) then
                         if (qbmm) then
@@ -1880,7 +1865,7 @@ contains
                             rho, &
                             vel(1), &
                             pres
-                        print*, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
+                        print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
                     write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
@@ -2068,33 +2053,28 @@ contains
 
     end subroutine s_close_run_time_information_file ! ---------------------
 
-
-    !> Closes communication files 
+    !> Closes communication files
     subroutine s_close_com_files() ! ---------------------------------------
 
-       integer :: i !< Generic loop iterator
-       do i = 1, num_fluids
-             close(i+120)
-       end do
+        integer :: i !< Generic loop iterator
+        do i = 1, num_fluids
+            close (i + 120)
+        end do
 
     end subroutine s_close_com_files ! -------------------------------------
 
     subroutine s_close_sim_data_file() ! -----------------------
 
+        ! Writing the footer of and closing the run-time information file
+        write (21519, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (21519, '(A)') ''
+        write (21519, '(A)') ''
+        write (21519, '(A)') '========================================'// &
+            '========================================'
+        close (21519)
 
-         ! Writing the footer of and closing the run-time information file
-         write (21519, '(A)') '----------------------------------------'// &
-             '----------------------------------------'
-         write (21519, '(A)') ''
-         write (21519, '(A)') ''
-         write (21519, '(A)') '========================================'// &
-             '========================================'
-         close (21519)
-
-     end subroutine s_close_sim_data_file !---------------------
-
-
-
+    end subroutine s_close_sim_data_file !---------------------
 
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------
@@ -2116,7 +2096,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        allocate(c_mass(1:num_fluids,1:5))
+        allocate (c_mass(1:num_fluids, 1:5))
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
@@ -2156,8 +2136,8 @@ contains
     subroutine s_finalize_data_output_module() ! ---------------------------
 
         integer :: i !< Generic loop iterator
-        
-        deallocate(c_mass)
+
+        deallocate (c_mass)
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE(icfl_sf)
