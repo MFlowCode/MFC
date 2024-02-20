@@ -27,6 +27,43 @@
   MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 </p>
 
+## Getting started
+
+You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
+Its rather straightforward.
+On MacOS, you can use [Homebrew](https://brew.sh) to install MFC's modest set of dependencies.
+Simply add the following to your `.bashrc` (or `.zshrc`)
+```console
+# === MFC MPI Installation ===
+export MFC_GCC_VER=11
+export OMPI_MPICC=gcc-$MFC_GCC_VER
+export OMPI_CXX=g++-$MFC_GCC_VER
+export OMPI_FC=gfortran-$MFC_GCC_VER
+export CC=gcc-$MFC_GCC_VER
+export CXX=g++-$MFC_GCC_VER
+export FC=gfortran-$MFC_GCC_VER
+# === MFC MPI Installation ===
+```
+then, from a new command line, issue
+```console
+brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
+HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
+```
+Now you're ready to build and test MFC!
+Clone it to a convenient directory via
+```console
+git clone https://github.com/mflowcode/MFC.git
+cd MFC
+```
+then build and test!
+```console
+./mfc.sh build -j 8
+./mfc.sh test -j 8
+```
+And you're done!
+You can learn more about MFC's capabilities in its documentation or play with the examples located in the `examples/` directory!
+
+
 ## Citation
 
 If you use MFC, consider citing it:
