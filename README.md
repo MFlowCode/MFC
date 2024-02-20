@@ -19,7 +19,7 @@
 <p align="justify">
   Welcome to the home of MFC!
   MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-  It scales __ideally to exascale__; tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like Oak Ridge Summit and Frontier.
+  It scales <b>ideally to exascale</b>; tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like Oak Ridge Summit and Frontier.
   MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
   We have an active Slack channel and development team.
