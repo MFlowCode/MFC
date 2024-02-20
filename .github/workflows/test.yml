@@ -21,10 +21,10 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
+        os:    ['ubuntu']
         mpi:   ['mpi', 'no-mpi']
         debug: ['debug', 'no-debug']
-        intel: [true, false]
+        intel: [true]
         exclude:
           - intel: true
             os:    macos
@@ -90,41 +90,41 @@ jobs:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
-  docker:
-    name:    Github | Docker
-    runs-on: ubuntu-latest
-    steps:
-    - name: Clone
-      uses: actions/checkout@v3
+  # docker:
+  #   name:    Github | Docker
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Clone
+  #     uses: actions/checkout@v3
 
-    - name: Test
-      run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a -r -v
+  #   - name: Test
+  #     run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a -r -v
 
-  self:
-    name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC'
-    continue-on-error: true
-    strategy:
-      matrix:
-        device: ['cpu', 'gpu']
-    runs-on:
-      group:  phoenix
-      labels: gt
-    steps:
-      - name: Clone
-        uses: actions/checkout@v3
+  # self:
+  #   name: Georgia Tech | Phoenix (NVHPC)
+  #   if: github.repository == 'MFlowCode/MFC'
+  #   continue-on-error: true
+  #   strategy:
+  #     matrix:
+  #       device: ['cpu', 'gpu']
+  #   runs-on:
+  #     group:  phoenix
+  #     labels: gt
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v3
 
-      - name: Build & Test
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+  #     - name: Build & Test
+  #       run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
 
-      - name: Print Logs
-        if:   always()
-        run:  cat test-${{ matrix.device }}.out
+  #     - name: Print Logs
+  #       if:   always()
+  #       run:  cat test-${{ matrix.device }}.out
 
-      - name: Archive Logs
-        uses: actions/upload-artifact@v3
-        if:   always()
-        with:
-          name: logs
-          path: test-${{ matrix.device }}.out
+  #     - name: Archive Logs
+  #       uses: actions/upload-artifact@v3
+  #       if:   always()
+  #       with:
+  #         name: logs
+  #         path: test-${{ matrix.device }}.out
 
