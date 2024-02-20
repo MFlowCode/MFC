@@ -31,12 +31,13 @@
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
-On MacOS, you can use [Homebrew](https://brew.sh) to install MFC's modest set of dependencies.
-From a command line, issue
+
+We'll give a brief intro. here for MacOS.
+Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```console
 brew install wget make python make cmake coreutils gcc openmpi
 ```
-Now you're ready to build and test MFC!
+You're now ready to build and test MFC!
 Clone it to a convenient directory via
 ```console
 git clone https://github.com/mflowcode/MFC.git
@@ -44,12 +45,9 @@ cd MFC
 ```
 then build and test!
 ```console
-export CC=gcc-13
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
-where `export CC=gcc-13` assumes installation of `gcc` version `13` and avoids the use of AppleClang.
-It can be moved to your `.bashrc` or similar.
 And... you're done!
 
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
