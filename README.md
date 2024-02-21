@@ -11,6 +11,9 @@
   <a href="https://github.com/MFlowCode/MFC/actions">
     <img src="https://github.com/MFlowCode/MFC/actions/workflows/test.yml/badge.svg" />
   </a>
+  <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
+    <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" />
+  </a>
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
   </a>
