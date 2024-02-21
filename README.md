@@ -19,16 +19,15 @@
   </a>
 </p>
 
-<p align="justify">
-  Welcome to the home of MFC!
-  MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-  It scales <b>ideally to exascale</b>; tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines, like Oak Ridge Summit and Frontier.
-  MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
+Welcome to the home of MFC!
+MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
+MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   
-  Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
-  We have an active Slack channel and development team.
-  MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
-</p>
+Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
+We have an active Slack channel and development team.
+MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
+
 
 ## An example
 
@@ -72,7 +71,7 @@ The shock-droplet interaction case above was run via
 where `8` is the number of cores the example will run on.
 You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
 
-## Is this _really_ exascale?
+## Is this really exascale
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
 The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
