@@ -72,6 +72,16 @@ The shock-droplet interaction case above was run via
 where `8` is the number of cores the example will run on.
 You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
 
+## Is this _really_ exascale?
+
+[OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
+The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
+
+<p align="center">
+    <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
+</p>
+
+
 ## What else can this thing do
 
 MFC has many features.
