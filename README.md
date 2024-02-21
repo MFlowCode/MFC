@@ -25,7 +25,7 @@ It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and 
 MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   
 Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
-We have an active Slack channel and development team.
+We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
 MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 
 
