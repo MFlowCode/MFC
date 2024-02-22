@@ -48,9 +48,14 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
                 srun --ntasks-per-node ${tasks_per_node}         \
                      ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                      "${target.get_install_binpath()}"
-        elif [ "$binary" == "mpirun" ] || [ "$binary" == "mpiexec" ]; then
+        elif [ "$binary" == "mpirun" ]; then
             ${' '.join([f"'{x}'" for x in profiler ])}              \
-                $binary -np ${nodes*tasks_per_node}                 \
+                mpirun -np ${nodes*tasks_per_node}                 \
+                        ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+                        "${target.get_install_binpath()}"
+        elif [ "$binary" == "mpiexec" ]; then
+            ${' '.join([f"'{x}'" for x in profiler ])}              \
+                mpiexec --ntasks=${nodes*tasks_per_node}                 \
                         ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                         "${target.get_install_binpath()}"
         fi
