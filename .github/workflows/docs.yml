@@ -35,6 +35,7 @@ jobs:
         cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
+    # From here https://github.com/cicirello/generate-sitemap
     - name: Generate the sitemap
       id: sitemap
       uses: cicirello/generate-sitemap@v1
