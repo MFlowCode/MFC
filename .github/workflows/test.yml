@@ -78,6 +78,8 @@ jobs:
           echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
           echo $(ifort --version)
           echo $(mpif90 --version)
+          echo $(which mpif90)
+          echo $(type mpif90)
 
       - name: Build
         run:  |
