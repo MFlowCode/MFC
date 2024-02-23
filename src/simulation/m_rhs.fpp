@@ -1197,7 +1197,7 @@ contains
                             end do
                         end do
                     else
-    
+
                         if (alt_soundspeed) then
                             do j = advxb, advxe
                                 if ((j == advxe) .and. (bubbles .neqv. .true.)) then
@@ -1471,9 +1471,9 @@ contains
     !     if (id == 1) then
 
     !     elseif (id == 2) then
-           
+
     !     elseif (id == 3) then
-            
+
     !     end if
 
     ! end subroutine s_compute_advection_source_term
