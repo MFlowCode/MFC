@@ -30,12 +30,12 @@ module m_global_parameters
 
     integer :: proc_rank !< Rank of the local processor
 
-    integer :: m
-    integer :: n
-    integer :: p !<
+    integer(8) :: m
+    integer(8) :: n
+    integer(8) :: p !<
     !! Number of cells in the x-, y- and z-coordinate directions
 
-    integer :: m_glb, n_glb, p_glb !<
+    integer(8) :: m_glb, n_glb, p_glb !<
     !! Global number of cells in each direction
 
     integer :: num_dims !< Number of spatial dimensions

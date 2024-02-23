@@ -51,7 +51,8 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer nm, nl, is1, is2, ierr
+        integer is1, is2, ierr
+        integer(8) nl, nm
         real(kind(0d0)), dimension(nm, nl) :: ar, ai, zr, zi
         real(kind(0d0)), dimension(nl) :: wr, wi, fv1, fv2, fv3
 
@@ -125,7 +126,8 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer i, j, k, l, ml, nl, jj, nm, igh, low, iexc
+        integer i, j, k, l, jj, igh, low, iexc
+        integer(8) nl, ml, nm
         real(kind(0d0)), dimension(nm, nl) :: ar, ai
         real(kind(0d0)), dimension(nl) :: scale
         real(kind(0d0)) :: c, f, g, r, s, b2, radix
@@ -295,7 +297,8 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer i, j, ml, nl, ii, jj, la, mp, nm, igh, kp1, low
+        integer i, j, ii, jj, la, mp, igh, kp1, low
+        integer(8) nl, ml, nm
         real(kind(0d0)), dimension(nm, nl) :: ar, ai
         real(kind(0d0)), dimension(igh) :: ortr, orti
         real(kind(0d0)) :: f, g, h, fi, fr, scale, c
@@ -460,8 +463,9 @@ contains
 !     this version dated october 1989.
 !
 !     ------------------------------------------------------------------
-        integer i, j, k, l, ml, nl, en, ii, jj, ll, nm, nn, igh, ip1, &
+        integer i, j, k, l, en, ii, jj, ll, nn, igh, ip1, &
             itn, its, low, lp1, enm1, iend, ierr
+        integer(8) nl, ml, nm
         real(kind(0d0)), dimension(nm, nl) :: hr, hi, zr, zi
         real(kind(0d0)), dimension(nl) :: wr, wi
         real(kind(0d0)), dimension(igh) :: ortr, orti
@@ -843,7 +847,8 @@ contains
 !
 !     ------------------------------------------------------------------
 !
-        integer i, j, k, ml, nl, ii, nm, igh, low
+        integer i, j, k, ii, igh, low
+        integer(8) nl, ml, nm
         double precision scale(nl), zr(nm, ml), zi(nm, ml)
         double precision s
 

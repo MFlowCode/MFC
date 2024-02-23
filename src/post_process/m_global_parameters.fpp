@@ -29,9 +29,9 @@ module m_global_parameters
 
     !> @name Number of cells in the x-, y- and z-coordinate directions
     !> @{
-    integer :: m, m_root
-    integer :: n
-    integer :: p
+    integer(8) :: m, m_root
+    integer(8) :: n
+    integer(8) :: p
     !> @}
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
@@ -42,7 +42,7 @@ module m_global_parameters
 
     !> @name Global number of cells in each direction
     !> @{
-    integer :: m_glb, n_glb, p_glb
+    integer(8) :: m_glb, n_glb, p_glb
     !> @}
 
     integer :: num_dims !< Number of spatial dimensions

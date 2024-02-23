@@ -556,7 +556,7 @@ contains
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(nl, wr, wi, zr, zi, alpha, beta, wave, shift)
-        integer nl
+        integer(8) nl
         real(kind(0d0)), dimension(0:nl - 1) :: wr, wi !< eigenvalues
         real(kind(0d0)), dimension(0:nl - 1, 0:nl - 1) :: zr, zi !< eigenvectors
         real(kind(0d0)), dimension(0:nl - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
