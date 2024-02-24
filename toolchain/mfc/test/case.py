@@ -218,7 +218,7 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("ib", 'F') == 'T':
             return 1e-10
 
-        return 5e-12
+        return 1e-12
 
 
 @dataclasses.dataclass
