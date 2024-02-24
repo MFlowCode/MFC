@@ -24,7 +24,7 @@ module m_qbmm
 
     implicit none
 
-    private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff
+    private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
 
@@ -410,6 +410,245 @@ contains
         !$acc update device(bubmoms)
 
     end subroutine s_initialize_qbmm_module
+
+    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
+
+        integer :: idir
+        integer :: i, j, k, l, q
+
+        real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var
+
+        if (idir == 1) then
+
+            !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+            if (.not. polytropic) then
+                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                do i = 1, nb
+                    do q = 1, nnode
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2)* &
+                                                            (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+
+                                    if (R2 - R**2d0 > 0d0) then
+                                        var = R2 - R**2d0
+                                    else
+                                        var = verysmall
+                                    end if
+
+                                    if (q <= 2) then
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+
+                                    else
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                    end if
+
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do q = 0, n
+                    do i = 0, m
+
+                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
+                        j = bubxb
+                        !$acc loop seq
+                        do k = 1, nb
+                            rhs_vf(j)%sf(i, q, l) = &
+                                rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
+                            rhs_vf(j + 1)%sf(i, q, l) = &
+                                rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)
+                            rhs_vf(j + 2)%sf(i, q, l) = &
+                                rhs_vf(j + 2)%sf(i, q, l) + mom_3d(0, 1, k)%sf(i, q, l)
+                            rhs_vf(j + 3)%sf(i, q, l) = &
+                                rhs_vf(j + 3)%sf(i, q, l) + mom_3d(2, 0, k)%sf(i, q, l)
+                            rhs_vf(j + 4)%sf(i, q, l) = &
+                                rhs_vf(j + 4)%sf(i, q, l) + mom_3d(1, 1, k)%sf(i, q, l)
+                            rhs_vf(j + 5)%sf(i, q, l) = &
+                                rhs_vf(j + 5)%sf(i, q, l) + mom_3d(0, 2, k)%sf(i, q, l)
+                            j = j + 6
+                        end do
+
+                    end do
+                end do
+            end do
+
+        elseif (idir == 2) then
+
+            !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+            if (.not. polytropic) then
+                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                do i = 1, nb
+                    do q = 1, nnode
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                    rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2)* &
+                                                            (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+
+                                    if (R2 - R**2d0 > 0d0) then
+                                        var = R2 - R**2d0
+                                    else
+                                        var = verysmall
+                                    end if
+
+                                    if (q <= 2) then
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+
+                                    else
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                    end if
+
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+        elseif (idir == 3) then
+
+            if (.not. polytropic) then
+                if (grid_geometry == 3) then
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
+                                        nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                        if (R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
+
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    do i = 1, nb
+                        do q = 1, nnode
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                        R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+
+                                        if (R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
+
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
+
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+
+        end if
+
+    end subroutine
 
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
