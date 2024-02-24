@@ -39,13 +39,13 @@ echo
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}"
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
     % else:
-        ${' '.join([f"'{x}'" for x in profiler ])}             \
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
             mpirun -np ${nodes*tasks_per_node}                 \
                    --bind-to none                              \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                   "${target.get_install_binpath()}"
+                   "${target.get_install_binpath()}")
     % endif
 
     ${helpers.run_epilogue(target)}
