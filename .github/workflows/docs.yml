@@ -24,7 +24,8 @@ jobs:
     # https://github.com/doxygen/doxygen/issues/9016
     - name: Build Doxygen
       run:  |
-        sudo apt install cmake ninja-build graphviz graphviz
+        sudo apt update -y
+        sudo apt install -y cmake ninja-build graphviz graphviz
         git clone https://github.com/doxygen/doxygen.git ../doxygen
         cmake -S ../doxygen -B ../doxygen/build -G Ninja
         sudo ninja -C ../doxygen/build install
