@@ -42,9 +42,7 @@ contains
         elseif (n == 0 .and. p > 0) then
             call s_mpi_abort('Unsupported choice of the combination of '// &
                              'values for n and p. Exiting ...')
-        elseif ((m + 1)*(n + 1)*(p + 1) &
-                < &
-                2**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
+        elseif (nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
             call s_mpi_abort('Unsupported choice of the combination of '// &
                              'values for num_procs, m, n and p. '// &
                              'Exiting ...')
@@ -97,9 +95,7 @@ contains
         elseif (p > 0 .and. p + 1 < weno_order) then
             call s_mpi_abort('Unsupported choice of the combination of '// &
                              'values for p and weno_order. Exiting ...')
-        elseif ((m + 1)*(n + 1)*(p + 1) &
-                < &
-                weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
+        elseif (nGlobal < weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
             then
             call s_mpi_abort('Unsupported choice of the combination of '// &
                              'values for num_procs, m, n, p and '// &

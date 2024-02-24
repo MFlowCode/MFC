@@ -41,7 +41,7 @@ print(json.dumps({
     # Correct errors when computing speed of sound
     'mixture_err'                  : 'T',
     # Use TVD RK3 for time marching
-    'time_stepper'                 : 1,
+    'time_stepper'                 : 3,
     # Use WENO5
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
