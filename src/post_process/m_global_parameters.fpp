@@ -34,6 +34,8 @@ module m_global_parameters
     integer :: p
     !> @}
 
+    integer(8) :: nGlobal ! Total number of cells in global domain
+
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
     logical :: cyl_coord
