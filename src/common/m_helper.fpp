@@ -132,6 +132,31 @@ contains
 
     end subroutine s_comp_n_from_cons
 
+    ! Compute the bubble volume fraction alpha from the bubble number density n
+        !! @param q_cons_vf is the conservative variable
+        !! @param weights is the Simpson weights for quadrature
+    subroutine s_comp_alpha_from_n(q_cons_vf, weights)
+        !$acc routine seq
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        real(kind(0d0)), dimension(nb) :: weights
+        real(kind(0d0)) :: nR3bar
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    nR3bar = 0d0
+                    !$acc loop seq
+                    do i = 1, nb
+                        nR3bar = nR3bar + weights(i)*(q_cons_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
+                    end do
+                    q_cons_vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_vf(n_idx)%sf(j, k, l)**2)
+                end do
+            end do
+        end do
+
+    end subroutine s_comp_alpha_from_n
+
     subroutine s_print_2D_array(A, div)
 
         real(kind(0d0)), dimension(:, :) :: A

@@ -29,6 +29,8 @@ module m_time_steppers
 
     use m_boundary_conditions
 
+    use m_helper
+
     use m_fftw
 
     use m_nvtx
@@ -315,27 +317,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n .and. alter_alpha) then
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        do i = 1, nb
-                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j, k, l, i, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
-                                error stop "R < 0"
-                            end if
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -442,27 +424,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) then
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        do i = 1, nb
-                            if (q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j, k, l, i, q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l)
-                                error stop "R < 0"
-                            end if
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -533,27 +495,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) then
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        do i = 1, nb
-                            if (q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l) < 0) then
-                                print *, j, k, l, i, q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l)
-                                error stop "R < 0"
-                            end if
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -662,25 +604,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        !$acc loop seq
-                        do i = 1, nb
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -752,25 +676,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        !$acc loop seq
-                        do i = 1, nb
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(2)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(2)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(2)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -841,25 +747,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        nR3bar = 0d0
-                        !$acc loop seq
-                        do i = 1, nb
-                            if (polytropic) then
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            else
-                                nR3bar = nR3bar + weight(i)*(q_cons_ts(1)%vf(bub_idx%rs(i))%sf(j, k, l))**3d0
-                            end if
-                        end do
-                        q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_ts(1)%vf(n_idx)%sf(j, k, l)**2)
-                    end do
-                end do
-            end do
-        end if
+        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
