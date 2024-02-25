@@ -160,6 +160,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if

@@ -26,6 +26,15 @@ module m_bubbles
     real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
     !$acc declare create(chi_vw, k_mw, rho_mw)
 
+    !> @name Bubble dynamic source terms
+    !> @{
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
+    !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+
+    type(scalar_field) :: divu !< matrix for div(u)
+    !$acc declare create(divu)
+
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
     !$acc declare create(rs, vs, ms, ps)
 
@@ -34,6 +43,15 @@ contains
     subroutine s_initialize_bubbles_module()
 
         integer :: i, j, k, l, q
+        type(int_bounds_info) :: ix, iy, iz
+
+        ! Configuring Coordinate Direction Indexes =========================
+        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+
+        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ! ==================================================================
 
         @:ALLOCATE(rs(1:nb))
         @:ALLOCATE(vs(1:nb))
@@ -56,6 +74,69 @@ contains
             !$acc update device(ps, ms)
         end if
 
+        @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+
+        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+
+    end subroutine
+
+    subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer :: idir
+        integer :: i, j, k, l, q
+
+        if (idir == 1) then
+
+            if (.not. qbmm) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            divu%sf(j, k, l) = 0d0
+                            divu%sf(j, k, l) = &
+                                5d-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                            q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+
+                        end do
+                    end do
+                end do
+            end if
+
+        elseif (idir == 2) then
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        divu%sf(j, k, l) = divu%sf(j, k, l) + &
+                                           5d-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                                       q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+
+                    end do
+                end do
+            end do
+
+        elseif (idir == 3) then
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        divu%sf(j, k, l) = divu%sf(j, k, l) + &
+                                           5d-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                                       q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+
+                    end do
+                end do
+            end do
+
+        end if
+
     end subroutine
 
     !>  The purpose of this procedure is to compute the source terms
@@ -68,20 +149,12 @@ contains
         !!  @param bub_v_src   Bubble velocity equation source
         !!  @param bub_p_src   Bubble pressure equation source
         !!  @param bub_m_src   Bubble mass equation source
-    subroutine s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                       q_cons_vf, q_prim_vf, t_step, id, rhs_vf)
+    subroutine s_compute_bubble_source(nbub, q_cons_vf, q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(scalar_field), intent(IN) :: divu
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub
         integer, intent(IN) :: t_step, id
-
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: bub_adv_src
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb), intent(INOUT) :: bub_r_src, &
-                                                                          bub_v_src, &
-                                                                          bub_p_src, &
-                                                                          bub_m_src
 
         real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
