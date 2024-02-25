@@ -18,6 +18,7 @@ module m_helper
     private; public :: s_compute_finite_difference_coefficients, &
  s_comp_n_from_prim, &
  s_comp_n_from_cons, &
+ s_comp_alpha_from_n, &
  s_initialize_nonpoly, &
  s_simpson, &
  s_transcoeff, &
@@ -136,10 +137,10 @@ contains
         !! @param q_cons_vf is the conservative variable
         !! @param weights is the Simpson weights for quadrature
     subroutine s_comp_alpha_from_n(q_cons_vf, weights)
-        !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         real(kind(0d0)), dimension(nb) :: weights
         real(kind(0d0)) :: nR3bar
+        integer(kind(0d0)) :: i, j, k, l
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p

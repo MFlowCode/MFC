@@ -317,7 +317,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -424,7 +424,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -495,7 +495,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -604,7 +604,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -676,7 +676,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(2)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -747,7 +747,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_compute_alpha_from_n(q_cons_ts(1)%vf,weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -809,8 +809,7 @@ contains
         call s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
 
         ! Compute bubble source
-        call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                     q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
+        call s_compute_bubble_source(nbub, q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
 
         ! Update bubble variables
         !$acc parallel loop collapse(4) gang vector default(present)
