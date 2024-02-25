@@ -271,7 +271,43 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 
 - 'model%scale', 'model%rotate` and `model%translate` define how the model should be transformed to domain-space by first scaling by `model%scale`, then rotating about the Z, X, and Y axes (using `model%rotate`), and finally translating by `model%translate`.
 
-### 4. Fluid Material’s
+### 4. Immersed Boundary Patches
+
+| Parameter            | Type    | Analytical Definition Description |
+| ---:                 | :----:  | :----:                | 
+| `geometry`             | Integer | Geometry configuration of the patch.|
+| `x[y,z]_centroid`      | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
+| `length_x[y,z]`        | Real    | Length, if applicable, in the [x,y,z]-direction. |
+| `radius`               | Real    | Radius, if applicable, of the applied geometry. |
+| `theta`                | Real    | Angle of attach applied to airfoil IB patches |
+| `c`                    | Real    | 
+| `t`                    | Real    |
+| `m`                    | Real    | 
+| `p`                    | Real    |
+| `slip`                 | Logical | Apply a slip boundary |
+
+These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
+
+#### Parameter Descriptions
+
+- `geometry` defines the type of geometry of a patch with an integer number.
+Definitions for currently implemented patch types are list in table [Immersed Boundary Patch Type](#immersed-boundary-patch-types)
+
+- `x[y,z]_centroid` is the centroid location of the patch in the x[y,z]-direction
+
+- `length_x[y,z]` is the length of the patch in the x[y,z]-direction.
+
+- `radius` is the radius to be used for circular patches.
+
+- `theta` allows for the angle of attach of airfoil patches to be changed.
+
+- `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
+`m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
+Additional details on this specification can be found in [The Naca Airfoil Series](https://web.stanford.edu/~cantwell/AA200_Course_Material/The%20NACA%20airfoil%20series.pdf)
+
+- `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
+
+### 5. Fluid Material’s
 
 | Parameter | Type   | Description                                    |
 | ---:      | :----: |          :---                                  |
@@ -301,7 +337,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 
 - `fluid_pp(i)%cv`, `fluid_pp(i)%qv`, and `fluid_pp(i)%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
-### 5. Simulation Algorithm
+### 6. Simulation Algorithm
 
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
@@ -399,7 +435,7 @@ If this option is false, velocity gradient is computed using finite difference s
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
 
-### 6. Formatted Output
+### 7. Formatted Output
 
 | Parameter            | Type    | Description                                    |
 | ---:                 | :----:  |          :---                                  |
@@ -457,7 +493,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
 
-### 7. Acoustic Source
+### 8. Acoustic Source
 
 | Parameter                | Type    | Description |
 | ---:                     | :----:  | :--- |
@@ -502,7 +538,7 @@ There are a few additional spatial support types available for special source ty
 - `Mono(i)%support_width` defines how many cell width the monopole support function extended by.
 Large `Mono(i)%support_width` is preferred when `Mono(i)%mag` is large.
 
-### 8. Ensemble-Averaged Bubble Model
+### 9. Ensemble-Averaged Bubble Model
 
 | Parameter      | Type    | Description                                    |
 | ---:           | :----:  |          :---                                  |
@@ -578,7 +614,7 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 - `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.  
 
-### 9. Velocity Field Setup
+### 10. Velocity Field Setup
 
 | Parameter           | Type    | Description |
 | ---:                | :----:  | :--- |
@@ -608,7 +644,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 - `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile.
 This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and `vel_profile = TRUE`.
 
-### 10. Phase Change Model
+### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `relax`                | Logical | Activates Phase Change model |
@@ -690,6 +726,19 @@ The patch types supported by the MFC are listed in table [Patch Types](#patch-ty
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
+
+### Immersed Boundary Patch Types
+
+| #    | Name               | Dim.   | 
+| ---: | :----:             | :---  | 
+| 2    | 2D Circle          | 2      | 
+| 3    | 2D Rectangle       | 2      |   
+| 4    | 2D Airfoil         | 2      |      
+| 8    | 3D Sphere          | 3      |      
+| 10   | 3D Cylinder        | 3      |      
+| 11   | 3D Airfoil         | 3      |      
+
+
 
 ### Monopole supports
 
