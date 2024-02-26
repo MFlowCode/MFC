@@ -34,16 +34,19 @@ cd "${MFC_ROOTDIR}"
 cd - > /dev/null
 echo
 
+# Fixes Delta not being able to find core library file
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-22.11/openmpi-4.1.5-nzb4n4r/lib/
+
 % for target in targets:
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}"
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
     % else:
-        ${' '.join([f"'{x}'" for x in profiler ])}             \
-            mpirun -np ${nodes*tasks_per_node} \
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
+            mpirun -np ${nodes*tasks_per_node}                 \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                   "${target.get_install_binpath()}"
+                   "${target.get_install_binpath()}")
     % endif
 
     ${helpers.run_epilogue(target)}
