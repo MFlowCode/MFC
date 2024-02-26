@@ -42,7 +42,7 @@ jobs:
       uses: cicirello/generate-sitemap@v1
       with:
         base-url-path: https://mflowcode.github.io/
-        path-to-root: build/install/docs
+        path-to-root: build/install/docs/mfc
         include-pdf: false
         sitemap-format: txt
 
