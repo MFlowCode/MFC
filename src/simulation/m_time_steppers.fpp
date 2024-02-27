@@ -317,7 +317,9 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -424,7 +426,9 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -495,7 +499,9 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -604,7 +610,9 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -676,7 +684,9 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf, weight)
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
+        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -746,8 +756,10 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
+        
+        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf, weight)
+        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -775,22 +787,15 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step, time_avg, pb, mv) ! ------------------------
+    subroutine s_adaptive_dt_bubble(t_step, time_avg, pb, mv, dt_in) ! ------------------------
 
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
-
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: bub_adv_src
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, 1:nb) :: bub_r_src, &
-                                                           bub_v_src, &
-                                                           bub_p_src, &
-                                                           bub_m_src
-        type(scalar_field) :: divu
+        real(kind(0d0)), intent(IN) :: dt_in
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
-
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
 
-        integer :: j, k, l, q !< Generic loop iterator
+        integer :: i, j, k, l, q !< Generic loop iterator
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp  !<
 
@@ -798,7 +803,7 @@ contains
 
         ! Compute q_prim from q_cons
         ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ix%end = m; iy%end = n; iz%end = p
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
@@ -806,7 +811,18 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
 
-        call s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
+        ! call s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        rhs_vf(i)%sf(j, k, l) = 0d0
+                    end do
+                end do
+            end do
+        end do
 
         ! Compute bubble source
         call s_compute_bubble_source(nbub, q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
@@ -818,9 +834,9 @@ contains
                 do j = ix%beg, ix%end
                     do q = 1, nb
                         q_cons_ts(1)%vf(bub_idx%rs(q))%sf(j, k, l) = &
-                            bub_r_src(j, k, l, q)
+                            rhs_vf(rs(q))%sf(j, k, l)
                         q_cons_ts(1)%vf(bub_idx%vs(q))%sf(j, k, l) = &
-                            bub_v_src(j, k, l, q)
+                            rhs_vf(vs(q))%sf(j, k, l)
                     end do
                 end do
             end do
@@ -845,13 +861,13 @@ contains
         call nvtxStartRange("Operator_splitting")
 
         ! Stage 1 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, dt/2)
+        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         ! Stage 2 of 3 =====================================================
-        call s_adaptive_dt_bubble(t_step, time_avg, pb_ts(1)%sf, mv_ts(1)%sf)
+        call s_adaptive_dt_bubble(t_step, time_avg, pb_ts(1)%sf, mv_ts(1)%sf, 0.5d0*dt)
 
         ! Stage 3 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, dt/2)
+        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         call nvtxEndRange
 

@@ -11,6 +11,10 @@ module m_helper
 
     use m_global_parameters    !< Definitions of the global parameters
 
+    use m_mpi_common           !< MPI modules
+
+    use ieee_arithmetic        !< For checking NaN
+
     ! ==========================================================================
 
     implicit none
@@ -30,6 +34,7 @@ module m_helper
  f_cross, &
  f_create_transform_matrix, &
  f_create_bbox, &
+ s_bubble_checker, &
  s_print_2D_array
 
 contains
@@ -135,10 +140,8 @@ contains
 
     ! Compute the bubble volume fraction alpha from the bubble number density n
         !! @param q_cons_vf is the conservative variable
-        !! @param weights is the Simpson weights for quadrature
-    subroutine s_comp_alpha_from_n(q_cons_vf, weights)
+    subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0d0)), dimension(nb) :: weights
         real(kind(0d0)) :: nR3bar
         integer(kind(0d0)) :: i, j, k, l
 
@@ -149,14 +152,30 @@ contains
                     nR3bar = 0d0
                     !$acc loop seq
                     do i = 1, nb
-                        nR3bar = nR3bar + weights(i)*(q_cons_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
+                        nR3bar = nR3bar + weight(i)*(q_cons_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                     end do
-                    q_cons_vf(alf_idx)%sf(j, k, l) = (4*pi*nR3bar)/(3*q_cons_vf(n_idx)%sf(j, k, l)**2)
+                    q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
                 end do
             end do
         end do
 
     end subroutine s_comp_alpha_from_n
+
+    ! Check if void fraction or nR has negative value which is non-physical
+        !! @param q_cons_vf is the conservative variable
+    subroutine s_bubble_checker(q_cons_vf)
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        integer :: i !< Generic loop iterator
+
+        !$acc loop seq
+        do i = 1, nb
+            if (any(q_cons_vf(bub_idx%rs(i))%sf < 0d0)) call s_mpi_abort("nR < 0")
+            if (any(ieee_is_nan(q_cons_vf(bub_idx%rs(i))%sf))) call s_mpi_abort("nR is NaN")
+        end do
+        if (any(q_cons_vf(alf_idx)%sf < 0d0)) call s_mpi_abort("alpha_b < 0")
+        if (any(ieee_is_nan(q_cons_vf(alf_idx)%sf))) call s_mpi_abort("alpha_b is NaN")
+
+    end subroutine s_bubble_checker
 
     subroutine s_print_2D_array(A, div)
 

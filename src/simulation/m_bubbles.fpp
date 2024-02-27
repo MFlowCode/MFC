@@ -209,14 +209,18 @@ contains
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                     end do
 
-                    R3 = 0d0
+                    if (adv_n .and. alter_alpha) then 
+                        nbub(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
+                    else 
+                        R3 = 0d0
 
-                    !$acc loop seq
-                    do q = 1, nb
-                        R3 = R3 + weight(q)*Rtmp(q)**3.d0
-                    end do
+                        !$acc loop seq
+                        do q = 1, nb
+                            R3 = R3 + weight(q)*Rtmp(q)**3.d0
+                        end do
 
-                    nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                        nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                    end if
 
                     R2Vav = 0d0
 
@@ -319,14 +323,14 @@ contains
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2)/h0
+                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2d0)/h0
 
                             ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
                             !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
                             if (max(d1, d2) < 1e-15) then
                                 h1 = max(1e-6, h0*1e-3)
                             else
-                                h1 = (0.01/max(d1, d2))**(1/3d0)
+                                h1 = (0.01/max(d1, d2))**(1d0/3d0)
                             end if
 
                             ! Set h = min(100*h0,h1)
@@ -340,7 +344,6 @@ contains
                                     h = dt - t_new
                                 end if
 
-                                ii = 1
                                 ! Advancing one sub-step
                                 do while (.true.)
                                     ! Advance one sub-step and evaluate the error
@@ -359,15 +362,15 @@ contains
                                     myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
-                                    myR_tmp(3) = myR_tmp(1) + (h/4)*(myV_tmp(1) + myV_tmp(2))
-                                    myV_tmp(3) = myV_tmp(1) + (h/4)*(myA_tmp(1) + myA_tmp(2))
+                                    myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
+                                    myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
 
                                     ! Stage 3
                                     myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
-                                    myR_tmp(4) = myR + (h/6)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
-                                    myV_tmp(4) = myV + (h/6)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
+                                    myR_tmp(4) = myR + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
+                                    myV_tmp(4) = myV + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
 
                                     ! Stage 4
                                     myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
@@ -379,28 +382,28 @@ contains
                                             /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
                                     err_V = (-5*h/24)*(myA_tmp(2) + myA_tmp(3) - 2*myA_tmp(4)) &
                                             /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-                                    err = DSQRT((err_R**2 + err_V**2)/2)/1e-2 ! Rtol = 1e-2
+                                    err = DSQRT((err_R**2 + err_V**2)/2d0)/1e-2 ! Rtol = 1e-2
 
                                     ! Determine acceptance/rejection and update step size
-                                    if ((err <= 1 + 1e-5) .and. myR_tmp(4) > 0) then
+                                    if ((err <= 1d0) .and. myR_tmp(4) > 0d0) then
                                         ! Accepted. Finalize the sub-step
                                         myR = myR_tmp(4)
                                         myV = myV_tmp(4)
                                         t_new = t_new + h
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2d0, max(0.5d0, (1/err)**(1/3d0)))
+                                        h = h*min(2d0, max(0.5d0, (1d0/err)**(1d0/3d0)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
                                         if (myR_tmp(4) > 0) then
-                                            h = h*min(2d0, max(0.5d0, (1d0/err)**(1/3d0)))
+                                            h = h*min(2d0, max(0.5d0, (1d0/err)**(1d0/3d0)))
                                         else
-                                            h = 0.5*h
+                                            h = 0.5d0*h
                                         end if
                                     end if
-                                    ii = ii + 1
+
                                     if (h < h_min) h_min = h
                                 end do
 
@@ -419,15 +422,15 @@ contains
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
                         end if
 
-                        if (alf < 1.d-11) then
-                            bub_adv_src(j, k, l) = 0d0
-                            bub_r_src(j, k, l, q) = 0d0
-                            bub_v_src(j, k, l, q) = 0d0
-                            if (.not. polytropic) then
-                                bub_p_src(j, k, l, q) = 0d0
-                                bub_m_src(j, k, l, q) = 0d0
-                            end if
-                        end if
+                        ! if (alf < 1.d-11) then
+                            ! bub_adv_src(j, k, l) = 0d0
+                            ! bub_r_src(j, k, l, q) = 0d0
+                            ! bub_v_src(j, k, l, q) = 0d0
+                            ! if (.not. polytropic) then
+                            !     bub_p_src(j, k, l, q) = 0d0
+                            !     bub_m_src(j, k, l, q) = 0d0
+                            ! end if
+                        ! end if
                     end do
                 end do
             end do
@@ -437,18 +440,26 @@ contains
         do l = 0, p
             do q = 0, n
                 do i = 0, m
-                    rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
-                    if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
-                        rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
-                    !$acc loop seq
-                    do k = 1, nb
-                        rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
-                        rhs_vf(vs(k))%sf(i, q, l) = rhs_vf(vs(k))%sf(i, q, l) + bub_v_src(i, q, l, k)
-                        if (polytropic .neqv. .true.) then
-                            rhs_vf(ps(k))%sf(i, q, l) = rhs_vf(ps(k))%sf(i, q, l) + bub_p_src(i, q, l, k)
-                            rhs_vf(ms(k))%sf(i, q, l) = rhs_vf(ms(k))%sf(i, q, l) + bub_m_src(i, q, l, k)
-                        end if
-                    end do
+                    if (adap_dt) then
+                        !$acc loop seq
+                        do k = 1, nb
+                            rhs_vf(rs(k))%sf(i, q, l) = bub_r_src(i, q, l, k)
+                            rhs_vf(vs(k))%sf(i, q, l) = bub_v_src(i, q, l, k)
+                        end do
+                    else
+                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
+                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
+                            rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+                        !$acc loop seq
+                        do k = 1, nb
+                            rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
+                            rhs_vf(vs(k))%sf(i, q, l) = rhs_vf(vs(k))%sf(i, q, l) + bub_v_src(i, q, l, k)
+                            if (polytropic .neqv. .true.) then
+                                rhs_vf(ps(k))%sf(i, q, l) = rhs_vf(ps(k))%sf(i, q, l) + bub_p_src(i, q, l, k)
+                                rhs_vf(ms(k))%sf(i, q, l) = rhs_vf(ms(k))%sf(i, q, l) + bub_m_src(i, q, l, k)
+                            end if
+                        end do
+                    end if 
                 end do
             end do
         end do

@@ -65,8 +65,6 @@ module m_start_up
 
     use m_ibm
 
-    use m_helper
-
     use m_compile_specific
 
     use m_checker
