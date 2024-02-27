@@ -858,7 +858,7 @@ contains
 
         call cpu_time(start)
 
-        call nvtxStartRange("Operator_splitting")
+        call nvtxStartRange("Time_Step")
 
         ! Stage 1 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)

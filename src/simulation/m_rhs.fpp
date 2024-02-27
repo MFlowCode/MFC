@@ -695,7 +695,6 @@ contains
 
             if (all(Re_size == 0)) then
                 iv%beg = 1; iv%end = sys_size
-                !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
