@@ -209,9 +209,9 @@ contains
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                     end do
 
-                    if (adv_n .and. alter_alpha) then 
+                    if (adv_n .and. alter_alpha) then
                         nbub(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
-                    else 
+                    else
                         R3 = 0d0
 
                         !$acc loop seq
@@ -423,13 +423,13 @@ contains
                         end if
 
                         ! if (alf < 1.d-11) then
-                            ! bub_adv_src(j, k, l) = 0d0
-                            ! bub_r_src(j, k, l, q) = 0d0
-                            ! bub_v_src(j, k, l, q) = 0d0
-                            ! if (.not. polytropic) then
-                            !     bub_p_src(j, k, l, q) = 0d0
-                            !     bub_m_src(j, k, l, q) = 0d0
-                            ! end if
+                        ! bub_adv_src(j, k, l) = 0d0
+                        ! bub_r_src(j, k, l, q) = 0d0
+                        ! bub_v_src(j, k, l, q) = 0d0
+                        ! if (.not. polytropic) then
+                        !     bub_p_src(j, k, l, q) = 0d0
+                        !     bub_m_src(j, k, l, q) = 0d0
+                        ! end if
                         ! end if
                     end do
                 end do
@@ -459,7 +459,7 @@ contains
                                 rhs_vf(ms(k))%sf(i, q, l) = rhs_vf(ms(k))%sf(i, q, l) + bub_m_src(i, q, l, k)
                             end if
                         end do
-                    end if 
+                    end if
                 end do
             end do
         end do
