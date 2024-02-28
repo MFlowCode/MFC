@@ -268,9 +268,9 @@ contains
 
                                 call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
                             end if
-
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-
+                        else if (i == n_idx .and. adv_n .and. bubbles) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
