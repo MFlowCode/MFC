@@ -1,18 +1,18 @@
-This file was created on 2024-02-27 19:27:49.855695.
+This file was created on 2023-12-26 16:10:53.041331.
 
 mfc.sh:
 
-    Invocation: test -j 16 --generate -- -c richardson
+    Invocation: test --generate -o 6249EDDE
     Lock:       mpi=Yes & gpu=No & debug=No
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on richardson.cluster
+        CMake v3.26.2 on ipsec-10-2-65-18.vpn.gatech.edu
     
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -24,94 +24,61 @@ pre_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++
+        OMPI_FC  : gfortran
 
-syscheck:
+documentation:
 
     CMake Configuration:
     
-        CMake v3.25.2 on richardson.cluster
+        CMake v3.26.2 on ipsec-10-2-192-132.vpn.gatech.edu
     
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on richardson.cluster
-    
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
         SYSCHECK      : OFF
-        DOCUMENTATION : OFF
+        DOCUMENTATION : ON
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : /opt/homebrew/bin/doxygen
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++
+        OMPI_FC  : gfortran
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.25.2 on richardson.cluster
+        CMake v3.26.2 on ipsec-10-2-65-18.vpn.gatech.edu
     
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -123,45 +90,93 @@ simulation:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
         OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+        OMPI_CXX : g++
+        OMPI_FC  : gfortran
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.26.2 on ipsec-10-2-65-18.vpn.gatech.edu
+    
+        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
+        OMPI_CC  : 
+        OMPI_CXX : g++
+        OMPI_FC  : gfortran
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.26.2 on ipsec-10-2-65-18.vpn.gatech.edu
+    
+        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
+        OMPI_CC  : 
+        OMPI_CXX : g++
+        OMPI_FC  : gfortran
 
 CPU:
 
-    CPU Info:
-    From lscpu
-    Architecture:          x86_64
-    CPU op-mode(s):        32-bit, 64-bit
-    Byte Order:            Little Endian
-    CPU(s):                16
-    On-line CPU(s) list:   0-15
-    Thread(s) per core:    1
-    Core(s) per socket:    8
-    Socket(s):             2
-    NUMA node(s):          2
-    Vendor ID:             GenuineIntel
-    CPU family:            6
-    Model:                 63
-    Model name:            Intel(R) Xeon(R) CPU E5-2630 v3 @ 2.40GHz
-    Stepping:              2
-    CPU MHz:               2599.968
-    BogoMIPS:              4793.77
-    Virtualization:        VT-x
-    L1d cache:             32K
-    L1i cache:             32K
-    L2 cache:              256K
-    L3 cache:              20480K
-    NUMA node0 CPU(s):     0-7
-    NUMA node1 CPU(s):     8-15
+    CPU Info: 
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M2
 
