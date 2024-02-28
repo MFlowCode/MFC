@@ -84,6 +84,46 @@ contains
 
     end subroutine
 
+    !> Bubble source part in Strang operator splitting shceme
+        !! @param q_cons_vf conservative variables
+    subroutine s_adaptive_dt_bubble(t_step, q_cons_vf, q_prim_vf, rhs_vf) ! ------------------------
+
+        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf, rhs_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
+
+        integer :: i, j, k, l, q !< Generic loop iterator
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
+                        rhs_vf(i)%sf(j, k, l) = 0d0
+                    end do
+                end do
+            end do
+        end do
+
+        ! Compute bubble source
+        call s_compute_bubble_source(nbub, q_cons_vf(1:sys_size), q_prim_vf(1:sys_size), t_step, rhs_vf)
+
+        ! Update bubble variables
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, nb
+                        q_cons_vf(rs(i))%sf(j, k, l) = rhs_vf(rs(i))%sf(j, k, l)
+                        q_cons_vf(vs(i))%sf(j, k, l) = rhs_vf(vs(i))%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_adaptive_dt_bubble ! ------------------------------
+
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -149,12 +189,12 @@ contains
         !!  @param bub_v_src   Bubble velocity equation source
         !!  @param bub_p_src   Bubble pressure equation source
         !!  @param bub_m_src   Bubble mass equation source
-    subroutine s_compute_bubble_source(nbub, q_cons_vf, q_prim_vf, t_step, id, rhs_vf)
+    subroutine s_compute_bubble_source(nbub, q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub
-        integer, intent(IN) :: t_step, id
+        integer, intent(IN) :: t_step
 
         real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
@@ -198,7 +238,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, nbub)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -235,7 +275,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp, nbub)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

@@ -785,65 +785,6 @@ contains
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
 
-    !> 3rd order TVD RK time-stepping algorithm
-        !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step, time_avg, pb, mv, dt_in) ! ------------------------
-
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-
-        integer :: i, j, k, l, q !< Generic loop iterator
-        type(int_bounds_info) :: ix, iy, iz
-        type(vector_field) :: gm_alpha_qp  !<
-
-        integer :: id
-
-        ! Compute q_prim from q_cons
-        ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m; iy%end = n; iz%end = p
-
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_prim_vf, &
-            gm_alpha_qp%vf, &
-            ix, iy, iz)
-
-        ! call s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
-
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
-                        rhs_vf(i)%sf(j, k, l) = 0d0
-                    end do
-                end do
-            end do
-        end do
-
-        ! Compute bubble source
-        call s_compute_bubble_source(nbub, q_cons_ts(1)%vf(1:sys_size), q_prim_vf(1:sys_size), t_step, id, rhs_vf)
-
-        ! Update bubble variables
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
-                    do q = 1, nb
-                        q_cons_ts(1)%vf(bub_idx%rs(q))%sf(j, k, l) = &
-                            rhs_vf(rs(q))%sf(j, k, l)
-                        q_cons_ts(1)%vf(bub_idx%vs(q))%sf(j, k, l) = &
-                            rhs_vf(vs(q))%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_adaptive_dt_bubble ! ------------------------------
-
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for
         !!      the source term
@@ -856,6 +797,9 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp
+
         call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
@@ -864,7 +808,16 @@ contains
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         ! Stage 2 of 3 =====================================================
-        call s_adaptive_dt_bubble(t_step, time_avg, pb_ts(1)%sf, mv_ts(1)%sf, 0.5d0*dt)
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        call s_adaptive_dt_bubble(t_step, q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
 
         ! Stage 3 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)

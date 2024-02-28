@@ -1434,7 +1434,6 @@ contains
                                                                                            q_cons_qp%vf(1:sys_size), &
                                                                                            q_prim_qp%vf(1:sys_size), &
                                                                                            t_step, &
-                                                                                           num_dims, &
                                                                                            rhs_vf)
         call nvtxEndRange
         ! END: Additional pphysics and source terms ============================
