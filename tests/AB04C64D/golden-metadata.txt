@@ -1,8 +1,8 @@
-This file was created on 2024-02-27 19:42:56.802113.
+This file was created on 2024-02-27 21:06:03.591029.
 
 mfc.sh:
 
-    Invocation: test -j 16 --generate -- -c richardson
+    Invocation: test --generate -j 16 -- -c richardson
     Lock:       mpi=Yes & gpu=No & debug=No
 
 pre_process:
@@ -71,7 +71,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -81,8 +81,8 @@ post_process:
         Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -104,7 +104,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -114,8 +114,8 @@ simulation:
         Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -155,7 +155,7 @@ CPU:
     Model:                 63
     Model name:            Intel(R) Xeon(R) CPU E5-2630 v3 @ 2.40GHz
     Stepping:              2
-    CPU MHz:               1200.093
+    CPU MHz:               1200.000
     BogoMIPS:              4793.77
     Virtualization:        VT-x
     L1d cache:             32K
