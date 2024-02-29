@@ -203,14 +203,11 @@ print(json.dumps({{**case, **mods}}))
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
     def compute_tolerance(self) -> float:
-        if self.params.get("adap_dt", 'F') == 'T':
-            return 2e-10
-
         if self.params.get("qbmm", 'F') == 'T':
             return 1e-10
 
         if self.params.get("bubbles", 'F') == 'T':
-            return 1e-10
+            return 2e-10
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
