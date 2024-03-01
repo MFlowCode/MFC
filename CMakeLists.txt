@@ -470,8 +470,12 @@ if (MFC_DOCUMENTATION)
 
     macro(GEN_DOCS target name)
         set(DOXYGEN_PROJECT_NAME     "\"${name}\"")
-        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/src/${target}\"\
-                                     \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+
+        foreach (f90 ${${target}_SRCs})
+            set(DOXYGEN_INPUT "${DOXYGEN_INPUT} \"${f90}\"")
+        endforeach()
+
         set(DOXYGEN_HTML_HEADER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/header.html\"")
         set(DOXYGEN_HTML_FOOTER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/footer.html\"")
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
