@@ -23,7 +23,7 @@ print(json.dumps({
 Thus, you can run your case file with Python to view the computed case dictionary that will be processed by MFC when you run:
 
 ```console
-$ python3 my_case_file.py
+python3 my_case_file.py
 ```
 
 This is particularly useful when computations are done in Python to generate the case.
