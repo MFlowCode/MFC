@@ -166,8 +166,6 @@ Copyright 2021-2024.
 MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 ## Acknowledgements
- 
-<p align="justify">
-  MFC development was supported by multiple current and past grants from the US Department of Defense, National Institute of Health (NIH), Department of Energy (DOE), and the National Science Foundation (NSF).
-  MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
-</p>
+
+Multiple federal sponsors have supported MFC development, including the US Department of Defense, National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
+MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
