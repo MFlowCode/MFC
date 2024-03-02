@@ -33,7 +33,7 @@ Please refer to `./mfc.sh run -h` for a complete list of arguments and options, 
 To run all stages of MFC, that is [pre_process](https://github.com/MFlowCode/MFC/tree/master/src/pre_process/), [simulation](https://github.com/MFlowCode/MFC/tree/master/src/simulation/), and [post_process](https://github.com/MFlowCode/MFC/tree/master/src/post_process/) on the sample case [2D_shockbubble](https://github.com/MFlowCode/MFC/tree/master/examples/2D_shockbubble/),
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py
+./mfc.sh run examples/2D_shockbubble/case.py
 ```
 
 If you want to run a subset of the available stages, you can use the `-t` argument.
@@ -46,14 +46,14 @@ For example,
 - Running [pre_process](https://github.com/MFlowCode/MFC/tree/master/src/pre_process/) with 2 cores:
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -t pre_process -n 2
+./mfc.sh run examples/2D_shockbubble/case.py -t pre_process -n 2
 ```
 
 - Running [simulation](https://github.com/MFlowCode/MFC/tree/master/src/simulation/) and [post_process](https://github.com/MFlowCode/MFC/tree/master/src/post_process/)
 using 4 cores:
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
+./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
 ## Batch Execution
@@ -65,7 +65,7 @@ The number of nodes can be specified with the `-N` (i.e `--nodes`) option.
 We provide a list of (baked-in) submission batch scripts in the `toolchain/templates` folder.
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -t simulation -c <computer name>
+./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -t simulation -c <computer name>
 ```
 
 Other useful arguments include:
@@ -115,8 +115,8 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 - Create a new duplicate input file, (ex. `restart_case.py`), on which it should:
 
 1. For the Computational Domain Parameters 
-    - Have the following removed BUT `m`, `n`, and `p`:
-		- All domaing/mesh information
+    - Have the following removed __except__ `m`, `n`, and `p`:
+		- All domain/mesh information
 			- `(xyz)_domain%beg`
 			- `(xyz)_domain%end`
 			- `stretch_(xyz)`
@@ -124,13 +124,13 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 			- `(xyz)_a`
 			- `(xyz)_b`
 	- Have the following altered:
-		- `t_step_start` : $t_s$ # this is the point at which the simulation will restart
-		- `t_step_stop`  : $t_{f2}$ # your new final simulation time, which can be the same as $t_f$
+		- `t_step_start` : $t_s$ # the point at which the simulation will restart
+		- `t_step_stop`  : $t_{f2}$ # new final simulation time, which can be the same as $t_f$
 		- `t_step_save`  : ${SF}_2$ # if interested in changing the saving frequency 
 	- Have the following ADDED:
 		- `old_ic` : 'T' # to specify that we have initial conditions from previous simulations
 		- `old_grid` : 'T' # to specify that we have a grid from previous simulations (maybe I do not need m, n, and p, then?)
-		- `t_step_old` : $t_i$ # this is the time step used as the `t_step_start` of the original `case.py` file
+		- `t_step_old` : $t_i$ # the time step used as the `t_step_start` of the original `case.py` file
 2. For the Simulation Algorithm Parameters
 	- Substitute `num_patches` to reflect the number of ADDED patches in the `restart_case.py` file. If no patches are added, set `num_patches: 0`
 
@@ -153,17 +153,17 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
 
 ```console
-$ ./mfc.sh run case.py -t post_process
-$ ./mfc.sh run restart_case.py -t post_process
+./mfc.sh run case.py -t post_process
+./mfc.sh run restart_case.py -t post_process
 ```	
 
 We have provided an example `case.py` and `restart_case.py` in `/examples/1D_vacuum_restart/`. This simulation is a duplicate of the `1D_vacuum` case. It demonstrates stopping at timestep 7000, adding a new patch, and restarting the simulation. To test this code, run:
 
 ```console
-$ ./mfc.sh run examples/1D_vacuum_restart/case.py -t pre_process simulation
-$ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t pre_process simulation
-$ ./mfc.sh run examples/1D_vacuum_restart/case.py -t post_process
-$ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
+./mfc.sh run examples/1D_vacuum_restart/case.py -t pre_process simulation
+./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t pre_process simulation
+./mfc.sh run examples/1D_vacuum_restart/case.py -t post_process
+./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
 ```
 
 ### Example Runs
@@ -171,6 +171,6 @@ $ ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
 ```console
-$ ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
+./mfc.sh run examples/2D_shockbubble/case.py -e batch \
                -N 2 -n 4 -t simulation -a <redacted> -c summit
 ```
