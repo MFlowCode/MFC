@@ -188,7 +188,7 @@ The code outputs error messages when an empty region is left in the domain.
 
 Some parameters, as described above, can be defined by analytical functions in the input file. For example, one can define the following patch:
 
-```json
+```console
 'patch_icpp(2)%geometry'    : 15,
 'patch_icpp(2)%x_centroid'  : 0.25,
 'patch_icpp(2)%length_x'    : 9.5,
