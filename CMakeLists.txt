@@ -566,6 +566,9 @@ if (MFC_DOCUMENTATION)
     install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
             DESTINATION "docs/mfc")
 
+    install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/robots.txt"
+            DESTINATION "docs/mfc")
+
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
             DESTINATION "docs/mfc")
 endif()
