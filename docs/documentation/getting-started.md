@@ -7,7 +7,6 @@ You can either download MFC's [latest release from GitHub](https://github.com/MF
 ```console
 git clone https://github.com/MFlowCode/MFC.git
 cd MFC
-git checkout <release tag>
 ```
 
 ## Build Environment
