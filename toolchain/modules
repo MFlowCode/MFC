@@ -11,16 +11,19 @@ s-all python/3.8.10 darshan-runtime/3.3.1-lite hsi/5.0.2.p5 xalt/1.2.1
 s-cpu lsf-tools/2.0 cmake/3.23.2 ninja/1.10.2 spectrum-mpi/10.4.0.3-20210112
 s-cpu gcc/12.1.0
 s-gpu nvhpc/22.11 cuda/nvhpc
+s-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 b     PSC Bridges2
 b-all python/3.8.6
 b-cpu allocations/1.0 gcc/10.2.0 openmpi/4.0.5-gcc10.2.0
 b-gpu openmpi/4.0.5-nvhpc22.9 nvhpc/22.9 cuda
+b-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 a     OLCF Ascent
 a-all python cmake/3.22.2
 a-cpu gcc/11.1.0 spectrum-mpi cuda
 a-gpu nvhpc/21.11 spectrum-mpi cuda/nvhpc nsight-compute nsight-systems
+a-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 r     Richardson
 r-all python/3.7
@@ -30,16 +33,19 @@ w     OLCF Wombat
 w-all cmake/3.25.1 python/3.10.8
 w-cpu gcc/11.1.0 openmpi/4.0.5_gcc
 w-gpu nvhpc/22.11
+w-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 e     SDSC Expanse
 e-all python/3.8.5
 e-cpu cpu/0.15.4 gcc/9.2.0 openmpi/4.1.1 cmake/3.18.2
 e-gpu gpu/0.15.4 cuda/11.0.2 nvhpc/22.2 openmpi/4.0.5 cmake/3.19.8
+e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 p     GT Phoenix
 p-all python/3.9.12-rkxvr6 cmake/3.23.1-327dbl
 p-cpu gcc/10.3.0-o57x6h openmpi/4.1.4
 p-gpu cuda/11.7.0-7sdye3 nvhpc/22.11
+p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
 
 c     OLCF Crusher
 c-all cmake/3.23.2 cray-fftw/3.3.10.2 hdf5/1.12.1 cray-python/3.9.13.1
@@ -51,3 +57,4 @@ d     NCSA Delta
 d-all python/3.11.6
 d-cpu gcc/11.4.0 openmpi
 d-gpu nvhpc/22.11 openmpi+cuda/4.1.5+cuda cmake
+d-gpu CC=nvc CXX=nvc++ FC=nvfortran
