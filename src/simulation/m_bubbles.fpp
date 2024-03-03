@@ -84,6 +84,29 @@ contains
 
     end subroutine
 
+    ! Compute the bubble volume fraction alpha from the bubble number density n
+        !! @param q_cons_vf is the conservative variable
+    subroutine s_comp_alpha_from_n(q_cons_vf)
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        real(kind(0d0)) :: nR3bar
+        integer(kind(0d0)) :: i, j, k, l
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    nR3bar = 0d0
+                    !$acc loop seq
+                    do i = 1, nb
+                        nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
+                    end do
+                    q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+                end do
+            end do
+        end do
+
+    end subroutine s_comp_alpha_from_n
+
     !> Bubble source part in Strang operator splitting shceme
         !! @param q_cons_vf conservative variables
     subroutine s_adaptive_dt_bubble(t_step, q_cons_vf, q_prim_vf, rhs_vf) ! ------------------------
@@ -275,11 +298,10 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp, nbub)
+        !$acc parallel loop collapse(4) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp, nbub)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    !$acc loop seq
                     do q = 1, nb
 
                         bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
@@ -342,9 +364,9 @@ contains
                             ! Evaluate f(x0,y0)
                             myR_tmp(1) = myR
                             myV_tmp(1) = myV
-                            myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                 pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
+                            myA_tmp(1) = 0d0 !f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
+                                              !   pb, pbdot, alf, n_tait, B_tait, &
+                                               !  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
                             d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
@@ -358,9 +380,9 @@ contains
                             ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
                             myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
                             myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
-                            myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                                 pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
+                            myA_tmp(2) = 0d0 !f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
+                                              !   pb, pbdot, alf, n_tait, B_tait, &
+                                               !  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
                             d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2d0)/h0
@@ -392,9 +414,9 @@ contains
                                     myV_tmp(1) = myV
 
                                     ! Stage 1
-                                    myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                         pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                    myA_tmp(1) =  f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
+                                                          pb, pbdot, alf, n_tait, B_tait, &
+                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
                                     myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
                                     myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
 

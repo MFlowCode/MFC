@@ -540,9 +540,10 @@ contains
 
         ! Stage 1 of 3 =====================================================
 
-        call cpu_time(start)
-
-        call nvtxStartRange("Time_Step")
+        if (.not. adap_dt) then
+            call cpu_time(start)
+            call nvtxStartRange("Time_Step")
+        end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
 
@@ -769,18 +770,18 @@ contains
             end if
         end if
 
-        call nvtxEndRange
+        if (.not. adap_dt) then
+            call nvtxEndRange
+            call cpu_time(finish)
 
-        call cpu_time(finish)
+            time = time + (finish - start)
 
-        time = time + (finish - start)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
+            if (t_step >= 4) then
+                time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+            else
+                time_avg = 0d0
+            end if
         end if
-
         ! ==================================================================
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
