@@ -153,10 +153,19 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran:-minline>
         )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran:-O0>
+        )
     endif()
-    
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+    endif()
+
+    if (DEFINED ENV{MFC_CUDA_CC})
+        string(REGEX MATCHALL "[0-9]+" MFC_CUDA_CC $ENV{MFC_CUDA_CC})
+        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for ${MFC_CUDA_CC}.")
     endif()
 endif()
 
@@ -395,13 +404,19 @@ function(MFC_SETUP_TARGET)
                 target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_cuTENSOR)
             endif()
 
-            if     (CMAKE_BUILD_TYPE STREQUAL "Release")
+            foreach (cc ${MFC_CUDA_CC})
                 target_compile_options(${ARGS_TARGET}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE -gpu=cc${cc}
                 )
-            elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            endforeach()
+
+            target_compile_options(${ARGS_TARGET}
+                PRIVATE -gpu=keep,ptxinfo,lineinfo
+            )
+
+            if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug -O0
+                    PRIVATE -gpu=autocompare,debug
                 )
             endif()
         endif()
@@ -470,8 +485,12 @@ if (MFC_DOCUMENTATION)
 
     macro(GEN_DOCS target name)
         set(DOXYGEN_PROJECT_NAME     "\"${name}\"")
-        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/src/${target}\"\
-                                     \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+
+        foreach (f90 ${${target}_SRCs})
+            set(DOXYGEN_INPUT "${DOXYGEN_INPUT} \"${f90}\"")
+        endforeach()
+
         set(DOXYGEN_HTML_HEADER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/header.html\"")
         set(DOXYGEN_HTML_FOOTER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/footer.html\"")
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
@@ -545,6 +564,9 @@ if (MFC_DOCUMENTATION)
 
     # > Copy Resources (main landing page & assets)
     install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
+            DESTINATION "docs/mfc")
+
+    install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/robots.txt"
             DESTINATION "docs/mfc")
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
