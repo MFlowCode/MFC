@@ -20,8 +20,8 @@
 </p>
 
 Welcome to the home of MFC!
-MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
+MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
 MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   
 Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
@@ -96,7 +96,7 @@ They are organized below, just click the drop-downs!
 * Multi- and single-phase 
 	* Phase change via p, pT, and pTg schemes
 * Grids
-	* 1-3D Cartesian, Cylindrical, Axi-symmetric. 
+	* 1-3D Cartesian, cylindrical, axi-symmetric. 
 	* Arbitrary grid stretching for multiple domain regions available.
 	* Complex/arbitrary geometries via immersed boundary methods 
 	* STL geometry files supported
@@ -162,12 +162,10 @@ If you use MFC, consider citing it:
 
 ## License
  
-Copyright 2021-2024.
+Copyright 2021-2024 Spencer Bryngelson and Tim Colonius.
 MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 ## Acknowledgements
- 
-<p align="justify">
-  MFC development was supported by multiple current and past grants from the US Department of Defense, National Institute of Health (NIH), Department of Energy (DOE), and the National Science Foundation (NSF).
-  MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
-</p>
+
+Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
+MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
