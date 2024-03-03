@@ -364,9 +364,9 @@ contains
                             ! Evaluate f(x0,y0)
                             myR_tmp(1) = myR
                             myV_tmp(1) = myV
-                            myA_tmp(1) = 0d0 !f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                              !   pb, pbdot, alf, n_tait, B_tait, &
-                                               !  bub_adv_src(j, k, l), divu%sf(j, k, l))
+                            myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
+                                                 pb, pbdot, alf, n_tait, B_tait, &
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
                             d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
@@ -380,9 +380,9 @@ contains
                             ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
                             myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
                             myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
-                            myA_tmp(2) = 0d0 !f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                              !   pb, pbdot, alf, n_tait, B_tait, &
-                                               !  bub_adv_src(j, k, l), divu%sf(j, k, l))
+                            myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
+                                                 pb, pbdot, alf, n_tait, B_tait, &
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
                             d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2d0)/h0
