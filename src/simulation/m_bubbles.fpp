@@ -414,9 +414,9 @@ contains
                                     myV_tmp(1) = myV
 
                                     ! Stage 1
-                                    myA_tmp(1) =  f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                          pb, pbdot, alf, n_tait, B_tait, &
-                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                    myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
+                                                         pb, pbdot, alf, n_tait, B_tait, &
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
                                     myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
                                     myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
 
