@@ -2,7 +2,7 @@
  
 To run MFC's test suite, run
 ```console
-$ ./mfc.sh test -j <thread count>
+./mfc.sh test -j <thread count>
 ```
 
 It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate.
@@ -12,7 +12,7 @@ Run `./mfc.sh test -h` for a full list of accepted arguments.
 
 Most notably, you can consult the full list of tests by running
 ```
-$ ./mfc.sh test -l
+./mfc.sh test -l
 ```
 
 To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
@@ -22,7 +22,7 @@ To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instea
 
 To (re)generate *golden files*, append the `--generate` option:
 ```console
-$ ./mfc.sh test --generate -j 8
+./mfc.sh test --generate -j 8
 ```
 
 It is recommended that a range be specified when generating golden files for new test cases, as described in the previous section, in an effort not to regenerate the golden files of existing test cases.
@@ -88,7 +88,7 @@ Finally, the case is appended to the `cases` list, which will be returned by the
 
 To test updated post process code, append the `-a` or `--test-all` option: 
 ```console
-$ ./mfc.sh test -a -j 8
+./mfc.sh test -a -j 8
 ```
 
 This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files.
