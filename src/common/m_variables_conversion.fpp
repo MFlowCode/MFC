@@ -19,6 +19,8 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_finger_matrix_calc   !< Using finger matrix calculations
+
     use m_helper
     ! ==========================================================================
 
@@ -170,6 +172,12 @@ contains
                    )/gamma
 
         end if
+
+        if (hyperelasticity .and. present(G)) then
+        !TODO ADD CODE HERE
+
+        end if
+
 
     end subroutine s_compute_pressure
 
@@ -427,6 +435,7 @@ contains
 #endif
 
         if (present(G_K)) then
+        !TODO Check our mixture rule? Replace with Cauchy numbers, make code nondimensional
             G_K = 0d0
             do i = 1, num_fluids
                 G_K = G_K + alpha_K(i)*G(i)
@@ -498,6 +507,7 @@ contains
             G_K = 0d0
             do i = 1, num_fluids
                 !TODO: change to use Gs directly here?
+                !TODO: Make this changes as well for GPUs
                 G_K = G_K + alpha_K(i)*G(i)
             end do
             G_K = max(0d0, G_K)
@@ -876,7 +886,7 @@ contains
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (hypoelasticity) then
+                        if (hypoelasticity .or. hyperelasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                                                             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                         else if (bubbles) then
@@ -888,7 +898,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity) then
+                        if (hypoelasticity .or. hyperelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1124,6 +1134,20 @@ contains
                             end if
                         end do
                     end if
+              
+                    if (hyperelasticity) then
+                    ! TODO ADD the e^e term contribution to the total energy equation here
+                    ! Multiple functions need to be called for 3x3 matrix calculations at each cell
+
+                    ! PRECOMPUTATIONS TO CALCULATE \rho e^e = \rho (\frac{\mu}{4 \rho_0} \tr ((\hat(g) - I)^2))
+                    ! To do that, we need \hat(g), to get \hat(g), we need G^e
+                    ! To get G^e, we need g_{ij}^e, we have this stored in q_cons_vf(i) where 
+                    ! i goes from stress_idx%beg to stress_idx%end
+                        !do i = stress_idx%beg, stress_idx%end
+                        !        q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + & 
+                        !                                        stuff 
+                    end if
+
                 end do
             end do
         end do
