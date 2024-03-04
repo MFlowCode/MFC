@@ -74,7 +74,7 @@ class MFCInputFile:
 
             return lhs == rhs
 
-        inc_dir = os.path.join(target.get_build_dirpath(), "include", target.name)
+        inc_dir = os.path.join(target.get_staging_dirpath(), "include", target.name)
         common.create_directory(inc_dir)
 
         fpp_path = os.path.join(inc_dir, "case.fpp")
