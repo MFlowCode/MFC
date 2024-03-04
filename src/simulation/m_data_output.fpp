@@ -503,62 +503,63 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
         integer :: i, j, k, l, w !< Generic loop iterators
-        integer :: ierr, counter, counter2, counter3, root !< number of data points extracted to fit shape to SH perturbations
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        real(kind(0d0)) :: u, m_a_x, m_a_y, m_a_z, eps
-        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_x, d_magdalphax, d_magdalphay, f_NS, rho, alpha_rhob
-        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_y, mag_d_alpha, d_rho_x, d_rho_y, mag_d_rho, alpha_b
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: d_alph_mpi_barrier_x3, d_alpha_y3, d_alpha_z3
-        real(kind(0d0)) :: xdv, ydv, mag_d_alpha3, nondim_time, alphaxm, alphaxp, alphaym, alphayp
+        real(kind(0d0)) :: u, eps
+        real(kind(0d0)), dimension(0:m, 0:n) :: rho 
+        real(kind(0d0)) ::  nondim_time
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
-        real(kind(0d0)) :: alpha_t, concavity_x_prior, concavity_x_post, concavity_y_prior, concavity_y_post
-        real(kind(0d0)), allocatable :: q(:), maxdalphy(:), maxdalphx(:)
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
-        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_tdf(:), y_tdf(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
+        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
 
-        real(kind(0d0)) :: axp, axm, ayp, aym
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp
 
         call s_calculate_COM(q_prim_vf, xcom, ycom, vol_fluid)
 
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, kind(0d0))*dt
         else
-            nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
+            nondim_time = real(t_step, kind(0d0))*dt 
         end if
         root = 0
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-        do k = 0, n
-            OLoop: do j = 0, m
-                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
-                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
-                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
+        do l = 0, p
+            do k = 0, n
+                OLoop: do j = 0, m
+                    axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
+                    axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
+                    ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
+                    aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
+                    azm = q_prim_vf(E_idx + 2)%sf(j, k, p - 1)
+                    azp = q_prim_vf(E_idx + 2)%sf(j, k, p + 1) 
+ 
 
-                if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
-                    .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
-                    if (counter == 0) then
-                        counter = counter + 1
-                        x_d1(counter) = x_cc(j)
-                        y_d1(counter) = y_cc(k)
-                    else
-                        do i = 1, counter
-                            if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
-                                                               y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
-                                                                                      + dy(k)**2)) then
-                                cycle OLoop
-                            elseif (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
-                                                                   y_d1(i))**2) > 2*sqrt(dx(j)**2 &
-                                                                                         + dy(k)**2) .and. i == counter) then
-                                counter = counter + 1
-                                x_d1(counter) = x_cc(j)
-                                y_d1(counter) = y_cc(k)
-                            end if
-                        end do
+                    if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
+                        .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
+                        if (counter == 0) then
+                            counter = counter + 1
+                            x_d1(counter) = x_cc(j)
+                            y_d1(counter) = y_cc(k)
+                        else
+                            do i = 1, counter
+                                if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                    y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
+                                    + dy(k)**2)) then
+                                    cycle OLoop
+                                elseif (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                        y_d1(i))**2) > 2*sqrt(dx(j)**2 &
+                                        + dy(k)**2) .and. i == counter) then
+                                    counter = counter + 1
+                                    x_d1(counter) = x_cc(j)
+                                    y_d1(counter) = y_cc(k)
+                                end if
+                            end do
+                        end if
                     end if
-                end if
-            end do OLoop
+                end do OLoop
+            end do
         end do
 
         allocate (y_d(counter))
