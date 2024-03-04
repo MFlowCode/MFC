@@ -474,13 +474,14 @@ if [ "$1" == "venv" ]; then
 fi
 
 
+old_pypath="$PYTHONPATH"
+
 # Activate the Python venv
 source "$(pwd)/build/venv/bin/activate"
 ok "(venv) Entered the$MAGENTA Python$COLOR_RESET virtual environment."
 
-echo $PYTHONPATH
-
-export PYTHONPATH="$PYTHONPATH:/sw/frontier/omniperf/python_dependency_installs/3.10.10"
+export PYTHONPATH="$PYTHONPATH:$old_pypath"
+#export PTYHONPATH="$PYTHONPATH:/sw/frontier/omniperf/python_dependency_installs/3.10.10:/opt/cray/pe/python/3.10.10"
 
 
 # Install Python dependencies if, either:
