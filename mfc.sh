@@ -156,7 +156,7 @@ if [ "$1" == "load" ]; then
         # This will load necessary modules, then set them to their versions
         # included with the 23.05 CPE release.
         # This is the safest way to get a fully consistent CPE environment.
-        MODULES=("${MODULES[@]}" "cray-fftw" "cray-hdf5" "cray-python" "cray-mpich" "cpe/23.05")
+        MODULES=("${MODULES[@]}" "cray-fftw" "cray-hdf5" "cray-mpich" "cpe/23.09" "cce/16.0.1" "rocm/5.5.1" "cray-python" "omniperf")
     else
         echo -e $RED"Error: Requested system $u_computer is not supported (yet!)"$COLOR_RESET
 
@@ -477,6 +477,10 @@ fi
 # Activate the Python venv
 source "$(pwd)/build/venv/bin/activate"
 ok "(venv) Entered the$MAGENTA Python$COLOR_RESET virtual environment."
+
+echo $PYTHONPATH
+
+export PYTHONPATH="$PYTHONPATH:/sw/frontier/omniperf/python_dependency_installs/3.10.10"
 
 
 # Install Python dependencies if, either:

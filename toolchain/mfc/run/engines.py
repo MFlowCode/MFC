@@ -21,6 +21,9 @@ def profiler_prepend():
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
+    if ARG("omniperf") is not None:
+        return ["omniperf", "profile"] + ARG("omniperf") + [" -- "]
+
     return []
 
 
@@ -70,7 +73,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         cmd = []
 
-        if ARG("mpi"):
+        if ARG("mpi") and (ARG("omniperf") is None):
             cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
 
         cmd += profiler_prepend()

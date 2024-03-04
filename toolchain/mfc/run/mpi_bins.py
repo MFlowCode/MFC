@@ -50,7 +50,7 @@ class SRUN(MPIBinary):
     def gen_params(self) -> typing.List[str]:
         host = os.popen('hostname').read()
         if "frontier" in host:
-            params = ['-n', ARG("tasks_per_node")]
+            params = ['-n', ARG("tasks_per_node"), "--unbuffered"]
         else:
             params = ['--ntasks-per-node', ARG("tasks_per_node")]
 
