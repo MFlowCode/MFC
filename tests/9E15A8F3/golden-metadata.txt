@@ -1,75 +1,9 @@
-This file was created on 2024-02-28 00:44:31.121786.
+This file was created on 2024-03-04 21:48:11.781901.
 
 mfc.sh:
 
-    Invocation: test -o 9E15A8F3 762D6DDF B43FCEFE --generate -- -c richardson
+    Invocation: test --generate -o 2F922EB8 0B0B12FF 2AB92995 E36F9518 9E15A8F3 B7A5A541 -- -c richardson
     Lock:       mpi=Yes & gpu=No & debug=No
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on richardson.cluster
-    
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on richardson.cluster
-    
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
 
 syscheck:
 
@@ -104,6 +38,39 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on richardson.cluster
+    
+        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
+        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/gcc/9.3.0/bin/gcc
+        CXX      : /opt/gcc/9.3.0/bin/g++
+        FC       : /opt/gcc/9.3.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 simulation:
 
     CMake Configuration:
@@ -115,6 +82,39 @@ simulation:
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/gcc/9.3.0/bin/gcc
+        CXX      : /opt/gcc/9.3.0/bin/g++
+        FC       : /opt/gcc/9.3.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on richardson.cluster
+    
+        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
+        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
