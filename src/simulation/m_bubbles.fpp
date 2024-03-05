@@ -256,7 +256,7 @@ contains
 
                         bub_adv_src(j, k, l) = 4.d0*pi*nbub*R2Vav
                     end if
-                    
+
                     !$acc loop seq
                     do q = 1, nb
 
