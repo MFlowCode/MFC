@@ -299,7 +299,12 @@ def generate_cases() -> typing.List[TestCase]:
 
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
             cases.append(create_case(stack, 'nb=1', {'nb': 1}))
-            cases.append(create_case(stack, 'adv_n=T', {'adv_n': 'T'}))
+
+            stack.push("adv_n=T", {'adv_n': 'T'})
+            cases.append(create_case(stack, '', {}))
+            cases.append(create_case(stack, 'alter_alpha', {'alter_alpha': 'T'}))
+            stack.pop()
+
             cases.append(create_case(stack, 'adap_dt=T', {'adap_dt': 'T'}))
 
             stack.push('', {'fluid_pp(1)%pi_inf': 351.5})
