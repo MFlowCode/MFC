@@ -88,7 +88,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
 
-            work_timeout = 30
+            work_timeout = 60
 
             cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout):")
 
