@@ -502,7 +502,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
-        integer :: i, j, k, l, w !< Generic loop iterators
+        integer :: i, j, k, l, w, cent !< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
         real(kind(0d0)) :: u, eps
@@ -525,15 +525,22 @@ contains
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-        do l = 0, p
+        if (mod(p, 2) > 0) then
+            cent = p/2 + 1/2
+        elseif (mod(p, 2) == 0) then
+            cent = p/2 + 1/2
+        elseif (p == 0) then
+            cent = 0
+        endif
+       ! do l = 0, p
             do k = 0, n
                 OLoop: do j = 0, m
-                    axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
-                    axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
-                    ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
-                    aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
-                    azm = q_prim_vf(E_idx + 2)%sf(j, k, p - 1)
-                    azp = q_prim_vf(E_idx + 2)%sf(j, k, p + 1) 
+                    axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
+                    axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
+                    ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
+                    aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, cent)
+                   ! azm = q_prim_vf(E_idx + 2)%sf(j, k, p - 1)
+                   ! azp = q_prim_vf(E_idx + 2)%sf(j, k, p + 1) 
  
 
                     if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
@@ -560,7 +567,7 @@ contains
                     end if
                 end do OLoop
             end do
-        end do
+       ! end do
 
         allocate (y_d(counter))
         allocate (x_d(counter))
