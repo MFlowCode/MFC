@@ -236,7 +236,7 @@ contains
                         Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                     end do
 
-                    if (adv_n .and. alter_alpha) then
+                    if (adv_n) then
                         nbub(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
                     else
                         R3 = 0d0
@@ -303,7 +303,7 @@ contains
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                        ! myRho = q_prim_vf(1)%sf(j, k, l)
+                        myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
@@ -376,29 +376,27 @@ contains
                                     ! Stage 0
                                     myR_tmp(1) = myR
                                     myV_tmp(1) = myV
-
-                                    ! Stage 1
                                     myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
+
+                                    ! Stage 1
                                     myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
                                     myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
-
-                                    ! Stage 2
                                     myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
+
+                                    ! Stage 2
                                     myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
                                     myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
-
-                                    ! Stage 3
                                     myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
+
+                                    ! Stage 3
                                     myR_tmp(4) = myR + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
                                     myV_tmp(4) = myV + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
-
-                                    ! Stage 4
                                     myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
@@ -446,6 +444,7 @@ contains
                                             pb, pbdot, alf, n_tait, B_tait, &
                                             bub_adv_src(j, k, l), divu%sf(j, k, l))
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+                            if (nbub(j, k, l) == 0) stop("nbub is zero")
                         end if
 
                         if (alf < 1.d-11) then

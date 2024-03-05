@@ -111,6 +111,10 @@ contains
             call s_mpi_abort('nnode not supported')
         end if
 
+        if (alter_alpha .and. (.not. adv_n)) then
+            call s_mpi_abort('alter_alpha requires adv_n = T')
+        end if
+
         if (model_eqns == 3) then
             if (riemann_solver /= 2) then
                 call s_mpi_abort('Unsupported combination of values of '// &
@@ -305,6 +309,9 @@ contains
             else if (.not. polytropic) then
                 call s_mpi_abort('Unsupported combination of adap_dt '// &
                                  'and polytropic. Exiting ...')
+            else if (.not. alter_alpha) then
+                call s_mpi_abort('Unsupported combination of adap_dt '// &
+                                 'and alter_alpha. Exiting ...')
             end if
         end if
         ! END: Simulation Algorithm Parameters =============================
