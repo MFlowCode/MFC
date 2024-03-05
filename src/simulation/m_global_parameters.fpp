@@ -314,7 +314,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, alter_alpha, adap_dt, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d

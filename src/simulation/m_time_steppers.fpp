@@ -798,9 +798,6 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
-        type(int_bounds_info) :: ix, iy, iz
-        type(vector_field) :: gm_alpha_qp
-
         call cpu_time(start)
 
         call nvtxStartRange("Time_Step")
@@ -809,16 +806,7 @@ contains
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         ! Stage 2 of 3 =====================================================
-        ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m; iy%end = n; iz%end = p
-
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_prim_vf, &
-            gm_alpha_qp%vf, &
-            ix, iy, iz)
-
-        call s_adaptive_dt_bubble(t_step, q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
+        call s_adaptive_dt_bubble(t_step)
 
         ! Stage 3 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
@@ -838,6 +826,29 @@ contains
         ! ==================================================================
 
     end subroutine s_strang_splitting ! ------------------------------------
+
+    !> Bubble source part in Strang operator splitting scheme
+        !! @param q_cons_vf conservative variables
+    subroutine s_adaptive_dt_bubble(t_step) ! ------------------------
+
+        integer, intent(IN) :: t_step
+
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp
+
+        integer :: i, j, k, l, q !< Generic loop iterator
+
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+
+    end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

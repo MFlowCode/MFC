@@ -154,9 +154,6 @@ module m_rhs
     !$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
     !$acc   ixt, iyt, izt)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare create(nbub)
-
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -569,10 +566,6 @@ contains
             end do
         end do
 
-        if (bubbles) then
-            @:ALLOCATE(nbub(0:m, 0:n, 0:p))
-        end if
-
     end subroutine s_initialize_rhs_module ! -------------------------------
 
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
@@ -596,6 +589,7 @@ contains
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
         integer :: ndirs
 
         real(kind(0d0)) :: mytime, sound
@@ -1430,8 +1424,7 @@ contains
 
         ! Add bubles source term
         call nvtxStartRange("RHS_bubbles")
-        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source(nbub, &
-                                                                                           q_cons_qp%vf(1:sys_size), &
+        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source(q_cons_qp%vf(1:sys_size), &
                                                                                            q_prim_qp%vf(1:sys_size), &
                                                                                            t_step, &
                                                                                            rhs_vf)

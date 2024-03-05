@@ -32,6 +32,9 @@ module m_bubbles
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
+    !$acc declare create(nbub)
+
     type(scalar_field) :: divu !< matrix for div(u)
     !$acc declare create(divu)
 
@@ -74,6 +77,8 @@ contains
             !$acc update device(ps, ms)
         end if
 
+        @:ALLOCATE(nbub(0:m, 0:n, 0:p))
+
         @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 
         @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
@@ -106,46 +111,6 @@ contains
         end do
 
     end subroutine s_comp_alpha_from_n
-
-    !> Bubble source part in Strang operator splitting shceme
-        !! @param q_cons_vf conservative variables
-    subroutine s_adaptive_dt_bubble(t_step, q_cons_vf, q_prim_vf, rhs_vf) ! ------------------------
-
-        integer, intent(IN) :: t_step
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf, rhs_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
-
-        integer :: i, j, k, l, q !< Generic loop iterator
-
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, sys_size
-                        rhs_vf(i)%sf(j, k, l) = 0d0
-                    end do
-                end do
-            end do
-        end do
-
-        ! Compute bubble source
-        call s_compute_bubble_source(nbub, q_cons_vf(1:sys_size), q_prim_vf(1:sys_size), t_step, rhs_vf)
-
-        ! Update bubble variables
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do i = 1, nb
-                        q_cons_vf(rs(i))%sf(j, k, l) = rhs_vf(rs(i))%sf(j, k, l)
-                        q_cons_vf(vs(i))%sf(j, k, l) = rhs_vf(vs(i))%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
@@ -212,11 +177,10 @@ contains
         !!  @param bub_v_src   Bubble velocity equation source
         !!  @param bub_p_src   Bubble pressure equation source
         !!  @param bub_m_src   Bubble mass equation source
-    subroutine s_compute_bubble_source(nbub, q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    subroutine s_compute_bubble_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(INOUT) :: nbub
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_vf
         integer, intent(IN) :: t_step
 
         real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
@@ -261,7 +225,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, nbub)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -284,7 +248,7 @@ contains
 
                         nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
                     end if
-
+                    
                     R2Vav = 0d0
 
                     !$acc loop seq
@@ -298,7 +262,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(4) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp, nbub)
+        !$acc parallel loop collapse(4) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -369,12 +333,12 @@ contains
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-                            d0 = DSQRT((myR_tmp(1)**2 + myV_tmp(1)**2)/2)
-                            d1 = DSQRT((myV_tmp(1)**2 + myA_tmp(1)**2)/2)
-                            if (d0 < 1e-5 .or. d1 < 1e-5) then
-                                h0 = 1e-6
+                            d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
+                            d1 = DSQRT((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
+                            if (d0 < 1d-5 .or. d1 < 1d-5) then
+                                h0 = 1d-6
                             else
-                                h0 = 0.01*(d0/d1)
+                                h0 = 1d-2*(d0/d1)
                             end if
 
                             ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -385,18 +349,18 @@ contains
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2 + (myA_tmp(2) - myA_tmp(1))**2)/2d0)/h0
+                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
 
                             ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
                             !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-                            if (max(d1, d2) < 1e-15) then
-                                h1 = max(1e-6, h0*1e-3)
+                            if (max(d1, d2) < 1d-15) then
+                                h1 = max(1d-6, h0*1d-3)
                             else
-                                h1 = (0.01/max(d1, d2))**(1d0/3d0)
+                                h1 = (1d-2/max(d1, d2))**(1d0/3d0)
                             end if
 
                             ! Set h = min(100*h0,h1)
-                            h = min(100*h0, h1)
+                            h = min(100d0*h0, h1)
 
                             ! Advancing one step
                             t_new = 0d0
@@ -440,11 +404,11 @@ contains
                                                          bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Estimate error
-                                    err_R = (-5*h/24)*(myV_tmp(2) + myV_tmp(3) - 2*myV_tmp(4)) &
+                                    err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
                                             /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
-                                    err_V = (-5*h/24)*(myA_tmp(2) + myA_tmp(3) - 2*myA_tmp(4)) &
+                                    err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                                             /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-                                    err = DSQRT((err_R**2 + err_V**2)/2d0)/1e-2 ! Rtol = 1e-2
+                                    err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
 
                                     ! Determine acceptance/rejection and update step size
                                     if ((err <= 1d0) .and. myR_tmp(4) > 0d0) then
@@ -459,7 +423,7 @@ contains
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (myR_tmp(4) > 0) then
+                                        if (myR_tmp(4) > 0d0) then
                                             h = h*min(2d0, max(0.5d0, (1d0/err)**(1d0/3d0)))
                                         else
                                             h = 0.5d0*h
@@ -484,15 +448,15 @@ contains
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
                         end if
 
-                        ! if (alf < 1.d-11) then
-                        ! bub_adv_src(j, k, l) = 0d0
-                        ! bub_r_src(j, k, l, q) = 0d0
-                        ! bub_v_src(j, k, l, q) = 0d0
-                        ! if (.not. polytropic) then
-                        !     bub_p_src(j, k, l, q) = 0d0
-                        !     bub_m_src(j, k, l, q) = 0d0
-                        ! end if
-                        ! end if
+                        if (alf < 1.d-11) then
+                            bub_adv_src(j, k, l) = 0d0
+                            bub_r_src(j, k, l, q) = 0d0
+                            bub_v_src(j, k, l, q) = 0d0
+                            if (.not. polytropic) then
+                                bub_p_src(j, k, l, q) = 0d0
+                                bub_m_src(j, k, l, q) = 0d0
+                            end if
+                        end if
                     end do
                 end do
             end do
@@ -505,8 +469,8 @@ contains
                     if (adap_dt) then
                         !$acc loop seq
                         do k = 1, nb
-                            rhs_vf(rs(k))%sf(i, q, l) = bub_r_src(i, q, l, k)
-                            rhs_vf(vs(k))%sf(i, q, l) = bub_v_src(i, q, l, k)
+                            q_cons_vf(rs(k))%sf(i, q, l) = bub_r_src(i, q, l, k)
+                            q_cons_vf(vs(k))%sf(i, q, l) = bub_v_src(i, q, l, k)
                         end do
                     else
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
@@ -808,8 +772,8 @@ contains
     end function f_rddot_KM
 
     !>  Subroutine that computes bubble wall properties for vapor bubbles
-    !>  @param pb Internal bubble pressure
-    !>  @param iR0 Current bubble size index
+        !!  @param pb Internal bubble pressure
+    !!  @param iR0 Current bubble size index
     subroutine s_bwproperty(pb, iR0)
         !$acc routine seq
         real(kind(0.d0)), intent(IN) :: pb
