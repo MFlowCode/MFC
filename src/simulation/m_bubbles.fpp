@@ -248,7 +248,7 @@ contains
 
                         nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
                     end if
-                    
+
                     R2Vav = 0d0
 
                     !$acc loop seq
