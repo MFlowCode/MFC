@@ -32,9 +32,6 @@ module m_bubbles
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare create(nbub)
-
     type(scalar_field) :: divu !< matrix for div(u)
     !$acc declare create(divu)
 
@@ -76,8 +73,6 @@ contains
         if (.not. polytropic) then
             !$acc update device(ps, ms)
         end if
-
-        @:ALLOCATE(nbub(0:m, 0:n, 0:p))
 
         @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
 
@@ -197,6 +192,8 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
         real(kind(0d0)) :: start, finish
 
+        real(kind(0d0)) :: nbub !< Bubble number density
+
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
         integer :: i, j, k, l, q, ii !< Loop variables
@@ -225,20 +222,20 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
 
-                    !$acc loop seq
-                    do q = 1, nb
-                        Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
-                        Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
-                    end do
-
                     if (adv_n) then
-                        nbub(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
+                        nbub = q_prim_vf(n_idx)%sf(j, k, l)
                     else
+                        !$acc loop seq
+                        do q = 1, nb
+                            Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
+                            Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
+                        end do
+
                         R3 = 0d0
 
                         !$acc loop seq
@@ -246,29 +243,22 @@ contains
                             R3 = R3 + weight(q)*Rtmp(q)**3.d0
                         end do
 
-                        nbub(j, k, l) = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                        nbub = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
                     end if
 
-                    R2Vav = 0d0
+                    if (.not. adap_dt) then
+                        R2Vav = 0d0
 
+                        !$acc loop seq
+                        do q = 1, nb
+                            R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
+                        end do
+
+                        bub_adv_src(j, k, l) = 4.d0*pi*nbub*R2Vav
+                    end if
+                    
                     !$acc loop seq
                     do q = 1, nb
-                        R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
-                    end do
-
-                    bub_adv_src(j, k, l) = 4.d0*pi*nbub(j, k, l)*R2Vav
-
-                end do
-            end do
-        end do
-
-        !$acc parallel loop collapse(4) gang vector default(present) private(myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    do q = 1, nb
-
-                        bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
 
                         !$acc loop seq
                         do ii = 1, num_fluids
@@ -316,8 +306,8 @@ contains
                             vflux = f_vflux(myR, myV, mv, q)
                             pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
-                            bub_p_src(j, k, l, q) = nbub(j, k, l)*pbdot
-                            bub_m_src(j, k, l, q) = nbub(j, k, l)*vflux*4.d0*pi*(myR**2.d0)
+                            bub_p_src(j, k, l, q) = nbub*pbdot
+                            bub_m_src(j, k, l, q) = nbub*vflux*4.d0*pi*(myR**2.d0)
                         else
                             pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
                         end if
@@ -436,14 +426,15 @@ contains
 
                             end do
 
-                            bub_r_src(j, k, l, q) = nbub(j, k, l)*myR
-                            bub_v_src(j, k, l, q) = nbub(j, k, l)*myV
+                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
 
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
                                             bub_adv_src(j, k, l), divu%sf(j, k, l))
-                            bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
+                            bub_v_src(j, k, l, q) = nbub*rddot
+                            bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
                         if (alf < 1.d-11) then
@@ -460,17 +451,11 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do l = 0, p
-            do q = 0, n
-                do i = 0, m
-                    if (adap_dt) then
-                        !$acc loop seq
-                        do k = 1, nb
-                            q_cons_vf(rs(k))%sf(i, q, l) = bub_r_src(i, q, l, k)
-                            q_cons_vf(vs(k))%sf(i, q, l) = bub_v_src(i, q, l, k)
-                        end do
-                    else
+        if (.not. adap_dt) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do q = 0, n
+                    do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
                         if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
                             rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
@@ -483,11 +468,10 @@ contains
                                 rhs_vf(ms(k))%sf(i, q, l) = rhs_vf(ms(k))%sf(i, q, l) + bub_m_src(i, q, l, k)
                             end if
                         end do
-                    end if
+                    end do
                 end do
             end do
-        end do
-
+        end if
     end subroutine s_compute_bubble_source
 
     !>  Function that computes that bubble wall pressure for Gilmore bubbles

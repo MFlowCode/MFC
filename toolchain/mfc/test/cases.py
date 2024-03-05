@@ -302,10 +302,7 @@ def generate_cases() -> typing.List[TestCase]:
 
             stack.push("adv_n=T", {'adv_n': 'T'})
             cases.append(create_case(stack, '', {}))
-            stack.push("alter_alpha=T", {'alter_alpha': 'T'})
-            cases.append(create_case(stack, '', {}))
             cases.append(create_case(stack, 'adap_dt=T', {'adap_dt': 'T'}))
-            stack.pop()
             stack.pop()
 
             stack.push('', {'fluid_pp(1)%pi_inf': 351.5})

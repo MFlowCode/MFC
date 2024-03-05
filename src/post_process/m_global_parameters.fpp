@@ -225,7 +225,6 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     logical :: adv_n
-    logical :: alter_alpha
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
@@ -345,7 +344,6 @@ contains
         poly_sigma = dflt_real
         sigR = dflt_real
         adv_n = .false.
-        alter_alpha = .false.
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 

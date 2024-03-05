@@ -293,8 +293,7 @@ module m_global_parameters
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
-    logical :: adv_n        !< Solve the number density equation
-    logical :: alter_alpha  !< Recompute alpha from number density
+    logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
@@ -314,7 +313,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, alter_alpha, adap_dt, pi_fac)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -471,7 +470,6 @@ contains
         R0_type = dflt_int
 
         adv_n = .false.
-        alter_alpha = .false.
         adap_dt = .false.
 
         pi_fac = 1d0

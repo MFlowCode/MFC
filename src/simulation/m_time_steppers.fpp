@@ -317,7 +317,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
@@ -426,7 +426,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
@@ -499,7 +499,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
@@ -611,7 +611,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
@@ -685,7 +685,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
 
@@ -758,7 +758,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n .and. alter_alpha) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 

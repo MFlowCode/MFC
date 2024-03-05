@@ -1576,7 +1576,7 @@ contains
                                     end do
 
                                     if (.not. qbmm) then
-                                        if (adv_n .and. alter_alpha) then
+                                        if (adv_n) then
                                             nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, n_idx)
                                             nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, n_idx)
                                         else

@@ -169,8 +169,7 @@ module m_global_parameters
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
-    logical :: adv_n !< Solve the number density equation
-    logical :: alter_alpha  !< Recompute alpha from number density
+    logical :: adv_n !< Solve the number density equation and compute alpha from number density
     !> @}
 
     !> @name Immersed Boundaries
@@ -366,7 +365,6 @@ contains
         poly_sigma = dflt_real
 
         adv_n = .false.
-        alter_alpha = .false.
 
         qbmm = .false.
         nmom = 1
