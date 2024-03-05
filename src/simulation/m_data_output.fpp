@@ -532,15 +532,12 @@ contains
         elseif (p == 0) then
             cent = 0
         endif
-       ! do l = 0, p
             do k = 0, n
                 OLoop: do j = 0, m
                     axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
                     axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
                     ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
                     aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, cent)
-                   ! azm = q_prim_vf(E_idx + 2)%sf(j, k, p - 1)
-                   ! azp = q_prim_vf(E_idx + 2)%sf(j, k, p + 1) 
  
 
                     if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
@@ -567,7 +564,6 @@ contains
                     end if
                 end do OLoop
             end do
-       ! end do
 
         allocate (y_d(counter))
         allocate (x_d(counter))

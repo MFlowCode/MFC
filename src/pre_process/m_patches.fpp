@@ -1469,6 +1469,8 @@ contains
                         P5 = unassociated_legendre(x_p, 5)
                         P6 = unassociated_legendre(x_p, 6)
                         P7 = unassociated_legendre(x_p, 7)
+                        P8 = unassociated_legendre(x_p, 8)
+                        P9 = unassociated_legendre(x_p, 9)
                     end if
 
                     if (x_cc(i) - x_centroid >= 0 &
