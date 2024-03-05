@@ -444,7 +444,6 @@ contains
                                             pb, pbdot, alf, n_tait, B_tait, &
                                             bub_adv_src(j, k, l), divu%sf(j, k, l))
                             bub_v_src(j, k, l, q) = nbub(j, k, l)*rddot
-                            if (nbub(j, k, l) == 0) stop("nbub is zero")
                         end if
 
                         if (alf < 1.d-11) then

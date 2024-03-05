@@ -1254,7 +1254,7 @@ contains
 
                                 nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
                             end if
-                            
+
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub
                         end if

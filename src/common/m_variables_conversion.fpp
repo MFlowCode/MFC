@@ -949,7 +949,7 @@ contains
                                 qK_prim_vf(n_idx)%sf(j, k, l) = qK_cons_vf(n_idx)%sf(j, k, l)
                                 nbub_sc = qK_prim_vf(n_idx)%sf(j, k, l)
                             else
-                                call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight) 
+                                call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
                             end if
 
                             !$acc loop seq

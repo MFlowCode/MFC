@@ -1,9 +1,75 @@
-This file was created on 2024-03-04 21:47:30.312951.
+This file was created on 2024-03-05 00:34:18.341999.
 
 mfc.sh:
 
-    Invocation: test --generate -o 2F922EB8 0B0B12FF 2AB92995 E36F9518 9E15A8F3 B7A5A541 -- -c richardson
+    Invocation: test --generate -o 2F922EB8 C3D09836 5BBBB3B5 2AB92995 B5269872 0525BE0D 9E15A8F3 6BB28EFD B1C82F3C -j 16 -- -c richardson
     Lock:       mpi=Yes & gpu=No & debug=No
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on richardson.cluster
+    
+        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
+        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/gcc/9.3.0/bin/gcc
+        CXX      : /opt/gcc/9.3.0/bin/g++
+        FC       : /opt/gcc/9.3.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on richardson.cluster
+    
+        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
+        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/gcc/9.3.0/bin/gcc
+        CXX      : /opt/gcc/9.3.0/bin/g++
+        FC       : /opt/gcc/9.3.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -71,72 +137,6 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on richardson.cluster
-    
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on richardson.cluster
-    
-        C       : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gcc)
-        Fortran : GNU v9.3.0 (/opt/gcc/9.3.0/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/hyeoksu/MFC/MFC-Caltech-Feb27/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/gcc/9.3.0/bin/gcc
-        CXX      : /opt/gcc/9.3.0/bin/g++
-        FC       : /opt/gcc/9.3.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -155,7 +155,7 @@ CPU:
     Model:                 63
     Model name:            Intel(R) Xeon(R) CPU E5-2630 v3 @ 2.40GHz
     Stepping:              2
-    CPU MHz:               2400.000
+    CPU MHz:               1300.031
     BogoMIPS:              4793.77
     Virtualization:        VT-x
     L1d cache:             32K
