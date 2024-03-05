@@ -130,7 +130,6 @@ print(json.dumps({
 
     # adv_n
     'adv_n'                         : 'T',
-    'alter_alpha'                   : 'T',
 
     # adap_dt
     'adap_dt'                       : 'T',

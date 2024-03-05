@@ -347,7 +347,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation\\%;%[4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
-| `adv_n`   	         | Logical | Solving directly for the number density in the method of classes |
+| `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
