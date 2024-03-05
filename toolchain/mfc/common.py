@@ -31,7 +31,7 @@ class MFCException(Exception):
     pass
 
 
-def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, env=None, **kwargs) -> int:
+def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, **kwargs) -> int:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
 
     if stdout != subprocess.DEVNULL:

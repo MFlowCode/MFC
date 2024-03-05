@@ -186,8 +186,8 @@ print(json.dumps({
     'cyl_coord'                    : 'F',
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(5000*16.0/ARGS["gbpp"]),
-    't_step_save'                  : int(1000*16.0/ARGS["gbpp"]),
+    't_step_stop'                  : int(25),
+    't_step_save'                  : int(25),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -199,7 +199,7 @@ print(json.dumps({
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
-    'weno_order'                   : 3,
+    'weno_order'                   : 5,
     'weno_eps'                     : 1.0E-16,
     'mapped_weno'                  : 'T',
     'riemann_solver'               : 2,

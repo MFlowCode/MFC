@@ -21,11 +21,10 @@ def profiler_prepend():
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
-    if ARG("omniperf") is not None:
-        return ["omniperf", "profile"] + ARG("omniperf") + [" -- "]
+    if ARG("omni") is not None:
+        return ["omniperf", "profile"] + ARG("omni") + ["--"]
 
     return []
-
 
 @dataclasses.dataclass
 class Engine:
@@ -73,9 +72,6 @@ MPI Binary    (-b)  {self.mpibin.bin}\
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         cmd = []
 
-        if ARG("mpi") and (ARG("omniperf") is None):
-            cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
-
         cmd += profiler_prepend()
 
         cmd.append(self.get_binpath(target_name))
@@ -88,7 +84,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
 
-            work_timeout = 60
+            work_timeout = 30
 
             cons.print(f"Ensuring the [bold magenta]Interactive Engine[/bold magenta] works ({work_timeout}s timeout):")
 
