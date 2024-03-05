@@ -94,10 +94,10 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
-	"SHELL: -I /ccs/home/aradhakr34/HIP/hipfort/install_cce/include/hipfort/amdgcn"
+	    "SHELL: -I /ccs/home/aradhakr34/HIP/hipfort/install_cce/include/hipfort/amdgcn"
     )
 
-    add_link_options("SHELL: -L /ccs/home/aradhakr34/HIP/hipfort/install_cce/lib"	    
+    add_link_options("SHELL: -L /ccs/home/aradhakr34/HIP/hipfort/install_cce/lib"
 	             "SHELL: -L /opt/rocm-5.5.1/lib"
 	             "SHELL: -lhipfort-amdgcn"
 	             "SHELL: -lhipfft"
@@ -113,7 +113,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
 
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
-
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -158,7 +157,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
             add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
         endif()
     endif()
-
 
     # === === Enable LTO/IPO if supported
     CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
@@ -321,6 +319,15 @@ if (MFC_SIMULATION)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
         find_package(CUDAToolkit REQUIRED)
         target_link_libraries(simulation PRIVATE CUDA::nvToolsExt)
+    endif()
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        add_custom_command(TARGET simulation POST_BUILD
+            COMMAND           "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cce_simulation_workgroup_256.sh"
+                              "${CMAKE_CURRENT_BINARY_DIR}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT           "Patching & Rebuilding with Cray hacks"
+        )
     endif()
 endif()
 

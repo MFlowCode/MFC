@@ -5,7 +5,7 @@
 # size in the generated code and recompile, then set the recommended
 # environment variable to use the new code.
 
-# Using the script requires `-hkeepfiles` at link! 
+# Using the script requires `-hkeepfiles` at link!
 
 # This script needs to be run after every time simulation
 # is built to generate a correct offload binary.
@@ -18,20 +18,20 @@ WGSIZE=256
 
 ## Turning bitcode into human-readable IR
 echo "Disassembling"
-${CCE_LLVM_PATH}/bin/llvm-dis build/simulation/simulation-cce-openmp-pre-llc.bc
+${CCE_LLVM_PATH}/bin/llvm-dis "$1/simulation-cce-openmp-pre-llc.bc"
 
 ## Find/replace the workgroup size to what it _should be_ in the (human readable) IR
 echo "Globally setting amdgpu-flat-work-group-size size to 1,$WGSIZE"
-sed "s/\"amdgpu-flat-work-group-size\"\=\"1,1024\"/\"amdgpu-flat-work-group-size\"\=\"1,${WGSIZE}\"/g" build/simulation/simulation-cce-openmp-pre-llc.ll > build/simulation/simulation-cce-openmp-pre-llc-wg${WGSIZE}.ll
+sed "s/\"amdgpu-flat-work-group-size\"\=\"1,1024\"/\"amdgpu-flat-work-group-size\"\=\"1,${WGSIZE}\"/g" "$1/simulation-cce-openmp-pre-llc.ll" > "$1/simulation-cce-openmp-pre-llc-wg${WGSIZE}.ll"
 
 ## This is building to an AMD GPU code object, using internal copy/pasted Cray Fortran   flags.
 ## The flags may need to be adjusted for future compiler versions
 echo "Invoking LLC to compile"
-${CCE_LLVM_PATH}/bin/llc -mtriple=amdgcn-amd-amdhsa -disable-promote-alloca-to-lds -mcpu=gfx90a -amdgpu-dump-hsa-metadata build/simulation/simulation-cce-openmp-pre-llc-wg${WGSIZE}.ll -filetype=obj -o build/simulation/simulation-cce-openmp__llc_wg${WGSIZE}.amdgpu
+${CCE_LLVM_PATH}/bin/llc -mtriple=amdgcn-amd-amdhsa -disable-promote-alloca-to-lds -mcpu=gfx90a -amdgpu-dump-hsa-metadata "$1/simulation-cce-openmp-pre-llc-wg${WGSIZE}.ll" -filetype=obj -o "$1/simulation-cce-openmp__llc_wg${WGSIZE}.amdgpu"
 
 ## Wrapping AMD GPU code object in an object that CCE OpenACC runtime understands
 echo "Linking to a CCE Offload module"
-${CCE_LLVM_PATH}/bin/lld  -flavor gnu --no-undefined -shared -o build/simulation/simulation-wg${WGSIZE}.lld.exe build/simulation/simulation-cce-openmp__llc_wg${WGSIZE}.amdgpu
+${CCE_LLVM_PATH}/bin/lld  -flavor gnu --no-undefined -shared -o "$1/simulation-wg${WGSIZE}.lld.exe" "$1/simulation-cce-openmp__llc_wg${WGSIZE}.amdgpu"
 
 ## Backend/hidden env var that tells the runtime where to find the offload object
 echo "Now "

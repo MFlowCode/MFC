@@ -31,18 +31,18 @@ class MFCException(Exception):
     pass
 
 
-def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None) -> int:
+def system(command: typing.List[str], no_exception: bool = False, exception_text=None, on_error=lambda: None, cwd=None, stdout=None, stderr=None, env=None, **kwargs) -> int:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
 
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
-    
+
     cons.print(f"$ {' '.join(cmd)}")
-    
+
     if stdout != subprocess.DEVNULL:
         cons.print(no_indent=True)
 
-    r = subprocess.run(cmd, cwd=cwd, stdout=stdout, stderr=stderr)
+    r = subprocess.run(cmd, **kwargs, cwd=cwd, stdout=stdout, stderr=stderr)
 
     if r.returncode != 0:
         on_error()
@@ -119,7 +119,7 @@ def get_program_output(arguments: typing.List[str] = None, cwd=None):
     return (proc.communicate()[0].decode(), proc.returncode)
 
 
-def get_py_program_output(filepath: str, arguments: typing.List[str] = None):    
+def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
     dirpath  = os.path.abspath (os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
@@ -154,12 +154,12 @@ def does_command_exist(s: str) -> bool:
 def format_list_to_string(arr: list, item_style=None, empty=None):
     if empty is None:
         empty = "nothing"
-    
+
     pre, post = "", ""
     if item_style is not None:
         pre  = f"[{item_style}]"
         post = f"[/{item_style}]"
-    
+
     if len(arr) == 0:
         return f"{pre}{empty}{post}"
 

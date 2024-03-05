@@ -126,8 +126,12 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             cons.indent()
 
             if not ARG("dry_run"):
+                from ..build import get_target, get_build_dirpath
                 start_time = time.monotonic()
-                common.system(self.get_exec_cmd(name), cwd=self.input.case_dirpath)
+                common.system(self.get_exec_cmd(name), cwd=self.input.case_dirpath, env={
+                    **os.environ.copy(),
+                    **{'CRAY_ACC_MODULE': f'{get_build_dirpath(get_target(name))}/simulation-wg256.lld.exe'}
+                })
                 end_time   = time.monotonic()
                 cons.print(no_indent=True)
 
