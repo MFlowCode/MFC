@@ -92,7 +92,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("-s", "--scratch",        action="store_true",                       default=False,      help="Build from scratch.")
     run.add_argument("--ncu",                  nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Compute.")
     run.add_argument("--nsys",                 nargs=argparse.REMAINDER,        type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument("--omniperf",             nargs=argparse.REMAINDER,        type=str, default="MFC",      help="Profile with AMD omniperf.")
+    run.add_argument("--omniperf",             nargs=argparse.REMAINDER,        type=str,                     help="Profile with AMD omniperf.")
     run.add_argument(      "--dry-run",        action="store_true",                       default=False,      help="(Batch) Run without submitting batch file.")
     run.add_argument("--case-optimization",    action="store_true",                       default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",       action="store_true",                       default=False,      help="(Testing) Do not rebuild MFC.")
