@@ -577,7 +577,7 @@ contains
             if (model_eqns == 2) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
-                mom_idx%beg = cont_idx%end + 1
+                mom_idx%beg = cont_idx%end + 
                 mom_idx%end = cont_idx%end + num_dims
                 E_idx = mom_idx%end + 1
                 adv_idx%beg = E_idx + 1
@@ -688,6 +688,13 @@ contains
                 if (hypoelasticity) then
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                    ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                    sys_size = stress_idx%end
+                end if
+
+                if (hyperelasticity) then
+                    stress_idx%beg = sys_size + 1
+                    stress_idx%end = sys_size + (num_dims*num_dims)
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
                 end if
