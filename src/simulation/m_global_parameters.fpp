@@ -120,9 +120,10 @@ module m_global_parameters
     real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
     real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
-    logical :: null_weights   !< Null undesired WENO weights
-    logical :: mixture_err    !< Mixture properties correction
-    logical :: hypoelasticity !< hypoelasticity modeling
+    logical :: null_weights    !< Null undesired WENO weights
+    logical :: mixture_err     !< Mixture properties correction
+    logical :: hypoelasticity  !< hypoelasticity modeling
+    logical :: hyperelasticity !< hyperelasticity modeling
     logical :: cu_tensor
 
     integer :: cpu_start, cpu_end, cpu_rate
@@ -406,6 +407,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
+        hyperelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
         cu_mpi = .false.
@@ -693,9 +695,9 @@ contains
                 end if
 
                 if (hyperelasticity) then
+                    ! number of distinct stress is 1 in 1D, 6 in 2D, and 9 in 3D
                     stress_idx%beg = sys_size + 1
-                    stress_idx%end = sys_size + (num_dims*num_dims)
-                    ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                    stress_idx%end = sys_size + num_dims**2
                     sys_size = stress_idx%end
                 end if
 

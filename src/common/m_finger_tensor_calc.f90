@@ -49,19 +49,27 @@ module m_finger_tensor_calc
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
         real(kind(0d0)) :: det
 
-        det = 
+        if num_dims .eq. 1 then
+           det = tensor(1) ! does this make sense?
+        elseif num_dims .eq. 2 then
+           det = tensor(1)*tensor(4) - tensor(2)*tensor(3)
+        else 
+           det = tensor(1)*(tensor(2)*tensor(3)
+        end if
         
         return det 
 
     end function s_calculate_determinant
 
     subroutine s_calculate_deviatoric(tensor,deviatoric)
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: deviatoric
 
-    end subroutine s_calculate_deviatoric
+            end subroutine s_calculate_deviatoric
 
     subroutine s_calculate_atransposea(tensor,tproduct)
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tproduct
 
     end subroutine s_calculate_atransposea
 
