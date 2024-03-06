@@ -406,7 +406,7 @@ When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires `bubbles = TRUE`, `polytropic = TRUE`, `adv_n = TURE` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires `bubbles = TRUE`, `polytropic = TRUE`, `adv_n = TRUE` and `time_stepper = 3`.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
@@ -664,7 +664,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 | ---:                   | :----:  |          :---                                  |
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
 
-- `pi_fac` speficies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`). This parameter works only for `bubbles = TRUE`, and it enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is artifical value.
+- `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`). This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
 
 
 ## Enumerations
