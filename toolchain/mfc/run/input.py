@@ -171,7 +171,7 @@ class MFCInputFile:
         if ARG("case_optimization"):
             cons.print("[yellow]INFO:[/yellow] Case optimization is enabled.")
 
-            nterms = -100
+            nterms = 1
 
             bubble_model = int(self.case_dict.get("bubble_model", "-100"))
 
@@ -208,7 +208,6 @@ class MFCInputFile:
             "simulation"   : self.__get_sim_fpp,
             "post_process" : self.__get_post_fpp,
         }.get(build.get_target(target).name, _default)()
-
         return result
 
     def generate_fpp(self, target) -> None:

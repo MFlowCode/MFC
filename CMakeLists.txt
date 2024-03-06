@@ -125,10 +125,28 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
         "SHELL:-h nomessage=296:878:1391:1069"
         "SHELL:-h msgs" "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h acc_model=auto_async_none"
+        "SHELL: -h acc_model=no_fast_addr"
+        "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
+	    "SHELL: -I /ccs/home/aradhakr34/HIP/hipfort/install_cce/include/hipfort/amdgcn"
     )
 
+    add_link_options("SHELL: -L /ccs/home/aradhakr34/HIP/hipfort/install_cce/lib"
+	             "SHELL: -L /opt/rocm-5.5.1/lib"
+	             "SHELL: -lhipfort-amdgcn"
+	             "SHELL: -lhipfft"
+	             "SHELL: -lamdhip64"
+		     "SHELL:-hkeepfiles"
+	)
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-e D "SHELL:-h func_trace")
+        add_compile_options(
+                "SHELL:-h acc_model=auto_async_none"
+                "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -K trap=fp" "SHELL: -G2"
+
+        )
+        add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -443,6 +461,15 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI OpenACC FFTW)
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        add_custom_command(TARGET simulation POST_BUILD
+            COMMAND           "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cce_simulation_workgroup_256.sh"
+                              "${CMAKE_CURRENT_BINARY_DIR}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT           "Patching & Rebuilding with Cray hacks"
+        )
+    endif()
 endif()
 
 if (MFC_POST_PROCESS)

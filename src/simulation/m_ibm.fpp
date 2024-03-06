@@ -37,23 +37,28 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
+
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ghost_points)
+    @:CRAY_DECLARE_GLOBAL_SCALAR(type(integer_field), ib_markers)
+    !$acc declare link(ib_markers, levelset, levelset_norm, ghost_points) 
+#else
     type(integer_field), public :: ib_markers
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
-
     real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
     !! Matrix of distance to IB
-
     real(kind(0d0)), dimension(:, :, :, :, :), allocatable :: levelset_norm
     !! Matrix of normal vector to IB
-
     type(ghost_point), dimension(:), allocatable :: ghost_points
     !! Matrix of normal vector to IB
+    !$acc declare create(ib_markers, levelset, levelset_norm, ghost_points)    
+#endif
 
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
-
-    !$acc declare create(ib_markers, levelset, levelset_norm)
-    !$acc declare create(ghost_points, gp_layers, num_gps)
+    !$acc declare create(gp_layers, num_gps)
 
 contains
 
@@ -69,10 +74,11 @@ contains
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0))
         end if
+        @:ACC_SETUP_SFs(ib_markers)
 
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
-        @:ALLOCATE(levelset(0:m, 0:n, 0:p, num_ibs))
-        @:ALLOCATE(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
+        @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
+        @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
 
     end subroutine s_initialize_ibm_module
 
@@ -86,7 +92,7 @@ contains
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps)
-        @:ALLOCATE(ghost_points(num_gps))
+        @:ALLOCATE_GLOBAL(ghost_points(num_gps))
 
         call s_find_ghost_points(ghost_points)
         !$acc update device(ghost_points)
@@ -777,9 +783,9 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_finalize_ibm_module()
-        deallocate (ib_markers%sf)
-        deallocate (levelset)
-        deallocate (levelset_norm)
+        @:DEALLOCATE(ib_markers%sf)
+        @:DEALLOCATE_GLOBAL(levelset)
+        @:DEALLOCATE_GLOBAL(levelset_norm)
     end subroutine s_finalize_ibm_module
 
 end module m_ibm

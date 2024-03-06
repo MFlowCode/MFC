@@ -81,21 +81,34 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
+    !!$acc declare create(ixb, ixe, iyb, iye, izb, ize)
+    real(kind(0d0)) :: temp
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    public :: gammas, pi_infs
+    !$acc declare link(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+#else
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
-    integer, allocatable, dimension(:) :: bubrs
+#endif
+
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    !$acc declare link(bubrs, Gs, Res)
+#else
+    real(kind(0d0)), allocatable, dimension(:)    :: Gs
+    integer,         allocatable, dimension(:)    :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
-
+#endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
@@ -449,9 +462,13 @@ contains
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
+#else
         !$acc routine seq
+#endif
 
-        real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_Ke
 
         real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_rho_K, alpha_K !<
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
@@ -505,17 +522,17 @@ contains
         end if
 
         if (any(Re_size > 0)) then
-
+            
             do i = 1, 2
                 Re_K(i) = dflt_real
-
+        
                 if (Re_size(i) > 0) Re_K(i) = 0d0
-
-                do j = 1, Re_size(i)
+        
+               do j = 1, Re_size(i)
                     Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
                               + Re_K(i)
                 end do
-
+        
                 Re_K(i) = 1d0/max(Re_K(i), sgm_eps)
 
             end do
@@ -527,7 +544,11 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
+#else
         !$acc routine seq
+#endif
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K, qv_K
 
@@ -614,14 +635,14 @@ contains
 
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(gs_min (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(ps_inf(1:num_fluids))
-        @:ALLOCATE(cvs    (1:num_fluids))
-        @:ALLOCATE(qvs    (1:num_fluids))
-        @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
+        @:ALLOCATE_GLOBAL(gs_min (1:num_fluids))
+        @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(ps_inf(1:num_fluids))
+        @:ALLOCATE_GLOBAL(cvs    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(qvs    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(qvps    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
@@ -633,13 +654,12 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-!$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        !$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
 
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
-
+            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
@@ -651,7 +671,7 @@ contains
 #endif
 
         if (bubbles) then
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE_GLOBAL(bubrs(1:nb))
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -837,7 +857,7 @@ contains
 
         real(kind(0d0)) :: pres
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
 
         real(kind(0.d0)) :: ntmp
 
@@ -858,6 +878,7 @@ contains
         #:endif
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp)
+
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -898,6 +919,7 @@ contains
                         end if
 #endif
                     end if
+
 
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
@@ -978,6 +1000,7 @@ contains
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
                 end do
             end do
         end do
@@ -1014,8 +1037,9 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
-        real(kind(0d0)) :: G
+        real(kind(0d0)) :: G = 0d0
         real(kind(0d0)), dimension(2) :: Re_K
+
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -1050,6 +1074,8 @@ contains
                         dyn_pres = dyn_pres + q_cons_vf(i)%sf(j, k, l)* &
                                    q_prim_vf(i)%sf(j, k, l)/2d0
                     end do
+
+
 
                     ! Computing the energy from the pressure
                     if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
@@ -1181,7 +1207,7 @@ contains
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        !$acc update device(is1b, is2b, is3b, is1e, is2e, is3e)
+        !$acc enter data copyin(is1b, is2b, is3b, is1e, is2e, is3e)
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
@@ -1242,9 +1268,19 @@ contains
                             + pres_K*dir_flg(dir_idx(i))
                     end do
 
+
+                    if(j == 1) then
+#ifdef CRAY_PRINT_DEBUG
+                        print *, "cbc debug"
+                        print *, E_K
+                        print *, pres_K
+                        print *, vel_K(dir_idx(1))
+#endif
+                    end if
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
-
+                    ! comment out above and it will run to completion
+                    
                     ! have been using == 2
                     if (riemann_solver == 1) then
                         !$acc loop seq
@@ -1266,6 +1302,7 @@ contains
                         end do
 
                     end if
+
                 end do
             end do
         end do
@@ -1281,10 +1318,9 @@ contains
         deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 #endif
 
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
-
+        @:DEALLOCATE_GLOBAL(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
         if (bubbles) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE_GLOBAL(bubrs)
         end if
 
         ! Nullifying the procedure pointer to the subroutine transferring/
