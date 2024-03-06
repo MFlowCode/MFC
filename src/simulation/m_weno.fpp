@@ -519,6 +519,8 @@ contains
         real(kind(0d0)), dimension(0:weno_polyn) :: beta
         real(kind(0d0)), pointer :: beta_p(:)
 
+        real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
+
         integer :: i, j, k, l, r, s, w
 
         integer :: t1, t2, c_rate, c_max
@@ -660,22 +662,24 @@ print*, "weno_body"
 !$acc loop seq
                             do i = 1, v_size
 
-                                dvd(1) = v_rs_ws_${XYZ}$(j + 2, k, l, i) &
-                                         - v_rs_ws_${XYZ}$(j + 1, k, l, i)
-                                dvd(0) = v_rs_ws_${XYZ}$(j + 1, k, l, i) &
-                                         - v_rs_ws_${XYZ}$(j, k, l, i)
-                                dvd(-1) = v_rs_ws_${XYZ}$(j, k, l, i) &
-                                          - v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                dvd(-2) = v_rs_ws_${XYZ}$(j - 1, k, l, i) &
-                                          - v_rs_ws_${XYZ}$(j - 2, k, l, i)
+                                v_rs1 = v_rs_ws_${XYZ}$(j - 2, k, l, i)
+                                v_rs2 = v_rs_ws_${XYZ}$(j - 1, k, l, i)
+                                v_rs3 = v_rs_ws_${XYZ}$(j, k, l, i)
+                                v_rs4 = v_rs_ws_${XYZ}$(j + 1, k, l, i)
+                                v_rs5 = v_rs_ws_${XYZ}$(j + 2, k, l, i)
 
-                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                dvd(1) = v_rs5 - v_rs4
+                                dvd(0) = v_rs4 - v_rs3
+                                dvd(-1) = v_rs3 - v_rs2
+                                dvd(-2) = v_rs2 - v_rs1
+
+                                poly(0) = v_rs3 &
                                           + poly_coef_cbL_${XYZ}$(j, 0, 0)*dvd(1) &
                                           + poly_coef_cbL_${XYZ}$(j, 0, 1)*dvd(0)
-                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                poly(1) = v_rs3 &
                                           + poly_coef_cbL_${XYZ}$(j, 1, 0)*dvd(0) &
                                           + poly_coef_cbL_${XYZ}$(j, 1, 1)*dvd(-1)
-                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                poly(2) = v_rs3 &
                                           + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
                                           + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
 
@@ -719,13 +723,13 @@ print*, "weno_body"
                                         print *, dvd(-1)
                                  end if
 #endif
-                                poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                poly(0) = v_rs3 &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
-                                poly(1) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                poly(1) = v_rs3 &
                                           + poly_coef_cbR_${XYZ}$(j, 1, 0)*dvd(0) &
                                           + poly_coef_cbR_${XYZ}$(j, 1, 1)*dvd(-1)
-                                poly(2) = v_rs_ws_${XYZ}$(j, k, l, i) &
+                                poly(2) = v_rs3 &
                                           + poly_coef_cbR_${XYZ}$(j, 2, 0)*dvd(-1) &
                                           + poly_coef_cbR_${XYZ}$(j, 2, 1)*dvd(-2)
 
