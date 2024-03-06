@@ -46,12 +46,12 @@ dx      = Lx/float(Nx+1)
 dy      = Ly/float(Ny+1)
 
 # Time advancement
-cfl     = 1e-1
-T       = 50.
+cfl     = 5e-1
+T       = 20.
 dt      = cfl*dx/(1.+c_w/u_ref)
 Ntfinal = int(T/dt)
 Ntstart = 0
-Nfiles  = 50
+Nfiles  = 20
 t_save  = int(math.ceil((Ntfinal-0)/float(Nfiles)))
 Nt      = t_save*Nfiles
 t_step_start    = Ntstart
