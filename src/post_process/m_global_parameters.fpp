@@ -93,6 +93,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
+    logical :: hyperelasticity !< Turn hyperelasticity on
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -275,7 +276,9 @@ contains
         alt_soundspeed = .false.
         relax = .false.
         relax_model = dflt_int
+
         hypoelasticity = .false.
+        hyperelastictiy = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -469,6 +472,12 @@ contains
             if (hypoelasticity) then
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + num_dims**2
                 sys_size = stress_idx%end
             end if
 

@@ -84,6 +84,7 @@ module m_global_parameters
     integer :: sys_size        !< Number of unknowns in the system of equations
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity  !< activate hypoelasticity
+    logical :: hyperelasticity !< activate hyperelasticity
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
@@ -272,6 +273,7 @@ contains
         weno_order = dflt_int
 
         hypoelasticity = .false.
+        hyperelasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -573,6 +575,13 @@ contains
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                ! number of distinct stress is 1 in 1D, 6 in 2D, and 9 in 3D
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + num_dims**2
                 sys_size = stress_idx%end
             end if
 
