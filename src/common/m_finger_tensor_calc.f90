@@ -51,9 +51,11 @@ module m_finger_tensor_calc
         elseif (num_dims .eq. 2) then
            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
         else 
-           f_determinant = tensor(1)*(tensor(2)*tensor(3))
-        end if
-        
+           f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8))
+                           - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7))
+                           + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
+        end if        
+   
     end function f_determinant
 
     subroutine s_calculate_deviatoric(tensor,deviatoric)
