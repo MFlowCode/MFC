@@ -41,7 +41,7 @@ module m_ibm
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ghost_points)
+    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
     @:CRAY_DECLARE_GLOBAL_SCALAR(type(integer_field), ib_markers)
     !$acc declare link(ib_markers, levelset, levelset_norm, ghost_points) 
 #else

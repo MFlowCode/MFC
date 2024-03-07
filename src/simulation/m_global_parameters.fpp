@@ -1,4 +1,4 @@
-!>
+!!>
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
@@ -20,7 +20,7 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
-#ifdef MFC_OpenACC
+#ifdef MFC_OPENACC
     use openacc
 #endif
 
@@ -106,11 +106,10 @@ module m_global_parameters
     integer :: model_eqns     !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
-        integer, parameter :: num_fluids = ${num_fluids}$   !< number of fluids
     #:else
         integer :: num_dims       !< Number of spatial dimensions
-        integer :: num_fluids
     #:endif
+    integer :: num_fluids
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
@@ -145,7 +144,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids)
+        !$acc declare create(num_dims, weno_polyn, weno_order)
     #:endif
 
     !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity, relax, palpha_eps,ptgalpha_eps)
@@ -399,8 +398,8 @@ module m_global_parameters
     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, pi_infs, ps_inf, cvs, qvs, qvps)
-    !$acc declare link(gammas, pi_infs, ps_inf, cvs, qvs, qvps)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare link(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -410,7 +409,19 @@ module m_global_parameters
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
     logical :: weno_flat, riemann_flat, cu_mpi
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), pb_ts)
 
+    @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), mv_ts)
+
+    !$acc declare link(pb_ts, mv_ts)
+#else
+    type(pres_field), allocatable, dimension(:) :: pb_ts
+    
+    type(pres_field), allocatable, dimension(:) :: mv_ts
+
+    !$acc declare create(pb_ts, mv_ts)
+#endif
     ! ======================================================================
 
 contains

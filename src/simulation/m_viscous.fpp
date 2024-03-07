@@ -35,10 +35,13 @@ module m_viscous
     !$acc declare create(Re_viscous)
 #endif
 
-    !> @name Additional field for capillary source terms
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !> @}
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
+    !$acc declare link(tau_Re_vf)
+#else
+    real(kind(0d0)), allocatable, dimension(:) :: tau_Re_vf
+    !$acc declare create(tau_Re_vf)
+#endif
 
 contains
 
@@ -865,7 +868,7 @@ contains
                             end do
                         end do
                     end do
-=
+
     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg, is2_viscous%end - 1

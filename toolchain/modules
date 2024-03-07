@@ -48,9 +48,9 @@ p-gpu cuda/11.7.0-7sdye3 nvhpc/22.11
 p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
 
 c     OLCF Crusher
-c-gpu rocm/5.1.0 craype-accel-amd-gfx90a
+c-gpu rocm/5.5.1 craype-accel-amd-gfx90a
 c-all cpe/23.09
-c-all cmake/3.23.2 cray-fftw cray-hdf5 cray-mpich cce/16.0.1 
+c-all cray-fftw cray-hdf5 cray-mpich cce/16.0.1 
 c-all rocm/5.5.1 cray-python  omniperf
 c-cpu
 

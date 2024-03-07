@@ -27,8 +27,8 @@ module m_monopole
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_mono)
     !$acc declare link(loc_mono)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
-    !$acc declare link(foc_length, aperture)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture, support_width)
+    !$acc declare link(foc_length, aperture, support_width)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, npulse, dir, delay)
     !$acc declare link(mag, length, npulse, dir, delay)

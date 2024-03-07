@@ -86,15 +86,8 @@ module m_variables_conversion
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-    public :: gammas, pi_infs
-    !$acc declare link(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-#else
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-#endif
-
 #endif
 
 #ifdef CRAY_ACC_WAR
@@ -468,7 +461,7 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_Ke
+        real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
 
         real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_rho_K, alpha_K !<
         real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
@@ -635,6 +628,7 @@ contains
 
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
+#ifdef MFC_SIMULATION
         @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
         @:ALLOCATE_GLOBAL(gs_min (1:num_fluids))
         @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
@@ -643,6 +637,17 @@ contains
         @:ALLOCATE_GLOBAL(qvs    (1:num_fluids))
         @:ALLOCATE_GLOBAL(qvps    (1:num_fluids))
         @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
+#else
+        @:ALLOCATE(gammas (1:num_fluids))
+        @:ALLOCATE(gs_min (1:num_fluids))
+        @:ALLOCATE(pi_infs(1:num_fluids))
+        @:ALLOCATE(ps_inf(1:num_fluids))
+        @:ALLOCATE(cvs    (1:num_fluids))
+        @:ALLOCATE(qvs    (1:num_fluids))
+        @:ALLOCATE(qvps    (1:num_fluids))
+        @:ALLOCATE(Gs     (1:num_fluids))
+#endif
+
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
@@ -671,7 +676,11 @@ contains
 #endif
 
         if (bubbles) then
+#ifdef MFC_SIMULATION
             @:ALLOCATE_GLOBAL(bubrs(1:nb))
+#else
+            @:ALLOCATE(bubrs(1:nb))
+#endif
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -1318,10 +1327,17 @@ contains
         deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 #endif
 
+#ifdef MFC_SIMULATION
         @:DEALLOCATE_GLOBAL(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
         if (bubbles) then
             @:DEALLOCATE_GLOBAL(bubrs)
         end if
+#else
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        if (bubbles) then
+            @:DEALLOCATE(bubrs)
+        end if
+#endif
 
         ! Nullifying the procedure pointer to the subroutine transferring/
         ! computing the mixture/species variables to the mixture variables

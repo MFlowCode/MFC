@@ -20,7 +20,7 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
-#ifdef MFC_OpenACC
+#ifdef _OPENACC
     use openacc
 #endif
 
@@ -537,18 +537,12 @@ contains
         is2_weno = is2_weno_d
         is3_weno = is3_weno_d
         
-        !$acc update device(is1_weno, is2_weno, is3_weno)e
+        !$acc update device(is1_weno, is2_weno, is3_weno)
 
-#ifdef CRAY_PRINT_DEBUG
-print*, "weno_init"
-#endif
         if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
-#ifdef CRAY_PRINT_DEBUG
-print*, "weno_body"
-#endif
 
         if (weno_order == 1) then
             if (weno_dir == 1) then
@@ -716,18 +710,7 @@ print*, "weno_body"
 
 
                                 vL_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-#ifdef CRAY_PRINT_DEBUG
-                                if(j == 1) then
-                                        print *, "WENO OUTPUT"
-                                        print *, vL_rs_vf_x(j, k, l, i)
-                                        print *, vR_rs_vf_x(j, k, l, i)
-                                        ! without these prints, dvd is getting optimized out
-                                        ! yuck!
-                                        print *, dvd(1)
-                                        print *, dvd(0)
-                                        print *, dvd(-1)
-                                 end if
-#endif
+
                                 poly(0) = v_rs_ws_${XYZ}$(j, k, l, i) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 0)*dvd(1) &
                                           + poly_coef_cbR_${XYZ}$(j, 0, 1)*dvd(0)
@@ -752,13 +735,6 @@ print*, "weno_body"
                                 end if
 
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = sum(omega*poly)
-#ifdef CRAY_PRINT_DEBUG
-                                if(j == 1) then
-                                        print *, "WENO OUTPUT"
-                                        print *, vL_rs_vf_x(j, k, l, i)
-                                        print *, vR_rs_vf_x(j, k, l, i)
-                                 end if
-#endif
  
                              end do
                         end do

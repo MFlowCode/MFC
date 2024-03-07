@@ -19,7 +19,7 @@ module m_fftw
 
 #if defined(MFC_OpenACC) && defined(__PGI)
     use cufft
-#else if defined(_OPENACC)
+#else if defined(MFC_OpenACC)
     use hipfort
     use hipfort_check
     use hipfort_hipfft
@@ -49,11 +49,11 @@ module m_fftw
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-#if defined(MFC_OpenACC) && defined(__PGI)
+#if defined(MFC_OpenACC) 
     !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
 #ifdef CRAY_ACC_WAR
-        @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), data_real_gpu)
+        @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
         @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
         @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
         !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
@@ -93,7 +93,7 @@ contains
 
         batch_size = x_size*sys_size
 
-#if defined(MFC_OPENACC) 
+#if defined(MFC_OpenACC) 
         rank = 1; istride = 1; ostride = 1
 
         allocate(gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
@@ -118,7 +118,7 @@ contains
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
-#if defined(_OPENACC) 
+#if defined(MFC_OpenACC) 
         @:ALLOCATE_GLOBAL(data_real_gpu(1:real_size*x_size*sys_size))
         @:ALLOCATE_GLOBAL(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         @:ALLOCATE_GLOBAL(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -147,7 +147,7 @@ contains
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
-#if defined(MFC_OPENACC) 
+#if defined(MFC_OpenACC) 
 
 !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
@@ -308,7 +308,7 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
-#if defined(MFC_OPENACC) 
+#if defined(MFC_OpenACC) 
         @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)        
 #if defined(_PGI)
         
