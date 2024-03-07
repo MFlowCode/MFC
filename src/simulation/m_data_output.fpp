@@ -528,11 +528,11 @@ contains
         if (mod(p, 2) > 0) then
             cent = p/2 + 1/2
         elseif (mod(p, 2) == 0) then
-            cent = p/2 + 1/2
+            cent = p/2
         elseif (p == 0) then
             cent = 0
         endif
-            do k = 0, n
+           do k = 0, n
                 OLoop: do j = 0, m
                     axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
                     axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
@@ -564,6 +564,8 @@ contains
                     end if
                 end do OLoop
             end do
+        !    endif
+        !    end do
 
         allocate (y_d(counter))
         allocate (x_d(counter))
