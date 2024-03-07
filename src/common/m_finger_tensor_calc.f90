@@ -23,7 +23,7 @@ module m_finger_tensor_calc
               f_determinant, &
               s_calculate_deviatoric, &
               s_calculate_atransposea, &
-              s_calculate_elastic_energy
+              f_elastic_energy
     
     contains 
 
@@ -113,7 +113,7 @@ module m_finger_tensor_calc
         matrix(:) = matrix(:)**2
         ! compute the trace
         f_elastic_energy = f_trace(matrix)
-    end subroutine s_calculate_elastic_energy
+    end function f_elastic_energy
 
     function f_trace(tensor)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
