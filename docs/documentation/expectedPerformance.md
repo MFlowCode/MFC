@@ -5,31 +5,19 @@ This page shows a summary of these results.
 
 ## Expected time-steps/hour
 
-The following table outlines expected performance in terms of the number of time steps per hour, rounded to the nearest hundred (higher is better).
-A 3D inviscid, 6-equation problem is solved for various problem sizes (grid cells) and hardware.
-A 3rd order (3-stage) Runge-Kutta time-stepper is used.
-CPU results utilize an entire processor die.
+The following table outlines observed performance as nanoseconds per grid point (ns/GP) per right-hand side evaluation (lower is better).
+A 3D, inviscid, 5-equation problem with two advected species is solved for various problem sizes (grid cells per CPU die or GPU device) and hardware.
 
-| Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
+| Hardware             | # Cores | 1M GPs      | 4M GPs      | 8M GPs | Compiler    | Computer      |
 | ---:                 | :----:  |    :----:      |  :---:         | :---:        | :----:      | :---          |
-| NVIDIA V100          | 1 (device)      | 88.5k          | 18.7k          | N/A          | NVHPC 22.11 | PACE Phoenix  |
-| NVIDIA V100          | 1 (device)      | 78.8k          | 18.8k          | N/A          | NVHPC 22.11 | OLCF Summit   |
-| NVIDIA A100          | 1 (device)      | 114.4k         | 34.6k          | 16.5k        | NVHPC 23.5  | Wingtip       |
-| AMD MI250X           | 1 (GCD)      | 77.5k          | 22.3k          | 11.2k        | CCE 16.0.1  | OLCF Frontier |
-| Intel Xeon Gold 6226 | 12 (cores)     | 2.5k           | 0.7k           | 0.4k         | GNU 10.3.0  | PACE Phoenix  |
-| Apple Silicon M2     | 6 (cores)       | 2.8k           | 0.6k           | 0.2k         | GNU 13.2.0  | N/A           |
+| NVIDIA V100          | 1 (device)       | 95.6         | 104          | 104        | NVHPC 22.11 | PACE Phoenix  |
+| NVIDIA V100          | 1 (device)      | 101         |  104         | 104        | NVHPC 22.11 | OLCF Summit   |
+| NVIDIA A100          | 1 (device)      | 71         | 56          | 59        | NVHPC 23.5  | Wingtip       |
+| AMD MI250X           | 1 (GCD)      | 108          | 90       | 96      | CCE 16.0.1  | OLCF Frontier |
+| Intel Xeon Gold 6226 | 12 (cores)     | 1963           | 1688           | 1686         | GNU 10.3.0  | PACE Phoenix  |
+| Apple M2     | 6 (cores)      | 2919           | 245          | 4500        | GNU 13.2.0  | N/A           |
 
-We also show the expected performance of MFC for the same problem as above, except for the 5-equation model used, in the table below.
-It is presented in the same manner as the one above.
-
-| Hardware             | # Cores | Steps/Hr (1M pts)      | Steps/Hr (4M pts)      | Steps/Hr  (8M pts)   | Compiler    | Computer      |
-| ---:                 | :----:  |    :----:      |  :---:         | :---:        | :----:      | :---          |
-| NVIDIA V100          | 1 (device)       | 113.4k         | 26.2k          | 13.0k        | NVHPC 22.11 | PACE Phoenix  |
-| NVIDIA V100          | 1 (device)      | 107.7k         | 26.3k          | 13.1k        | NVHPC 22.11 | OLCF Summit   |
-| NVIDIA A100          | 1 (device)      | 153.5k         | 48.0k          | 22.5k        | NVHPC 23.5  | Wingtip       |
-| AMD MI250X           | 1 (GCD)      | 104.2k         | 31.0k          | 14.8k        | CCE 16.0.1  | OLCF Frontier |
-| Intel Xeon Gold 6226 | 12 (cores)     | 5.4k           | 1.6k           | 0.8k         | GNU 10.3.0  | PACE Phoenix  |
-| Apple Silicon M2     | 6 (cores)      | 3.7k           | 11.0k          | 0.3k         | GNU 13.2.0  | N/A           |
+__All results are in nanoseconds per grid point per RHS evaluation.__
 
 ## Weak scaling
 
