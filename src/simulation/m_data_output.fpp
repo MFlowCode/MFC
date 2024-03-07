@@ -591,6 +591,14 @@ contains
 
     end subroutine s_write_sim_data_file ! -----------------------------------
 
+    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
+        real(kind(0d0)) :: rho
+
+
+    end subroutine
+
     subroutine s_calculate_numerical_schlieran(q_prim_vf, f_NS)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l
