@@ -34,25 +34,23 @@ module m_finger_tensor_calc
 
         integer :: i !< Generic loop iterators
 
-#ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
         do i = 1, num_dims**2
            tensor(i) = q_cons_vf(stress_idx%beg+i-1)%sf(j,k,l)
         end do
-#endif
     end subroutine s_allocate_tensor
 
     function f_determinant(tensor)
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
         real(kind(0d0)) :: f_determinant
 
         if (num_dims .eq. 1) then
-           f_determinant = tensor(1) ! does this make sense?
+           f_determinant = tensor(1) ! TODO: Mirelys: does this make sense?
         elseif (num_dims .eq. 2) then
            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
         else 
-           f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8))
-                           - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7))
+           f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8)) & 
+                           - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7)) & 
                            + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
         end if        
    
@@ -61,13 +59,46 @@ module m_finger_tensor_calc
     subroutine s_calculate_deviatoric(tensor,deviatoric)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: deviatoric
+        real(kind(0d0)) :: trace13
 
-            end subroutine s_calculate_deviatoric
+        deviatoric = tensor
+        trace13 = tensor(1)
+        if (num_dims .eq. 2) then
+           trace13 = trace13 + tensor(4)
+        elseif (num_dims .eq. 3) then
+           trace13 = trace13 + tensor(5) + tensor(9)    
+        end if
+        trace13 = (1.0/3.0)*trace13
+        deviatoric(1) = tensor(1) - trace13
+        if (num_dims .eq. 2) then       
+           deviatoric(4) = tensor(4) - trace13
+        elseif (num_dims .eq. 3) then 
+           deviatoric(5) = tensor(5) - trace13
+           deviatoric(9) = tensor(9) - trace13
+        end if
+    end subroutine s_calculate_deviatoric
 
-    subroutine s_calculate_atransposea(tensor,tproduct)
+    subroutine s_calculate_atransposea(tensor,ata)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tproduct
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
 
+        ata(1) = tensor(1)**2 ! TODO: Mirelys: Does this make sense? 
+        if (num_dims .eq. 2) then
+           ata(1) = ata(1) + tensor(3)**2
+           ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
+           ata(3) = ata(2)
+           ata(4) = tensor(2)**2 + tensor(4)**2
+        elseif (num_dims .eq. 3) then
+           ata(1) = ata(1) + tensor(4)**2 + tensor(7)**2
+           ata(5) = tensor(2) + tensor(5)**2 + tensor(8)**2
+           ata(9) = tensor(3) + tensor(6)**2 + tensor(9)**2
+           ata(2) = tensor(1)*tensor(2) + tensor(4)*tensor(5) + tensor(7)*tensor(8) 
+           ata(3) = tensor(1)*tensor(3) + tensor(4)*tensor(6) + tensor(7)*tensor(9) 
+           ata(6) = tensor(2)*tensor(3) + tensor(5)*tensor(6) + tensor(8)*tensor(9) 
+           ata(4) = ata(2)
+           ata(7) = ata(3)
+           ata(8) = ata(4)
+        end if
     end subroutine s_calculate_atransposea
 
 end module m_finger_tensor_calc

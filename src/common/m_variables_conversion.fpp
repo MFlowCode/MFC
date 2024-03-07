@@ -173,11 +173,30 @@ contains
 
         end if
 
-        !if (hyperelasticity .and. present(G)) then
-        !TODO ADD CODE HERE
+        if (hyperelasticity .and. present(G)) then
+             ! calculate elastic contribution to Energy
+            E_e = 0d0
+            do s = stress_idx%beg, stress_idx%end
+                if (G > 0) then
+                    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                    ! Additional terms in 2D and 3D
+                    if ((s == stress_idx%beg + 1) .or. &
+                        (s == stress_idx%beg + 3) .or. &
+                        (s == stress_idx%beg + 4)) then
+                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                    end if
+                end if
+            end do
 
-        !end if
+            pres = ( &
+                   energy - &
+                   0.5d0*(mom**2.d0)/rho - &
+                   pi_inf - qv - E_e &
+                   )/gamma
+      
+        
 
+        end if
 
     end subroutine s_compute_pressure
 
