@@ -22,7 +22,8 @@ module m_finger_tensor_calc
     private; public :: s_allocate_tensor, & 
               f_determinant, &
               s_calculate_deviatoric, &
-              s_calculate_atransposea
+              s_calculate_atransposea, &
+              s_calculate_elastic_energy
     
     contains 
 
@@ -62,12 +63,7 @@ module m_finger_tensor_calc
         real(kind(0d0)) :: trace13
 
         deviatoric = tensor
-        trace13 = tensor(1)
-        if (num_dims .eq. 2) then
-           trace13 = trace13 + tensor(4)
-        elseif (num_dims .eq. 3) then
-           trace13 = trace13 + tensor(5) + tensor(9)    
-        end if
+        trace13 = f_trace(tensor)
         trace13 = (1.0/3.0)*trace13
         deviatoric(1) = tensor(1) - trace13
         if (num_dims .eq. 2) then       
@@ -100,5 +96,34 @@ module m_finger_tensor_calc
            ata(8) = ata(4)
         end if
     end subroutine s_calculate_atransposea
+
+    function f_elastic_energy(ghat)
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: ghat
+        real(kind(0d0)), dimension(num_dims**2) :: matrix
+        real(kind(0d0)) :: f_elastic_energy
+        ! remove the identity and square
+        matrix = ghat
+        matrix(1) = matrix(1) - 1d0
+        if (num_dims .eq. 2) then
+            matrix(4) = matrix(4) - 1d0
+        elseif (num_dims .eq. 3) then 
+            matrix(5) = matrix(5) - 1d0
+            matrix(9) = matrix(9) - 1d0
+        end if 
+        matrix(:) = matrix(:)**2
+        ! compute the trace
+        f_elastic_energy = f_trace(matrix)
+    end subroutine s_calculate_elastic_energy
+
+    function f_trace(tensor)
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)) :: f_trace
+        f_trace = tensor(1)
+        if (num_dims .eq. 2) then
+           f_trace = f_trace + tensor(4)
+        elseif (num_dims .eq. 3) then
+           f_trace = f_trace + tensor(5) + tensor(9)    
+        end if
+    end function f_trace
 
 end module m_finger_tensor_calc

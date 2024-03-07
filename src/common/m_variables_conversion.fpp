@@ -192,10 +192,7 @@ contains
                    energy - &
                    0.5d0*(mom**2.d0)/rho - &
                    pi_inf - qv - E_e &
-                   )/gamma
-      
-        
-
+                   )/gamma    
         end if
 
     end subroutine s_compute_pressure
@@ -917,7 +914,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity) then ! .or. hyperelasticity) then
+                        if (hypoelasticity .or. hyperelasticity) then ! .or. hyperelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1002,6 +999,26 @@ contains
                         end do
                     end if
 
+                    if (hyperelasticity) then
+                        !$acc loop seq
+                        do i = strxb, strxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                        /rho_K
+                            ! subtracting elastic contribution for pressure calculation
+                            if (G_K > 1000) then !TODO: check if stable for >0
+                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                ! extra terms in 2 and 3D
+                                if ((i == strxb + 1) .or. &
+                                    (i == strxb + 3) .or. &
+                                    (i == strxb + 4)) then
+                                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                    ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                end if
+                            end if
+                        end do
+                    end if
+
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -1042,8 +1059,9 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
-        real(kind(0d0)) :: G
+        real(kind(0d0)) :: G, detG
         real(kind(0d0)), dimension(2) :: Re_K
+        real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -1162,9 +1180,12 @@ contains
                     ! To do that, we need \hat(g), to get \hat(g), we need G^e
                     ! To get G^e, we need g_{ij}^e, we have this stored in q_cons_vf(i) where 
                     ! i goes from stress_idx%beg to stress_idx%end
-                        !do i = stress_idx%beg, stress_idx%end
-                        !        q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + & 
-                        !                                        stuff 
+                        call s_allocate_tensor(q_cons_vf,j,k,l,gtensor)
+                        call s_calculate_atransposea(gtensor,getge) ! getge is G^e
+                        detG =  f_determinant(getge) ! determinant of G^e
+                        ghat(:) = getge(:)*detG**(-1.d0/3.d0)
+                        e_e = (G/(4.d0*rho)*f_elastic_energy(ghat)
+                        q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + e_e
                     end if
 
                 end do
