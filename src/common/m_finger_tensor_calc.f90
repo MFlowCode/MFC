@@ -23,6 +23,7 @@ module m_finger_tensor_calc
               f_determinant, &
               s_calculate_deviatoric, &
               s_calculate_atransposea
+    
     contains 
 
     subroutine s_allocate_tensor(q_cons_vf,j,k,l,tensor)
