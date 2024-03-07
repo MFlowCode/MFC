@@ -2,10 +2,6 @@
 !! @file m_variables_conversion.f90
 !! @brief Contains module m_variables_conversion
 
-#:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
-#:include '../simulation/include/case.fpp'
-
 !> @brief This module consists of subroutines used in the calculation of matrix 
 !!              operations for the finger tensor
 
@@ -23,16 +19,16 @@ module m_finger_tensor_calc
 
     implicit none
 
-    private; 
-
-    public :: s_finger_tensor !variables ! name public variables for all of the subroutines
-
+    private; public :: s_allocate_tensor, & 
+              f_determinant, &
+              s_calculate_deviatoric, &
+              s_calculate_atransposea
     contains 
 
     subroutine s_allocate_tensor(q_cons_vf,j,k,l,tensor)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(int_bounds_info), optional, intent(IN) :: j, k, l
+        integer, intent(IN) :: j, k, l
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
 
         integer :: i !< Generic loop iterators
@@ -45,21 +41,19 @@ module m_finger_tensor_calc
 #endif
     end subroutine s_allocate_tensor
 
-    function s_calculate_determinant(tensor)
+    function f_determinant(tensor)
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: tensor
-        real(kind(0d0)) :: det
+        real(kind(0d0)) :: f_determinant
 
-        if num_dims .eq. 1 then
-           det = tensor(1) ! does this make sense?
-        elseif num_dims .eq. 2 then
-           det = tensor(1)*tensor(4) - tensor(2)*tensor(3)
+        if (num_dims .eq. 1) then
+           f_determinant = tensor(1) ! does this make sense?
+        elseif (num_dims .eq. 2) then
+           f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
         else 
-           det = tensor(1)*(tensor(2)*tensor(3)
+           f_determinant = tensor(1)*(tensor(2)*tensor(3))
         end if
         
-        return det 
-
-    end function s_calculate_determinant
+    end function f_determinant
 
     subroutine s_calculate_deviatoric(tensor,deviatoric)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor

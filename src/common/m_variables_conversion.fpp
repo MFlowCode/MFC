@@ -19,7 +19,7 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    use m_finger_matrix_calc   !< Using finger matrix calculations
+    use m_finger_tensor_calc   !< Using finger matrix calculations
 
     use m_helper
     ! ==========================================================================
@@ -173,10 +173,10 @@ contains
 
         end if
 
-        if (hyperelasticity .and. present(G)) then
+        !if (hyperelasticity .and. present(G)) then
         !TODO ADD CODE HERE
 
-        end if
+        !end if
 
 
     end subroutine s_compute_pressure
@@ -898,7 +898,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity .or. hyperelasticity) then
+                        if (hypoelasticity) then ! .or. hyperelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
