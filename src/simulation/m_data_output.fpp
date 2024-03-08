@@ -591,11 +591,12 @@ contains
 
     end subroutine s_write_sim_data_file ! -----------------------------------
 
-    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+    subroutine s_calculate_energy_contributions(q_cons_vf, Elk, Elp, Egk, Egie)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
         real(kind(0d0)) :: rho
-        integer :: i, j, k, l !looping indicies
+        real(kind(0d0)), dimension(num_dims) :: vel
+        integer :: i, j, k, l, s !looping indicies
         
         Elk = 0d0
         Elp = 0d0
@@ -610,10 +611,17 @@ contains
                 do j = 0, n
                     do i = 0, m
                         do l = 0, num_fluids
-                            rho = rho + q_prim_vf(l)%sf(i,j,k)
+                            rho = rho + q_cons_vf(l)%sf(i,j,k)
                         end do
-
-                        
+                        do s = 1, num_dims
+                            vel(s) = q_cons_vf(cont_idx%end + s)%sf(i, j, k)/rho
+                            if (q_cons_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
+                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)
+                            else
+                                Egk = Egk + 0.5d0*rho*vel(s)*vel(s)
+                            endif
+                        end do
+                                                       
                     end do
                 end do
             end do
@@ -621,7 +629,7 @@ contains
 
 
 
-    end subroutine
+    end subroutine s_calculate_energy_contributions
 
     subroutine s_calculate_numerical_schlieran(q_prim_vf, f_NS)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -1511,7 +1519,7 @@ contains
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
         real(kind(0d0)) :: tmp !<
-            !! Temporary variable to store quantity for mpi_allreduce
+            !! Temporary                         variable to store quantity for mpi_allreduce
 
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
