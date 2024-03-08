@@ -19,10 +19,10 @@ module m_fftw
 
 #if defined(MFC_OpenACC) && defined(__PGI)
     use cufft
-#else if defined(MFC_OpenACC)
+#elif defined(MFC_OpenACC)
     use hipfort
     use hipfort_check
-    use hipfort_hipfft
+    use hipfort_hipfft    
 #endif
 
     ! ==========================================================================
@@ -33,7 +33,7 @@ module m_fftw
  s_apply_fourier_filter, &
  s_finalize_fftw_module
 
-#if !(defined(MFC_OpenACC) && defined(__PGI))
+#if !defined(MFC_OpenACC)
     include 'fftw3.f03'
 #endif
 
