@@ -61,8 +61,8 @@ module m_mpi_proxy
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
+    !$acc declare create(v_size)
     !> @}
-
     !real :: s_time, e_time
     !real :: compress_time, mpi_time, decompress_time
     !integer :: nCalls_time = 0
@@ -119,6 +119,8 @@ contains
 
             v_size = sys_size
         end if
+
+        !$acc update device(v_size)
 
 #endif
 
