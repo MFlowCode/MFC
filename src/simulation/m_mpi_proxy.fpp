@@ -31,10 +31,10 @@ module m_mpi_proxy
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ib_buff_send) 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ib_buff_recv)    
-    private :: q_cons_buff_recv, q_cons_buff_send
-!$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send) 
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)    
+    
+    !$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
 #else
     real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
@@ -789,7 +789,7 @@ contains
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
-!$acc update device(v_size)
+        !$acc update device(v_size)
 
 #ifdef MFC_MPI
 

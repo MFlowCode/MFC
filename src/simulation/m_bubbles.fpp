@@ -36,8 +36,8 @@ module m_bubbles
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), bub_r_src, bub_v_src, bub_p_src, bub_m_src)
     !$acc declare link(bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
-    @:CRAY_DECLARE_GLOBAL_SCALAR(type(scalar_field), divu)
-    !$acc declare link(divu)    
+    type(scalar_field) :: divu !< matrix for div(u)
+    !$acc declare create(divu)  
 
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
     !$acc declare link(rs, vs, ms, ps)
@@ -99,7 +99,7 @@ contains
         @:ALLOCATE_GLOBAL(bub_p_src(0:m, 0:n, 0:p, 1:nb))
         @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
-    end subroutine
+    end subroutine s_initialize_bubbles_module
 
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
@@ -154,7 +154,7 @@ contains
 
         end if
 
-    end subroutine
+    end subroutine s_compute_bubbles_rhs
 
     !>  The purpose of this procedure is to compute the source terms
         !!      that are needed for the bubble modeling
