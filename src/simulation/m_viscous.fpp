@@ -39,7 +39,7 @@ module m_viscous
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
     !$acc declare link(tau_Re_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:) :: tau_Re_vf
+    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !$acc declare create(tau_Re_vf)
 #endif
 

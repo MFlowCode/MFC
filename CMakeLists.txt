@@ -463,7 +463,7 @@ if (MFC_SIMULATION)
                      SOURCES "${simulation_SRCs}"
                      MPI OpenACC FFTW)
 
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND MFC_OpenACC)
         add_custom_command(TARGET simulation POST_BUILD
             COMMAND           "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cce_simulation_workgroup_256.sh"
                               "${CMAKE_CURRENT_BINARY_DIR}"
