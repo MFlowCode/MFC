@@ -603,8 +603,6 @@ contains
         Egk = 0d0
         Egie = 0d0
         rho = 0d0
-        
-        
 
         if (p > 0) then
             do k = 0, p
@@ -622,6 +620,8 @@ contains
                             endif
                         end do
                                                        
+                            rho = rho + q_prim_vf(l)%sf(i,j,k)
+                        end do                      
                     end do
                 end do
             end do
