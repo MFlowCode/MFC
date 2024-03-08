@@ -88,8 +88,8 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
     test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
-
-    test.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    test.add_argument(      "--no-build",     action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
+    test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
 
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
