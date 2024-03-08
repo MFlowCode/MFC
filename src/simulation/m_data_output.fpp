@@ -595,6 +595,30 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
         real(kind(0d0)) :: rho
+        integer :: i, j, k, l !looping indicies
+        
+        Elk = 0d0
+        Elp = 0d0
+        Egk = 0d0
+        Egie = 0d0
+        rho = 0d0
+        
+        
+
+        if (p > 0) then
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        do l = 0, num_fluids
+                            rho = rho + q_prim_vf(l)%sf(i,j,k)
+                        end do
+
+                        
+                    end do
+                end do
+            end do
+        end if
+
 
 
     end subroutine
