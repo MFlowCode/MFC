@@ -6,7 +6,7 @@ This page shows a summary of these results.
 ## Expected time-steps/hour
 
 The following table outlines observed performance as nanoseconds per grid point (ns/GP) per right-hand side evaluation (lower is better).
-We solve an example 3D, inviscid, 5-equation model problem with two advected species.
+We solve an example 3D, inviscid, 5-equation model problem with two advected species (a total of 8 PDEs).
 The numerics are WENO5 and the HLLC approximate Riemann solver.
 We report results for various numbers of grid points per CPU die (or GPU device) and hardware.
 
