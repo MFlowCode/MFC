@@ -862,6 +862,10 @@ contains
 
         real(kind(0d0)) :: pres
 
+        real(kind(0d0)) :: detG, e_e
+
+        real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
+
         integer :: i, j, k, l !< Generic loop iterators
 
         real(kind(0.d0)) :: ntmp
@@ -999,24 +1003,18 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity) then
-                        !$acc loop seq
-                        do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /rho_K
-                            ! subtracting elastic contribution for pressure calculation
-                            if (G_K > 1000) then !TODO: check if stable for >0
-                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
-                                ! extra terms in 2 and 3D
-                                if ((i == strxb + 1) .or. &
-                                    (i == strxb + 3) .or. &
-                                    (i == strxb + 4)) then
-                                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                    ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
-                                end if
-                            end if
-                        end do
+                    !$acc loop seq
+                    do i = strxb, strxe
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                    end do
+
+                    if (hyperelasticity .and. G_K .gt. 0.d0) then
+                       call s_allocate_tensor(qK_prim_vf,j,k,l,gtensor)
+                       call s_calculate_atransposea(gtensor,getge) ! getge is G^e
+                       detG =  f_determinant(getge) ! determinant of G^e
+                       ghat(:) = getge(:)*detG**(-1.d0/3.d0)
+                       e_e = (G_K/(4.d0*rho_K))*f_elastic_energy(ghat)              
+                       qK_prim_vf(E_idx)%sf(j,k,l) = qK_prim_vf(E_idx)%sf(j,k,l) - e_e/gamma_k
                     end if
 
                     !$acc loop seq
@@ -1059,8 +1057,9 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
-        real(kind(0d0)) :: G, detG
+        real(kind(0d0)) :: G
         real(kind(0d0)), dimension(2) :: Re_K
+        real(kind(0d0)) :: detG, e_e
         real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
 
         integer :: i, j, k, l, q !< Generic loop iterators
@@ -1172,19 +1171,12 @@ contains
                         end do
                     end if
               
-                    if (hyperelasticity) then
-                    ! TODO ADD the e^e term contribution to the total energy equation here
-                    ! Multiple functions need to be called for 3x3 matrix calculations at each cell
-
-                    ! PRECOMPUTATIONS TO CALCULATE \rho e^e = \rho (\frac{\mu}{4 \rho_0} \tr ((\hat(g) - I)^2))
-                    ! To do that, we need \hat(g), to get \hat(g), we need G^e
-                    ! To get G^e, we need g_{ij}^e, we have this stored in q_cons_vf(i) where 
-                    ! i goes from stress_idx%beg to stress_idx%end
+                    if (hyperelasticity .and. G .gt. 0.d0 ) then
                         call s_allocate_tensor(q_cons_vf,j,k,l,gtensor)
                         call s_calculate_atransposea(gtensor,getge) ! getge is G^e
                         detG =  f_determinant(getge) ! determinant of G^e
                         ghat(:) = getge(:)*detG**(-1.d0/3.d0)
-                        e_e = (G/(4.d0*rho)*f_elastic_energy(ghat)
+                        e_e = (G/(4.d0*rho))*f_elastic_energy(ghat)
                         q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + e_e
                     end if
 
