@@ -131,10 +131,6 @@ module m_global_parameters
     integer :: riemann_solver !< Riemann solver algorithm
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
-    logical :: relax          !< activate phase change
-    integer :: relax_model    !< Relaxation model
-    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     logical :: alt_soundspeed !< Alternate mixture sound speed
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
@@ -147,8 +143,16 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order)
     #:endif
 
-    !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity, relax, palpha_eps,ptgalpha_eps)
+    !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
 
+    logical :: relax          !< activate phase change
+    integer :: relax_model    !< Relaxation model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+
+#ifndef _CRAYFTN
+    !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
+#endif
 
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
@@ -963,6 +967,14 @@ contains
         intxe = internalEnergies_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+        !$acc update device(m, n, p)
+
+        !$acc update device(alt_soundspeed, monopole, num_mono)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+
+        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+        !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE_GLOBAL(x_cb(-1 - buff_size:m + buff_size))

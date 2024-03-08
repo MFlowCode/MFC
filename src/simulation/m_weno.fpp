@@ -66,7 +66,6 @@ module m_weno
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_z)
     !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
     !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
-    !$acc declare link(poly_coef_L, poly_coef_R)
 #else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
@@ -76,8 +75,6 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
 #endif
-    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L
-    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R
 
     !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
     !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
@@ -97,7 +94,7 @@ module m_weno
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_z)
-    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z, d_L, d_R)
+    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z)
 #else
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
@@ -107,8 +104,6 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
 #endif
-    real(kind(0d0)), pointer, dimension(:, :) :: d_L
-    real(kind(0d0)), pointer, dimension(:, :) :: d_R
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
     !> @}
@@ -122,13 +117,12 @@ module m_weno
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
-    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z, beta_coef)
+    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z)
 #else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
 #endif
-    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
@@ -153,8 +147,7 @@ module m_weno
     !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
     !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
     !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z,   &
-    !$acc                v_size, )
+    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
 #endif
 
 contains
@@ -741,6 +734,11 @@ contains
                     end do
                 end do
                 !$acc end parallel loop
+
+                if (mp_weno) then
+                    call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
+                     vR_rs_vf_${XYZ}$)                   
+                end if
             end if
             #:endfor
         end if

@@ -81,7 +81,7 @@ module m_variables_conversion
     end interface ! ============================================================
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !!$acc declare create(ixb, ixe, iyb, iye, izb, ize)
+    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
     real(kind(0d0)) :: temp
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
@@ -102,6 +102,7 @@ module m_variables_conversion
     !$acc declare create(bubrs, Gs, Res)
 #endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
+    !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
@@ -625,7 +626,9 @@ contains
             end if
         end if
 #endif
-
+        
+        !$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
+        !$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
         !$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
 #ifdef MFC_SIMULATION
@@ -1216,7 +1219,7 @@ contains
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
-        !$acc enter data copyin(is1b, is2b, is3b, is1e, is2e, is3e)
+        !$acc update device(is1b, is2b, is3b, is1e, is2e, is3e)
 
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
