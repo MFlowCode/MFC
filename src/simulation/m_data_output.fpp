@@ -594,7 +594,7 @@ contains
     subroutine s_calculate_energy_contributions(q_cons_vf, Elk, Elp, Egk, Egie)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
-        real(kind(0d0)) :: rho
+        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
@@ -603,6 +603,13 @@ contains
         Egk = 0d0
         Egie = 0d0
         rho = 0d0
+        pi_inf = fluid_pp(1)%pi_inf
+        qv = fluid_pp(1)%qv
+        gamma = fluid_pp(1)%gamma
+        
+
+
+
 
         if (p > 0) then
             do k = 0, p
@@ -611,6 +618,14 @@ contains
                         do l = 0, num_fluids
                             rho = rho + q_cons_vf(l)%sf(i,j,k)
                         end do
+                        dV = dx(i)*dy(j)*dz(k)
+                        call s_compute_pressure( &
+                            q_cons_vf(1)%sf(i, j, k), &
+                            q_cons_vf(alf_idx)%sf(i, j, k), &
+                            0.5d0*(q_cons_vf(2)%sf(i, j, k)**2.d0)/ &
+                            q_cons_vf(1)%sf(i, j, k), &
+                            pi_inf, gamma, rho, qv, pres)
+
                         do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(i, j, k)/rho
                             if (q_cons_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
@@ -619,9 +634,6 @@ contains
                                 Egk = Egk + 0.5d0*rho*vel(s)*vel(s)
                             endif
                         end do
-                                                       
-                            rho = rho + q_prim_vf(l)%sf(i,j,k)
-                        end do                      
                     end do
                 end do
             end do
