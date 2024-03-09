@@ -3,9 +3,9 @@
 !! @brief  Contains module m_start_up
 
 !> @brief This module contains the subroutines that read in and check the
-!!              consistency of the user provided inputs. This module also allocates, initializes and 
-!!              deallocates the relevant variables and sets up the time stepping, 
-!!              MPI decompostion and I/O procedures
+!!              consistency of the user provided inputs. This module also allocates, initializes and
+!!              deallocates the relevant variables and sets up the time stepping,
+!!              MPI decomposition and I/O procedures
 module m_start_up
 
     ! Dependencies =============================================================
@@ -18,7 +18,7 @@ module m_start_up
 
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
-                                
+
     use m_data_input            !< Procedures reading raw simulation data to fill
                                 !! the conservative, primitive and grid variables
 
@@ -53,7 +53,9 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
-        ! Namelist for all of the parameters to be inputed by the user
+        character(len=1000) :: line
+
+        ! Namelist for all of the parameters to be inputted by the user
         namelist /user_inputs/ case_dir, m, n, p, t_step_start, &
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, adv_alphan, &
@@ -69,7 +71,8 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma
+            polydisperse, poly_sigma, file_per_process, relax, &
+            relax_model
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -83,8 +86,11 @@ contains
             read (1, NML=user_inputs, iostat=iostatus)
 
             if (iostatus /= 0) then
-                call s_mpi_abort('Invalid line in post_process.inp. It is '// &
-                    'likely due to a datatype mismatch. Exiting ...')
+                backspace (1)
+                read (1, fmt='(A)') line
+                print *, 'Invalid line in namelist: '//trim(line)
+                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                                 'likely due to a datatype mismatch. Exiting ...')
             end if
 
             close (1)
@@ -92,6 +98,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if
@@ -120,7 +128,7 @@ contains
         ! Constraint on the location of the case directory
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Unsupported choice for the value of '// &
-                'case_dir. Exiting ...')
+                             'case_dir. Exiting ...')
         end if
 
         call s_check_inputs()
@@ -128,14 +136,14 @@ contains
     end subroutine s_check_input_file ! ------------------------------------
 
     subroutine s_perform_time_step(t_step)
-    
-        integer, intent(INOUT) :: t_step 
+
+        integer, intent(INOUT) :: t_step
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")',                                &
-                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                  (t_step      - t_step_start)/t_step_save + 1,                                       &
-                  (t_step_stop - t_step_start)/t_step_save + 1,                                       &
-                  t_step
+            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                (t_step - t_step_start)/t_step_save + 1, &
+                (t_step_stop - t_step_start)/t_step_save + 1, &
+                t_step
         end if
 
         ! Populating the grid and conservative variables
@@ -156,10 +164,10 @@ contains
 
     subroutine s_save_data(t_step, varname, pres, c, H)
 
-        integer, intent(INOUT) :: t_step 
+        integer, intent(INOUT) :: t_step
         character(LEN=name_len), intent(INOUT) :: varname
         real(kind(0d0)), intent(INOUT) :: pres, c, H
-        
+
         integer :: i, j, k, l
 
         ! Opening a new formatted database file
@@ -438,11 +446,11 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
                         H = ((gamma_sf(i, j, k) + 1d0)*pres + &
-                        pi_inf_sf(i, j, k))/rho_sf(i, j, k)
+                             pi_inf_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
-                            gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                            H, adv, 0d0, c)
+                                                      gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
+                                                      H, adv, 0d0, c)
 
                         q_sf(i, j, k) = c
                     end do
@@ -573,16 +581,16 @@ contains
 
         ! Closing the formatted database file
         call s_close_formatted_database_file()
-    end subroutine s_save_data    
+    end subroutine s_save_data
 
     subroutine s_initialize_modules()
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        if(bubbles .and. nb > 1) then
+        if (bubbles .and. nb > 1) then
             call s_simpson
         end if
-        if(bubbles .and. .not. polytropic) then
+        if (bubbles .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         if (num_procs > 1) call s_initialize_mpi_proxy_module()
@@ -591,7 +599,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_data_output_module()
 
-        ! Associate pointers for serial or paralle I/O
+        ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
         else
@@ -611,7 +619,7 @@ contains
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
             call s_check_input_file()
-            
+
             print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
         end if
 
@@ -623,7 +631,6 @@ contains
         call s_mpi_decompose_computational_domain()
 
     end subroutine s_initialize_mpi_domain
-
 
     subroutine s_finalize_modules()
         ! Disassociate pointers for serial and parallel I/O

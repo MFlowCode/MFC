@@ -35,6 +35,8 @@ module m_global_parameters
     integer :: p !<
     !! Number of cells in the x-, y- and z-coordinate directions
 
+    integer(8) :: nGlobal ! Global number of cells in the domain
+
     integer :: m_glb, n_glb, p_glb !<
     !! Global number of cells in each direction
 
@@ -72,6 +74,10 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters ==========================================
     integer :: model_eqns      !< Multicomponent flow model
+    logical :: relax           !< activate phase change
+    integer :: relax_model     !< Relax Model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Alpha limiter
@@ -95,14 +101,16 @@ module m_global_parameters
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
     logical :: parallel_io !< Format of the data files
+    logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
 
     logical :: vel_profile !< Set hypertangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
- 
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
+    real(kind(0d0)) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
     real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
@@ -113,10 +121,11 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
-
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
+    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
+    type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
@@ -159,6 +168,23 @@ module m_global_parameters
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
+    !> @name Immersed Boundaries
+    !> @{
+    logical :: ib           !< Turn immersed boundaries on
+    integer :: num_ibs      !< Number of immersed boundaries
+    integer :: Np
+
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+
+    type(probe_parameters), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    !! Database of the immersed boundary patch parameters for each of the
+    !! patches employed in the configuration of the initial condition. Note that
+    !! the maximum allowable number of patches, num_patches_max, may be changed
+    !! in the module m_derived_types.f90.
+    ! ==========================================================================
+
+    !> @}
+
     !> @name Non-polytropic bubble gas compression
     !> @{
     logical :: polytropic
@@ -172,7 +198,6 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
-
 
     !> @}
 
@@ -238,6 +263,10 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
+        relax = .false.
+        relax_model = dflt_int
+        palpha_eps = dflt_real
+        ptgalpha_eps = dflt_real
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
@@ -248,12 +277,21 @@ contains
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0d0
+                bc_${DIM}$%ve${DIR}$ = 0d0
+            #:endfor
+        #:endfor
+
         parallel_io = .false.
+        file_per_process = .false.
         precision = 2
         vel_profile = .false.
         instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
+        perturb_flow_mag = dflt_real
         perturb_sph = .false.
         perturb_sph_fluid = dflt_int
         fluid_rho = dflt_real
@@ -263,10 +301,11 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model%scale(:)     = 1d0
+            patch_icpp(i)%model%scale(:) = 1d0
             patch_icpp(i)%model%translate(:) = 0d0
-            patch_icpp(i)%model%filepath(:)  = ' '
-            patch_icpp(i)%model%spc          = 10
+            patch_icpp(i)%model%filepath(:) = ' '
+            patch_icpp(i)%model%spc = 10
+            patch_icpp(i)%model%threshold = 0.9d0
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
@@ -290,6 +329,9 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
+            patch_icpp(i)%cv = 0d0
+            patch_icpp(i)%qv = 0d0
+            patch_icpp(i)%qvp = 0d0
             patch_icpp(i)%tau_e = 0d0
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
@@ -334,6 +376,27 @@ contains
         Pe_c = dflt_real
         Tw = dflt_real
 
+        ! Immersed Boundaries
+        ib = .false.
+        num_ibs = dflt_int
+
+        do i = 1, num_patches_max
+            patch_ib(i)%geometry = dflt_int
+            patch_ib(i)%x_centroid = dflt_real
+            patch_ib(i)%y_centroid = dflt_real
+            patch_ib(i)%z_centroid = dflt_real
+            patch_ib(i)%length_x = dflt_real
+            patch_ib(i)%length_y = dflt_real
+            patch_ib(i)%length_z = dflt_real
+            patch_ib(i)%radius = dflt_real
+            patch_ib(i)%theta = dflt_real
+            patch_ib(i)%c = dflt_real
+            patch_ib(i)%t = dflt_real
+            patch_ib(i)%m = dflt_real
+            patch_ib(i)%p = dflt_real
+            patch_ib(i)%slip = .false.
+        end do
+
         ! Fluids physical parameters
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
@@ -345,6 +408,9 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
+            fluid_pp(i)%cv = 0d0
+            fluid_pp(i)%qv = 0d0
+            fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = 0d0
         end do
 
@@ -470,21 +536,21 @@ contains
                 end if
 
                 !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                if(.not. qbmm) then
-                    if ( polytropic ) then
+                if (.not. qbmm) then
+                    if (polytropic) then
                         rhoref = 1.d0
                         pref = 1.d0
                     end if
                 end if
 
-                !Initialize pb0,pv,pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic) 
-                if(qbmm) then
-                    if(polytropic) then
-                        allocate(pb0(nb))
-                        if(Web == dflt_real) then                            
+                !Initialize pb0,pv,pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                if (qbmm) then
+                    if (polytropic) then
+                        allocate (pb0(nb))
+                        if (Web == dflt_real) then
                             pb0 = pref
-                            pb0 = pb0 / pref
-                            pref = 1d0                  
+                            pb0 = pb0/pref
+                            pref = 1d0
                         end if
                         rhoref = 1d0
                     end if
@@ -572,7 +638,6 @@ contains
                     pref = 1.d0
                 end if
 
-
             end if
         end if
 
@@ -593,24 +658,26 @@ contains
 
 #ifdef MFC_MPI
 
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
-            allocate (MPI_IO_DATA%var(1:sys_size))                
+            allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
         do i = 1, sys_size
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
+
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 
 #endif
 
@@ -690,6 +757,8 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
+
+        if (ib) deallocate (MPI_IO_IB_DATA%var%sf)
 
 #endif
 

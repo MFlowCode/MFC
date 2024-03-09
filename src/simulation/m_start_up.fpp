@@ -13,9 +13,9 @@
 !!              contain the inputs, the initial condition data and the grid data
 !!              that are provided by the user. The module is additionally tasked
 !!              with verifying the consistency of the user inputs and completing
-!!              the grid variables. This module also also allocating, initializing 
-!!              I/O, and deallocating the relevant variables on both cpus and gpus as well as 
-!!              setting up the time stepping, domain decomposition and I/O procedures.  
+!!              the grid variables. This module also also allocating, initializing
+!!              I/O, and deallocating the relevant variables on both cpus and gpus as well as
+!!              setting up the time stepping, domain decomposition and I/O procedures.
 module m_start_up
 
     ! Dependencies =============================================================
@@ -49,6 +49,8 @@ module m_start_up
 
     use m_hypoelastic
 
+    use m_phase_change          !< Phase-change module
+
     use m_viscous
 
     use m_bubbles
@@ -61,6 +63,8 @@ module m_start_up
 
     use m_nvtx
 
+    use m_ibm
+
     use m_helper
 
     use m_compile_specific
@@ -70,17 +74,17 @@ module m_start_up
 
     implicit none
 
-    private; public ::   s_read_input_file, &
-                         s_check_input_file, &
-                         s_read_data_files, &
-                         s_read_serial_data_files, &
-                         s_read_parallel_data_files, &
-                         s_populate_grid_variables_buffers, &
-                         s_initialize_internal_energy_equations, &
-                         s_initialize_modules, s_initialize_gpu_vars, &
-                         s_initialize_mpi_domain, s_finalize_modules, &
-                         s_perform_time_step, s_save_data, &
-                         s_save_performance_metrics
+    private; public :: s_read_input_file, &
+ s_check_input_file, &
+ s_read_data_files, &
+ s_read_serial_data_files, &
+ s_read_parallel_data_files, &
+ s_populate_grid_variables_buffers, &
+ s_initialize_internal_energy_equations, &
+ s_initialize_modules, s_initialize_gpu_vars, &
+ s_initialize_mpi_domain, s_finalize_modules, &
+ s_perform_time_step, s_save_data, &
+ s_save_performance_metrics
 
     abstract interface ! ===================================================
 
@@ -117,16 +121,19 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
+        character(len=1000) :: line
+
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, &
             model_eqns, num_fluids, adv_alphan, &
-            mpp_lim, time_stepper,  weno_eps, weno_flat, &
+            mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
+            ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -141,7 +148,8 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type
+            R0_type, file_per_process, relax, relax_model, &
+            palpha_eps, ptgalpha_eps
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -155,8 +163,11 @@ contains
             read (1, NML=user_inputs, iostat=iostatus)
 
             if (iostatus /= 0) then
-                call s_mpi_abort('Invalid line in simulation.inp. It is '// &
-                    'likely due to a datatype mismatch. Exiting ...')
+                backspace (1)
+                read (1, fmt='(A)') line
+                print *, 'Invalid line in namelist: '//trim(line)
+                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                                 'likely due to a datatype mismatch. Exiting ...')
             end if
 
             close (1)
@@ -174,7 +185,7 @@ contains
 
     !> The goal of this procedure is to verify that each of the
     !!      user provided inputs is valid and that their combination
-    !!      consitutes a meaningful configuration for the simulation.
+    !!      constitutes a meaningful configuration for the simulation.
     subroutine s_check_input_file() ! --------------------------------------
 
         ! Relative path to the current directory file in the case directory
@@ -229,7 +240,7 @@ contains
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
 
-        if (file_exist .neqv. .true.) then 
+        if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
 
@@ -250,6 +261,14 @@ contains
 
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                end if
+            end do
+        end if
         ! ==================================================================
 
         ! Cell-boundary Locations in y-direction ===========================
@@ -331,11 +350,11 @@ contains
                 end if
             end do
             !Read pb and mv for non-polytropic qbmm
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A)') &
-                            trim(t_step_dir)//'/pb', sys_size + (i-1)*nnode + r, '.dat'
+                            trim(t_step_dir)//'/pb', sys_size + (i - 1)*nnode + r, '.dat'
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), &
@@ -347,11 +366,11 @@ contains
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
                     end do
-                end do                
+                end do
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A)') &
-                            trim(t_step_dir)//'/mv', sys_size + (i-1)*nnode + r , '.dat'
+                            trim(t_step_dir)//'/mv', sys_size + (i - 1)*nnode + r, '.dat'
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), &
@@ -363,10 +382,63 @@ contains
                             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
                         end if
                     end do
-                end do 
+                end do
             end if
         end if
         ! ==================================================================
+
+        ! Read IBM Data ====================================================
+
+        if (ib) then
+            do i = 1, num_ibs
+                write (file_path, '(A,I0,A)') &
+                    trim(t_step_dir)//'/ib.dat'
+                inquire (FILE=trim(file_path), EXIST=file_exist)
+                if (file_exist) then
+                    open (2, FILE=trim(file_path), &
+                          FORM='unformatted', &
+                          ACTION='read', &
+                          STATUS='old')
+                    read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+                else
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                end if
+
+                if (patch_ib(i)%c > 0) then
+
+                    print *, "HERE Np", Np
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_u.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_u; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_l.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_l; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+                end if
+            end do
+
+        end if
 
     end subroutine s_read_serial_data_files ! -------------------------------------
 
@@ -392,7 +464,9 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
 
-        integer :: i
+        character(len=10) :: t_step_start_string
+
+        integer :: i, j
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -417,6 +491,16 @@ contains
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
+                    print *, "HERE Np", Np
+                end if
+            end do
+        end if
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
@@ -450,7 +534,7 @@ contains
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
-                    call s_mpi_abort( 'File '//trim(file_loc)//'is missing. Exiting...')
+                    call s_mpi_abort('File '//trim(file_loc)//'is missing. Exiting...')
                 end if
 
                 ! Assigning local cell boundary locations
@@ -463,47 +547,126 @@ contains
             end if
         end if
 
-        ! Open the file to read conservative variables
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (file_per_process) then
+            call s_int_to_str(t_step_start, t_step_start_string)
+            ! Open the file to read conservative variables
+            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (file_exist) then
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            ! Initialize MPI data I/O
+                ! Initialize MPI data I/O
 
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
-            call s_initialize_mpi_data(q_cons_vf)
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            ! Resize some integers so MPI can read even the biggest file
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8d0, MPI_OFFSET_KIND)
-            MOK = int(1d0, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
 
-            ! Read the data for each variable
-            if (bubbles .or. hypoelasticity) then
+                    do i = 1, sys_size!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
-                do i = 1, sys_size!adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if (qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
-                end do
-                !Read pb and mv for non-polytropic qbmm
-                if(qbmm .and. .not. polytropic) then
-                    do i = sys_size + 1, sys_size + 2*nb*nnode
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+        else
+            ! Open the file to read conservative variables
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                ! Initialize MPI data I/O
+
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
+
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
+
+                    do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -513,26 +676,121 @@ contains
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
                     end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if (qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+                            ! Initial displacement to skip at beginning of file
+                            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, sys_size
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
                 end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
             else
-                do i = 1, adv_idx%end
-                    var_MOK = int(i, MPI_OFFSET_KIND)
-
-                    ! Initial displacement to skip at beginning of file
-                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
-                end do
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
 
-            call s_mpi_barrier()
+        end if
 
-            call MPI_FILE_CLOSE(ifile, ierr)
-        else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+        if (ib) then
+
+            do j = 1, num_ibs
+                if (patch_ib(j)%c > 0) then
+
+                    print *, "HERE Np", Np
+
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_loc, '(A)') 'airfoil_l.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    end if
+
+                    write (file_loc, '(A)') 'airfoil_u.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end if
+
+                    do i = 1, Np
+                        airfoil_grid_l(i)%x = MPI_IO_airfoil_IB_DATA%var(i)%x
+                        airfoil_grid_l(i)%y = MPI_IO_airfoil_IB_DATA%var(i)%y
+                    end do
+
+                    do i = 1, Np
+                        airfoil_grid_u(i)%x = MPI_IO_airfoil_IB_DATA%var(Np + i)%x
+                        airfoil_grid_u(i)%y = MPI_IO_airfoil_IB_DATA%var(Np + i)%y
+                    end do
+
+                end if
+            end do
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
@@ -765,6 +1023,7 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
+        real(kind(0d0)) :: qv
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: pres
 
@@ -774,7 +1033,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, Re)
+                    call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0d0
                     do i = mom_idx%beg, mom_idx%end
@@ -783,11 +1042,12 @@ contains
                     end do
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                        dyn_pres, pi_inf, gamma, rho, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf)
+                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
+                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -800,8 +1060,8 @@ contains
         integer, intent(INOUT) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg, time_final
         real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)),  dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)),  dimension(:), intent(INOUT) :: io_proc_time
+        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
+        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
         logical, intent(INOUT) :: file_exists
         real(kind(0d0)), intent(INOUT) :: start, finish
         integer, intent(INOUT) :: nt
@@ -809,11 +1069,11 @@ contains
         integer :: i, j, k, l
 
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")',                             &
-                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                  t_step      - t_step_start + 1,                                                     &
-                  t_step_stop - t_step_start + 1,                                                     &
-                  t_step
+            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                t_step - t_step_start + 1, &
+                t_step_stop - t_step_start + 1, &
+                t_step
         end if
         mytime = mytime + dt
 
@@ -838,8 +1098,10 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
 
+        if (relax) call s_relaxation_solver(q_cons_ts(1)%vf)
+
         ! Time-stepping loop controls
-        if ((mytime + dt) >= finaltime) dt = finaltime - mytime 
+        if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
@@ -849,8 +1111,8 @@ contains
         integer, intent(INOUT) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg, time_final
         real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)),  dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)),  dimension(:), intent(INOUT) :: io_proc_time
+        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
+        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
         logical, intent(INOUT) :: file_exists
         real(kind(0d0)), intent(INOUT) :: start, finish
         integer, intent(INOUT) :: nt
@@ -902,7 +1164,7 @@ contains
     end subroutine s_save_performance_metrics
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
-        real(kind(0d0)), intent(INOUT) ::  start, finish, io_time_avg
+        real(kind(0d0)), intent(INOUT) :: start, finish, io_time_avg
         integer, intent(INOUT) :: t_step, nt
         integer :: i, j, k, l
 
@@ -915,8 +1177,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
+                            if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                                print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do
@@ -924,7 +1186,7 @@ contains
                 end do
             end do
 
-            if(qbmm .and. .not. polytropic) then
+            if (qbmm .and. .not. polytropic) then
                 !$acc update host(pb_ts(1)%sf)
                 !$acc update host(mv_ts(1)%sf)
             end if
@@ -940,23 +1202,23 @@ contains
             end if
         end if
 
-    end subroutine s_save_data    
+    end subroutine s_save_data
 
     subroutine s_initialize_modules()
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
-        if(bubbles .and. nb > 1 .and. R0_type == 1) then
+        if (bubbles .and. nb > 1 .and. R0_type == 1) then
             call s_simpson
         end if
         !Initialize variables for non-polytropic (Preston) model
-        if(bubbles .and. .not. polytropic) then
+        if (bubbles .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
-        if(qbmm .and. polytropic .and. Web /= dflt_real) then
-            pb0 = pref + 2d0 * fluid_pp(1)%ss / (R0*R0ref)
-            pb0 = pb0 / pref
-            pref = 1d0                              
+        if (qbmm .and. polytropic .and. Web /= dflt_real) then
+            pb0 = pref + 2d0*fluid_pp(1)%ss/(R0*R0ref)
+            pb0 = pb0/pref
+            pref = 1d0
         end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
@@ -969,7 +1231,7 @@ contains
         call s_initialize_riemann_solvers_module()
 
         if(bubbles) call s_initialize_bubbles_module()
-
+        if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
@@ -989,6 +1251,7 @@ contains
 #endif
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
@@ -1009,6 +1272,7 @@ contains
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+        if (ib) call s_ibm_setup()
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
@@ -1041,11 +1305,11 @@ contains
         integer(acc_device_kind) :: devtype
 #endif
 
-    ! Initializing MPI execution environment
+        ! Initializing MPI execution environment
 
         call s_mpi_initialize()
 
-    ! Bind GPUs if OpenACC is enabled
+        ! Bind GPUs if OpenACC is enabled
 #ifdef MFC_OpenACC
 #ifndef MFC_MPI
         local_size = 1
@@ -1058,8 +1322,8 @@ contains
 #endif
 
         devtype = acc_get_device_type()
-        devNum  = acc_get_num_devices(devtype)
-        dev     = mod(local_rank, devNum)
+        devNum = acc_get_num_devices(devtype)
+        dev = mod(local_rank, devNum)
 
         call acc_set_device_num(dev, devtype)
 #endif
@@ -1072,7 +1336,21 @@ contains
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
             call s_check_input_file()
-            print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
+
+            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")', &
+#:if not MFC_CASE_OPTIMIZATION
+                "regular", &
+#:else
+                "case-optimized", &
+#:endif
+                m, n, p, num_procs, &
+#ifdef MFC_OpenACC
+!&<
+                "with OpenACC offloading"
+!&>
+#else
+                "on CPUs"
+#endif
         end if
 
         ! Broadcasting the user inputs to all of the processors and performing the
@@ -1093,17 +1371,26 @@ contains
         !$acc update device(m, n, p)
         !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
         do i = 1, sys_size
-        !$acc update device(q_cons_ts(1)%vf(i)%sf)
+            !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
-        if(qbmm .and. .not. polytropic) then
-        !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+        if (qbmm .and. .not. polytropic) then
+            !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
         !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
-    end subroutine s_initialize_gpu_vars
+    
+        !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
+        !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
+        !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
+
+        !$acc update device(relax)
+        if (relax) then
+            !$acc update device(palpha_eps, ptgalpha_eps)
+        end if
+    end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules()
         ! Disassociate pointers for serial and parallel I/O
@@ -1121,6 +1408,7 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
+        if (relax) call s_finalize_relaxation_solver_module()      
 
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()

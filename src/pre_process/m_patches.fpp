@@ -29,26 +29,27 @@ module m_patches
     implicit none
 
     private; public :: s_line_segment, &
-        s_spiral, &
-        s_circle, &
-        s_varcircle, &
-        s_3dvarcircle, &
-        s_ellipse, &
-        s_ellipsoid, &
-        s_rectangle, &
-        s_sweep_line, &
-        s_2D_TaylorGreen_vortex, &
-        s_1D_analytical, &
-        s_1d_bubble_pulse, &
-        s_2D_analytical, &
-        s_3D_analytical, &
-        s_spherical_harmonic, &
-        s_sphere, &
-        s_cuboid, &
-        s_cylinder, &
-        s_sweep_plane, &
-        s_model
-
+ s_spiral, &
+ s_circle, &
+ s_airfoil, &
+ s_3D_airfoil, &
+ s_varcircle, &
+ s_3dvarcircle, &
+ s_ellipse, &
+ s_ellipsoid, &
+ s_rectangle, &
+ s_sweep_line, &
+ s_2D_TaylorGreen_vortex, &
+ s_1D_analytical, &
+ s_1d_bubble_pulse, &
+ s_2D_analytical, &
+ s_3D_analytical, &
+ s_spherical_harmonic, &
+ s_sphere, &
+ s_cuboid, &
+ s_cylinder, &
+ s_sweep_plane, &
+ s_model
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
@@ -126,9 +127,13 @@ contains
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
-                                            eta, q_prim_vf, patch_id_fp)
+                                                        eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
+
+                ! Updating the patch identities bookkeeping variable
+                if (1d0 - eta < 1d-16) patch_id_fp(i, 0, 0) = patch_id
+
             end if
         end do
 
@@ -157,7 +162,7 @@ contains
         thickness = patch_icpp(patch_id)%length_x
         nturns = patch_icpp(patch_id)%length_y
 
-    !
+        !
         logic_grid = 0
         do k = 0, int(m*91*nturns)
             th = k/real(int(m*91d0*nturns))*nturns*2.d0*pi
@@ -184,9 +189,12 @@ contains
             do i = 0, m
                 if ((logic_grid(i, j, 0) == 1)) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -199,10 +207,11 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: radius
 
@@ -210,11 +219,18 @@ contains
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        radius = patch_icpp(patch_id)%radius
-        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+
+        if (.not. ib) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            radius = patch_icpp(patch_id)%radius
+            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        else
+            x_centroid = patch_ib(patch_id)%x_centroid
+            y_centroid = patch_ib(patch_id)%y_centroid
+            radius = patch_ib(patch_id)%radius
+        end if
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -228,25 +244,25 @@ contains
         do j = 0, n
             do i = 0, m
 
-                if (patch_icpp(patch_id)%smoothen) then
+                if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
 
                     eta = tanh(smooth_coeff/min(dx, dy)* &
-                            (sqrt((x_cc(i) - x_centroid)**2 &
-                                    + (y_cc(j) - y_centroid)**2) &
+                               (sqrt((x_cc(i) - x_centroid)**2 &
+                                     + (y_cc(j) - y_centroid)**2) &
                                 - radius))*(-0.5d0) + 0.5d0
 
                 end if
 
                 if (((x_cc(i) - x_centroid)**2 &
-                    + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                    .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                     + (y_cc(j) - y_centroid)**2 <= radius**2 &
+                     .and. &
+                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
-                    patch_id_fp(i, j, 0) == smooth_patch_id) &
+                    (.not. ib .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
                     then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                eta, q_prim_vf, patch_id_fp)
-                    
+                                                            eta, q_prim_vf, patch_id_fp)
+
                     @:analytical()
                 end if
 
@@ -254,6 +270,329 @@ contains
         end do
 
     end subroutine s_circle ! ----------------------------------------------
+
+    subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        integer :: i, j, k, l
+        integer :: Np1, Np2
+
+        if (.not. ib) return
+        x0 = patch_ib(patch_id)%x_centroid
+        y0 = patch_ib(patch_id)%y_centroid
+        ca = patch_ib(patch_id)%c
+        pa = patch_ib(patch_id)%p
+        ma = patch_ib(patch_id)%m
+        ta = patch_ib(patch_id)%t
+        theta = pi*patch_ib(patch_id)%theta/180d0
+
+        Np1 = int((pa*ca/dx)*20)
+        Np2 = int(((ca - pa*ca)/dx)*20)
+        Np = Np1 + Np2 + 1
+
+        allocate (airfoil_grid_u(1:Np))
+        allocate (airfoil_grid_l(1:Np))
+
+        airfoil_grid_u(1)%x = x0
+        airfoil_grid_u(1)%y = y0
+
+        airfoil_grid_l(1)%x = x0
+        airfoil_grid_l(1)%y = y0
+
+        eta = 1d0
+
+        do i = 1, Np1 + Np2 - 1
+            if (i <= Np1) then
+                xc = x0 + i*(pa*ca/Np1)
+                xa = (xc - x0)/ca
+                yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                dycdxc = (2*ma/pa**2)*(pa - xa)
+            else
+                xc = x0 + pa*ca + (i - Np1)*((ca - pa*ca)/Np2)
+                xa = (xc - x0)/ca
+                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+            end if
+
+            yt = (5d0*ta)*(0.2969*xa**0.5d0 - 0.126*xa - 0.3516*xa**2d0 + 0.2843*xa**3 - 0.1015*xa**4)
+            sin_c = dycdxc/(1 + dycdxc**2)**0.5
+            cos_c = 1/(1 + dycdxc**2)**0.5
+
+            xu = xa - yt*sin_c
+            yu = yc + yt*cos_c
+
+            xl = xa + yt*sin_c
+            yl = yc - yt*cos_c
+
+            xu = xu*ca + x0
+            yu = yu*ca + y0
+
+            xl = xl*ca + x0
+            yl = yl*ca + y0
+
+            airfoil_grid_u(i + 1)%x = xu
+            airfoil_grid_u(i + 1)%y = yu
+
+            airfoil_grid_l(i + 1)%x = xl
+            airfoil_grid_l(i + 1)%y = yl
+
+        end do
+
+        airfoil_grid_u(Np)%x = x0 + ca
+        airfoil_grid_u(Np)%y = y0
+
+        airfoil_grid_l(Np)%x = x0 + ca
+        airfoil_grid_l(Np)%y = y0
+
+        do j = 0, n
+            do i = 0, m
+
+                if (patch_ib(patch_id)%theta /= dflt_real) then
+                    x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
+                    y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
+                else
+                    x_act = x_cc(i)
+                    y_act = y_cc(j)
+                end if
+
+                if (x_act >= x0 .and. x_act <= x0 + ca) then
+                    xa = (x_act - x0)/ca
+                    if (xa <= pa) then
+                        yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                        dycdxc = (2*ma/pa**2)*(pa - xa)
+                    else
+                        yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                        dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+                    end if
+                    if (y_act >= y0) then
+                        k = 1
+                        do while (airfoil_grid_u(k)%x < x_act)
+                            k = k + 1
+                        end do
+                        if (airfoil_grid_u(k)%x == x_act) then
+                            if (y_act <= airfoil_grid_u(k)%y) then
+                                !!IB
+                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                !eta, q_prim_vf, patch_id_fp)
+                                patch_id_fp(i, j, 0) = patch_id
+                            end if
+                        else
+                            f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
+                            if (y_act <= ((1d0 - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                                !!IB
+                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                !eta, q_prim_vf, patch_id_fp)
+                                patch_id_fp(i, j, 0) = patch_id
+                            end if
+                        end if
+                    else
+                        k = 1
+                        do while (airfoil_grid_l(k)%x < x_act)
+                            k = k + 1
+                        end do
+                        if (airfoil_grid_l(k)%x == x_act) then
+                            if (y_act >= airfoil_grid_l(k)%y) then
+                                !!IB
+                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                !eta, q_prim_vf, patch_id_fp)
+                                patch_id_fp(i, j, 0) = patch_id
+                            end if
+                        else
+                            f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
+
+                            if (y_act >= ((1d0 - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                   !!IB
+                                !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                !eta, q_prim_vf, patch_id_fp)
+                                patch_id_fp(i, j, 0) = patch_id
+                            end if
+                        end if
+                    end if
+                end if
+            end do
+        end do
+
+        if (patch_ib(patch_id)%theta /= dflt_real) then
+            do i = 1, Np
+                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
+                airfoil_grid_l(i)%y = -1d0*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
+
+                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
+                airfoil_grid_u(i)%y = -1d0*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
+            end do
+        end if
+
+    end subroutine s_airfoil
+
+    subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        real(kind(0d0)) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        integer :: i, j, k, l
+        integer :: Np1, Np2
+
+        if (.not. ib) return
+        x0 = patch_ib(patch_id)%x_centroid
+        y0 = patch_ib(patch_id)%y_centroid
+        z0 = patch_ib(patch_id)%z_centroid
+        lz = patch_ib(patch_id)%length_z
+        ca = patch_ib(patch_id)%c
+        pa = patch_ib(patch_id)%p
+        ma = patch_ib(patch_id)%m
+        ta = patch_ib(patch_id)%t
+        theta = pi*patch_ib(patch_id)%theta/180d0
+
+        Np1 = int((pa*ca/dx)*20)
+        Np2 = int(((ca - pa*ca)/dx)*20)
+        Np = Np1 + Np2 + 1
+
+        allocate (airfoil_grid_u(1:Np))
+        allocate (airfoil_grid_l(1:Np))
+
+        airfoil_grid_u(1)%x = x0
+        airfoil_grid_u(1)%y = y0
+
+        airfoil_grid_l(1)%x = x0
+        airfoil_grid_l(1)%y = y0
+
+        z_max = z0 + lz/2
+        z_min = z0 - lz/2
+
+        eta = 1d0
+
+        do i = 1, Np1 + Np2 - 1
+            if (i <= Np1) then
+                xc = x0 + i*(pa*ca/Np1)
+                xa = (xc - x0)/ca
+                yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                dycdxc = (2*ma/pa**2)*(pa - xa)
+            else
+                xc = x0 + pa*ca + (i - Np1)*((ca - pa*ca)/Np2)
+                xa = (xc - x0)/ca
+                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+            end if
+
+            yt = (5d0*ta)*(0.2969*xa**0.5d0 - 0.126*xa - 0.3516*xa**2d0 + 0.2843*xa**3 - 0.1015*xa**4)
+            sin_c = dycdxc/(1 + dycdxc**2)**0.5
+            cos_c = 1/(1 + dycdxc**2)**0.5
+
+            xu = xa - yt*sin_c
+            yu = yc + yt*cos_c
+
+            xl = xa + yt*sin_c
+            yl = yc - yt*cos_c
+
+            xu = xu*ca + x0
+            yu = yu*ca + y0
+
+            xl = xl*ca + x0
+            yl = yl*ca + y0
+
+            airfoil_grid_u(i + 1)%x = xu
+            airfoil_grid_u(i + 1)%y = yu
+
+            airfoil_grid_l(i + 1)%x = xl
+            airfoil_grid_l(i + 1)%y = yl
+
+        end do
+
+        airfoil_grid_u(Np)%x = x0 + ca
+        airfoil_grid_u(Np)%y = y0
+
+        airfoil_grid_l(Np)%x = x0 + ca
+        airfoil_grid_l(Np)%y = y0
+
+        do l = 0, p
+            if (z_cc(l) >= z_min .and. z_cc(l) <= z_max) then
+                do j = 0, n
+                    do i = 0, m
+
+                        if (patch_ib(patch_id)%theta /= dflt_real) then
+                            x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
+                            y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
+                        else
+                            x_act = x_cc(i)
+                            y_act = y_cc(j)
+                        end if
+
+                        if (x_act >= x0 .and. x_act <= x0 + ca) then
+                            xa = (x_act - x0)/ca
+                            if (xa <= pa) then
+                                yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                                dycdxc = (2*ma/pa**2)*(pa - xa)
+                            else
+                                yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                                dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+                            end if
+                            if (y_act >= y0) then
+                                k = 1
+                                do while (airfoil_grid_u(k)%x < x_act)
+                                    k = k + 1
+                                end do
+                                if (airfoil_grid_u(k)%x == x_act) then
+                                    if (y_act <= airfoil_grid_u(k)%y) then
+                                        !!IB
+                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                        !eta, q_prim_vf, patch_id_fp)
+                                        patch_id_fp(i, j, l) = patch_id
+                                    end if
+                                else
+                                    f = (airfoil_grid_u(k)%x - x_act)/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
+                                    if (y_act <= ((1d0 - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                                        !!IB
+                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                        !eta, q_prim_vf, patch_id_fp)
+                                        patch_id_fp(i, j, l) = patch_id
+                                    end if
+                                end if
+                            else
+                                k = 1
+                                do while (airfoil_grid_l(k)%x < x_act)
+                                    k = k + 1
+                                end do
+                                if (airfoil_grid_l(k)%x == x_act) then
+                                    if (y_act >= airfoil_grid_l(k)%y) then
+                                        !!IB
+                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                        !eta, q_prim_vf, patch_id_fp)
+                                        patch_id_fp(i, j, l) = patch_id
+                                    end if
+                                else
+                                    f = (airfoil_grid_l(k)%x - x_act)/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
+
+                                    if (y_act >= ((1d0 - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                           !!IB
+                                        !call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                        !eta, q_prim_vf, patch_id_fp)
+                                        patch_id_fp(i, j, l) = patch_id
+                                    end if
+                                end if
+                            end if
+                        end if
+                    end do
+                end do
+            end if
+        end do
+
+        if (patch_ib(patch_id)%theta /= dflt_real) then
+            do i = 1, Np
+                airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
+                airfoil_grid_l(i)%y = -1d0*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
+
+                airfoil_grid_u(i)%x = (airfoil_grid_u(i)%x - x0)*cos(theta) + (airfoil_grid_u(i)%y - y0)*sin(theta) + x0
+                airfoil_grid_u(i)%y = -1d0*(airfoil_grid_u(i)%x - x0)*sin(theta) + (airfoil_grid_u(i)%y - y0)*cos(theta) + y0
+            end do
+        end if
+
+    end subroutine s_3D_airfoil
 
     !>             The varcircle patch is a 2D geometry that may be used
         !!             . It  generatres an annulus
@@ -299,12 +638,15 @@ contains
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
 
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
+
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
-                                                    dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                     dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                 end if
 
             end do
@@ -358,12 +700,15 @@ contains
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
-                            
+                                                                eta, q_prim_vf, patch_id_fp)
+
                         @:analytical()
 
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
+
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
-                                                        dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
+                                                         dexp(-0.5d0*((myr - radius)**2.d0)/(thickness/3.d0)**2.d0)
                     end if
 
                 end do
@@ -410,23 +755,26 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx, dy)* &
-                            (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
-                                    ((y_cc(j) - y_centroid)/b)**2) &
+                               (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                     ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
                 end if
 
                 if ((((x_cc(i) - x_centroid)/a)**2 + &
-                    ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
-                    .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                     ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
+                     .and. &
+                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
-                
+                                                            eta, q_prim_vf, patch_id_fp)
+
                     @:analytical()
+
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -483,25 +831,28 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
-                                        ((cart_y - y_centroid)/b)**2 + &
-                                        ((cart_z - z_centroid)/c)**2) &
+                                   (sqrt(((x_cc(i) - x_centroid)/a)**2 + &
+                                         ((cart_y - y_centroid)/b)**2 + &
+                                         ((cart_z - z_centroid)/c)**2) &
                                     - 1d0))*(-0.5d0) + 0.5d0
                     end if
 
                     if ((((x_cc(i) - x_centroid)/a)**2 + &
-                        ((cart_y - y_centroid)/b)**2 + &
-                        ((cart_z - z_centroid)/c)**2 <= 1d0 &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                         ((cart_y - y_centroid)/b)**2 + &
+                         ((cart_z - z_centroid)/c)**2 <= 1d0 &
+                         .and. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                     eta, q_prim_vf, patch_id_fp)
-                                    
+                                                                eta, q_prim_vf, patch_id_fp)
+
                         @:analytical()
+
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -518,25 +869,33 @@ contains
         !!              rectangular patch DOES NOT allow for the smoothing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf) ! -------------------------------------
+    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib) ! -------------------------------------
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        logical :: ib !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< generic loop iterators
-        
+
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
 
         ! Transferring the rectangle's centroid and length information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
+        if (.not. ib) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            length_x = patch_icpp(patch_id)%length_x
+            length_y = patch_icpp(patch_id)%length_y
+        else
+            x_centroid = patch_ib(patch_id)%x_centroid
+            y_centroid = patch_ib(patch_id)%y_centroid
+            length_x = patch_ib(patch_id)%length_x
+            length_y = patch_ib(patch_id)%length_y
+        end if
 
         ! Computing the beginning and the end x- and y-coordinates of the
         ! rectangle based on its centroid and lengths
@@ -566,9 +925,12 @@ contains
                     then
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
+
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                         !zero density, reassign according to Tait EOS
@@ -576,6 +938,10 @@ contains
                             (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
                             rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
                     end if
+
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
+
                 end if
             end do
         end do
@@ -624,20 +990,23 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy) &
-                                        *(a*x_cc(i) + b*y_cc(j) + c) &
-                                        /sqrt(a**2 + b**2))
+                                           *(a*x_cc(i) + b*y_cc(j) + c) &
+                                           /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0d0 &
-                    .and. &
-                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                     .and. &
+                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                     .or. &
                     patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                      eta, q_prim_vf, patch_id_fp)
-                    
+                                                            eta, q_prim_vf, patch_id_fp)
+
                     @:analytical()
+
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
                 end if
 
             end do
@@ -684,7 +1053,7 @@ contains
         ! state in the cells that this patch covers.
         eta = 1d0
         ! U0 is the characteristic velocity of the vortex
-        U0 = patch_icpp(patch_id)%vel(1) 
+        U0 = patch_icpp(patch_id)%vel(1)
         ! L0 is the characteristic length of the vortex
         L0 = patch_icpp(patch_id)%vel(2)
         ! Checking whether the patch covers a particular cell in the
@@ -701,16 +1070,19 @@ contains
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
 
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
+
                     ! Assign Parameters =========================================================
-                    q_prim_vf(mom_idx%beg  )%sf(i,j,0) = U0*SIN(x_cc(i)/L0)*COS(y_cc(j)/L0)
-                    q_prim_vf(mom_idx%end  )%sf(i,j,0) = -U0*COS(x_cc(i)/L0)*SIN(y_cc(j)/L0)
-                    q_prim_vf(E_idx        )%sf(i,j,0) = patch_icpp(patch_id)%pres + (COS(2*x_cc(i))/L0 + &
-                                                            COS(2*y_cc(j))/L0)* &
-                                                            (q_prim_vf(1)%sf(i,j,0)*U0*U0)/16
+                    q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
+                    q_prim_vf(mom_idx%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
+                    q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
+                                                                                cos(2*y_cc(j))/L0)* &
+                                                   (q_prim_vf(1)%sf(i, j, 0)*U0*U0)/16
                     ! ================================================================================
 
                 end if
@@ -766,9 +1138,13 @@ contains
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
-                                                eta, q_prim_vf, patch_id_fp)
+                                                        eta, q_prim_vf, patch_id_fp)
 
                 @:Hardcoded1D()
+
+                ! Updating the patch identities bookkeeping variable
+                if (1d0 - eta < 1d-16) patch_id_fp(i, 0, 0) = patch_id
+
             end if
         end do
 
@@ -818,10 +1194,10 @@ contains
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
-                                                eta, q_prim_vf, patch_id_fp)
+                                                        eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
-                
+
             end if
         end do
 
@@ -883,9 +1259,12 @@ contains
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
 
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
                     @:Hardcoded2D()
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
+
                 end if
             end do
         end do
@@ -959,9 +1338,12 @@ contains
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                                eta, q_prim_vf, patch_id_fp)
 
                         @:Hardcoded3D()
+
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
 
                     end if
 
@@ -1018,10 +1400,10 @@ contains
                     end if
 
                     if (((x_cc(i) - x_centroid)**2 &
-                        + (cart_y - y_centroid)**2 &
-                        + (cart_z - z_centroid)**2 <= radius**2 &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2 &
+                         .and. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
                         then
 
                         call s_convert_cylindrical_to_spherical_coord(x_cc(i), y_cc(j))
@@ -1055,7 +1437,7 @@ contains
                         elseif (epsilon == 4d0) then
                             if (beta == 0d0) then
                                 H = 3d0/16d0*sqrt(1d0/pi)*(35d0*cos(sph_phi)**4d0 - &
-                                                        3d1*cos(sph_phi)**2 + 3d0)
+                                                           3d1*cos(sph_phi)**2 + 3d0)
                             elseif (beta == 1d0) then
                                 H = -3d0/8d0*sqrt(5d0/pi)*exp(cmplx_i*z_cc(k))* &
                                     sin(sph_phi)*(7d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
@@ -1107,10 +1489,11 @@ contains
         !!              provided. Please note that the spherical patch DOES allow
         !!              for the smoothing of its boundary.
         !!      @param patch_id is the patch identifier
-    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib) ! ----------------------------------------
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: radius
 
@@ -1123,12 +1506,21 @@ contains
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
         ! identity and smoothing coefficient information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        z_centroid = patch_icpp(patch_id)%z_centroid
-        radius = patch_icpp(patch_id)%radius
-        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        if (.not. ib) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            z_centroid = patch_icpp(patch_id)%z_centroid
+            radius = patch_icpp(patch_id)%radius
+            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        else
+            x_centroid = patch_ib(patch_id)%x_centroid
+            y_centroid = patch_ib(patch_id)%y_centroid
+            z_centroid = patch_ib(patch_id)%z_centroid
+            radius = patch_ib(patch_id)%radius
+        end if
+
+        print *, x_centroid, y_centroid, z_centroid, radius
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -1150,29 +1542,28 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (patch_icpp(patch_id)%smoothen) then
+                    if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
 
                         eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                (sqrt((x_cc(i) - x_centroid)**2 &
-                                        + (cart_y - y_centroid)**2 &
-                                        + (cart_z - z_centroid)**2) &
+                                   (sqrt((x_cc(i) - x_centroid)**2 &
+                                         + (cart_y - y_centroid)**2 &
+                                         + (cart_z - z_centroid)**2) &
                                     - radius))*(-0.5d0) + 0.5d0
 
                     end if
 
                     if (((x_cc(i) - x_centroid)**2 &
-                        + (cart_y - y_centroid)**2 &
-                        + (cart_z - z_centroid)**2 <= radius**2 &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                         + (cart_y - y_centroid)**2 &
+                         + (cart_z - z_centroid)**2 <= radius**2 &
+                         .and. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
-                        patch_id_fp(i, j, k) == smooth_patch_id) &
+                        (.not. ib .and. patch_id_fp(i, j, k) == smooth_patch_id)) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
+                                                                eta, q_prim_vf, patch_id_fp)
 
-                        
                         @:analytical()
                     end if
 
@@ -1248,9 +1639,12 @@ contains
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
-                        
+                                                                eta, q_prim_vf, patch_id_fp)
+
                         @:analytical()
+
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
 
                     end if
                 end do
@@ -1268,10 +1662,11 @@ contains
         !!              that the cylindrical patch DOES allow for the smoothing
         !!              of its lateral boundary.
         !!      @param patch_id is the patch identifier
-    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf) ! --------------------------------------
+    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib) ! --------------------------------------
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: radius
 
@@ -1279,15 +1674,26 @@ contains
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
-        x_centroid = patch_icpp(patch_id)%x_centroid
-        y_centroid = patch_icpp(patch_id)%y_centroid
-        z_centroid = patch_icpp(patch_id)%z_centroid
-        length_x = patch_icpp(patch_id)%length_x
-        length_y = patch_icpp(patch_id)%length_y
-        length_z = patch_icpp(patch_id)%length_z
-        radius = patch_icpp(patch_id)%radius
-        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+
+        if (.not. ib) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            z_centroid = patch_icpp(patch_id)%z_centroid
+            length_x = patch_icpp(patch_id)%length_x
+            length_y = patch_icpp(patch_id)%length_y
+            length_z = patch_icpp(patch_id)%length_z
+            radius = patch_icpp(patch_id)%radius
+            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        else
+            x_centroid = patch_ib(patch_id)%x_centroid
+            y_centroid = patch_ib(patch_id)%y_centroid
+            z_centroid = patch_ib(patch_id)%z_centroid
+            length_x = patch_ib(patch_id)%length_x
+            length_y = patch_ib(patch_id)%length_y
+            length_z = patch_ib(patch_id)%length_z
+            radius = patch_ib(patch_id)%radius
+        end if
 
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cylinder based on its centroid and lengths
@@ -1318,55 +1724,57 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (patch_icpp(patch_id)%smoothen) then
+                    if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
 
                         if (length_x /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dy, dz)* &
-                                    (sqrt((cart_y - y_centroid)**2 &
-                                            + (cart_z - z_centroid)**2) &
+                                       (sqrt((cart_y - y_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         elseif (length_y /= dflt_real) then
                             eta = tanh(smooth_coeff/min(dx, dz)* &
-                                    (sqrt((x_cc(i) - x_centroid)**2 &
-                                            + (cart_z - z_centroid)**2) &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         else
                             eta = tanh(smooth_coeff/min(dx, dy)* &
-                                    (sqrt((x_cc(i) - x_centroid)**2 &
-                                            + (cart_y - y_centroid)**2) &
+                                       (sqrt((x_cc(i) - x_centroid)**2 &
+                                             + (cart_y - y_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
                         end if
 
                     end if
 
                     if ((((length_x /= dflt_real .and. &
-                        (cart_y - y_centroid)**2 &
-                        + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                        x_boundary%beg <= x_cc(i) .and. &
-                        x_boundary%end >= x_cc(i)) &
+                           (cart_y - y_centroid)**2 &
+                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                           x_boundary%beg <= x_cc(i) .and. &
+                           x_boundary%end >= x_cc(i)) &
+                          .or. &
+                          (length_y /= dflt_real .and. &
+                           (x_cc(i) - x_centroid)**2 &
+                           + (cart_z - z_centroid)**2 <= radius**2 .and. &
+                           y_boundary%beg <= cart_y .and. &
+                           y_boundary%end >= cart_y) &
+                          .or. &
+                          (length_z /= dflt_real .and. &
+                           (x_cc(i) - x_centroid)**2 &
+                           + (cart_y - y_centroid)**2 <= radius**2 .and. &
+                           z_boundary%beg <= cart_z .and. &
+                           z_boundary%end >= cart_z)) &
+                         .and. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
-                        (length_y /= dflt_real .and. &
-                        (x_cc(i) - x_centroid)**2 &
-                        + (cart_z - z_centroid)**2 <= radius**2 .and. &
-                        y_boundary%beg <= cart_y .and. &
-                        y_boundary%end >= cart_y) &
-                        .or. &
-                        (length_z /= dflt_real .and. &
-                        (x_cc(i) - x_centroid)**2 &
-                        + (cart_y - y_centroid)**2 <= radius**2 .and. &
-                        z_boundary%beg <= cart_z .and. &
-                        z_boundary%end >= cart_z)) &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                        .or. &
-                        patch_id_fp(i, j, k) == smooth_patch_id) &
+                        (.not. ib .and. patch_id_fp(i, j, k) == smooth_patch_id)) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
-                                        
+                                                                eta, q_prim_vf, patch_id_fp)
+
                         @:analytical()
 
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
@@ -1427,24 +1835,26 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = 5d-1 + 5d-1*tanh(smooth_coeff/min(dx, dy, dz) &
-                                            *(a*x_cc(i) + &
-                                                b*cart_y + &
-                                                c*cart_z + d) &
-                                            /sqrt(a**2 + b**2 + c**2))
+                                               *(a*x_cc(i) + &
+                                                 b*cart_y + &
+                                                 c*cart_z + d) &
+                                               /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0d0 &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                         .and. &
+                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         .or. &
                         patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                    eta, q_prim_vf, patch_id_fp)
-                                                
+                                                                eta, q_prim_vf, patch_id_fp)
+
                         @:analytical()
 
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, k) = patch_id
                     end if
 
                 end do
@@ -1457,9 +1867,9 @@ contains
     !! @param patch_id is the patch identifier
     subroutine s_model(patch_id, patch_id_fp, q_prim_vf) ! ---------------------
 
-        integer, intent(IN)                              :: patch_id
+        integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field),     dimension(1:sys_size)    :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1477,12 +1887,12 @@ contains
         t_mat4x4 :: transform
 
         if (proc_rank == 0) then
-            print*, " * Reading model: " // trim(patch_icpp(patch_id)%model%filepath)
+            print *, " * Reading model: "//trim(patch_icpp(patch_id)%model%filepath)
         end if
         model = f_model_read(patch_icpp(patch_id)%model%filepath)
 
         if (proc_rank == 0) then
-            print*, " * Transforming model..."
+            print *, " * Transforming model..."
         end if
         transform = f_create_transform_matrix(patch_icpp(patch_id)%model)
         call s_transform_model(model, transform)
@@ -1490,60 +1900,72 @@ contains
         bbox = f_create_bbox(model)
 
         if (proc_rank == 0) then
-            write (*,"(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-            write (*,"(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2d0
-            write (*,"(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+            write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2d0
+            write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
 
             !call s_model_write("__out__.stl", model)
             !call s_model_write("__out__.obj", model)
 
-            grid_mm(1,:) = (/ minval(x_cc) - 0d5 * dx, maxval(x_cc) + 0d5 * dx /)
-            grid_mm(2,:) = (/ minval(y_cc) - 0d5 * dy, maxval(y_cc) + 0d5 * dy /)
-    
-            if (p .gt. 0) then
-                grid_mm(3,:) = (/ minval(z_cc) - 0d5 * dz, maxval(z_cc) + 0d5 * dz /)
+            grid_mm(1, :) = (/minval(x_cc) - 0d5*dx, maxval(x_cc) + 0d5*dx/)
+            grid_mm(2, :) = (/minval(y_cc) - 0d5*dy, maxval(y_cc) + 0d5*dy/)
+
+            if (p > 0) then
+                grid_mm(3, :) = (/minval(z_cc) - 0d5*dz, maxval(z_cc) + 0d5*dz/)
             else
-                grid_mm(3,:) = (/ 0d0, 0d0 /)
+                grid_mm(3, :) = (/0d0, 0d0/)
             end if
 
-            write (*,"(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
-            write (*,"(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2d0
-            write (*,"(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
+            write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
+            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2d0
+            write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
         end if
 
-        ncells = (m+1)*(n+1)*(p+1)
+        ncells = (m + 1)*(n + 1)*(p + 1)
         do i = 0, m; do j = 0, n; do k = 0, p
 
-            cell_num = i*(n+1)*(p+1) + j*(p+1) + (k+1)
-            if (proc_rank == 0 .and. mod(cell_num, ncells / 100) == 0) then
-                write (*,"(A, I3, A)", advance="no") &
-                    CHAR(13) // "  * Generating grid: ", &
-                    NINT(100 * real(cell_num) / ncells), "%"
-            end if
+                    cell_num = i*(n + 1)*(p + 1) + j*(p + 1) + (k + 1)
+                    if (proc_rank == 0 .and. mod(cell_num, ncells/100) == 0) then
+                        write (*, "(A, I3, A)", advance="no") &
+                            char(13)//"  * Generating grid: ", &
+                            nint(100*real(cell_num)/ncells), "%"
+                    end if
 
-            point = (/ x_cc(i), y_cc(j), 0d0 /)
-            if (p .gt. 0) then
-                point(3) = z_cc(k)
-            end if
+                    point = (/x_cc(i), y_cc(j), 0d0/)
+                    if (p > 0) then
+                        point(3) = z_cc(k)
+                    end if
 
-            if (grid_geometry == 3) then
-                point = f_convert_cyl_to_cart(point)
-            end if
+                    if (grid_geometry == 3) then
+                        point = f_convert_cyl_to_cart(point)
+                    end if
 
-            eta = f_model_is_inside(model, point, (/ dx, dy, dz /), patch_icpp(patch_id)%model%spc)
-            
-            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                eta, q_prim_vf, patch_id_fp)
+                    eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
 
-            ! Note: Should probably use *eta* to compute primitive variables
-            ! if defining them analytically.
-            @:analytical()
+                    if (patch_icpp(patch_id)%smoothen) then
+                        if (eta > patch_icpp(patch_id)%model%threshold) then
+                            eta = 1d0
+                        end if
+                    else
+                        if (eta > patch_icpp(patch_id)%model%threshold) then
+                            eta = 1d0
+                        else
+                            eta = 0d0
+                        end if
+                    end if
 
-        end do; end do; end do
+                    call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                            eta, q_prim_vf, patch_id_fp)
+
+                    ! Note: Should probably use *eta* to compute primitive variables
+                    ! if defining them analytically.
+                    @:analytical()
+
+                end do; end do; end do
 
         if (proc_rank == 0) then
-            print*, ""
-            print*, " * Cleaning up..."
+            print *, ""
+            print *, " * Cleaning up..."
         end if
 
         call s_model_free(model)
@@ -1564,12 +1986,12 @@ contains
 
         !$acc routine seq
 
-        t_vec3, intent(in)  :: cyl
+        t_vec3, intent(in) :: cyl
         t_vec3 :: cart
 
-        cart = (/ cyl(1), &
-                  cyl(2)*sin(cyl(3)), &
-                  cyl(2)*cos(cyl(3)) /)
+        cart = (/cyl(1), &
+                 cyl(2)*sin(cyl(3)), &
+                 cyl(2)*cos(cyl(3))/)
 
     end function f_convert_cyl_to_cart
 

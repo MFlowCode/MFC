@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+<%namespace name="helpers" file="helpers.mako"/>
+
+% if engine == 'batch':
+#SBATCH --nodes=${nodes}
+#SBATCH --ntasks-per-node=${tasks_per_node}
+#SBATCH --cpus-per-task=1
+#SBATCH --job-name="${name}"
+#SBATCH --time=${walltime}
+% if partition:
+#SBATCH --partition=${partition}
+% endif
+% if account:
+#SBATCH --account="${account}"
+% endif
+% if gpu:
+#SBATCH --gpus-per-node=${tasks_per_node}
+% endif
+#SBATCH --output="${name}.out"
+#SBATCH --error="${name}.err"
+#SBATCH --export=ALL
+% if email:
+#SBATCH --mail-user=${email}
+#SBATCH --mail-type="BEGIN, END, FAIL"
+% endif
+% endif
+
+${helpers.template_prologue()}
+
+ok ":) Loading modules:\n"
+cd "${MFC_ROOTDIR}"
+. ./mfc.sh load -c d -m ${'g' if gpu else 'c'}
+cd - > /dev/null
+echo
+
+# Fixes Delta not being able to find core library file
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-22.11/openmpi-4.1.5-nzb4n4r/lib/
+
+% for target in targets:
+    ${helpers.run_prologue(target)}
+
+    % if not mpi:
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
+    % else:
+        (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
+            mpirun -np ${nodes*tasks_per_node}                 \
+                   ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+                   "${target.get_install_binpath()}")
+    % endif
+
+    ${helpers.run_epilogue(target)}
+
+    echo
+% endfor
+
+${helpers.template_epilogue()}

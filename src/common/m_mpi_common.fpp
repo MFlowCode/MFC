@@ -27,8 +27,7 @@ module m_mpi_common
 
 contains
 
-
-    !> The subroutine intializes the MPI execution environment
+    !> The subroutine initializes the MPI execution environment
         !!      and queries both the number of processors which will be
         !!      available for the job and the local processor rank.
     subroutine s_mpi_initialize() ! ----------------------------------------
@@ -45,7 +44,7 @@ contains
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
 
-        ! Checking whether the MPI environment has been properly intialized
+        ! Checking whether the MPI environment has been properly initialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting ...'
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
@@ -61,14 +60,18 @@ contains
 
     end subroutine s_mpi_initialize ! --------------------------------------
 
-
-    subroutine s_initialize_mpi_data(q_cons_vf) ! --------------------------
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers) ! --------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
 
+        type(integer_field), &
+            optional, &
+            intent(IN) :: ib_markers
+
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
+        integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
 
@@ -80,25 +83,25 @@ contains
         end do
 
         !Additional variables pb and mv for non-polytropic qbmm
-#ifdef MFC_PRE_PROCESS 
-        if(qbmm .and. .not. polytropic) then
+#ifdef MFC_PRE_PROCESS
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i) 
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i) 
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m, 0:n, 0:p, j, i)
                 end do
-            end do                  
+            end do
         end if
 #endif
 
-#ifdef MFC_SIMULATION 
-        if(qbmm .and. .not. polytropic) then
+#ifdef MFC_SIMULATION
+        if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do j = 1, nnode
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
-                        MPI_IO_DATA%var(sys_size + (i-1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i) 
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m, 0:n, 0:p, j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m, 0:n, 0:p, j, i)
                 end do
-            end do                  
+            end do
         end if
 #endif
         ! Define global(g) and local(l) sizes for flow variables
@@ -118,20 +121,74 @@ contains
         end do
 
 #ifndef MFC_POST_PROCESS
-        if(qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
 
             end do
+        end if
+#endif
+
+#ifndef MFC_POST_PROCESS
+        if (present(ib_markers)) then
+
+#ifdef MPI_SIMULATION
+            MPI_IO_IB_DATA%var%sf => ib_markers%sf
+#else
+            MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
+#endif
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
+
+        end if
+#endif
+
+#ifndef MFC_POST_PROCESS
+        if (present(ib_markers)) then
+            do j = 1, num_ibs
+                if (patch_ib(j)%c > 0) then
+
+#ifdef MFC_PRE_PROCESS
+                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
+#endif
+
+                    airfoil_glb(1) = 3*Np*num_procs
+                    airfoil_loc(1) = 3*Np
+                    airfoil_start(1) = 3*proc_rank*Np
+
+#ifdef MFC_PRE_PROCESS
+                    do i = 1, Np
+                        MPI_IO_airfoil_IB_DATA%var(i)%x = airfoil_grid_l(i)%x
+                        MPI_IO_airfoil_IB_DATA%var(i)%y = airfoil_grid_l(i)%y
+                    end do
+#endif
+
+                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
+                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), ierr)
+                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(1), ierr)
+
+#ifdef MFC_PRE_PROCESS
+                    do i = 1, Np
+                        MPI_IO_airfoil_IB_DATA%var(Np + i)%x = airfoil_grid_u(i)%x
+                        MPI_IO_airfoil_IB_DATA%var(Np + i)%y = airfoil_grid_u(i)%y
+                    end do
+#endif
+                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
+                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), ierr)
+                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(2), ierr)
+
+                end if
+            end do
+
         end if
 #endif
 
 #endif
 
     end subroutine s_initialize_mpi_data ! ---------------------------------
-
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
@@ -145,7 +202,6 @@ contains
 #endif
 
     end subroutine mpi_bcast_time_step_values
-
 
     !>  The goal of this subroutine is to determine the global
         !!      extrema of the stability criteria in the computational
@@ -202,7 +258,6 @@ contains
 #endif
 
     end subroutine s_mpi_reduce_stability_criteria_extrema ! ---------------
-
 
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
@@ -270,7 +325,6 @@ contains
 
     end subroutine s_mpi_allreduce_max ! -----------------------------------
 
-
     !>  The following subroutine takes the inputted variable and
         !!      determines its minimum value on the entire computational
         !!      domain. The result is stored back into inputted variable.
@@ -299,7 +353,6 @@ contains
 #endif
 
     end subroutine s_mpi_reduce_min ! --------------------------------------
-
 
     !>  The following subroutine takes the first element of the
         !!      2-element inputted variable and determines its maximum
@@ -343,8 +396,8 @@ contains
         character(len=*), intent(in), optional :: prnt
 
         if (present(prnt)) then
-            print*, prnt
-            call flush(6)
+            print *, prnt
+            call flush (6)
 
         end if
 
@@ -353,7 +406,7 @@ contains
         stop 1
 
 #else
-        
+
         ! Terminating the MPI environment
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
 
@@ -373,7 +426,6 @@ contains
 
     end subroutine s_mpi_barrier ! -----------------------------------------
 
-
     !> The subroutine finalizes the MPI execution environment.
     subroutine s_mpi_finalize() ! ------------------------------------------
 
@@ -385,6 +437,5 @@ contains
 #endif
 
     end subroutine s_mpi_finalize ! ----------------------------------------
-
 
 end module m_mpi_common

@@ -25,7 +25,7 @@ module m_mpi_proxy
 
     implicit none
 
-    !> @name Buffers of the conservative variables recieved/sent from/to neighbooring
+    !> @name Buffers of the conservative variables received/sent from/to neighboring
     !! processors. Note that these variables are structured as vectors rather
     !! than arrays.
     !> @{
@@ -33,7 +33,7 @@ module m_mpi_proxy
     real(kind(0d0)), allocatable, dimension(:) :: q_cons_buffer_out
     !> @}
 
-    !> @name Recieve counts and displacement vector variables, respectively, used in
+    !> @name Receive counts and displacement vector variables, respectively, used in
     !! enabling MPI to gather varying amounts of data from all processes to the
     !! root process
     !> @{
@@ -47,7 +47,6 @@ module m_mpi_proxy
     !> @}
 
 contains
-
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
@@ -112,7 +111,7 @@ contains
 
         end if
 
-        ! Allocating and configuring the recieve counts and the displacement
+        ! Allocating and configuring the receive counts and the displacement
         ! vector variables used in variable-gather communication procedures.
         ! Note that these are only needed for either multidimensional runs
         ! that utilize the Silo database file format or for 1D simulations.
@@ -159,16 +158,16 @@ contains
             & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb' ]
+            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         #:for VAR in [ 'cyl_coord', 'adv_alphan', 'mpp_lim', 'mixture_err',    &
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
-            & 'E_wrt', 'pres_wrt', 'gamma_wrt',                & 
-            & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', & 
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
-            & 'polytropic', 'polydisperse' ]
+            & 'E_wrt', 'pres_wrt', 'gamma_wrt',                &
+            & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
+            & 'polytropic', 'polydisperse', 'file_per_process', 'relax' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -182,6 +181,9 @@ contains
         do i = 1, num_fluids_max
             call MPI_BCAST(fluid_pp(i)%gamma, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%pi_inf, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%cv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qv, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%qvp, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
 
@@ -609,7 +611,7 @@ contains
         else
             offset_x%beg = 0
         end if
-        
+
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
             proc_coords(1) = proc_coords(1) + 1
@@ -638,7 +640,7 @@ contains
     end subroutine s_mpi_decompose_computational_domain ! ------------------
 
     !>  Communicates the buffer regions associated with the grid
-        !!      variables with processors in charge of the neighbooring
+        !!      variables with processors in charge of the neighboring
         !!      sub-domains. Note that only cell-width spacings feature
         !!      buffer regions so that no information relating to the
         !!      cell-boundary locations is communicated.
@@ -838,7 +840,7 @@ contains
     end subroutine s_mpi_sendrecv_grid_vars_buffer_regions ! ---------------
 
     !>  Communicates buffer regions associated with conservative
-        !!      variables with processors in charge of the neighbooring
+        !!      variables with processors in charge of the neighboring
         !!      sub-domains
         !!  @param q_cons_vf Conservative variables
         !!  @param pbc_loc Processor boundary condition (PBC) location
@@ -930,13 +932,13 @@ contains
                                 r = sys_size*(j + buff_size) &
                                     + sys_size*buff_size*k + (i - 1) &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                             
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                                
+#endif
                             end do
                         end do
                     end do
@@ -1010,13 +1012,13 @@ contains
                                 r = (i - 1) + sys_size*(j - m - 1) &
                                     + sys_size*buff_size*k &
                                     + sys_size*buff_size*(n + 1)*l
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)                                
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                                 
+#endif
                             end do
                         end do
                     end do
@@ -1106,11 +1108,11 @@ contains
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif            
+#endif
                             end do
                         end do
                     end do
@@ -1192,11 +1194,11 @@ contains
                                     (m + 2*buff_size + 1)*buff_size*l
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif 
+#endif
                             end do
                         end do
                     end do
@@ -1291,11 +1293,11 @@ contains
                                     (n + 2*buff_size + 1)*(l + buff_size)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif                           
+#endif
                             end do
                         end do
                     end do
@@ -1382,11 +1384,11 @@ contains
                                     (n + 2*buff_size + 1)*(l - p - 1)
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buffer_in(r)
 #if defined(__INTEL_COMPILER)
-                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                     print *, "Error", j, k, l, i
                                     error stop "NaN(s) in recv"
                                 end if
-#endif 
+#endif
                             end do
                         end do
                     end do
@@ -1401,7 +1403,6 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_cons_vars_buffer_regions ! ---------------
-
 
     !>  This subroutine gathers the Silo database metadata for
         !!      the spatial extents in order to boost the performance of
@@ -1574,7 +1575,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Mimimum flow variable extent
+        ! Minimum flow variable extent
         call MPI_GATHERV(minval(q_sf), 1, MPI_DOUBLE_PRECISION, &
                          data_extents(1, 0), recvcounts, 2*displs, &
                          MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -1628,7 +1629,7 @@ contains
             deallocate (q_cons_buffer_out)
         end if
 
-        ! Deallocating the recieve counts and the displacement vector
+        ! Deallocating the receive counts and the displacement vector
         ! variables used in variable-gather communication procedures
         if ((format == 1 .and. n > 0) .or. n == 0) then
             deallocate (recvcounts)
@@ -1638,6 +1639,5 @@ contains
 #endif
 
     end subroutine s_finalize_mpi_proxy_module ! -------------------------
-
 
 end module m_mpi_proxy
