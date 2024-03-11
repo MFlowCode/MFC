@@ -201,7 +201,7 @@ contains
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
-            @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &
+            @:ALLOCATE_GLOBAL(rhs_pb(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then

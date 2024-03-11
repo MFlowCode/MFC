@@ -37,15 +37,17 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
+    type(integer_field), public :: ib_markers
+    !$acc declare create(ib_markers)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
-    @:CRAY_DECLARE_GLOBAL_SCALAR(type(integer_field), ib_markers)
-    !$acc declare link(ib_markers, levelset, levelset_norm, ghost_points) 
+
+    !$acc declare link(levelset, levelset_norm, ghost_points) 
 #else
-    type(integer_field), public :: ib_markers
+    
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
     real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
     !! Matrix of distance to IB
@@ -53,7 +55,8 @@ module m_ibm
     !! Matrix of normal vector to IB
     type(ghost_point), dimension(:), allocatable :: ghost_points
     !! Matrix of normal vector to IB
-    !$acc declare create(ib_markers, levelset, levelset_norm, ghost_points)    
+
+    !$acc declare create(levelset, levelset_norm, ghost_points)    
 #endif
 
     integer :: gp_layers !< Number of ghost point layers
@@ -79,6 +82,8 @@ contains
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
         @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
         @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
+
+        !$acc enter data copyin(gp_layers, num_gps)
 
     end subroutine s_initialize_ibm_module
 
@@ -162,7 +167,7 @@ contains
                 physical_loc = [x_cc(j), y_cc(k), 0d0]
             end if
 
-            ! Interpolate primitive variables at image point associated w/ GP
+            !Interpolate primitive variables at image point associated w/ GP
             if (bubbles .and. .not. qbmm) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
