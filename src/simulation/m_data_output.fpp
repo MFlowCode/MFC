@@ -594,7 +594,7 @@ contains
     subroutine s_calculate_energy_contributions(q_cons_vf, Elk, Elp, Egk, Egie)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
-        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb
+        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb, tmp
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
@@ -642,6 +642,16 @@ contains
                 end do
             end do
         end if
+        tmp = Elk
+        call s_mpi_allreduce_sum(tmp, Elk)
+        tmp = Elp
+        call s_mpi_allreduce_sum(tmp, Elp)
+        tmp = Egie
+        call s_mpi_allreduce_sum(tmp, Egie)
+        tmp = Egk
+        call s_mpi_allreduce_sum(tmp, Egk)
+        tmp = Vb
+        call s_mpi_allreduce_sum(tmp, Vb)
         Elp = Elp + Vb
 
 
