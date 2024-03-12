@@ -51,6 +51,9 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
+    TYPE(scalar_field), ALLOCATABLE, DIMENSION(:), PUBLIC :: q_particle !<
+    !! Lagrangian solver (particle void fraction)
+
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
 contains
@@ -205,6 +208,28 @@ contains
 
         end do
 
+        IF(avgdensflag) THEN !Lagrangian solver
+                
+            ! Checking whether the data file associated with the variable
+            ! position of currently manipulated conservative variable exists
+            WRITE(file_num, '(I0)') sys_size + 1
+            file_loc = TRIM(t_step_dir) // '/q_cons_vf' // &
+            TRIM(file_num) // '.dat'
+            INQUIRE(FILE = TRIM(file_loc), EXIST = file_check)
+
+            ! Reading the data file if it exists, exiting otherwise
+            IF(file_check) THEN
+                OPEN(1, FILE = TRIM(file_loc), FORM = 'unformatted', &
+                STATUS = 'old', ACTION = 'read')
+                READ(1) q_particle(1)%sf(0:m,0:n,0:p)
+                CLOSE(1)
+            ELSE
+                PRINT '(A)', 'File q_cons_vf' // TRIM(file_num) // &
+                      '.dat is missing in ' // TRIM(t_step_dir) // &
+                                                    '. Exiting ...'
+                CALL s_mpi_abort()
+            END IF
+        END IF
         ! ==================================================================
 
     end subroutine s_read_serial_data_files ! ---------------------------------
@@ -237,6 +262,14 @@ contains
         character(len=10) :: t_step_string
 
         integer :: i
+
+        INTEGER :: alt_sys !Altered sys_size for lagrangian solver
+
+        IF(avgdensflag) THEN
+            alt_sys = sys_size +1
+        ELSE
+            alt_sys = sys_size
+        END IF
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -364,7 +397,11 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-                call s_initialize_mpi_data(q_cons_vf)
+                IF(avgdensflag) THEN !Lagrangian solver
+                    CALL s_initialize_mpi_data(q_cons_vf, beta=q_particle(1))
+                ELSE
+                    CALL s_initialize_mpi_data(q_cons_vf)
+                END IF
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -376,7 +413,7 @@ contains
                 WP_MOK = int(8d0, MPI_OFFSET_KIND)
                 MOK = int(1d0, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
                 if (bubbles .or. hypoelasticity) then
@@ -404,6 +441,24 @@ contains
                                                MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
+
+                IF(avgdensflag) THEN !Lagrangian solver
+                ! Note that definition of sys_size is different from
+                ! that used in simulation
+                IF(adv_alphan .NEQV. .TRUE.)  THEN
+                    var_MOK = INT(sys_size+2, MPI_OFFSET_KIND)
+                ELSE
+                    var_MOK = INT(sys_size+1, MPI_OFFSET_KIND)
+                END IF
+
+                ! Initial displacement to skip at beginning of file
+                disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
+
+                CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(sys_size+1), &
+                                                                           'native',mpi_info_int,ierr)
+                CALL MPI_FILE_READ(ifile,MPI_IO_DATA%var(sys_size+1)%sf,data_size, &
+                                                        MPI_DOUBLE_PRECISION,status,ierr)
+                END IF
 
                 call s_mpi_barrier()
 
@@ -1060,6 +1115,8 @@ contains
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
 
+        IF(avgdensflag) ALLOCATE(q_particle(1)) !Lagrangian solver
+
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
         ! simulation
@@ -1079,6 +1136,12 @@ contains
                                               -buff_size:p + buff_size))
                 end do
 
+                IF(avgdensflag) THEN !Lagrangian solver
+                    ALLOCATE(q_particle(1)%sf( -buff_size:m+buff_size, &
+                                           -buff_size:n+buff_size, &
+                                           -buff_size:p+buff_size ))
+                END IF
+
                 ! Simulation is 2D
             else
 
@@ -1090,6 +1153,11 @@ contains
                                               -buff_size:n + buff_size, &
                                               0:0))
                 end do
+
+                IF(avgdensflag) THEN !Lagrangian solver
+                    ALLOCATE(q_particle(1)%sf( -buff_size:m+buff_size, &
+                                           -buff_size:n+buff_size, 0:0 ))
+                END IF
 
             end if
 
@@ -1104,6 +1172,10 @@ contains
                                           0:0, &
                                           0:0))
             end do
+
+            IF(avgdensflag) THEN !Lagrangian solver
+                ALLOCATE(q_particle(1)%sf( -buff_size:m+buff_size, 0:0, 0:0))
+            END IF
 
         end if
 
@@ -1128,6 +1200,11 @@ contains
 
         deallocate (q_cons_vf)
         deallocate (q_prim_vf)
+
+        IF(avgdensflag) THEN !Lagrangian solver
+            DEALLOCATE(q_particle(1)%sf)
+            DEALLOCATE(q_particle)
+        END IF
 
         s_read_data_files => null()
 

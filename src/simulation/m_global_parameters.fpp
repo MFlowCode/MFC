@@ -1,4 +1,3 @@
-!>
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
@@ -354,6 +353,59 @@ module m_global_parameters
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
     !$acc declare create(pb_ts, mv_ts)
+
+    ! ======================================================================
+    !< Global variables used in the Lagrangian solver
+
+    real(kind(0d0)) :: dt0              !< Initial time-step
+    logical :: particleflag             !< lagrangian particle switch
+    logical :: avgdensFlag              !< density correction switch
+    logical :: particleoutFlag          !< output bubble radius evolution
+    logical :: particlestatFlag         !< output global stats about bubbles
+    logical :: RPflag                   !< Rayleigh-Plesset equation
+    integer :: clusterflag              !< Cluster model
+    logical :: stillparticlesflag       !< keep bubbles at initial location (Always specify T)
+    integer :: heatflag                 !< Heat transfer model
+    integer :: massflag                 !< Mass transfer model
+    real(kind(0d0)) :: csonref          !< char. liquid speed of sound
+    real(kind(0d0)) :: rholiqref        !< char. liquid density
+    real(kind(0d0)) :: Lref             !< char. length
+    real(kind(0d0)) :: Tini                     !< Initial temperature
+    real(kind(0d0)) :: Runiv                    !< Universal Gas Constant
+    real(kind(0d0)) :: gammagas, gammavapor     !< Gas and vapour gamma 
+    real(kind(0d0)) :: pvap             !< Vapour pressure at the reference temperature 
+    real(kind(0d0)) :: cpgas, cpvapor   !< Gas and vapor specific heat capacity 
+    real(kind(0d0)) :: kgas, kvapor     !< Gas and vapor thermal conductivity
+    real(kind(0d0)) :: MWgas, MWvap     !< Gas and vapour molecular weight
+    real(kind(0d0)) :: diffcoefvap      !< Vapor diffusivity in gas
+    real(kind(0d0)) :: sigmabubble      !< Surface tension 
+    real(kind(0d0)) :: viscref          !< Liquid viscosity
+    real(kind(0d0)) :: RKeps            !< Adaptive RK accuracy
+    integer :: ratiodt                  !< Timestep ratio
+    integer :: projectiontype           !< Projection type
+    integer :: smoothtype               !< Smoothing function (1: Gaussian, 2:Delta 3x3 )
+    real(kind(0d0)) :: epsilonb         !< stddsv for the gaussian (in number of cells, for the delta is 1)
+    logical :: coupledFlag              !< Coupled liquid solver
+    integer :: solverapproach           !< Solver type (1: simple approach, 2: source terms)
+    logical :: correctpresFlag          !< Cell pressure correction term
+    real(kind(0d0)) :: charwidth        !< domain depth (size of the domain in the z direction, for 2D simulations)
+    real(kind(0d0)) :: valmaxvoid       !< maximum void fraction permitted
+    real(kind(0d0)) :: dtmaxpart        !< maxdtpart (typically set zero)
+    LOGICAL :: do_particles
+    LOGICAL :: do_sources
+    LOGICAL :: do_sampling
+    LOGICAL :: bubblesources
+    INTEGER :: send_size        !< Number of variables to be sent in m_mpi_proxy
+
+    ! Particle Sampling data structures
+    TYPE :: probedat
+        INTEGER :: id
+        INTEGER, DIMENSION(3) :: ip
+    END TYPE probedat
+
+    TYPE (probedat), ALLOCATABLE, DIMENSION(:) :: prb
+    INTEGER :: nsamples, totsamples     !< Number of samples in each proc and total number of samples
+
     ! ======================================================================
 
 contains
@@ -521,6 +573,47 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
+        !Lagrangian solver variables
+        particleflag = .FALSE.
+        avgdensFlag = .FALSE.
+        particleoutFlag = .FALSE.
+        particlestatFlag = .FALSE.
+        RPflag = .FALSE.
+        clusterflag = dflt_int
+        stillparticlesflag= .FALSE.
+        heatflag= dflt_int
+        massflag= dflt_int
+        csonref = dflt_real
+        rholiqref = dflt_real
+        Lref = dflt_real
+        Tini = dflt_real
+        Runiv = dflt_real
+        gammagas = dflt_real
+        gammavapor = dflt_real
+        pvap = dflt_real
+        cpgas = dflt_real
+        cpvapor = dflt_real
+        kgas = dflt_real
+        kvapor = dflt_real
+        MWgas = dflt_real
+        MWvap = dflt_real
+        diffcoefvap = dflt_real
+        sigmabubble = dflt_real
+        viscref = dflt_real
+        RKeps = dflt_real
+        ratiodt = dflt_int
+        projectiontype = dflt_int
+        smoothtype = dflt_int
+        epsilonb= dflt_real
+        coupledFlag = .FALSE.
+        solverapproach = 2
+        correctpresFlag = .FALSE.
+        charwidth = dflt_real
+        valmaxvoid = dflt_real
+        dtmaxpart = dflt_real
+        do_particles = .FALSE.
+        bubblesources = .FALSE.
+
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
     !>  The computation of parameters, the allocation of memory,
@@ -591,6 +684,19 @@ contains
                 else
                     alf_idx = 1
                 end if
+
+                !MPI send size for lagrangian solver
+                IF (particleflag) THEN
+                  IF ((solverapproach.EQ.2).AND.avgdensFlag) THEN
+                    send_size = adv_idx%end + 2
+                  ELSE
+                    send_size = adv_idx%end + 1
+                  END IF
+                ELSE
+                    send_size = adv_idx%end
+                END IF
+
+                if (proc_rank==0) print*, 'sys_size and send_size', sys_size, send_size
 
                 if (bubbles) then
                     bub_idx%beg = sys_size + 1
@@ -797,6 +903,9 @@ contains
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+        else if (particleflag) then !Lagrangian solver
+            ALLOCATE(MPI_IO_DATA%view(1:sys_size+1))
+            ALLOCATE(MPI_IO_DATA%var(1:sys_size+1))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -811,6 +920,11 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+        else if (particleflag) then !Lagrangian solver
+            DO i = 1, sys_size+1
+                ALLOCATE(MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
+                MPI_IO_DATA%var(i)%sf => NULL()
+            END DO
         end if
 
         ! Configuring the WENO average flag that will be used to regulate
@@ -856,6 +970,16 @@ contains
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
+
+        ! Particle-module correction for smearing function, Lagrangian solver
+        ! If clusterflag is 0, required buff_size is CEILING(3*stddsv)
+        ! If clusterflag is 3, required buff_size is CEILING(3*stddsv).
+        !buff_size = MAX(buff_size, INT(6d0))
+        !if (proc_rank==0) print*, 'buff_size before', buff_size
+        IF (do_particles) THEN
+            buff_size = MAX(buff_size, 6)
+        END IF
+        !if (proc_rank==0) print*, 'buff_size after', buff_size
 
         startx = -buff_size
         starty = 0
@@ -964,9 +1088,15 @@ contains
         deallocate (proc_coords)
         if (parallel_io) then
             deallocate (start_idx)
-            do i = 1, sys_size
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
+            IF(particleflag) THEN
+                DO i = 1, sys_size + 1   !< Altered sys_size for lagrangian solver
+                    MPI_IO_DATA%var(i)%sf => NULL()
+                END DO
+            ELSE
+                do i = 1, sys_size
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            END IF
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

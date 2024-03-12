@@ -42,6 +42,7 @@ module m_data_output
  s_write_serial_data_files, &
  s_write_parallel_data_files, &
  s_write_probe_files, &
+ s_write_initial_conc_serial, &
  s_close_run_time_information_file, &
  s_close_probe_files, &
  s_finalize_data_output_module
@@ -51,7 +52,7 @@ module m_data_output
         !> Write data files
         !! @param q_cons_vf Conservative variables
         !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
             import :: scalar_field, sys_size, pres_field
 
@@ -64,6 +65,9 @@ module m_data_output
                 intent(INOUT) :: q_prim_vf
 
             integer, intent(IN) :: t_step
+
+            ! Lagrangian particle
+            TYPE(scalar_field), OPTIONAL :: beta
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -434,12 +438,15 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step, beta) ! -------------
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
 
         integer, intent(IN) :: t_step
+
+        ! Lagrangian solver
+        TYPE(scalar_field), OPTIONAL :: beta
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -799,13 +806,22 @@ contains
             end if
         end if
 
+        ! Writing beta, lagrangian solver
+        IF(PRESENT(beta)) THEN
+            WRITE(file_path,'(A,I0,A)') TRIM(t_step_dir) // '/q_cons_vf', adv_idx%end+1, '.dat'
+            OPEN(2, FILE   = TRIM(file_path), &
+            FORM   = 'unformatted'  , &
+            STATUS = 'new'            )
+            WRITE(2) beta%sf(0:m,0:n,0:p); CLOSE(2)
+        END IF
+
     end subroutine s_write_serial_data_files ! ------------------------------------
 
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta) ! ----
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -816,6 +832,9 @@ contains
             intent(INOUT) :: q_prim_vf
 
         integer, intent(IN) :: t_step
+
+        ! Lagrangian solver
+        TYPE(scalar_field), OPTIONAL :: beta
 
 #ifdef MFC_MPI
 
@@ -832,6 +851,14 @@ contains
         character(len=10) :: t_step_string
 
         integer :: i !< Generic loop iterator
+
+        INTEGER :: alt_sys !< System size including lagrangian particles
+
+        IF (PRESENT(beta)) THEN
+            alt_sys = sys_size + 1
+        ELSE
+            alt_sys = sys_size
+        END IF
 
         if (file_per_process) then
 
@@ -912,7 +939,11 @@ contains
         else
             ! Initialize MPI data I/O
 
-            call s_initialize_mpi_data(q_cons_vf)
+            IF(PRESENT(beta)) THEN !lagrangian solver
+                CALL s_initialize_mpi_data(q_cons_vf, beta=beta)
+            ELSE
+                CALL s_initialize_mpi_data(q_cons_vf)
+            END IF
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step, '.dat'
@@ -934,7 +965,7 @@ contains
             WP_MOK = int(8d0, MPI_OFFSET_KIND)
             MOK = int(1d0, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             if (bubbles) then
                 ! Write the data for each variable
@@ -977,6 +1008,20 @@ contains
                 end do
             end if
 
+            ! Correction for lagrangian solver
+            IF (present(beta)) THEN
+                var_MOK = INT(sys_size+1, MPI_OFFSET_KIND)
+
+                ! Initial displacement to skip at beginning of file
+                disp = m_MOK*MAX(MOK,n_MOK)*MAX(MOK,p_MOK)*WP_MOK*(var_MOK-1)
+
+                CALL MPI_FILE_SET_VIEW(ifile,disp,MPI_DOUBLE_PRECISION,MPI_IO_DATA%view(sys_size+1), &
+                                                                        'native',mpi_info_int,ierr)
+                CALL MPI_FILE_WRITE_ALL(ifile,MPI_IO_DATA%var(sys_size+1)%sf,data_size, &
+                                                     MPI_DOUBLE_PRECISION,status,ierr)
+            END IF
+
+
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
@@ -993,7 +1038,6 @@ contains
         end if
 
         call MPI_FILE_CLOSE(ifile, ierr)
-
 #endif
 
     end subroutine s_write_parallel_data_files ! ---------------------------
@@ -1214,6 +1258,7 @@ contains
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
+
                         do s = 1, num_dims
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -1405,7 +1450,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.8,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1436,7 +1481,8 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+
+                        write (i + 30, '(6X,F12.8,F24.8,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1599,6 +1645,59 @@ contains
     end subroutine s_write_probe_files ! -----------------------------------
 
     @:s_compute_speed_of_sound()
+
+    !>  Used to initialize the lagrangian solver in serial
+        !!  @param beta Lagrangian void fraction
+    SUBROUTINE s_write_initial_conc_serial(beta) ! ---------------------
+
+            ! Current time-step
+            INTEGER :: t_step
+
+            ! Bubble void fraction
+            TYPE(scalar_field), INTENT(IN)  :: beta
+
+            ! Relative path to the current time-step directory
+            CHARACTER(LEN = path_len + 2*name_len) :: t_step_dir
+
+            ! Relative path to the grid and conservative variables data files
+            CHARACTER(LEN = path_len + 3*name_len) :: file_path
+
+            ! Logical used to check existence of current time-step directory
+            LOGICAL :: file_exist
+
+            t_step = 0
+
+            ! Creating or overwriting the current time-step directory
+            WRITE(t_step_dir,'(A,I0,A,I0)') TRIM(case_dir) // '/p', &
+                                            proc_rank, '/', t_step
+
+            file_path = TRIM(t_step_dir) // '/.'
+
+            !INQUIRE( DIRECTORY = TRIM(file_path), & ! Intel compiler
+            !         EXIST     = file_exist       )
+            INQUIRE( FILE      = TRIM(file_path), & ! NAG/PGI/GCC compiler
+                     EXIST     = file_exist       )
+
+            !fixme: no need to delete other data?
+            !IF(file_exist) CALL SYSTEM('rm -rf ' // TRIM(t_step_dir))
+
+            !CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
+
+            !fixme: deleting the exsiting particle data
+            !CALL SYSTEM('rm -rf ' // TRIM(t_step_dir) // '/q_cons_vf', &
+            !                            adv_idx%end+1, '.dat')
+
+            ! Writing beta
+            WRITE(file_path,'(A,I0,A)') TRIM(t_step_dir) // '/q_cons_vf', &
+                                        adv_idx%end+1, '.dat'
+
+            OPEN(2, FILE   = TRIM(file_path), &
+                    FORM   = 'unformatted'  , &
+                    STATUS = 'new'            )
+
+            WRITE(2) beta%sf(0:m,0:n,0:p); CLOSE(2)
+
+        END SUBROUTINE s_write_initial_conc_serial ! -------------------------
 
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to

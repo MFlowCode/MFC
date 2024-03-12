@@ -74,7 +74,7 @@ contains
     end subroutine s_compute_monopole_rhs
 
     subroutine s_monopole_calculations(q_cons_vf, &
-                                       q_prim_vf, t_step, id, rhs_vf)
+                                       q_prim_vf, t_step, id, rhs_vf, particleTime)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -90,6 +90,8 @@ contains
 
         integer, intent(IN) :: t_step, id
 
+        real(kind(0d0)), optional ::particleTime
+
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
 
         integer :: i, j, k, l, q, ii !< generic loop variables
@@ -103,6 +105,13 @@ contains
 
         real(kind(0d0)) :: the_time, sound
         real(kind(0d0)) :: s2, const_sos, s1
+
+        !Adjust current time to make it compatible with lagrangian solver (Runge-Kutta of 4th order)
+        if (present(particleTime)) then
+            the_time = particleTime
+        else
+            the_time = t_step*dt
+        end if
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -126,7 +135,6 @@ contains
                     !$acc loop seq
                     do q = 1, num_mono
 
-                        the_time = t_step*dt
                         if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
                             !$acc loop seq
                             do ii = 1, num_fluids
@@ -188,10 +196,11 @@ contains
                                 term_index = 1
                                 s1 = f_g(the_time, sound, const_sos, q, term_index)* &
                                      f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
+                                mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s1
+                            else
+                                mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
                             end if
 
-                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
-!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
 
                             if (n == 0) then
 
@@ -211,6 +220,8 @@ contains
                                     !mono_mom_src(1,j,k,l) = s2
                                     !mono_mom_src(2,j,k,l) = s2
                                     if (support(q) == 5) then
+                                        !mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2*cos(abs(angle))
+                                        !mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) - s2*sin(abs(angle))
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
                                     else
@@ -221,7 +232,7 @@ contains
                             else
                                 ! 3D
                                 if (dir(q) /= dflt_real) then
-                                    if (support(q) == 5) then
+                                    if (support(q) == 5) then                                        
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
                                     else if (support(q) == 6) then
@@ -266,7 +277,6 @@ contains
                 end do
             end do
         end do
-
     end subroutine
 
     !> This function gives the temporally varying amplitude of the pulse
@@ -295,6 +305,8 @@ contains
                                                 - 1.d0/(2.d0*pi/period))
             elseif (the_time <= (npulse(nm)*period + offset)) then
                 f_g = mag(nm)*sin((the_time + offset)*2.d0*pi/period)
+                !print*, period, sos, length(nm), mag(nm), the_time, offset, pi
+                !stop
             end if
         else if (pulse(nm) == 2) then
             ! Gaussian pulse

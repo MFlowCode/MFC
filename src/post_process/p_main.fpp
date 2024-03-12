@@ -16,6 +16,8 @@ program p_main
     use m_global_parameters     !< Global parameters for the code
 
     use m_start_up
+
+    USE m_particles_output
     ! ==========================================================================
 
     implicit none
@@ -42,6 +44,11 @@ program p_main
         call s_perform_time_step(t_step)
 
         call s_save_data(t_step, varname, pres, c, H)
+
+        ! Writing particle variables into formatted file !Lagrangian solver
+        IF(particleflag.and.(num_procs.eq.1)) THEN ! no second_dir
+           CALL write_particle_parallel(t_step)
+        END IF
 
         ! Modifies the time-step iterator so that it may reach the final time-
         ! step to be post-processed, in the case that this one is not originally

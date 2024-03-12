@@ -216,6 +216,9 @@ module m_global_parameters
     type(pres_field) :: pb
     type(pres_field) :: mv
 
+    !< Lagrangian solver
+    integer :: solverapproach
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
@@ -413,6 +416,9 @@ contains
             fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = 0d0
         end do
+
+        !Lagrangian solver
+        solverapproach = 2
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
