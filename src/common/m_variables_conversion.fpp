@@ -173,27 +173,27 @@ contains
 
         end if
 
-        if (hyperelasticity .and. present(G)) then
-             ! calculate elastic contribution to Energy
-            E_e = 0d0
-            do s = stress_idx%beg, stress_idx%end
-                if (G > 0) then
-                    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
-                    ! Additional terms in 2D and 3D
-                    if ((s == stress_idx%beg + 1) .or. &
-                        (s == stress_idx%beg + 3) .or. &
-                        (s == stress_idx%beg + 4)) then
-                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
-                    end if
-                end if
-            end do
+        !if (hyperelasticity .and. present(G)) then
+        !     ! calculate elastic contribution to Energy
+        !    E_e = 0d0
+        !    do s = stress_idx%beg, stress_idx%end
+        !        if (G > 0) then
+        !            E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+        !            ! Additional terms in 2D and 3D
+        !            if ((s == stress_idx%beg + 1) .or. &
+        !                (s == stress_idx%beg + 3) .or. &
+        !                (s == stress_idx%beg + 4)) then
+        !                E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+        !            end if
+        !        end if
+        !    end do
 
-            pres = ( &
-                   energy - &
-                   0.5d0*(mom**2.d0)/rho - &
-                   pi_inf - qv - E_e &
-                   )/gamma    
-        end if
+        !    pres = ( &
+        !           energy - &
+        !           0.5d0*(mom**2.d0)/rho - &
+        !           pi_inf - qv - E_e &
+        !           )/gamma    
+        !end if
 
     end subroutine s_compute_pressure
 
@@ -918,7 +918,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity .or. hyperelasticity) then ! .or. hyperelasticity) then
+                        if (hypoelasticity .or. hyperelasticity) then 
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1008,12 +1008,12 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (hyperelasticity .and. G_K .gt. 0.d0) then
-                       call s_allocate_tensor(qK_prim_vf,j,k,l,gtensor)
-                       call s_calculate_atransposea(gtensor,getge) ! getge is G^e
-                       detG =  f_determinant(getge) ! determinant of G^e
-                       ghat(:) = getge(:)*detG**(-1.d0/3.d0)
-                       e_e = (G_K/(4.d0*rho_K))*f_elastic_energy(ghat)              
+                    if (hyperelasticity) then
+                    !   call s_allocate_tensor(qK_prim_vf,j,k,l,gtensor)
+                    !   call s_calculate_atransposea(gtensor,getge) ! getge is G^e
+                    !   detG =  f_determinant(getge) ! determinant of G^e
+                    !   ghat(:) = getge(:)*detG**(-1.d0/3.d0)
+                       e_e = (G_K/(4.d0*rho_K))!*f_elastic_energy(ghat)              
                        qK_prim_vf(E_idx)%sf(j,k,l) = qK_prim_vf(E_idx)%sf(j,k,l) - e_e/gamma_k
                     end if
 
@@ -1171,14 +1171,14 @@ contains
                         end do
                     end if
               
-                    if (hyperelasticity .and. G .gt. 0.d0 ) then
-                        call s_allocate_tensor(q_cons_vf,j,k,l,gtensor)
-                        call s_calculate_atransposea(gtensor,getge) ! getge is G^e
-                        detG =  f_determinant(getge) ! determinant of G^e
-                        ghat(:) = getge(:)*detG**(-1.d0/3.d0)
-                        e_e = (G/(4.d0*rho))*f_elastic_energy(ghat)
-                        q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + e_e
-                    end if
+                    !if (hyperelasticity .and. G .gt. 0.d0 ) then
+                    !    call s_allocate_tensor(q_cons_vf,j,k,l,gtensor)
+                    !    call s_calculate_atransposea(gtensor,getge) ! getge is G^e
+                    !    detG =  f_determinant(getge) ! determinant of G^e
+                    !    ghat(:) = getge(:)*detG**(-1.d0/3.d0)
+                    !    e_e = (G/(4.d0*rho))*f_elastic_energy(ghat)
+                    !    q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + e_e
+                    !end if
 
                 end do
             end do
