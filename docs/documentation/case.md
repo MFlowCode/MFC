@@ -148,8 +148,9 @@ The value of `dt` needs to be sufficiently small such that the Courant-Friedrich
 
 - `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
 `t_step_save` is the time step interval for data output during simulation.
-To newly start simulation, set `t_step_start`=0.
-To restart simulation from $k$-th time step, set `t_step_start`=k.
+To newly start the simulation, set `t_step_start = 0`.
+To restart simulation from $k$-th time step, set `t_step_start = k`, do not run `pre_process`, and run `simulation` directly (`./mfc.sh run [...] -t simulation`).
+Ensure the data for the $k$-th time step is stored in the `restart_data/` directory within the case repository.
 
 ### 3. Patches
 
