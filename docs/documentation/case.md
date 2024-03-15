@@ -63,7 +63,7 @@ To run such a case, use the following format:
 For example, to run the 3D_weak_scaling case with `gbpp=2`:
 
 ```console
-./mfc.sh run examples/3D_weak_scaling/case.py 2 -t  -j 8
+./mfc.sh run examples/3D_weak_scaling/case.py 2 -t pre_process -j 8
 ```
 
 ## Parameters
@@ -226,8 +226,8 @@ end if
 
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
-Hard coded patches can be added by adding additional hard coded patch identifiers to `src//include/1[2,3]dHardcodedIC.fpp`.
-For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src//include/2dHardcodedIC.fpp`
+Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
     case(200)
@@ -473,7 +473,7 @@ Parallel I/O enables the use of different number of processors in each of the pr
 - `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO.
 The default behavior is to use a shared file.
 File per process is useful when running on 10's of thousands of ranks.
-If `file_per_process` is true, then , simulation, and post_process must be run with the same number of ranks.
+If `file_per_process` is true, then pre_process, simulation, and post_process must be run with the same number of ranks.
 
 - `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
 
