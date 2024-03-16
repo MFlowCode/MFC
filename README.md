@@ -39,6 +39,13 @@ MFC can execute high-fidelity simulations of shock-droplet interaction (see `exa
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
+Another example is the high-Mach flow over an airfoil, shown below.
+
+<p align="center">
+    <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+</p>
+
+
 ## Getting started
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
