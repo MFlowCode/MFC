@@ -15,9 +15,10 @@ include(ExternalProject)
 
 
 # Options
-option(MFC_FFTW "Build the FFTW3 dependency" OFF)
-option(MFC_HDF5 "Build the HDF5  dependency" OFF)
-option(MFC_SILO "Build the SILO  dependency" OFF)
+option(MFC_FFTW    "Build the FFTW3 dependency" OFF)
+option(MFC_HDF5    "Build the HDF5  dependency" OFF)
+option(MFC_SILO    "Build the SILO  dependency" OFF)
+option(MFC_HIPFORT "Build the HIPFORT dependency" OFF)
 
 
 # FFTW3
@@ -79,3 +80,22 @@ if (MFC_SILO)
     endif()
 endif()
 
+# HIPFORT
+if (MFC_HIPFORT)
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        ExternalProject_Add(hipfort
+            GIT_REPOSITORY "https://github.com/ROCmSoftwarePlatform/hipfort"
+            GIT_TAG        develop
+            GIT_SHALLOW    ON
+            GIT_PROGRESS   ON
+            CMAKE_ARGS     "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}"
+                           "-DHIPFORT_AR=${CMAKE_AR}"
+                           "-DHIPFORT_RANLIB=${CMAKE_RANLIB}"
+                           "-DHIPFORT_COMPILER_FLAGS=-f free -e F -O0 -h ipa0"
+                           "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+        )
+    else()
+        message(WARNING "The Fortran compiler vendor is not Cray so HIPFORT will not be built.")
+        add_custom_target(hipfort)
+    endif()
+endif()

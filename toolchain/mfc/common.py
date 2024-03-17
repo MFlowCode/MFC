@@ -28,7 +28,6 @@ MFC_LOGO = """\
 class MFCException(Exception):
     pass
 
-
 def system(command: typing.List[str], print_cmd = None, **kwargs) -> subprocess.CompletedProcess:
     cmd = [ str(x) for x in command if not isspace(str(x)) ]
 

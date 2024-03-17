@@ -1,6 +1,10 @@
 #:def s_compute_speed_of_sound()
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
-
+#ifdef CRAY_ACC_WAR
+!DIR$ INLINEALWAYS s_compute_speed_of_sound
+#else
+!$acc routine seq
+#endif
         real(kind(0d0)), intent(IN) :: pres
         real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
         real(kind(0d0)), intent(IN) :: H
@@ -12,19 +16,19 @@
 
         integer :: q
 
-        if (alt_soundspeed) then
-            blkmod1 = ((gammas(1) + 1d0)*pres + &
-                       pi_infs(1))/gammas(1)
-            blkmod2 = ((gammas(2) + 1d0)*pres + &
-                       pi_infs(2))/gammas(2)
-            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-        elseif (model_eqns == 3) then
-            c = 0d0
-            !$acc loop seq
-            do q = 1, num_fluids
-                c = c + adv(q)*(1d0/gammas(q) + 1d0)* &
-                    (pres + pi_infs(q)/(gammas(q) + 1d0))
-            end do
+        if (alt_soundspeed) then 
+            blkmod1 = ((gammas(1) + 1d0)*pres + & 
+                        pi_infs(1))/gammas(1)
+            blkmod2 = ((gammas(2) + 1d0)*pres + & 
+                        pi_infs(2))/gammas(2) 
+            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2))) 
+        elseif (model_eqns == 3) then 
+            c = 0d0 
+            !$acc loop seq 
+            do q = 1, num_fluids 
+                c = c + adv(q)*(1d0/gammas(q) + 1d0)* & 
+                    (pres + pi_infs(q)/(gammas(q) + 1d0)) 
+            end do 
             c = c/rho
 
         elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles))) then
@@ -39,17 +43,15 @@
                     (pres + pi_inf/(gamma + 1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
-
         else
             c = ((H - 5d-1*vel_sum)/gamma)
         end if
-
+        
         if (mixture_err .and. c < 0d0) then
             c = 100.d0*sgm_eps
         else
             c = sqrt(c)
         end if
-
     end subroutine s_compute_speed_of_sound
 #:enddef
 
