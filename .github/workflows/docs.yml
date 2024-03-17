@@ -18,7 +18,7 @@ jobs:
       cancel-in-progress: true
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     # We build doxygen from source because of
     # https://github.com/doxygen/doxygen/issues/9016

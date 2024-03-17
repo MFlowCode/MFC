@@ -39,8 +39,13 @@ def system(command: typing.List[str], print_cmd = None, **kwargs) -> subprocess.
     return subprocess.run(cmd, **kwargs, check=False)
 
 
-def file_write(filepath: str, content: str):
+def file_write(filepath: str, content: str, if_different: bool = False):
     try:
+        if if_different and os.path.isfile(filepath):
+            with open(filepath, "r") as f:
+                if f.read() == content:
+                    return
+
         with open(filepath, "w") as f:
             f.write(content)
     except IOError as exc:
