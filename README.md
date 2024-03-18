@@ -54,7 +54,7 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```console
-brew install wget make python make cmake coreutils gcc openmpi
+brew install wget make python make cmake coreutils gcc mpich
 ```
 You're now ready to build and test MFC!
 Clone it to a convenient directory via

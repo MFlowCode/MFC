@@ -53,3 +53,9 @@ examples/*/viz/
 examples/*.jpg
 examples/*.png
 *.mod
+
+# Video Files
+*.mp4
+*.mov
+*.mkv
+*.avi
