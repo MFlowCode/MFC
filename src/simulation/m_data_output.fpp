@@ -49,7 +49,10 @@ module m_data_output
  s_close_probe_files, &
  s_finalize_data_output_module, &
  s_open_sim_data_file, &
+ s_open_eng_data_file, &
  s_write_sim_data_file, &
+ s_write_eng_data_file, &
+ s_close_eng_data_file, &
  s_close_sim_data_file
     abstract interface ! ===================================================
 
@@ -220,13 +223,28 @@ contains
               FORM='formatted', &
               POSITION='append', &
               STATUS='unknown')
-!         call date_and_time(DATE=file_date)
 
-!         write (21519, '(A)') 'Date: '//file_date(5:6)//'/'// &
-!                file_date(7:8)//'/'// &
-!                file_date(3:4)
+    end subroutine s_open_sim_data_file ! ---------------------------------------
+    
+    
+    subroutine s_open_eng_data_file() ! ------------------------
 
-    end subroutine s_open_sim_data_file ! ----------------------------------------
+        character(LEN=path_len + 5*name_len) :: file_path !<
+             !! Relative path to a file in the case directory
+        character(LEN=8) :: file_date !<
+             !! Creation date of the run-time information file
+
+        write (file_path, '(A)') '/eng_data.txt'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (21520, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_eng_data_file ! ----------------------------------------
+
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -505,7 +523,7 @@ contains
         integer :: i, j, k, l, w, cent !< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        real(kind(0d0)) :: u, eps
+        real(kind(0d0)) :: u, eps, Elk, Elp, Egk, Egie
         real(kind(0d0)), dimension(0:m, 0:n) :: rho 
         real(kind(0d0)) ::  nondim_time
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
@@ -589,10 +607,37 @@ contains
             end if
         end if
 
+
     end subroutine s_write_sim_data_file ! -----------------------------------
 
-    subroutine s_calculate_energy_contributions(q_cons_vf, Elk, Elp, Egk, Egie)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+
+    subroutine s_write_eng_data_file(q_prim_vf, t_step)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer, intent(IN) :: t_step
+        integer :: i, j!< Generic loop iterators
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+
+        real(kind(0d0)) ::  Elk, Elp, Egk, Egie
+        real(kind(0d0)) ::  nondim_time
+
+        if (t_step_old /= dflt_int) then
+            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+        else
+            nondim_time = real(t_step, kind(0d0))*dt 
+        end if
+        root = 0
+        
+        call s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
+        
+        write (21520, '(F12.9,1X,F12.9,1X,F12.9,1X, F12.9, 1X, F12.9)') &
+                            Elp, Elk, Egie, Egk, nondim_time
+                   
+
+        end subroutine s_write_eng_data_file    
+        
+    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
         real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb, tmp
         real(kind(0d0)), dimension(num_dims) :: vel
@@ -613,26 +658,26 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        do l = 0, num_fluids
-                            rho = rho + q_cons_vf(l)%sf(i,j,k)
+                        do l = 1, num_fluids
+                            rho = rho + q_prim_vf(l)%sf(i,j,k)
                         end do
 
                         call s_compute_pressure( &
-                            q_cons_vf(1)%sf(i, j, k), &
-                            q_cons_vf(alf_idx)%sf(i, j, k), &
-                            0.5d0*(q_cons_vf(2)%sf(i, j, k)**2.d0)/ &
-                            q_cons_vf(1)%sf(i, j, k), &
+                            q_prim_vf(1)%sf(i, j, k), &
+                            q_prim_vf(alf_idx)%sf(i, j, k), &
+                            0.5d0*(q_prim_vf(2)%sf(i, j, k)**2.d0)/ &
+                            q_prim_vf(1)%sf(i, j, k), &
                             pi_inf, gamma, rho, qv, pres)
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
-                            vel(s) = q_cons_vf(cont_idx%end + s)%sf(i, j, k)/rho
-                            if (q_cons_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
+                            vel(s) = q_prim_vf(cont_idx%end + s)%sf(i, j, k)
+                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
                                 Elk = Elk + 0.5d0*rho*vel(s)*vel(s)
                             else
                                 Egk = Egk + 0.5d0*rho*vel(s)*vel(s)
                             endif
                         end do
-                        if (q_cons_vf(E_idx + 1)%sf(i, j, k) .lt. 0.9d0) then
+                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) .lt. 0.9d0) then
                                 Vb = Vb + dV
                                 Egie = Egie + pres*dV/(gamma-1)
                         else
@@ -653,7 +698,6 @@ contains
         tmp = Vb
         call s_mpi_allreduce_sum(tmp, Vb)
         Elp = Elp + Vb
-
 
 
     end subroutine s_calculate_energy_contributions
@@ -2148,6 +2192,20 @@ contains
         close (21519)
 
     end subroutine s_close_sim_data_file !---------------------
+
+    subroutine s_close_eng_data_file() ! -----------------------
+
+        ! Writing the footer of and closing the run-time information file
+        write (21520, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (21520, '(A)') ''
+        write (21520, '(A)') ''
+        write (21520, '(A)') '========================================'// &
+            '========================================'
+        close (21520)
+
+    end subroutine s_close_eng_data_file !---------------------
+
 
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------

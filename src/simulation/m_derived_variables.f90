@@ -110,6 +110,7 @@ contains
 
         if (sim_data .and. proc_rank == 0) then
             call s_open_sim_data_file()
+            call s_open_eng_data_file()
         end if
 
     end subroutine s_initialize_derived_variables ! -----------------------------
@@ -166,6 +167,7 @@ contains
         end if
         if (sim_data) then
             call s_write_sim_data_file(q_prim_vf, t_step)
+            call s_write_eng_data_file(q_prim_vf, t_step)
         end if
 
     end subroutine s_compute_derived_variables ! ---------------------------
@@ -472,6 +474,7 @@ contains
         if (proc_rank == 0) then
             if (sim_data) then
                 call s_close_sim_data_file()
+                call s_close_eng_data_file()
             end if
         end if
 
