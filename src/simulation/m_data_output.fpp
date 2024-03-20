@@ -612,7 +612,6 @@ contains
 
 
     subroutine s_write_eng_data_file(q_prim_vf, t_step)
-
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
         integer :: i, j!< Generic loop iterators
@@ -648,29 +647,27 @@ contains
         Egk = 0d0
         Egie = 0d0
         rho = 0d0
-        pi_inf = fluid_pp(1)%pi_inf
-        qv = fluid_pp(1)%qv
-        gamma = fluid_pp(1)%gamma
+        pi_inf = 0d0
+        qv = 0d0
+        gamma = 0d0
         Vb = 0d0
-
+        pres = 0d0
 
         if (p > 0) then
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        do l = 1, num_fluids
-                            rho = rho + q_prim_vf(l)%sf(i,j,k)
-                        end do
-
-                        call s_compute_pressure( &
-                            q_prim_vf(1)%sf(i, j, k), &
-                            q_prim_vf(alf_idx)%sf(i, j, k), &
-                            0.5d0*(q_prim_vf(2)%sf(i, j, k)**2.d0)/ &
-                            q_prim_vf(1)%sf(i, j, k), &
+                        call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
+                                                            rho, gamma, pi_inf, qv)
+                         call s_compute_pressure( &
+                            q_prim_vf(1)%sf(j, k, l), &
+                            q_prim_vf(alf_idx)%sf(j, k, l), &
+                            0.5d0*(q_prim_vf(2)%sf(j, k, l)**2.d0), &
                             pi_inf, gamma, rho, qv, pres)
+
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
-                            vel(s) = q_prim_vf(cont_idx%end + s)%sf(i, j, k)
+                            vel(s) =  q_prim_vf(cont_idx%end + s)%sf(j, k, l)
                             if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
                                 Elk = Elk + 0.5d0*rho*vel(s)*vel(s)
                             else

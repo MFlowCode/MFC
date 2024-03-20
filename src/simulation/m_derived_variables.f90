@@ -121,7 +121,7 @@ contains
 
         integer, intent(IN) :: t_step
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
+        
         integer :: i, j, k !< Generic loop iterators
 
         if (probe_wrt) then
