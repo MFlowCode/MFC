@@ -11,7 +11,8 @@
 
     "cmake.configureOnOpen": false,
 
+    "python.defaultInterpreterPath": "${workspaceFolder}/build/venv/bin/python3",
+
     "fortran.preferredCase":       "lowercase",
     "fortran.linter.includePaths": [ "${workspacefolder}/src/**" ],
-    "fortran.linter.fypp.enabled": true
 }

@@ -392,7 +392,7 @@ contains
                                                MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 else
-                    do i = 1, adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file

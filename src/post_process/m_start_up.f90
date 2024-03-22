@@ -89,7 +89,7 @@ contains
                 backspace (1)
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
-                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                call s_mpi_abort('Invalid line in post_process.inp. It is '// &
                                  'likely due to a datatype mismatch. Exiting ...')
             end if
 
@@ -98,6 +98,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if

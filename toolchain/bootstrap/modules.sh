@@ -63,9 +63,7 @@ if [[ -z "$COMPUTER" ]]; then
     return
 fi
 
-MODULES=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
-
-log "Loading modules for $M$COMPUTER$CR on $M$CG$CR"'s:'
+log "Loading modules (& env variables) for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
 # Reset modules to default system configuration
 if [ "$u_c" != 'p' ]; then
@@ -80,51 +78,29 @@ else
     module purge > /dev/null 2>&1
 fi
 
-# Find length of longest module_name in $MODULES for $COMPUTER
-max_module_length="0"
-for module_name in ${MODULES[@]}; do
-    module_length="${#module_name}"
+ELEMENTS=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
 
-    if [ "$module_length" -gt "$max_module_length" ]; then
-        max_module_length="$module_length"
-    fi
-done
+for element in ${ELEMENTS[@]}; do
+    if [[ "$element" != *'='* ]]; then
+        log " $ module load $M$element$CR"
+        module load "$element" > /dev/null 2>&1
 
-# Load modules ($MODULES)
-for module_name in ${MODULES[@]}; do
-    log_n " - $CYAN$module_name$COLOR_RESET "
+        # Handle Success / Failure
+        code=$?
+        if [ "$code" != '0' ]; then
+            error "Failed to load module $M$element$CR:"
 
-    # Add padding spaces
-    module_length="${#module_name}"
-    delta="$((max_module_length-module_length-1))"
-    if [ "$delta" -ge "0" ]; then
-        printf "%0.s " $(seq 0 $delta)
-    fi
+            # Run load again to show error message
+            module load "$element"
 
-    # Load the module
-    module load "$module_name" > /dev/null 2>&1
-
-    # Handle Success / Failure
-    code=$?
-    if [ "$code" == '0' ]; then
-        echo -e "[$G""SUCCESS$W]"
+            return
+        fi
     else
-        echo -e "[$R""FAILURE$W]"
-
-        # Run load again to show error message
-        module load "$module_name"
-
-        return
+        log " $ export $M$element$CR"
+        export $element
     fi
 done
 
-if [ "$cg" == 'gpu' ]; then
-    isnv=$($FC --version | grep NVIDIA | wc -l)
-    if [ $isnv -eq 0 ]; then
-        export CC=nvc CXX=nvc++ FC=nvfortran
-    fi
-fi
 ok 'All modules and environment variables have been loaded.'
-
 
 return
