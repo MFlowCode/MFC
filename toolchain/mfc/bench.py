@@ -16,7 +16,7 @@ class BenchCase:
     args: typing.List[str]
 
 
-def bench(targets = None):
+def bench(targets = None):    
     if targets is None:
         targets = ARG("targets")
 
@@ -56,7 +56,7 @@ def bench(targets = None):
 
         with open(log_filepath, "w") as log_file:
             system(
-                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                ["./mfc.sh", "run", case.path, ARG('mem'), "--case-optimization"] +
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
                 case.args,

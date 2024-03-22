@@ -1,3 +1,43 @@
-- slug: 3D_shockdroplet
-  path: benchmarks/3D_shockdroplet/case.py
+# Benchmark Case 1
+# Additional Benchmarked Features
+# - model_equations : 2
+# - time_stepper : 3
+# - weno_order : 3
+# - riemann_solver : 2
+- slug: Case 1
+  path: benchmarks/Case1/case.py
+  args: []
+
+# Benchmark Case 2
+# Additional Benchmarked Features
+# - viscosity enabled
+# - weno_Re_flux : T
+# - weno_order : 5
+# - bubbles : T
+# - bubble_model : 3
+# - monopole : T
+- slug: Case 2
+  path: benchmarks/Case2/case.py
+  args: []
+
+# Benchmark Case 3
+# Additional Benchmarked Features
+# - ibm : T
+- slug: Case 3
+  path: benchmarks/Case3/case.py
+  args: []
+
+# Benchmark Case 4
+# Additional Benchmarked Features
+# - hypoelasticity : T
+# - riemann_solver : 1
+- slug: Case 4
+  path: benchmarks/Case4/case.py
+  args: []
+
+# Benchmark Case 5
+# Additional Benchmarked Features
+# - phase change
+- slug: Case 5
+  path: benchmarks/Case5/case.py
   args: []
