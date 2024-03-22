@@ -30,7 +30,8 @@ sudo apt update
 sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++ \
                    python3 python3-dev         \
-                   "openmpi-*" libopenmpi-dev
+                   "openmpi-*" libopenmpi-dev \
+                   python3-venv
 ```
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
