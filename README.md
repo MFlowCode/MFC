@@ -61,14 +61,16 @@ Clone it to a convenient directory via
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
-and make sure MFC knows what compilers to use by putting the following in your `.bashrc` or `.zshrc`
+and make sure MFC knows what compilers to use by putting the following in your `~/.bashrc` or `~/.zshrc`
 ```console
 export CC=gcc-13
 export CXX=g++-13
 export FC=gfortran-13
 ```
-and build and test!
+and source that file, build, and test!
 ```console
+source ~/.bashrc
+source ~/.zshrc
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
