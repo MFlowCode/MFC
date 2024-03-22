@@ -4,8 +4,8 @@
 # - time_stepper : 3
 # - weno_order : 3
 # - riemann_solver : 2
-- slug: model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2
-  path: benchmarks/model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2/case.py
+- slug: 5eq_rk3_weno3_hllc
+  path: benchmarks/5eq_rk3_weno3_hllc/case.py
   args: []
 
 # Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
@@ -16,23 +16,23 @@
 # - bubbles : T
 # - bubble_model : 3
 # - monopole : T
-- slug: viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
-  path: benchmarks/viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T/case.py
+- slug: viscous_weno5_sgb_mono
+  path: benchmarks/viscous_weno5_sgb_mono/case.py
   args: []
 
 # Benchmark ibm_T
 # Additional Benchmarked Features
 # - ibm : T
-- slug: ibm_T
-  path: benchmarks/ibm_T/case.py
+- slug: ibm
+  path: benchmarks/ibm/case.py
   args: []
 
 # Benchmark hypoelasticity_T_riemann_solver_1
 # Additional Benchmarked Features
 # - hypoelasticity : T
 # - riemann_solver : 1
-- slug: hypoelasticity_T_riemann_solver_1
-  path: benchmarks/hypoelasticity_T_riemann_solver_1/case.py
+- slug: hypo_hll 
+  path: benchmarks/hypo_hll/case.py
   args: []
 
 
