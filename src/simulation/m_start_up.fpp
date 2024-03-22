@@ -1058,6 +1058,10 @@ contains
                 t_step - t_step_start + 1, &
                 t_step_stop - t_step_start + 1, &
                 t_step
+                if (relax) then
+                    !$acc update host(max_iter_pc_ts)
+                    print *, 'maximum # iterations for phase-change', max_iter_pc_ts
+                end if
         end if
         mytime = mytime + dt
 

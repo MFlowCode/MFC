@@ -119,6 +119,9 @@ contains
 
         !$acc declare create(p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok)
 
+        ! assigning value to the global parameter
+        max_iter_pc_ts = 0
+
         ! starting equilibrium solver
         !$acc parallel loop collapse(3) gang vector default(present) private(p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
         do j = 0, m
@@ -396,6 +399,9 @@ contains
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
 
+        ! updating maximum number of iterations
+        max_iter_pc_ts = maxval((/ max_iter_pc_ts, ns/))
+
     end subroutine s_infinite_pt_relaxation_k ! -----------------------
 
     !>  This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT
@@ -517,6 +523,9 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
+
+        ! updating maximum number of iterations
+        max_iter_pc_ts = maxval((/ max_iter_pc_ts, ns/))
 
     end subroutine s_infinite_ptg_relaxation_k ! -----------------------
 
