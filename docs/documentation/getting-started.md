@@ -120,7 +120,7 @@ export FC=gfortran-$MFC_GCC_VER
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
 ```console
-brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER mpich
+brew install wget python cmake gcc@$MFC_GCC_VER mpich
 ```
 
 They will download the dependencies MFC requires to build itself.
