@@ -56,12 +56,12 @@ Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
-Clone it to a convenient directory via
+Put it to a convenient directory via
 ```console
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
-and make sure MFC knows what compilers to use by putting the following in your `~/.bashrc` or `~/.zshrc`
+and make sure MFC knows what compilers to use by putting the following in your `~/.profile`
 ```console
 export CC=gcc-13
 export CXX=g++-13
@@ -69,8 +69,7 @@ export FC=gfortran-13
 ```
 and source that file, build, and test!
 ```console
-source ~/.bashrc
-source ~/.zshrc
+source ~/.profile
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
