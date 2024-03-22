@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 
-# Case file contributed by Anand Radhakrishnan and modified by Henry Le Berre
-# for integration as a weak scaling benchmark for MFC.
+# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
+# Additional Benchmarked Features
+# - viscosity enabled
+# - weno_Re_flux : T
+# - weno_order : 5
+# - bubbles : T
+# - bubble_model : 3
+# - monopole : T
 
 import json, math, argparse
 
@@ -12,6 +18,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
 parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("GPU",type = int, metavar="GPU", default=0, help="0 for CPU runs, 1 for GPU runs")
 
 ARGS = vars(parser.parse_args())
 DICT = json.loads(ARGS["dict"])
@@ -22,9 +29,9 @@ ncells = math.floor(ppg * procs * ARGS["gbpp"])
 s      = math.floor((ncells / 2.0) ** (1/3))
 Nx, Ny, Nz = 2*s, s, s
 
-x0      = 10.E-06
-y0      = 10.E-06
-z0      = 10.E-06
+x0      = 10.E-04
+y0      = 10.E-04
+z0      = 10.E-04
 p0      = 101325.
 rho0    = 1.E+03
 c0      = math.sqrt( p0/rho0 )
@@ -75,7 +82,7 @@ t0      = x0/c0
 nbubbles = 1 
 myr0     = R0ref
 
-cfl     = 0.1
+cfl     = 0.01
 Ldomain = 20.E-03
 L       = Ldomain/x0
 dx      = L/float(Nx)
@@ -95,7 +102,7 @@ print(json.dumps({
     'y_domain%beg'                 : -5.E-03/y0,
     'y_domain%end'                 : 5.E-03/y0,
     'z_domain%beg'                 : -5.E-03/z0,
-    'z_domain%end'                 : -5.E-03/z0,
+    'z_domain%end'                 : 5.E-03/z0,
     'stretch_x'                    : 'F',
     'cyl_coord'                    : 'F',
     'm'                            : Nx,
@@ -103,8 +110,8 @@ print(json.dumps({
     'p'                            : Nz,
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(500*16.0/ARGS["gbpp"]),
-    't_step_save'                  : int(100*16.0/ARGS["gbpp"]),
+    't_step_stop'                  : int(30*(95*ARGS['GPU'] + 5)),
+    't_step_save'                  : int(6*(95*ARGS['GPU'] + 5)),
     # ==========================================================
     
     # Simulation Algorithm Parameters ==========================
@@ -138,7 +145,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'F',
+    'parallel_io'                  :'T',
     # ==========================================================                                                   
     
     # Patch 1 _ Background =====================================
@@ -165,7 +172,7 @@ print(json.dumps({
     'patch_icpp(2)%y_centroid'     : 0.,
     'patch_icpp(2)%z_centroid'     : 0.,
     'patch_icpp(2)%length_x'       : 5.E-03/x0,
-    'patch_icpp(2)%length_z'       : 10.E-03/y0,
+    'patch_icpp(2)%length_y'       : 10.E-03/y0,
     'patch_icpp(2)%length_z'       : 10.E-03/z0,
     'patch_icpp(2)%alter_patch(1)' : 'T',
     'patch_icpp(2)%vel(1)'         : 0.0,

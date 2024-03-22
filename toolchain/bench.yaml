@@ -1,14 +1,14 @@
-# Benchmark Case 1
+# Benchmark model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2
 # Additional Benchmarked Features
 # - model_equations : 2
 # - time_stepper : 3
 # - weno_order : 3
 # - riemann_solver : 2
-- slug: Case 1
-  path: benchmarks/Case1/case.py
+- slug: model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2
+  path: benchmarks/model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2/case.py
   args: []
 
-# Benchmark Case 2
+# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
 # Additional Benchmarked Features
 # - viscosity enabled
 # - weno_Re_flux : T
@@ -16,28 +16,23 @@
 # - bubbles : T
 # - bubble_model : 3
 # - monopole : T
-- slug: Case 2
-  path: benchmarks/Case2/case.py
+- slug: viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
+  path: benchmarks/viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T/case.py
   args: []
 
-# Benchmark Case 3
+# Benchmark ibm_T
 # Additional Benchmarked Features
 # - ibm : T
-- slug: Case 3
-  path: benchmarks/Case3/case.py
+- slug: ibm_T
+  path: benchmarks/ibm_T/case.py
   args: []
 
-# Benchmark Case 4
+# Benchmark hypoelasticity_T_riemann_solver_1
 # Additional Benchmarked Features
 # - hypoelasticity : T
 # - riemann_solver : 1
-- slug: Case 4
-  path: benchmarks/Case4/case.py
+- slug: hypoelasticity_T_riemann_solver_1
+  path: benchmarks/hypoelasticity_T_riemann_solver_1/case.py
   args: []
 
-# Benchmark Case 5
-# Additional Benchmarked Features
-# - phase change
-- slug: Case 5
-  path: benchmarks/Case5/case.py
-  args: []
+

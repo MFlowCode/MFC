@@ -8,4 +8,8 @@ if [ "$job_device" == "gpu" ]; then
     device_opts="--gpu -g $gpu_ids"
 fi
 
-./mfc.sh bench --mem 8 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
+if ["$job_device" == "gpu"]; then
+    ./mfc.sh bench --mem 8 --mode 1 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
+else
+    ./mfc.sh bench --mem 1 --mode 0 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
+fi

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# Case file contributed by Anand Radhakrishnan and modified by Henry Le Berre
-# for integration as a weak scaling benchmark for MFC.
+# Benchmark ibm_T
+# Additional Benchmarked Features
+# - ibm : T
 
 import json, math, argparse
 
@@ -12,6 +13,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
 parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("GPU",type = int, metavar="GPU", default=0, help="0 for CPU runs, 1 for GPU runs")
 
 ARGS = vars(parser.parse_args())
 DICT = json.loads(ARGS["dict"])
@@ -46,8 +48,8 @@ print(json.dumps({
             'p'                            : Nz,                         
             'dt'                           : mydt,                      
             't_step_start'                 : 0,                         
-            't_step_stop'                  : int(500*16.0/ARGS["gbpp"]),
-            't_step_save'                  : int(100*16.0/ARGS["gbpp"]),
+            't_step_stop'                  : int(40*(95*ARGS['GPU'] + 5)),
+            't_step_save'                  : int(40*(95*ARGS['GPU'] + 5)),
 		    # ==========================================================
                                                                                 
             # Simulation Algorithm Parameters ==========================
@@ -85,7 +87,7 @@ print(json.dumps({
             'format'                       : 1,                        
             'precision'                    : 2,                        
             'prim_vars_wrt'                :'T',                       
-		    'parallel_io'                  :'F',                       
+		    'parallel_io'                  :'T',                       
 		    # ==========================================================
                                                                                 
 		    # Patch 1 L ================================================
