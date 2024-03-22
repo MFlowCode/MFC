@@ -30,7 +30,8 @@ sudo apt update
 sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++ \
                    python3 python3-dev         \
-                   "openmpi-*" libopenmpi-dev
+                   "openmpi-*" libopenmpi-dev \
+                   python3-venv
 ```
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
@@ -120,7 +121,7 @@ export FC=gfortran-$MFC_GCC_VER
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
 ```console
-brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER mpich
+brew install wget python cmake gcc@$MFC_GCC_VER mpich
 ```
 
 They will download the dependencies MFC requires to build itself.
