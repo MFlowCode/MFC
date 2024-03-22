@@ -50,11 +50,10 @@ Another example is the high-Mach flow over an airfoil, shown below.
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
-
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```console
-brew install wget make python make cmake coreutils gcc mpich
+brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
 Clone it to a convenient directory via
@@ -62,7 +61,13 @@ Clone it to a convenient directory via
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
-then build and test!
+and make sure MFC knows what compilers to use by putting the following in your `.bashrc` or `.zshrc`
+```console
+export CC=gcc-13
+export CXX=g++-13
+export FC=gfortran-13
+```
+and build and test!
 ```console
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
