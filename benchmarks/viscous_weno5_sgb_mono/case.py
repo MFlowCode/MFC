@@ -33,7 +33,7 @@ Nx, Ny, Nz = 2*s, s, s
 x0      = 10.E-04
 y0      = 10.E-04
 z0      = 10.E-04
-p0      = 101325.
+p0      = 1.
 rho0    = 1.E+03
 c0      = math.sqrt( p0/rho0 )
 patm    = 1.
@@ -111,8 +111,8 @@ print(json.dumps({
     'p'                            : Nz,
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(30*(95*size + 5)),
-    't_step_save'                  : int(6*(95*size + 5)),
+    't_step_stop'                  : int(30*(25*size + 5)),
+    't_step_save'                  : int(6*(25*size + 5)),
     # ==========================================================
     
     # Simulation Algorithm Parameters ==========================
@@ -197,6 +197,7 @@ print(json.dumps({
     'fluid_pp(1)%M_v'              : M_v,
     'fluid_pp(1)%mu_v'             : mu_v,
     'fluid_pp(1)%k_v'              : k_v,
+    'fluid_pp(1)%Re(1)'            : 1e3,
     # Last fluid_pp is always reserved for bubble gas state ===
     # if applicable  ==========================================
     'fluid_pp(2)%gamma'            : 1./(gamma_gas-1.),

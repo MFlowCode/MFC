@@ -52,10 +52,10 @@ print(json.dumps({
     'm'                            : Nx,
     'n'                            : Ny,
     'p'                            : Nz,
-    'dt'                           : 1.0E-6,
+    'dt'                           : 1.0E-7,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(20*(95*size + 5)),
-    't_step_save'                  : int(4*(95*size + 5)),
+    't_step_stop'                  : int(20*(45*size + 5)),
+    't_step_save'                  : int(4*(45*size + 5)),
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
@@ -75,7 +75,7 @@ print(json.dumps({
     # Correct errors when computing speed of sound
     'mixture_err'                  : 'T',
     # Use TVD RK3 for time marching
-    'time_stepper'                 : 2,
+    'time_stepper'                 : 3,
     # Reconstruct the primitive variables to minimize spurious
     # Use WENO5
     'weno_order'                   : 5,
