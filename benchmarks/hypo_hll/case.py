@@ -14,10 +14,11 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
 parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
-parser.add_argument("GPU",type = int, metavar="GPU", default=0, help="0 for CPU runs, 1 for GPU runs")
 
 ARGS = vars(parser.parse_args())
 DICT = json.loads(ARGS["dict"])
+
+size = 1 if DICT["gpu"] else 0
 
 ppg    = 8000000 / 16.0
 procs  = DICT["nodes"] * DICT["tasks_per_node"]
@@ -53,8 +54,8 @@ print(json.dumps({
     'p'                            : Nz,
     'dt'                           : 1.0E-6,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(20*(95*ARGS['GPU'] + 5)),
-    't_step_save'                  : int(4*(95*ARGS['GPU'] + 5)),
+    't_step_stop'                  : int(20*(95*size + 5)),
+    't_step_save'                  : int(4*(95*size + 5)),
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
