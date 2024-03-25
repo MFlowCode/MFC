@@ -1507,7 +1507,7 @@ contains
             if (p > 0) iz%beg = -buff_size; 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             
-            !$acc enter data copyin(ix, iy, iz)
+            !$acc update device(ix, iy, iz)
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size

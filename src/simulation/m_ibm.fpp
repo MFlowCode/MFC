@@ -91,6 +91,8 @@ contains
 
         integer :: i, j
 
+        !$acc update device(ib_markers%sf)
+
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
@@ -98,6 +100,7 @@ contains
 
         !$acc update device(num_gps)
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
+        !$acc enter data copyin(ghost_points)
 
         call s_find_ghost_points(ghost_points)
         !$acc update device(ghost_points)
@@ -127,7 +130,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
 
-        integer :: i, j, k, l, q, r !< Iterator variables
+        integer :: i, j, k, l, q, r , i1, j1!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
         real(kind(0d0)) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_K
@@ -135,7 +138,8 @@ contains
         real(kind(0d0)) :: qv_K
         real(kind(0d0)), dimension(num_fluids) :: Gs
 
-        real(kind(0d0)) :: pres_IP, vel_IP(3), vel_norm_IP(3)
+        real(kind(0d0)) :: pres_IP,  coeff
+        real(kind(0d0)), dimension(3) :: vel_IP, vel_norm_IP
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
         real(kind(0d0)), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
         real(kind(0d0)), dimension(nb*nmom) :: nmom_IP
@@ -151,14 +155,14 @@ contains
         real(kind(0d0)) :: buf
         type(ghost_point) :: gp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, i1, j1, q, coeff)
         do i = 1, num_gps
 
             gp = ghost_points(i)
             j = gp%loc(1)
             k = gp%loc(2)
             l = gp%loc(3)
-            patch_id = gp%ib_patch_id
+            patch_id = ghost_points(i)%ib_patch_id
 
             ! Calculate physical location of GP
             if (p > 0) then
@@ -169,7 +173,7 @@ contains
 
             !Interpolate primitive variables at image point associated w/ GP
             if (bubbles .and. .not. qbmm) then
-                call s_interpolate_image_point(q_prim_vf, gp, &
+                 call s_interpolate_image_point(q_prim_vf, gp, &
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP)
             else if (qbmm .and. polytropic) then
@@ -185,9 +189,10 @@ contains
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP)
             end if
 
-            dyn_pres = 0
+            dyn_pres = 0d0
 
             ! Set q_prim_vf params at GP so that mixture vars calculated properly
+            !$acc loop seq
             do q = 1, num_fluids
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -217,6 +222,11 @@ contains
             else
                 vel_g = 0d0
             end if
+
+            !$acc loop seq
+            do q = 1, num_dims
+                vel_g(q) = 0d0
+            end do
 
             ! Set momentum
             !$acc loop seq
@@ -511,16 +521,16 @@ contains
 
                 dist = 0d0
                 buf = 1d0
-                dist(1, 1, 1) = sqrt( &
+                dist(1, 1, 1) = dsqrt( &
                                 (x_cc(i1) - gp%ip_loc(1))**2 + &
                                 (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(2, 1, 1) = sqrt( &
+                dist(2, 1, 1) = dsqrt( &
                                 (x_cc(i2) - gp%ip_loc(1))**2 + &
                                 (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(1, 2, 1) = sqrt( &
+                dist(1, 2, 1) = dsqrt( &
                                 (x_cc(i1) - gp%ip_loc(1))**2 + &
                                 (y_cc(j2) - gp%ip_loc(2))**2)
-                dist(2, 2, 1) = sqrt( &
+                dist(2, 2, 1) = dsqrt( &
                                 (x_cc(i2) - gp%ip_loc(1))**2 + &
                                 (y_cc(j2) - gp%ip_loc(2))**2)
 
@@ -639,7 +649,11 @@ contains
     end subroutine s_compute_interpolation_coeffs
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_interpolate_image_point
+#else
         !$acc routine seq
+#endif
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -788,6 +802,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_finalize_ibm_module()
+
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE_GLOBAL(levelset)
         @:DEALLOCATE_GLOBAL(levelset_norm)

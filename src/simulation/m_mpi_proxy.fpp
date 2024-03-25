@@ -2441,19 +2441,19 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
+                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers * &
                                         & (m + 2*gp_layers + 1)* &
                                         & (n + 2*gp_layers + 1)* &
                                         & (p + 2*gp_layers + 1)/ &
                                         & (min(m, n, p) + 2*gp_layers + 1)))
             else
-                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
+                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers* &
                                         & (max(m, n) + 2*gp_layers + 1)))
             end if
         else
-            @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
+            @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers))
         end if
-        @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
+        @:ALLOCATE_GLOBAL(ib_buff_recv(0:ubound(ib_buff_send, 1)))
 
         !nCalls_time = nCalls_time + 1
 
