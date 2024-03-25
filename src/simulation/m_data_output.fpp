@@ -524,7 +524,6 @@ contains
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
         real(kind(0d0)) :: u, eps, Elk, Elp, Egk, Egie
-        real(kind(0d0)), dimension(0:m, 0:n) :: rho 
         real(kind(0d0)) ::  nondim_time
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
@@ -647,9 +646,6 @@ contains
         Egk = 0d0
         Egie = 0d0
         rho = 0d0
-        pi_inf = 0d0
-        qv = 0d0
-        gamma = 0d0
         Vb = 0d0
         pres = 0d0
 
@@ -657,17 +653,13 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
-                                                            rho, gamma, pi_inf, qv)
-                         call s_compute_pressure( &
-                            q_prim_vf(1)%sf(j, k, l), &
-                            q_prim_vf(alf_idx)%sf(j, k, l), &
-                            0.5d0*(q_prim_vf(2)%sf(j, k, l)**2.d0), &
-                            pi_inf, gamma, rho, qv, pres)
-
+                        do l = 1, num_fluids
+                           rho = rho + q_prim_vf(l)%sf(i, j, k)
+                        end do
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
-                            vel(s) =  q_prim_vf(cont_idx%end + s)%sf(j, k, l)
+                            vel(s) =  q_prim_vf(num_fluids + s)%sf(i, j, k)
                             if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
                                 Elk = Elk + 0.5d0*rho*vel(s)*vel(s)
                             else
@@ -676,7 +668,7 @@ contains
                         end do
                         if (q_prim_vf(E_idx + 1)%sf(i, j, k) .lt. 0.9d0) then
                                 Vb = Vb + dV
-                                Egie = Egie + pres*dV/(gamma-1)
+                                Egie = Egie + pres*dV
                         else
                                 Elp = Elp + pres*dV
                         endif
@@ -695,7 +687,6 @@ contains
         tmp = Vb
         call s_mpi_allreduce_sum(tmp, Vb)
         Elp = Elp + Vb
-
 
     end subroutine s_calculate_energy_contributions
 
