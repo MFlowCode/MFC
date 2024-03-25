@@ -186,8 +186,8 @@ print(json.dumps({
     'cyl_coord'                    : 'F',
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(5000*16.0/ARGS["gbpp"]),
-    't_step_save'                  : int(1000*16.0/ARGS["gbpp"]),
+    't_step_stop'                  : int(50*16.0/ARGS["gbpp"]),
+    't_step_save'                  : int(50*16.0/ARGS["gbpp"]),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================

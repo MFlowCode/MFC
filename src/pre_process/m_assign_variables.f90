@@ -259,6 +259,7 @@ contains
         real(kind(0d0)) :: orig_pi_inf
         real(kind(0d0)) :: orig_qv
         real(kind(0d0)) :: muR, muV
+        real(kind(0d0)) :: R3bar
 
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(kind(0d0)) :: pres   !< pressure
@@ -396,6 +397,15 @@ contains
                     end if
                 end if
             end do
+
+            if (adv_n) then
+                ! Initialize number density
+                R3bar = 0d0
+                do i = 1, nb
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
+                end do
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+            end if
         end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
@@ -475,7 +485,7 @@ contains
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-        ! Set streamwise velocity to hypertangent function of y
+        ! Set streamwise velocity to hyperbolic tangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
@@ -528,6 +538,15 @@ contains
 
                 end if
             end do
+
+            if (adv_n) then
+                ! Initialize number density
+                R3bar = 0d0
+                do i = 1, nb
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
+                end do
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+            end if
         end if
 
         if (mpp_lim .and. bubbles) then
@@ -547,7 +566,7 @@ contains
             do i = 1, nb
                 if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
-                    print *, 'setting to pb0'
+                    ! print *, 'setting to pb0'
                 end if
                 if (q_prim_vf(bub_idx%ms(i))%sf(j, k, l) == dflt_real) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)

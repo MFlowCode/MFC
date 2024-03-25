@@ -154,9 +154,6 @@ module m_rhs
     !$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
     !$acc   ixt, iyt, izt)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare create(nbub)
-
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -569,10 +566,6 @@ contains
             end do
         end do
 
-        if (bubbles) then
-            @:ALLOCATE(nbub(0:m, 0:n, 0:p))
-        end if
-
     end subroutine s_initialize_rhs_module ! -------------------------------
 
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
@@ -596,6 +589,7 @@ contains
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
         integer :: ndirs
 
         real(kind(0d0)) :: mytime, sound
@@ -695,7 +689,6 @@ contains
 
             if (all(Re_size == 0)) then
                 iv%beg = 1; iv%end = sys_size
-                !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
@@ -728,6 +721,15 @@ contains
 
                 if (bubbles) then
                     iv%beg = bubxb; iv%end = bubxe
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+                end if
+
+                if (adv_n) then
+                    iv%beg = n_idx; iv%end = n_idx
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -1105,7 +1107,6 @@ contains
                 ! RHS Contribution in z-direction ===============================
 
                 ! Applying the Riemann fluxes
-
                 if (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -1339,7 +1340,6 @@ contains
                         end if
                     end if
                 end if
-
             end if  ! id loop
             call nvtxEndRange
 
@@ -1424,12 +1424,10 @@ contains
 
         ! Add bubles source term
         call nvtxStartRange("RHS_bubbles")
-        if (bubbles .and. (.not. qbmm)) call s_compute_bubble_source(nbub, &
-                                                                     q_cons_qp%vf(1:sys_size), &
-                                                                     q_prim_qp%vf(1:sys_size), &
-                                                                     t_step, &
-                                                                     num_dims, &
-                                                                     rhs_vf)
+        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source(q_cons_qp%vf(1:sys_size), &
+                                                                                           q_prim_qp%vf(1:sys_size), &
+                                                                                           t_step, &
+                                                                                           rhs_vf)
         call nvtxEndRange
         ! END: Additional pphysics and source terms ============================
 

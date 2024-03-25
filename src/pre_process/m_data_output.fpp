@@ -262,15 +262,19 @@ contains
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
-                                do k = 1, nb
-                                    nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
-                                end do
+                                if (adv_n) then
+                                    nbub = q_cons_vf(n_idx)%sf(j, 0, 0)
+                                else
+                                    do k = 1, nb
+                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                                    end do
 
-                                call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                                end if
                             end if
-
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-
+                        else if (i == n_idx .and. adv_n .and. bubbles) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
