@@ -1,7 +1,32 @@
 #!/usr/bin/env python3
 
-import math
-import json
+# Benchmark model_equations_2_time_stepper_3_weno_order_3_riemann_solver_2
+# Additional Benchmarked Features
+# - model_equations : 2
+# - time_stepper : 3
+# - weno_order : 3
+# - riemann_solver : 2
+
+import json, math, argparse
+
+parser = argparse.ArgumentParser(
+    prog="Benchmarking Case 1",
+    description="This MFC case was created for the purposes of benchmarking MFC.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+
+ARGS = vars(parser.parse_args())
+DICT = json.loads(ARGS["dict"])
+
+size = 1 if DICT["gpu"] else 0
+
+ppg    = 8000000 / 16.0
+procs  = DICT["nodes"] * DICT["tasks_per_node"]
+ncells = math.floor(ppg * procs * ARGS["gbpp"])
+s      = math.floor((ncells / 2.0) ** (1/3))
+Nx, Ny, Nz = 2*s, s, s
 
 # athmospheric pressure - Pa (used as reference value)
 patm = 101325
@@ -13,10 +38,9 @@ D0 = 1.0E-3
 CtD = 0.06
 
 # cavity relative eccentricity (distance between radii)
-ecc = 0.564              
+ecc = 0.564
 
-# initial shock distance from the y axis. Note that the droplet center is located at y = 0. 
-# Thus, the distance from the shock to 
+# initial shock distance from the y axis. Note that the droplet center is located at y = 0. Thus, the distance from the shock to
 # the droplet is about D0/8
 ISD = 5.0/8 * D0
 
@@ -26,10 +50,10 @@ ISD = 5.0/8 * D0
 p0a = patm
 
 # density - kg/m3
-rho0a = 1.204 
+rho0a = 1.204
 
 # gamma
-gama = 1.40 
+gama = 1.40
 
 # pi infinity - Pa
 pia = 0
@@ -52,7 +76,7 @@ p0w = p0a - DP
 rho0w = 1000
 
 # gama
-gamw = 6.12 
+gamw = 6.12
 
 # pi infty - Pa
 piw = 3.43E+08
@@ -60,7 +84,7 @@ piw = 3.43E+08
 # speed of sound - m/s
 c_w = math.sqrt( gamw * ( p0w + piw ) / rho0w )
 
-# Shock Mach number of interest. Note that the post-shock properties can be defined in terms of either 
+# Shock Mach number of interest. Note that the post-shock properties can be defined in terms of either
 # Min or psOp0a. Just comment/uncomment appropriatelly
 Min = 2.4
 
@@ -71,7 +95,7 @@ psOp0a = ( Min ** 2 -1 ) * 2 * gama / ( gama + 1 ) + 1
 # psOp0a = 4.5
 
 # density
-rhosOrho0a = ( 1 + ( gama + 1 ) / ( gama - 1) * psOp0a ) / ( ( gama + 1 ) / ( gama - 1) + psOp0a ) 
+rhosOrho0a = ( 1 + ( gama + 1 ) / ( gama - 1) * psOp0a ) / ( ( gama + 1 ) / ( gama - 1) + psOp0a )
 
 # Mach number of the shocked region - just a checker, as it must return "Min"
 Ms = math.sqrt( ( gama + 1. ) / ( 2. * gama ) * ( psOp0a - 1. ) * ( p0a / ( p0a + pia ) ) + 1. )
@@ -88,7 +112,7 @@ ps = psOp0a * p0a
 rhos = rhosOrho0a * rho0a
 
 # post shock speed of sound - m/s
-c_s = math.sqrt( gama * (ps + pia) / rhos )                           
+c_s = math.sqrt( gama * (ps + pia) / rhos )
 
 # velocity at the post shock - m/s
 vel = c_a/gama * (psOp0a - 1.) * p0a / ( p0a + pia ) / Ms
@@ -111,21 +135,12 @@ zb =  0 * D0
 ze =  10 * D0
 
 # Stretching factor, to make sure the domaing is sufficiently large after the mesh stretch
-StF = 4.0                                                                             
-
-# number of elements into y direction
-Ny = 100
-
-# number of elements into z direction
-Nz = 100
-
-# number of elements into x direction
-Nx = Ny * 2
+StF = 4.0
 
 # grid delta x if mesh were uniform in x direction - m. Note that I do not need a measure for dy
 dx = ( xe - xb ) / Nx
 
-# I calculating tend twice; first is an estimate, second is
+# I calculate tend twice; first is an estimate, second is
 # the actual value used. This is because I am getting errors in the
 # post process part every time I approximate the actual Nt by an integer
 # number (think of a smarter way).
@@ -137,12 +152,10 @@ ttilde = 1.92
 # mismatches in simulation and post_process parts. Note that I wrote it this way so I have better control over the # of autosaves
 tendA = ttilde * D0 / vel
 
-# "CFL" number that I use to control both temporal and spatial discretizations, such that the ratio dx/dt remains constant for a given
-# simulation
-cfl = 0.05
+cfl = 0.1
 
 # time-step - s
-dt = cfl * dx/ ss  
+dt = dx * cfl/ ss
 
 # Save Frequency. Note that the number of autosaves will be SF + 1, as th IC (0.dat) is also saved
 SF = 400
@@ -173,26 +186,14 @@ print(json.dumps({
     'y_domain%end'                 : ye,
     'z_domain%beg'                 : zb,
     'z_domain%end'                 : ze,
-    'stretch_x'                    : 'T',
-    'a_x'                          : 20,
-    'x_a'                          : -1.2 * D0,
-    'x_b'                          :  1.2 * D0,
-    'stretch_y'                    : 'T',
-    'a_y'                          : 20,
-    'y_a'                          : -0.0 * D0,
-    'y_b'                          :  1.2 * D0,
-    'stretch_z'                    : 'T',
-    'a_z'                          : 20,
-    'z_a'                          : -0.0 * D0,
-    'z_b'                          :  1.2 * D0,
     'm'                            : Nx,
     'n'                            : Ny,
     'p'                            : Nz,
     'cyl_coord'                    : 'F',
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : 100,
-    't_step_save'                  : 100,
+    't_step_stop'                  : int(60*(95*size + 5)),
+    't_step_save'                  : int(12*(95*size + 5)),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -211,7 +212,7 @@ print(json.dumps({
     'mapped_weno'                  : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
-    'avg_state'			           : 2,
+    'avg_state'	                   : 2,
     'bc_x%beg'                     : -6,
     'bc_x%end'                     : -6,
     'bc_y%beg'                     : -2,
@@ -226,7 +227,7 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================
-    # I will use 1 for WATER properties, and 2 for AIR properties                                                            
+    # I will use 1 for WATER properties, and 2 for AIR properties
     # Patch 1: Background (AIR - 2) =============================
     'patch_icpp(1)%geometry'       : 9,
     'patch_icpp(1)%x_centroid'     : (xb+xe) / 2 * StF,
@@ -280,7 +281,6 @@ print(json.dumps({
     'patch_icpp(3)%alpha(1)'       : 1.0E+00,
     'patch_icpp(3)%alpha(2)'       : 0.0E+00,
     # ==========================================================
-    
 
     # Fluids Physical Parameters ===============================
     'fluid_pp(1)%gamma'            : 1.0E+00/(gamw-1),
@@ -291,3 +291,4 @@ print(json.dumps({
 }))
 
 # ==============================================================================
+
