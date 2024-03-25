@@ -56,7 +56,7 @@ def bench(targets = None):
 
         with open(log_filepath, "w") as log_file:
             system(
-                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                ["./mfc.sh", "run", case.path, ARG('mem'), "--case-optimization"] +
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
                 case.args,
@@ -81,15 +81,24 @@ def diff():
     cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('rhs'))}[/magenta].[/bold]")
 
     if lhs["metadata"] != rhs["metadata"]:
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata of lhs and rhs are not equal.")
-        quit(1)
+        def _lock_to_str(lock):
+            return ' '.join([f"{k}={v}" for k, v in lock.items()])
+
+        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.")
+        cons.print(f" This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).")
+        cons.print(f" lhs:")
+        cons.print(f" * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]")
+        cons.print(f" * Modes:      {_lock_to_str(lhs['metadata']['lock'])}")
+        cons.print(f" rhs:")
+        cons.print(f" * Invocation: {' '.join(rhs['metadata']['invocation'])}")
+        cons.print(f" * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]")
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Cases of lhs and rhs are not equal.[/bold yellow]")
-        cons.print(f"[bold yellow]lhs: {set(lhs['cases'].keys()) - slugs}[/bold yellow]")
-        cons.print(f"[bold yellow]rhs: {set(rhs['cases'].keys()) - slugs}[/bold yellow]")
-        cons.print(f"[bold yellow]Using intersection: {slugs}[/bold yellow]")
+        cons.print(f"[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.")
+        cons.print(f" * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.")
+        cons.print(f" * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.")
+        cons.print(f" Using intersection: {slugs} with {len(slugs)} elements.")
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]",    justify="left")
