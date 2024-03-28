@@ -84,7 +84,7 @@ for p_id in range(1, 10+1):
 
 SIMULATION = COMMON + [
     'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
-    't_step_stop', 't_step_save', 'time_stepper', 'weno_eps',
+    't_step_stop', 't_step_save', 't_step_print', 'time_stepper', 'weno_eps',
     'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
     'riemann_solver', 'wave_speeds', 'avg_state', 'prim_vars_wrt',
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',

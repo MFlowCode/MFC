@@ -123,7 +123,7 @@ contains
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, &
+            t_step_start, t_step_stop, t_step_save, t_step_print, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
@@ -165,7 +165,7 @@ contains
                 backspace (1)
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
-                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                call s_mpi_abort('Invalid line in simulation.inp. It is '// &
                                  'likely due to a datatype mismatch. Exiting ...')
             end if
 
@@ -316,39 +316,23 @@ contains
         end if
         ! ==================================================================
 
-        ! Cell-average Conservative Variables ==============================
-        if ((bubbles .neqv. .true.) .and. (hypoelasticity .neqv. .true.)) then
-            do i = 1, adv_idx%end
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/q_cons_vf', i, '.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-            end do
-        else
-            !make sure to read bubble variables
-            do i = 1, sys_size
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/q_cons_vf', i, '.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-            end do
-            !Read pb and mv for non-polytropic qbmm
+        do i = 1, sys_size
+            write (file_path, '(A,I0,A)') &
+                trim(t_step_dir)//'/q_cons_vf', i, '.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+        end do
+
+        if ((bubbles .eqv. .true.) .or. (hypoelasticity .eqv. .true.)) then
+            ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -1067,7 +1051,7 @@ contains
 
         integer :: i, j, k, l
 
-        if (proc_rank == 0) then
+        if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
                 int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                 t_step - t_step_start + 1, &

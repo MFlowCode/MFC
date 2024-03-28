@@ -83,6 +83,8 @@ module m_global_parameters
     integer :: t_step_start, t_step_stop, t_step_save
     !> @}
 
+    integer :: t_step_print !< Number of time-steps between printouts
+
     ! ==========================================================================
 
     ! Simulation Algorithm Parameters ==========================================
@@ -383,6 +385,7 @@ contains
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
+        t_step_print = 1
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

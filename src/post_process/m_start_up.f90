@@ -89,7 +89,7 @@ contains
                 backspace (1)
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
-                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                call s_mpi_abort('Invalid line in post_process.inp. It is '// &
                                  'likely due to a datatype mismatch. Exiting ...')
             end if
 

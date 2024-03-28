@@ -112,7 +112,8 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fcheck=all,no-array-temps 
             -fbacktrace
             -fimplicit-none
-        )
+            #-ffpe-trap=invalid,zero,denormal,overflow
+	)
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)

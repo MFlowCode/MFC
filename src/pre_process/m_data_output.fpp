@@ -763,6 +763,18 @@ contains
 
         end if
 
+        open (1, FILE='equations.dat', STATUS='unknown')
+
+        write (1, '(A)') "Equations: "
+        if (momxb /= 0) write (1, '(A,I3,I3)') " * Momentum:          ", momxb, momxe
+        if (advxb /= 0) write (1, '(A,I3,I3)') " * Advection:         ", advxb, advxe
+        if (contxb /= 0) write (1, '(A,I3,I3)') " * Continuity:        ", contxb, contxe
+        if (bubxb /= 0) write (1, '(A,I3,I3)') " * Bubbles:           ", bubxb, bubxe
+        if (strxb /= 0) write (1, '(A,I3,I3)') " * Stress:            ", strxb, strxe
+        if (intxb /= 0) write (1, '(A,I3,I3)') " * Internal Energies: ", intxb, intxe
+
+        close (1)
+
     end subroutine s_initialize_data_output_module ! --------------------------
 
     !> Resets s_write_data_files pointer
