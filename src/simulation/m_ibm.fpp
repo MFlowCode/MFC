@@ -645,7 +645,7 @@ contains
     end subroutine s_compute_interpolation_coeffs
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-
+!$acc routine seq
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
@@ -762,7 +762,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_levelset(levelset, levelset_norm)
-!$acc routine seq
+
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
         integer :: i !< Iterator variables
