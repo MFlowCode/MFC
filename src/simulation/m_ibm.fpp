@@ -119,7 +119,7 @@ contains
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
-!DIR$ OPTIMIZE (-O0)
+
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf !< Primitive Variables
@@ -299,7 +299,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
-!DIR$ OPTIMIZE (-O0)
+
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(IN) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(IN) :: levelset_norm
@@ -401,7 +401,6 @@ contains
     end subroutine s_compute_image_points
 
     subroutine s_find_num_ghost_points()
-!DIR$ OPTIMIZE (-O0)
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -438,7 +437,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     subroutine s_find_ghost_points(ghost_points)
-!DIR$ OPTIMIZE (-O0)
+
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
@@ -495,7 +494,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_interpolation_coeffs(ghost_points)
-!DIR$ OPTIMIZE (-O0)
+
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
 
         real(kind(0d0)), dimension(2, 2, 2) :: dist
@@ -646,7 +645,6 @@ contains
     end subroutine s_compute_interpolation_coeffs
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-!DIR$ OPTIMIZE (-O0)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -764,7 +762,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_levelset(levelset, levelset_norm)
-!DIR$ OPTIMIZE (-O0)
+!$acc routine seq
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
         integer :: i !< Iterator variables
