@@ -88,7 +88,7 @@ program p_main
             call s_save_data(t_step, start, finish, io_time_avg, nt)
         end if
 
-        IF(particleflag .AND. run_time_info) then
+        if (particleflag .AND. run_time_info) then
             call s_lagrangian_run_time_info(q_cons_ts(1)%vf, q_prim_vf, time_real, t_step, &
                                                                                dtnext, tavg)
         else
@@ -97,7 +97,7 @@ program p_main
 
     end do
 
-    IF(particleflag.AND.particlestatFlag) CALL write_particle_stats
+    if (particleflag.AND.particlestatFlag) CALL write_particle_stats
 
     ! ==========================================================================
 
