@@ -126,6 +126,7 @@ started, run ./mfc.sh build -h.""",
     # === BENCH ===
     add_common_arguments(bench)
     bench.add_argument("-o", "--output", metavar="OUTPUT", default=None, type=str, required="True", help="Path to the YAML output file to write the results to.")
+    bench.add_argument("-m", "--mem", metavar="MEM", default=1, type=int, help="Memory per task for benchmarking cases")
     bench.add_argument(metavar="FORWARDED", default=[], dest='--', nargs="*", help="Arguments to forward to the ./mfc.sh run invocations.")
 
     # === BENCH_DIFF ===

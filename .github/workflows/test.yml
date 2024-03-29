@@ -33,7 +33,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -46,10 +46,7 @@ jobs:
       - name: (MacOS) Build OpenMPI
         if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
         run: |
-          echo "OMPI_FC=gfortran-13" >> $GITHUB_ENV
-          echo "OMPI_CXX=g++-13"     >> $GITHUB_ENV
-          echo "OMPI_MPICC=gcc-13"   >> $GITHUB_ENV
-          HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-13 --verbose --build-from-source open-mpi
+          brew install mpich
 
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false
@@ -96,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Test
       run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
