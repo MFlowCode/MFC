@@ -191,8 +191,8 @@ MODULE m_particles_output
     INTEGER :: ifile, ireq, ierr, data_size, tot_data
     INTEGER :: i
 
-    INTEGER :: dumN1
-    REAL(KIND(0.D0)) :: dumR1, dumR2
+    INTEGER :: dmN1
+    REAL(KIND(0.D0)) :: dmR1, dmR2
 
     IF(num_procs >1 ) THEN
     PRINT '(A)', ' particle output does not support MPI. Exiting ...'
@@ -206,7 +206,7 @@ MODULE m_particles_output
     IF (file_exist) THEN
       IF(proc_rank .EQ. 0) THEN
         OPEN(9, FILE = TRIM(file_loc), FORM = 'unformatted', STATUS = 'unknown')
-          READ(9) dumN1, dumR1, dumR2, tot_step
+          READ(9) dmN1, dmR1, dmR2, tot_step
         CLOSE(9)
       END IF
     ELSE

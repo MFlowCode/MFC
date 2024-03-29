@@ -1683,7 +1683,7 @@ contains
 
             !CALL SYSTEM('mkdir -p ' // TRIM(t_step_dir))
 
-            !fixme: deleting the exsiting particle data
+            !fixme: deleting the existing particle data
             !CALL SYSTEM('rm -rf ' // TRIM(t_step_dir) // '/q_cons_vf', &
             !                            adv_idx%end+1, '.dat')
 

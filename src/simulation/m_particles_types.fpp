@@ -423,7 +423,7 @@ MODULE m_particles_types
 
     SUBROUTINE get_psi (coord,psi,cell)
       ! this subroutine returns the local psi coordinates 
-      ! it also gives the cell with respect these coodinates are defined
+      ! it also gives the cell with respect these coordinates are defined
     
       REAL(KIND(0.D0)), DIMENSION(3), INTENT(IN)  :: coord
       REAL(KIND(0.D0)), DIMENSION(3)              :: psi !local coordinates

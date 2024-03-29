@@ -790,7 +790,7 @@ MODULE m_kernel_functions
            L2 = center(2)**2d0+nodecoord(2)**2d0-2d0*center(2)*nodecoord(2)*COS(theta)
            distance = DSQRT(auxvect(1)**2d0+L2)
   
-           ! Cell fases for dpdx and dudx
+           ! Cell faces for dpdx and dudx
            L2_zp = center(2)**2d0+node_zp(2)**2d0-2d0*center(2)*node_zp(2)*COS(theta)
            dist_zp = DSQRT(auxv_zp(1)**2d0+L2_zp)
            L2_zm = center(2)**2d0+node_zm(2)**2d0-2d0*center(2)*node_zm(2)*COS(theta)

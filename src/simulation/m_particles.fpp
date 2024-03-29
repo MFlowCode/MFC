@@ -73,7 +73,7 @@ MODULE m_particles
             CALL s_populate_variables_buffers(q_cons_vf,q_particle)
         ELSE
             CALL s_populate_variables_buffers(q_cons_vf)
-            !IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THNE
+            !IF (We_size > 0 .AND. (We_riemann_flux .OR. We_rhs_flux)) THEN
                 !CALL s_account_for_capillary_potential_energy(q_cons_ts(1)%vf)
             !END IF
         END IF
@@ -703,7 +703,6 @@ MODULE m_particles
     REAL(KIND(0.D0))                 :: qtime
     INTEGER  :: i,j,k,l,nparticles
     LOGICAL  :: file_exist,indomain
-    real(kind(0.d0)) :: dumx
 
     CALL s_populate_variables_buffers(q_cons_vp, q_particle)
 
@@ -744,10 +743,6 @@ MODULE m_particles
       IF (file_exist) THEN
         OPEN(unit=85,file='input/particles.dat',form='formatted')
         101 READ(85 ,*,end=102)  (inputparticle(i), i=1,8)
-        !SAME BUBBLE DISTRIBUTION IF MONOPOLE COMES IN THE Z DIR
-        !dumx = inputparticle(1)
-        !inputparticle(1) = inputparticle(3)
-        !inputparticle(3) = dumx
         indomain = particle_in_domain(inputparticle(1:3))
         CALL get_part_id
         IF (indomain) THEN
