@@ -148,10 +148,10 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
              relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
-#endif
+!#endif
             R0_type, file_per_process
 
         ! Checking that an input file has been provided by the user. If it
@@ -1100,9 +1100,7 @@ contains
         elseif (time_stepper == 3) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
-#ifndef _CRAYFTN
-        if (relax) call s_relaxation_solver(q_cons_ts(1)%vf)
-#endif
+        if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
@@ -1254,9 +1252,9 @@ contains
 #endif
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
-#ifndef _CRAYFTN       
+!#ifndef _CRAYFTN       
         if (relax) call s_initialize_phasechange_module()
-#endif
+!#endif
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
@@ -1384,12 +1382,12 @@ contains
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
-#ifndef _CRAYFTN
-        !$acc update device(relax)
+!#ifndef _CRAYFTN
+        !$acc update device(relax, relax_model)
         if (relax) then
             !$acc update device(palpha_eps, ptgalpha_eps)
         end if
-#endif
+!#endif
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules()
@@ -1408,9 +1406,9 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         if (relax) call s_finalize_relaxation_solver_module()      
-#endif
+!#endif
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if

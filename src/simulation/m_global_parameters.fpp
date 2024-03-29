@@ -150,9 +150,9 @@ module m_global_parameters
     real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
     real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
 
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
     !$acc declare create(relax, relax_model, palpha_eps,ptgalpha_eps)
-#endif
+!#endif
 
 
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
@@ -975,6 +975,8 @@ contains
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
+
+        !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE_GLOBAL(x_cb(-1 - buff_size:m + buff_size))

@@ -7,7 +7,6 @@
 !> @brief This module is used to handle all operations related to immersed
 !!              boundary methods (IBMs)
 module m_ibm
-
     ! Dependencies =============================================================
 
     use m_derived_types        !< Definitions of the derived types
@@ -89,7 +88,7 @@ contains
 
     subroutine s_ibm_setup()
 
-        integer :: i, j
+        integer :: i, j, k
 
         !$acc update device(ib_markers%sf)
 
@@ -114,12 +113,13 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
         !$acc update device(ghost_points)
 
+
     end subroutine s_ibm_setup
 
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
-
+!DIR$ OPTIMIZE (-O0)
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf !< Primitive Variables
@@ -223,11 +223,6 @@ contains
                 vel_g = 0d0
             end if
 
-            !$acc loop seq
-            do q = 1, num_dims
-                vel_g(q) = 0d0
-            end do
-
             ! Set momentum
             !$acc loop seq
             do q = momxb, momxe
@@ -292,6 +287,8 @@ contains
                                                                         + pi_infs(q - intxb + 1))
                 end do
             end if
+            !print *, "GP", i, q_cons_vf(1)%sf(j, k, l), q_cons_vf(E_idx)%sf(j, k, l)
+            !print *, "COEFFS", i, ghost_points(i)%interp_coeffs
         end do
 
     end subroutine s_ibm_correct_state
@@ -302,7 +299,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
-
+!DIR$ OPTIMIZE (-O0)
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(IN) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(IN) :: levelset_norm
@@ -404,7 +401,7 @@ contains
     end subroutine s_compute_image_points
 
     subroutine s_find_num_ghost_points()
-
+!DIR$ OPTIMIZE (-O0)
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -441,7 +438,7 @@ contains
     end subroutine s_find_num_ghost_points
 
     subroutine s_find_ghost_points(ghost_points)
-
+!DIR$ OPTIMIZE (-O0)
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
@@ -498,7 +495,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_interpolation_coeffs(ghost_points)
-
+!DIR$ OPTIMIZE (-O0)
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
 
         real(kind(0d0)), dimension(2, 2, 2) :: dist
@@ -521,16 +518,16 @@ contains
 
                 dist = 0d0
                 buf = 1d0
-                dist(1, 1, 1) = dsqrt( &
+                dist(1, 1, 1) = sqrt( &
                                 (x_cc(i1) - gp%ip_loc(1))**2 + &
                                 (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(2, 1, 1) = dsqrt( &
+                dist(2, 1, 1) = sqrt( &
                                 (x_cc(i2) - gp%ip_loc(1))**2 + &
                                 (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(1, 2, 1) = dsqrt( &
+                dist(1, 2, 1) = sqrt( &
                                 (x_cc(i1) - gp%ip_loc(1))**2 + &
                                 (y_cc(j2) - gp%ip_loc(2))**2)
-                dist(2, 2, 1) = dsqrt( &
+                dist(2, 2, 1) = sqrt( &
                                 (x_cc(i2) - gp%ip_loc(1))**2 + &
                                 (y_cc(j2) - gp%ip_loc(2))**2)
 
@@ -649,11 +646,7 @@ contains
     end subroutine s_compute_interpolation_coeffs
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-#ifdef CRAY_ACC_WAR
-        !DIR$ INLINEALWAYS s_interpolate_image_point
-#else
-        !$acc routine seq
-#endif
+!DIR$ OPTIMIZE (-O0)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -771,7 +764,7 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_levelset(levelset, levelset_norm)
-
+!DIR$ OPTIMIZE (-O0)
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
         integer :: i !< Iterator variables

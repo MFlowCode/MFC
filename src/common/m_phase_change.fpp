@@ -74,7 +74,7 @@ contains
         !!      selecting the phase change module that will be used
         !!      (pT- or pTg-equilibrium)
     subroutine s_initialize_phasechange_module()
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
              + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0d0)*cvs(vp))
@@ -87,14 +87,7 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-        ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution to the selected relaxation system
-        if ((relax_model == 5) .or. (relax_model == 6)) then
-            s_relaxation_solver => s_infinite_relaxation_k
-        else
-            call s_mpi_abort('relaxation solver was not set!')
-        end if
-#endif
+!#endif
     end subroutine s_initialize_phasechange_module !-------------------------------
 
     !>  This subroutine is created to activate either the pT- (N fluids) or the
@@ -110,7 +103,7 @@ contains
         real(kind(0.0d0)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(kind(0.0d0)) :: TvF !< total volume fraction
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
 
         real(kind(0d0)), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
@@ -291,7 +284,7 @@ contains
                 end do
             end do
         end do
-#endif
+!#endif
     end subroutine s_infinite_relaxation_k ! ----------------
 
     !>  This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
@@ -321,7 +314,7 @@ contains
         real(kind(0.0d0)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
 
         integer :: i, ns !< generic loop iterators
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; pk(1:num_fluids) = 0.0d0
 
@@ -397,7 +390,7 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
-#endif
+!#endif
     end subroutine s_infinite_pt_relaxation_k ! -----------------------
 
     !>  This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT
@@ -427,7 +420,7 @@ contains
 
         !< Generic loop iterators
         integer :: i, ns
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         ! pTg-equilibrium solution procedure
         ! Newton Solver parameters
         ! counter
@@ -520,7 +513,7 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
-#endif
+!#endif
     end subroutine s_infinite_ptg_relaxation_k ! -----------------------
 
     !>  This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative
@@ -541,7 +534,7 @@ contains
         real(kind(0.0d0)), intent(OUT) :: MCT
         integer, intent(IN) :: j, k, l
         !> @}
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         if (rM < 0.0d0) then
 
             if ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) >= -1.0d0*mixM) .and. &
@@ -575,7 +568,7 @@ contains
             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = MCT*rM
 
         end if
-#endif
+!#endif
     end subroutine s_correct_partial_densities
 
     !>  This auxiliary subroutine calculates the 2 x 2 Jacobian and, its inverse and transpose
@@ -599,7 +592,7 @@ contains
         integer, intent(IN) :: j, k, l
         real(kind(0.0d0)), dimension(2, 2), intent(OUT) :: Jac, InvJac, TJac
         real(kind(0.0d0)) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
 
@@ -675,7 +668,7 @@ contains
 
         ! dividing by det(J)
         InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
-#endif
+!#endif
     end subroutine s_compute_jacobian_matrix
 
     !>  This auxiliary subroutine computes the residue of the pTg-equilibrium procedure
@@ -697,7 +690,7 @@ contains
         integer, intent(IN) :: j, k, l
         real(kind(0.0d0)), dimension(2), intent(OUT) :: R2D
         real(kind(0.0d0)) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
 
@@ -725,7 +718,7 @@ contains
                   /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
                         - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
                     + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP))/1
-#endif
+!#endif
     end subroutine s_compute_pTg_residue
 
     !>  This auxiliary subroutine finds the Saturation temperature for a given
@@ -742,7 +735,7 @@ contains
 
         ! Generic loop iterators
         integer :: ns
-#ifndef _CRAYFTN
+!#ifndef _CRAYFTN
         if ((pSat == 0.0d0) .and. (TSIn == 0.0d0)) then
 
             ! assigning Saturation temperature
@@ -783,14 +776,11 @@ contains
             end do
 
         end if
-#endif
+!#endif
     end subroutine s_TSat
 
     !>  This subroutine finalizes the phase change module
     subroutine s_finalize_relaxation_solver_module()
-#ifndef _CRAYFTN
-        s_relaxation_solver => null()
-#endif
     end subroutine
 
 #endif

@@ -40,7 +40,7 @@ contains
 
     !>  Initialize IBM module
     subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
-
+!DIR$ OPTIMIZE (-O0)
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
         integer, intent(IN) :: ib_patch_id
