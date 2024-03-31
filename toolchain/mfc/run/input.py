@@ -68,27 +68,16 @@ class MFCInputFile:
         cons.unindent()
 
     def __save_fpp(self, target, contents: str) -> None:
-        def __contents_equal(str_a: str, str_b: str) -> bool:
-            lhs = [ l.strip() for l in str_a.splitlines() if not common.isspace(l) ]
-            rhs = [ l.strip() for l in str_b.splitlines() if not common.isspace(l) ]
-
-            return lhs == rhs
-
         inc_dir = os.path.join(target.get_staging_dirpath(), "include", target.name)
         common.create_directory(inc_dir)
 
         fpp_path = os.path.join(inc_dir, "case.fpp")
-        opt_fpp  = common.file_read(fpp_path) if os.path.exists(fpp_path) else ""
 
-        if __contents_equal(contents, opt_fpp):
-            cons.print("[yellow]INFO:[/yellow] Custom case.fpp file is up to date.")
-            return
-
-        cons.print("[yellow]INFO:[/yellow] Writing a custom case.fpp file: --case-optimization configuration has changed.")
-        common.file_write(fpp_path, contents)
+        cons.print("Writing a (new) custom case.fpp file.")
+        common.file_write(fpp_path, contents, True)
 
     # pylint: disable=too-many-locals
-    def __get_pre_fpp(self) -> str:
+    def __get_pre_fpp(self, print: bool) -> str:
         DATA = {
             1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
             2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
@@ -131,20 +120,17 @@ class MFCInputFile:
 
             lines = []
             for attribute, expr in items:
-                varname         = re.findall(r"[a-zA-Z][a-zA-Z0-9_]*", attribute)[1]
-                qpvf_idx_var    = QPVF_IDX_VARS[varname]
-                qpvf_idx_offset = ""
+                if print:
+                    cons.print(f"* Codegen: {attribute} = {expr}")
+
+                varname  = re.findall(r"[a-zA-Z][a-zA-Z0-9_]*", attribute)[1]
+                qpvf_idx = QPVF_IDX_VARS[varname][:]
 
                 if len(re.findall(r"[0-9]+", attribute)) == 2:
                     idx = int(re.findall(r'[0-9]+', attribute)[1]) - 1
-                    if idx != 0:
-                        qpvf_idx_offset = f" + {idx}"
+                    qpvf_idx = f"{qpvf_idx} + {idx}"
 
-                sf_idx = DATA['sf_idx']
-
-                cons.print(f"[yellow]INFO:[/yellow] {self.__get_ndims()}D Analytical Patch #{pid}: Code generation for [magenta]{varname}[/magenta]...")
-
-                lhs = f"q_prim_vf({qpvf_idx_var}{qpvf_idx_offset})%sf({sf_idx})"
+                lhs = f"q_prim_vf({qpvf_idx})%sf({DATA['sf_idx']})"
                 rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
 
                 lines.append(f"        {lhs} = {rhs}")
@@ -167,9 +153,10 @@ class MFCInputFile:
 
         return content
 
-    def __get_sim_fpp(self) -> str:
+    def __get_sim_fpp(self, print: bool) -> str:
         if ARG("case_optimization"):
-            cons.print("[yellow]INFO:[/yellow] Case optimization is enabled.")
+            if print:
+                cons.print("Case optimization is enabled.")
 
             nterms = -100
 
@@ -194,20 +181,20 @@ class MFCInputFile:
 ! of --case-optimization.
 """
 
-    def __get_post_fpp(self) -> str:
+    def __get_post_fpp(self, _) -> str:
         return """\
 ! This file is purposefully empty for all post-process builds.
 """
 
-    def get_fpp(self, target) -> str:
-        def _default() -> str:
+    def get_fpp(self, target, print = True) -> str:
+        def _default(_) -> str:
             return ""
 
         result = {
             "pre_process"  : self.__get_pre_fpp,
             "simulation"   : self.__get_sim_fpp,
             "post_process" : self.__get_post_fpp,
-        }.get(build.get_target(target).name, _default)()
+        }.get(build.get_target(target).name, _default)(print)
 
         return result
 
