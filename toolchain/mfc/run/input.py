@@ -208,6 +208,7 @@ class MFCInputFile:
             "simulation"   : self.__get_sim_fpp,
             "post_process" : self.__get_post_fpp,
         }.get(build.get_target(target).name, _default)(print)
+        
         return result
 
     def generate_fpp(self, target) -> None:
