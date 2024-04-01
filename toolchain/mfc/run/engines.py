@@ -22,7 +22,16 @@ def profiler_prepend():
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
     if ARG("omni") is not None:
+        if not common.does_command_exist("omniperf"):
+            raise common.MFCException("Failed to locate [bold red]ROCM Omniperf[/bold red] (omniperf).")
+
         return ["omniperf", "profile"] + ARG("omni") + ["--"]
+
+    if ARG("roc") is not None:
+        if not common.does_command_exist("rocprof"):
+            raise common.MFCException("Failed to locate [bold red]ROCM rocprof[/bold red] (rocprof).")
+
+        return ["rocprof"] + ARG("roc")
 
     return []
 
@@ -71,6 +80,9 @@ MPI Binary    (-b)  {self.mpibin.bin}\
 
     def get_exec_cmd(self, target_name: str) -> typing.List[str]:
         cmd = []
+
+        if ARG("mpi"):
+        cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
 
         cmd += profiler_prepend()
 
