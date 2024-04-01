@@ -190,7 +190,7 @@ contains
         print*, trim(CRAY_ACC_MODULE)
 
         if (CRAY_ACC_MODULE == "") then
-            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
+            !call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
         end if
 #endif        
 #endif        
