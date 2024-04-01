@@ -310,7 +310,7 @@ contains
 
 #if defined(MFC_OpenACC) 
         @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)        
-#if defined(_PGI)
+#if defined(__PGI)
         
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
