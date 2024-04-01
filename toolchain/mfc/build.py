@@ -140,6 +140,9 @@ class MFCTarget:
             f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
         ]
 
+        if ARG("verbose"):
+            flags.append('--debug-find')
+
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
             flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
@@ -247,7 +250,14 @@ def __build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str
 
     history.add(target.name)
 
-    build(target.requires.compute(), history)
+    for dep in target.requires.compute():
+        # If we have already built and installed this target,
+        # do not do so again. This can be inferred by whether
+        # the target requesting this dependency is already configured.
+        if dep.isDependency and target.is_configured():
+            continue
+
+        build([dep], history)
 
     if not target.is_configured():
         target.configure()

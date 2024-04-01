@@ -56,7 +56,7 @@ def ARG(arg: str, dflt = None) -> typing.Any:
         return gARG[arg]
     if dflt is not None:
         return dflt
-    
+
     raise KeyError(f"{arg} is not an argument.")
 
 def ARGS() -> dict:

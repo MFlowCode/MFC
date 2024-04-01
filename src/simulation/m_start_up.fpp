@@ -187,10 +187,9 @@ contains
 #ifdef _CRAYFTN
 #ifdef MFC_OpenACC
         call get_environment_variable("CRAY_ACC_MODULE", CRAY_ACC_MODULE)
-        print*, trim(CRAY_ACC_MODULE)
 
         if (CRAY_ACC_MODULE == "") then
-            !call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
+            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
         end if
 #endif        
 #endif        

@@ -9,6 +9,8 @@ if (MFC_SILO OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     enable_language(C CXX)
 endif()
 
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
+
 # Imports
 include(GNUInstallDirs)
 include(ExternalProject)
@@ -64,7 +66,7 @@ endif()
 if (MFC_SILO)
     ExternalProject_Add(silo
         GIT_REPOSITORY "https://github.com/henryleberre/Silo"
-        GIT_TAG        964d993039b467e3d472d3a70afd03380fe2c320
+        GIT_TAG        af955eb5dd009caf00c41ca51611b37c052b042c
         GIT_SHALLOW    ON
         GIT_PROGRESS   ON
         CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
@@ -72,7 +74,7 @@ if (MFC_SILO)
                        -DSILO_ENABLE_BROWSER=OFF
                        -DHDF5_USE_STATIC_LIBRARIES=ON
                        "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                       $<$<BOOL:${MFC_BUILD_HDF5}>:"-DSILO_HDF5_DIR=\"${CMAKE_INSTALL_PREFIX}\"">
+                       "-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake"
     )
 
     if (MFC_HDF5 AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
