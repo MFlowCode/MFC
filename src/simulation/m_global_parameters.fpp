@@ -463,9 +463,7 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        #:if not MFC_CASE_OPTIMIZATION
-            num_fluids = dflt_int
-        #:endif
+        num_fluids = dflt_int
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
@@ -632,10 +630,8 @@ contains
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
 
-            #:if not MFC_CASE_OPTIMIZATION
             ! Setting number of fluids
-                num_fluids = 1
-            #:endif
+            num_fluids = 1
 
             ! Annotating structure of the state and flux vectors belonging
             ! to the system of equations defined by the selected number of
