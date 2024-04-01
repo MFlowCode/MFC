@@ -456,6 +456,9 @@ if (MFC_PRE_PROCESS)
     MFC_SETUP_TARGET(TARGET  pre_process
                      SOURCES "${pre_process_SRCs}"
                      MPI)
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        target_compile_options(pre_process PRIVATE -hfp0)
+    endif()
 endif()
 
 if (MFC_SIMULATION)
