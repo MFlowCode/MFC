@@ -38,7 +38,7 @@ class MFCTarget:
         m = hashlib.sha256()
         m.update(self.name.encode())
         m.update(CFG().make_slug().encode())
-        m.update(input.load({}).get_fpp(self).encode())
+        m.update(input.load({}).get_fpp(self, False).encode())
 
         return m.hexdigest()[:10]
 

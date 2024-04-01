@@ -39,24 +39,37 @@ MFC can execute high-fidelity simulations of shock-droplet interaction (see `exa
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
+Another example is the high-Mach flow over an airfoil, shown below.
+
+<p align="center">
+    <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+</p>
+
+
 ## Getting started
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
-
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```console
-brew install wget make python make cmake coreutils gcc openmpi
+brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
-Clone it to a convenient directory via
+Put it to a convenient directory via
 ```console
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
-then build and test!
+and make sure MFC knows what compilers to use by putting the following in your `~/.profile`
 ```console
+export CC=gcc-13
+export CXX=g++-13
+export FC=gfortran-13
+```
+and source that file, build, and test!
+```console
+source ~/.profile
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
