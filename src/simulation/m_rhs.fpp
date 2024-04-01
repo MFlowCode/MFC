@@ -1895,7 +1895,7 @@ contains
             @:DEALLOCATE_GLOBAL(qL_rsz_vf, qR_rsz_vf)
         end if
 
-        if (weno_Re_flux) then
+        if (any(Re_size > 0) .and. weno_Re_flux) then
             @:DEALLOCATE_GLOBAL(dqL_rsx_vf, dqR_rsx_vf)
 
             if (n > 0) then
