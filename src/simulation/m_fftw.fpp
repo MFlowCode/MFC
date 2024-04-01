@@ -172,8 +172,8 @@ contains
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
         ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
-#endif
         call hipCheck(hipDeviceSynchronize())
+#endif
 !$acc end host_data
         Nfq = 3
         !$acc update device(Nfq)
