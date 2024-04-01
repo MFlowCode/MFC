@@ -1002,18 +1002,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        if (ib) then
-            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-
-            ! Initial displacement to skip at beginning of file
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                    MPI_DOUBLE_PRECISION, status, ierr)
-        end if
-
         call MPI_FILE_CLOSE(ifile, ierr)
 
 #endif
