@@ -323,10 +323,12 @@ module m_global_parameters
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), weight)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), R0)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), V0)
+    !$acc declare link(weight, R0, V0)
 #else
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
     real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
+    !$acc declare create(weight, R0, V0)
 #endif
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
@@ -336,8 +338,10 @@ module m_global_parameters
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ptil)
+    !$acc declare link(ptil)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
+    !$acc declare create(ptil)
 #endif
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
@@ -352,20 +356,20 @@ module m_global_parameters
     #:endif
 
 
-    !$acc declare link(weight, R0, V0, ptil)
     !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma)
 
 
 #if CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:, :, :), mom_3d)
+    !$acc declare link(mom_sp, mom_3d)
 #else
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
+    !$acc declare create(mom_sp, mom_3d)
 #endif
     !> @}
 
-    !$acc declare link(mom_sp, mom_3d)
 
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
@@ -375,16 +379,17 @@ module m_global_parameters
 #if CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+    !$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 #else
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    !$acc declare create( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 #endif
     real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
     real(kind(0d0)) :: gam
     !> @}
 
-    !$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
     !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
     
     !> @name Acoustic monopole parameters
@@ -973,7 +978,7 @@ contains
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)

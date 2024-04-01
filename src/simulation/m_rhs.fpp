@@ -696,6 +696,7 @@ contains
             end do
         end do
 
+
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -979,8 +980,7 @@ contains
                             end if
                         end do
                     else
-                        !$acc parallel loop collapse(4) gang vector default(present) &
-                        !$acc& attach(rhs_vf(j)%sf)
+                        !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do q = 0, p
                                 do l = 0, n
