@@ -64,6 +64,9 @@ endif()
 
 # SILO
 if (MFC_SILO)
+    # If we are using the CCE, HDF5 is not built, and we wish to find
+    # the system's cray-hdf5. Otherwise, we point SILO to find HDF5 in
+    # our common install directory using SILO_HDF5_DIR.
     ExternalProject_Add(silo
         GIT_REPOSITORY "https://github.com/henryleberre/Silo"
         GIT_TAG        af955eb5dd009caf00c41ca51611b37c052b042c
@@ -74,6 +77,7 @@ if (MFC_SILO)
                        -DSILO_ENABLE_BROWSER=OFF
                        -DHDF5_USE_STATIC_LIBRARIES=ON
                        "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                       $<$<NOT:$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>>:"-DSILO_HDF5_DIR=\"${CMAKE_INSTALL_PREFIX}\"">
                        "-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake"
     )
 
