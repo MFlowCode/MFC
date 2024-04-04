@@ -37,7 +37,7 @@ module m_monopole
     !$acc declare link(mono_mass_src, mono_e_src)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
-    !$acc declare link(mono_mom_src)
+!$acc declare link(mono_mom_src)
 
 #else
     integer, allocatable, dimension(:) :: pulse, support
@@ -57,7 +57,7 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
     !> @}
-    !$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
+!$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
 
 #endif
 
@@ -65,9 +65,8 @@ contains
 
     subroutine s_initialize_monopole_module()
         integer :: i, j !< generic loop variables
- 
-        @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
+        @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
         do i = 1, num_mono
             mag(i) = mono(i)%mag
@@ -212,7 +211,6 @@ contains
                                 s1 = f_g(the_time, sound, const_sos, q, term_index)* &
                                      f_delta(j, k, l, loc_mono(:, q), length(q), q, angle, angle_z)
                             end if
-
 
                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
 !                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos

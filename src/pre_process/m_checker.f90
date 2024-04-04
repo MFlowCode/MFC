@@ -179,17 +179,17 @@ contains
                     call s_mpi_abort('m, n, and/or p are set to dflt_int.'// &
                                      'Please, correct them')
                 end if
-            ! in case it is NOT restart
-            ! Constraints on domain boundaries for cylindrical coordinates
+                ! in case it is NOT restart
+                ! Constraints on domain boundaries for cylindrical coordinates
             elseif (n == 0 &
-                .or. &
-                y_domain%beg /= 0d0 &
-                .or. &
-                y_domain%end == dflt_real &
-                .or. &
-                y_domain%end < 0d0 &
-                .or. &
-                y_domain%beg >= y_domain%end) then
+                    .or. &
+                    y_domain%beg /= 0d0 &
+                    .or. &
+                    y_domain%end == dflt_real &
+                    .or. &
+                    y_domain%end < 0d0 &
+                    .or. &
+                    y_domain%beg >= y_domain%end) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                                  'cyl_coord and n, y_domain%beg, or         '// &
                                  'y_domain%end. Exiting ...')

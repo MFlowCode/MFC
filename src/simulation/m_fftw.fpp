@@ -16,13 +16,12 @@ module m_fftw
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-
 #if defined(MFC_OpenACC) && defined(__PGI)
     use cufft
 #elif defined(MFC_OpenACC)
     use hipfort
     use hipfort_check
-    use hipfort_hipfft    
+    use hipfort_hipfft
 #endif
 
     ! ==========================================================================
@@ -49,25 +48,25 @@ module m_fftw
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
-#if defined(MFC_OpenACC) 
-    !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
+#if defined(MFC_OpenACC)
+!$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
 #ifdef CRAY_ACC_WAR
-        @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
-        @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
-        @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
-        !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
+    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
+    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
+!$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #else
-        real(kind(0d0)),    allocatable :: data_real_gpu(:)
-        complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
-        complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
-        !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+    real(kind(0d0)), allocatable :: data_real_gpu(:)
+    complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
+    complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
+!$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #endif
 
 #if defined(__PGI)
-        integer :: fwd_plan_gpu, bwd_plan_gpu
+    integer :: fwd_plan_gpu, bwd_plan_gpu
 #else
-        type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
+    type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
 #endif
     integer :: ierr
 
@@ -83,7 +82,6 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_initialize_fftw_module() ! ----------------------------------
 
-
         ! Size of input array going into DFT
         real_size = p + 1
         ! Size of output array coming out of DFT
@@ -93,16 +91,16 @@ contains
 
         batch_size = x_size*sys_size
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
         rank = 1; istride = 1; ostride = 1
 
-        allocate(gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
+        allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
-        !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
+!$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
+!$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
@@ -118,7 +116,7 @@ contains
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
         @:ALLOCATE_GLOBAL(data_real_gpu(1:real_size*x_size*sys_size))
         @:ALLOCATE_GLOBAL(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         @:ALLOCATE_GLOBAL(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -147,9 +145,9 @@ contains
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
@@ -158,7 +156,7 @@ contains
             end do
         end do
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
@@ -174,11 +172,11 @@ contains
         ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
         call hipCheck(hipDeviceSynchronize())
 #endif
-!$acc end host_data
+        !$acc end host_data
         Nfq = 3
         !$acc update device(Nfq)
 
-!$acc parallel loop collapse(3) gang vector default(present) 
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, Nfq
@@ -193,14 +191,14 @@ contains
 #else
         ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
         call hipCheck(hipDeviceSynchronize())
-#endif       
-!$acc end host_data
+#endif
+        !$acc end host_data
 
-!$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do k = 1, sys_size
             do j = 0, m
                 do l = 0, p
-                    data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
+                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -208,7 +206,7 @@ contains
 
         do i = 1, fourier_rings
 
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
@@ -217,7 +215,7 @@ contains
                 end do
             end do
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
@@ -232,14 +230,13 @@ contains
 #else
             ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
             call hipCheck(hipDeviceSynchronize())
-#endif         
-!$acc end host_data
-
+#endif
+            !$acc end host_data
 
             Nfq = min(floor(2d0*real(i, kind(0d0))*pi), cmplx_size)
             !$acc update device(Nfq)
 
-!$acc parallel loop collapse(3) gang vector default(present) 
+            !$acc parallel loop collapse(3) gang vector default(present)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, Nfq
@@ -254,23 +251,22 @@ contains
 #else
             ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
             call hipCheck(hipDeviceSynchronize())
-#endif      
-!$acc end host_data
+#endif
+            !$acc end host_data
 
-!$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
+            !$acc parallel loop collapse(3) gang vector default(present) firstprivate(i)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k-1)*real_size*x_size)/REAL(real_size,KIND(0d0))
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, kind(0d0))
                         q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do
             end do
-            
+
         end do
 
-
-#else 
+#else
         Nfq = 3
         do j = 0, m
             do k = 1, sys_size
@@ -308,10 +304,10 @@ contains
         !!      applying the Fourier filter in the azimuthal direction.
     subroutine s_finalize_fftw_module() ! ------------------------------------
 
-#if defined(MFC_OpenACC) 
-        @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)        
+#if defined(MFC_OpenACC)
+        @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)
-        
+
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
 #else

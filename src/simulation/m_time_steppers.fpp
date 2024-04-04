@@ -54,7 +54,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+!$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -75,7 +75,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+!$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
 #endif
 
 contains
@@ -125,7 +125,7 @@ contains
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
                     iz_t%beg:iz_t%end))
-            end do            
+            end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
 
@@ -152,7 +152,7 @@ contains
 
         ! Allocating the cell-average primitive variables
         @:ALLOCATE_GLOBAL(q_prim_vf(1:sys_size))
-        
+
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
@@ -458,8 +458,7 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-       end if
-
+        end if
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -528,8 +527,7 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-       end if
- 
+        end if
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -632,11 +630,9 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-       end if
-
+        end if
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -651,7 +647,6 @@ contains
         ! Stage 2 of 3 =====================================================
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
-
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -707,8 +702,7 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-       end if
-
+        end if
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -777,8 +771,7 @@ contains
 
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-       end if
-
+        end if
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then

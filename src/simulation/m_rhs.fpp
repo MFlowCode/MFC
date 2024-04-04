@@ -59,19 +59,17 @@ module m_rhs
  s_pressure_relaxation_procedure, &
  s_finalize_rhs_module
 
-
     !! This variable contains the WENO-reconstructed values of the cell-average
     !! conservative variables, which are located in q_cons_vf, at cell-interior
     !! Gaussian quadrature points (QP).
     type(vector_field) :: q_cons_qp !<
-    !$acc declare create(q_cons_qp)    
-
+    !$acc declare create(q_cons_qp)
 
     !! The primitive variables at cell-interior Gaussian quadrature points. These
     !! are calculated from the conservative variables and gradient magnitude (GM)
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
     type(vector_field) :: q_prim_qp !<
-    !$acc declare create(q_prim_qp)    
+    !$acc declare create(q_prim_qp)
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
     !! interior Gaussian quadrature points. These are WENO-reconstructed from
@@ -81,10 +79,10 @@ module m_rhs
     !> @{
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
-    !$acc declare link(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+!$acc declare link(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
 #else
-    type(vector_field) , allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-    !$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
+    type(vector_field), allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
+!$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
 #endif
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
@@ -95,16 +93,15 @@ module m_rhs
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-    !$acc declare link(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-    !$acc declare link(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+!$acc declare link(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+!$acc declare link(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 #else
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
-    !$acc declare create(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-    !$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+!$acc declare create(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+!$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 #endif
     !> @}
-
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
@@ -113,18 +110,17 @@ module m_rhs
 
     !$acc declare create(gm_alpha_qp)
 
-
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
     !> @{
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaL_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaR_n)
-    !$acc declare link(gm_alphaL_n, gm_alphaR_n)
+!$acc declare link(gm_alphaL_n, gm_alphaR_n)
 #else
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
-    !$acc declare create(gm_alphaL_n, gm_alphaR_n)
+!$acc declare create(gm_alphaL_n, gm_alphaR_n)
 #endif
     !> @}
 
@@ -136,22 +132,21 @@ module m_rhs
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_src_n)
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_gsrc_n)
-    !$acc declare link(flux_n, flux_src_n, flux_gsrc_n)
+!$acc declare link(flux_n, flux_src_n, flux_gsrc_n)
 #else
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
-    !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
+!$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
 #endif
     !> @}
 
-
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), qL_prim, qR_prim)
-    !$acc declare link(qL_prim, qR_prim)
+!$acc declare link(qL_prim, qR_prim)
 #else
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
-    !$acc declare create(qL_prim, qR_prim)
+!$acc declare create(qL_prim, qR_prim)
 #endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
@@ -172,49 +167,48 @@ module m_rhs
     !> @{
     type(scalar_field) :: alf_sum
     !> @}
-    !$acc declare create(alf_sum)
+!$acc declare create(alf_sum)
 
 #ifdef CRAY_ACC_WAR
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), blkmod1, blkmod2, alpha1, alpha2, Kterm)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
-    !$acc declare link(blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    !$acc declare link(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    !$acc declare link(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
+!$acc declare link(blkmod1, blkmod2, alpha1, alpha2, Kterm)
+!$acc declare link(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
+!$acc declare link(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
-    !$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
+!$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
+!$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
+!$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gamma_min, pres_inf)
-    !$acc declare link(gamma_min, pres_inf)
+!$acc declare link(gamma_min, pres_inf)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
-    !$acc declare create(gamma_min, pres_inf)
+!$acc declare create(gamma_min, pres_inf)
 #endif
-
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-    !$acc declare link(Res)
+!$acc declare link(Res)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-    !$acc declare create(Res)
+!$acc declare create(Res)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), nbub)
-    !$acc declare link(nbub)
+!$acc declare link(nbub)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare create(nbub)
+!$acc declare create(nbub)
 #endif
 
 contains
@@ -255,7 +249,7 @@ contains
         end do
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
-  
+
         do l = 1, cont_idx%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
             !$acc enter data copyin(q_prim_qp%vf(l)%sf)
@@ -300,12 +294,12 @@ contains
 
         do i = 1, num_dims
             @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
-            @:ALLOCATE(qR_prim(i)%vf(1:sys_size))    
+            @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
             do l = mom_idx%beg, mom_idx%end
                 @:ALLOCATE(qL_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
                 @:ALLOCATE(qR_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
             end do
-            @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))           
+            @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
         end do
 
         if (mpp_lim .and. bubbles) then
@@ -314,33 +308,33 @@ contains
         ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
         @:ALLOCATE_GLOBAL(qL_rsx_vf(ix%beg:ix%end, &
-                                 iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+            iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
         @:ALLOCATE_GLOBAL(qR_rsx_vf(ix%beg:ix%end, &
-                                 iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+            iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         if (n > 0) then
 
             @:ALLOCATE_GLOBAL(qL_rsy_vf(iy%beg:iy%end, &
-                                     ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+                ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE_GLOBAL(qR_rsy_vf(iy%beg:iy%end, &
-                                     ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+                ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
         else
             @:ALLOCATE_GLOBAL(qL_rsy_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE_GLOBAL(qR_rsy_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
         end if
 
         if (p > 0) then
             @:ALLOCATE_GLOBAL(qL_rsz_vf(iz%beg:iz%end, &
-                                     iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
             @:ALLOCATE_GLOBAL(qR_rsz_vf(iz%beg:iz%end, &
-                                     iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
         else
             @:ALLOCATE_GLOBAL(qL_rsz_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE_GLOBAL(qR_rsz_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
 
@@ -349,7 +343,6 @@ contains
         @:ALLOCATE_GLOBAL(dq_prim_dx_qp(1:1))
         @:ALLOCATE_GLOBAL(dq_prim_dy_qp(1:1))
         @:ALLOCATE_GLOBAL(dq_prim_dz_qp(1:1))
-        
 
         if (any(Re_size > 0)) then
             @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
@@ -364,11 +357,9 @@ contains
                               & iz%beg:iz%end))
                 end do
 
-                @:ACC_SETUP_VFs(dq_prim_dx_qp(1)) 
+                @:ACC_SETUP_VFs(dq_prim_dx_qp(1))
 
                 if (n > 0) then
-
-                    
 
                     do l = mom_idx%beg, mom_idx%end
                         @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf( &
@@ -380,7 +371,7 @@ contains
                     @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
 
                     if (p > 0) then
-                        
+
                         do l = mom_idx%beg, mom_idx%end
                             @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf( &
                                      & ix%beg:ix%end, &
@@ -464,34 +455,34 @@ contains
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 @:ALLOCATE_GLOBAL(dqL_rsx_vf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                    iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                 @:ALLOCATE_GLOBAL(dqR_rsx_vf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                    iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 if (n > 0) then
 
                     @:ALLOCATE_GLOBAL(dqL_rsy_vf(iy%beg:iy%end, &
-                                              ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE_GLOBAL(dqR_rsy_vf(iy%beg:iy%end, &
-                                              ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                 else
                     @:ALLOCATE_GLOBAL(dqL_rsy_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE_GLOBAL(dqR_rsy_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
 
                 if (p > 0) then
                     @:ALLOCATE_GLOBAL(dqL_rsz_vf(iz%beg:iz%end, &
-                                              iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE_GLOBAL(dqR_rsz_vf(iz%beg:iz%end, &
-                                              iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
                 else
                     @:ALLOCATE_GLOBAL(dqL_rsz_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE_GLOBAL(dqR_rsz_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
             end if
@@ -564,13 +555,13 @@ contains
                 if (riemann_solver /= 1) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
-            
+
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
             else
                 do l = 1, sys_size
-                    flux_n(i)%vf(l)%sf     => flux_n(1)%vf(l)%sf
+                    flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                     flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
 
                     !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
@@ -696,7 +687,6 @@ contains
                 end do
             end do
         end do
-
 
         ! ==================================================================
 
@@ -1507,7 +1497,7 @@ contains
             if (n > 0) iy%beg = -buff_size; 
             if (p > 0) iz%beg = -buff_size; 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-            
+
             !$acc update device(ix, iy, iz)
 
             !$acc parallel loop collapse(4) gang vector default(present)

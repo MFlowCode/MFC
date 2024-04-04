@@ -20,7 +20,7 @@ module m_hypoelastic
     implicit none
 
     private; public :: s_initialize_hypoelastic_module, &
-            s_compute_hypoelastic_rhs
+ s_compute_hypoelastic_rhs
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
@@ -32,7 +32,7 @@ module m_hypoelastic
     !$acc declare link(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rho_K_field, G_K_field)
-    !$acc declare link(rho_K_field, G_K_field)
+!$acc declare link(rho_K_field, G_K_field)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
@@ -43,7 +43,7 @@ module m_hypoelastic
     !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
-    !$acc declare create(rho_K_field, G_K_field)
+!$acc declare create(rho_K_field, G_K_field)
 
 #endif
 

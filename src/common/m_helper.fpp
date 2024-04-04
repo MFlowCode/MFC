@@ -191,7 +191,7 @@ contains
 #else
         @:ALLOCATE(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
         @:ALLOCATE(k_n(nb), k_v(nb), omegaN(nb))
-        @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))        
+        @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
 #endif
 
         pb0(:) = dflt_real

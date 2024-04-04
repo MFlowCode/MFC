@@ -31,7 +31,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -59,7 +59,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_buffer_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -100,7 +100,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS ss_compute_nonreflecting_subsonic_inflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -126,7 +126,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_outflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -166,7 +166,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_force_free_subsonic_outflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -202,7 +202,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_constant_pressure_subsonic_outflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -239,7 +239,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_supersonic_inflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
@@ -263,7 +263,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_supersonic_outflow_L
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
         real(kind(0d0)), dimension(3), intent(IN) :: lambda
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds

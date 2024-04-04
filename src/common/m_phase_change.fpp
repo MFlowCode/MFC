@@ -11,7 +11,7 @@
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
- 
+
     ! Dependencies =============================================================
 
     use m_derived_types        !< Definitions of the derived types
@@ -316,8 +316,7 @@ contains
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf;
-
+        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; 
         ! Performing tests before initializing the pT-equilibrium
         !$acc loop seq
         do i = 1, num_fluids

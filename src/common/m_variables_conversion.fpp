@@ -87,19 +87,19 @@ module m_variables_conversion
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
     @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-    !$acc declare link(bubrs, Gs, Res)
+!$acc declare link(bubrs, Gs, Res)
 #else
-    real(kind(0d0)), allocatable, dimension(:)    :: Gs
-    integer,         allocatable, dimension(:)    :: bubrs
+    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    integer, allocatable, dimension(:) :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-    !$acc declare create(bubrs, Gs, Res)
+!$acc declare create(bubrs, Gs, Res)
 #endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
@@ -459,7 +459,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -516,17 +516,17 @@ contains
         end if
 
         if (any(Re_size > 0)) then
-            
+
             do i = 1, 2
                 Re_K(i) = dflt_real
-        
+
                 if (Re_size(i) > 0) Re_K(i) = 0d0
-        
-               do j = 1, Re_size(i)
+
+                do j = 1, Re_size(i)
                     Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
                               + Re_K(i)
                 end do
-        
+
                 Re_K(i) = 1d0/max(Re_K(i), sgm_eps)
 
             end do
@@ -541,7 +541,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
-        !$acc routine seq
+!$acc routine seq
 #endif
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -626,10 +626,10 @@ contains
             end if
         end if
 #endif
-        
-        !$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
-        !$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
-        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
+
+!$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
+!$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
+!$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
 #ifdef MFC_SIMULATION
         @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
@@ -651,7 +651,6 @@ contains
         @:ALLOCATE(Gs     (1:num_fluids))
 #endif
 
-
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             gs_min(i) = 1.0d0/gammas(i) + 1.0d0
@@ -662,7 +661,7 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        !$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+!$acc update device(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
 
 #ifdef MFC_SIMULATION
 
@@ -890,7 +889,6 @@ contains
         #:endif
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp)
-
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -931,7 +929,6 @@ contains
                         end if
 #endif
                     end if
-
 
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
@@ -1052,7 +1049,6 @@ contains
         real(kind(0d0)) :: G = 0d0
         real(kind(0d0)), dimension(2) :: Re_K
 
-
         integer :: i, j, k, l, q !< Generic loop iterators
 
 #ifndef MFC_SIMULATION
@@ -1086,8 +1082,6 @@ contains
                         dyn_pres = dyn_pres + q_cons_vf(i)%sf(j, k, l)* &
                                    q_prim_vf(i)%sf(j, k, l)/2d0
                     end do
-
-
 
                     ! Computing the energy from the pressure
                     if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
@@ -1280,8 +1274,7 @@ contains
                             + pres_K*dir_flg(dir_idx(i))
                     end do
 
-
-                    if(j == 1) then
+                    if (j == 1) then
 #ifdef CRAY_PRINT_DEBUG
                         print *, "cbc debug"
                         print *, E_K
@@ -1292,7 +1285,7 @@ contains
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
                     ! comment out above and it will run to completion
-                    
+
                     ! have been using == 2
                     if (riemann_solver == 1) then
                         !$acc loop seq

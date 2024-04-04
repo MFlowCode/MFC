@@ -37,16 +37,16 @@ module m_ibm
  s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
-    !$acc declare create(ib_markers)
+!$acc declare create(ib_markers)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
 
-    !$acc declare link(levelset, levelset_norm, ghost_points) 
+!$acc declare link(levelset, levelset_norm, ghost_points)
 #else
-    
+
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
     real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
     !! Matrix of distance to IB
@@ -55,7 +55,7 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: ghost_points
     !! Matrix of normal vector to IB
 
-    !$acc declare create(levelset, levelset_norm, ghost_points)    
+!$acc declare create(levelset, levelset_norm, ghost_points)
 #endif
 
     integer :: gp_layers !< Number of ghost point layers
@@ -113,7 +113,6 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
         !$acc update device(ghost_points)
 
-
     end subroutine s_ibm_setup
 
     !>  Subroutine that updates the conservative variables at the ghost points
@@ -130,7 +129,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
 
-        integer :: i, j, k, l, q, r , i1, j1!< Iterator variables
+        integer :: i, j, k, l, q, r, i1, j1!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
         real(kind(0d0)) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_K
@@ -138,7 +137,7 @@ contains
         real(kind(0d0)) :: qv_K
         real(kind(0d0)), dimension(num_fluids) :: Gs
 
-        real(kind(0d0)) :: pres_IP,  coeff
+        real(kind(0d0)) :: pres_IP, coeff
         real(kind(0d0)), dimension(3) :: vel_IP, vel_norm_IP
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
         real(kind(0d0)), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
@@ -173,7 +172,7 @@ contains
 
             !Interpolate primitive variables at image point associated w/ GP
             if (bubbles .and. .not. qbmm) then
-                 call s_interpolate_image_point(q_prim_vf, gp, &
+                call s_interpolate_image_point(q_prim_vf, gp, &
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP)
             else if (qbmm .and. polytropic) then
@@ -645,7 +644,7 @@ contains
     end subroutine s_compute_interpolation_coeffs
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
-!$acc routine seq
+        !$acc routine seq
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables

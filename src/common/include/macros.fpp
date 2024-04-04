@@ -12,9 +12,9 @@
 
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
-    allocate(${', '.join(args)}$)
+    allocate (${', '.join(args)}$)
 #ifndef CRAY_ACC_WAR
-    !$acc enter data create(${', '.join(args)}$)
+!$acc enter data create(${', '.join(args)}$)
 #endif
 #:enddef ALLOCATE
 
@@ -22,23 +22,22 @@
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     deallocate (${', '.join(args)}$)
 #ifndef CRAY_ACC_WAR
-    !$acc exit data delete(${', '.join(args)}$)
+!$acc exit data delete(${', '.join(args)}$)
 #endif
 #:enddef DEALLOCATE
-
 
 #:def ALLOCATE_GLOBAL(*args)
     @:LOG({'@:ALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
 #ifdef CRAY_ACC_WAR
-    allocate(${', '.join(('p_' + arg.strip() for arg in args))}$)
+    allocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
     #:for arg in args
         ${re.sub('\(.*\)','',arg)}$ => ${ 'p_' + re.sub('\(.*\)','',arg.strip()) }$
     #:endfor
-    !$acc enter data create(${', '.join(('p_' + re.sub('\(.*\)','',arg.strip()) for arg in args))}$) &
-    !$acc& attach(${', '.join(map(lambda x: re.sub('\(.*\)','',x), args))}$)
+!$acc enter data create(${', '.join(('p_' + re.sub('\(.*\)','',arg.strip()) for arg in args))}$) &
+!$acc& attach(${', '.join(map(lambda x: re.sub('\(.*\)','',x), args))}$)
 #else
-    allocate(${', '.join(args)}$)
-    !$acc enter data create(${', '.join(args)}$)
+    allocate (${', '.join(args)}$)
+!$acc enter data create(${', '.join(args)}$)
 #endif
 
 #:enddef ALLOCATE_GLOBAL
@@ -49,12 +48,12 @@
     !$acc exit data delete(${', '.join(('p_' + arg.strip() for arg in args))}$) &
     !$acc& detach(${', '.join(args)}$)
     #:for arg in args
-        nullify( ${arg}$ )
+        nullify (${arg}$)
     #:endfor
-    deallocate(${', '.join(('p_' + arg.strip() for arg in args))}$)
+    deallocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
 #else
-    deallocate(${', '.join(args)}$)
-    !$acc exit data delete(${', '.join(args)}$)
+    deallocate (${', '.join(args)}$)
+!$acc exit data delete(${', '.join(args)}$)
 #endif
 
 #:enddef DEALLOCATE_GLOBAL
@@ -73,7 +72,7 @@
     ${intype}$, target :: ${', '.join(('p_' + arg.strip() for arg in args))}$
     ${intype}$, pointer :: ${', '.join(args)}$
 #else
-    ${intype}$ :: ${', '.join(args)}$
+    ${intype}$::${', '.join(args)}$
 #endif
 #:enddef CRAY_DECLARE_GLOBAL_SCALAR
 

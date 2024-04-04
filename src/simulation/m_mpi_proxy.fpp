@@ -31,10 +31,10 @@ module m_mpi_proxy
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send) 
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)    
-    
-    !$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
+
+!$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
 #else
     real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
@@ -56,7 +56,7 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create(q_cons_buff_send, q_cons_buff_recv, ib_buff_send, ib_buff_recv)
+!$acc declare create(q_cons_buff_send, q_cons_buff_recv, ib_buff_send, ib_buff_recv)
 #endif
     !> @name Generic flags used to identify and report MPI errors
     !> @{
@@ -120,7 +120,7 @@ contains
             v_size = sys_size
         end if
 
-        !$acc update device(v_size)
+!$acc update device(v_size)
 
 #endif
 
@@ -789,7 +789,7 @@ contains
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
-        !$acc update device(v_size)
+!$acc update device(v_size)
 
 #ifdef MFC_MPI
 
@@ -850,7 +850,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send, ib_buff_recv, ib_buff_send)
 
@@ -906,7 +906,7 @@ contains
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -963,7 +963,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1015,12 +1015,12 @@ contains
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
                 end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1186,7 +1186,7 @@ contains
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -1293,7 +1293,7 @@ contains
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -1417,7 +1417,7 @@ contains
                     end if
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1469,7 +1469,7 @@ contains
                                 MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -1524,7 +1524,7 @@ contains
                     end if
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1576,12 +1576,12 @@ contains
                                 MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
                 end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1747,7 +1747,7 @@ contains
                                 MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                                 MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -1803,7 +1803,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1860,7 +1860,7 @@ contains
 #endif
 
                 end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1983,7 +1983,7 @@ contains
                     end if
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2013,7 +2013,7 @@ contains
                             buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -2070,7 +2070,7 @@ contains
                     end if
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2101,12 +2101,12 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
                 end if
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -2225,7 +2225,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2255,7 +2255,7 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     end if
 #endif
 
@@ -2315,7 +2315,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                     if (cu_mpi) then
                         !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2475,7 +2475,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send, ib_buff_recv, ib_buff_send)
 
@@ -2506,7 +2506,7 @@ contains
                         MPI_INTEGER, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -2525,7 +2525,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -2555,13 +2555,13 @@ contains
                         MPI_INTEGER, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
             end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
             if (cu_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
@@ -2597,7 +2597,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -2626,7 +2626,7 @@ contains
                         MPI_INTEGER, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -2645,7 +2645,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -2675,7 +2675,7 @@ contains
                         MPI_INTEGER, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -2719,7 +2719,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -2750,7 +2750,7 @@ contains
                         MPI_INTEGER, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -2801,13 +2801,13 @@ contains
                         MPI_INTEGER, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
             end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
             if (cu_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
@@ -2845,7 +2845,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -2876,7 +2876,7 @@ contains
                         MPI_INTEGER, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -2927,13 +2927,13 @@ contains
                         MPI_INTEGER, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
             end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
             if (cu_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
@@ -2974,7 +2974,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -3005,7 +3005,7 @@ contains
                         MPI_INTEGER, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -3056,13 +3056,13 @@ contains
                         MPI_INTEGER, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
             end if
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
             if (cu_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
@@ -3101,7 +3101,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -3131,7 +3131,7 @@ contains
                         MPI_INTEGER, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 
@@ -3152,7 +3152,7 @@ contains
 
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 if (cu_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
@@ -3182,7 +3182,7 @@ contains
                         MPI_INTEGER, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(MFC_OpenACC) 
+#if defined(MFC_OpenACC)
                 end if
 #endif
 

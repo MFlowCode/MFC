@@ -72,13 +72,13 @@ module m_data_output
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
-    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+!$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
-    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+!$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 #endif
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
@@ -374,7 +374,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !$acc update host(icfl_sf)
 
-        if(any(Re_size > 0)) then
+        if (any(Re_size > 0)) then
             !$acc update host(vcfl_sf, Rc_sf)
         end if
 
@@ -1608,8 +1608,6 @@ contains
 
     end subroutine s_write_probe_files ! -----------------------------------
 
-    
-
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
@@ -1665,7 +1663,7 @@ contains
         if (any(Re_size > 0)) then
             @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
-            
+
             vcfl_max = 0d0
             Rc_min = 1d3
         end if

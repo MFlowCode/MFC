@@ -25,22 +25,22 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
- !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)   
+!$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
-    !$acc declare link(Res_viscous)
+!$acc declare link(Res_viscous)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
-    !$acc declare create(Re_viscous)
+!$acc declare create(Re_viscous)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
-    !$acc declare link(tau_Re_vf)
+!$acc declare link(tau_Re_vf)
 #else
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !$acc declare create(tau_Re_vf)
+!$acc declare create(tau_Re_vf)
 #endif
 
 contains
@@ -68,7 +68,7 @@ contains
         !$acc update device(Res_viscous, Re_idx, Re_size)
         !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
-         @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
+        @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
         do i = 1, num_dims
             @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
                                                    &  iy%beg:iy%end, &
@@ -110,12 +110,11 @@ contains
 
         type(int_bounds_info) :: ix, iy, iz
 
-
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -127,7 +126,7 @@ contains
             end do
         end do
         if (Re_size(1) > 0) then    ! Shear stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -201,7 +200,7 @@ contains
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -234,7 +233,7 @@ contains
         end if
 
         if (Re_size(2) > 0) then    ! Bulk stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -308,7 +307,7 @@ contains
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -338,7 +337,7 @@ contains
         if (p == 0) return
 
         if (Re_size(1) > 0) then    ! Shear stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -412,7 +411,7 @@ contains
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -446,7 +445,7 @@ contains
         end if
 
         if (Re_size(2) > 0) then    ! Bulk stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
@@ -520,7 +519,7 @@ contains
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -565,7 +564,6 @@ contains
                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
                              qL_prim_rsz_vf, qR_prim_rsz_vf
 
-
         type(vector_field), dimension(num_dims), intent(INOUT) :: qL_prim, qR_prim
 
         type(vector_field) :: q_prim_qp
@@ -594,7 +592,6 @@ contains
                 i, qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
                 ix, iy, iz)
         end do
-
 
         if (weno_Re_flux) then
             ! Compute velocity gradient at cell centers using scalar
@@ -630,11 +627,11 @@ contains
 
             !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j, k, l) - &
@@ -645,11 +642,11 @@ contains
                 end do
             end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end - 1
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j + 1, k, l) - &
@@ -662,11 +659,11 @@ contains
 
             if (n > 0) then
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(2)%vf(i)%sf(k, j, l) = &
                                     (q_prim_qp%vf(i)%sf(k, j, l) - &
@@ -677,8 +674,7 @@ contains
                     end do
                 end do
 
-
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg, is1_viscous%end
@@ -693,11 +689,11 @@ contains
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
@@ -712,11 +708,11 @@ contains
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + &
@@ -732,11 +728,11 @@ contains
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg + 1, is1_viscous%end
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
@@ -752,11 +748,11 @@ contains
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg, is1_viscous%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + &
@@ -774,11 +770,11 @@ contains
 
                 if (p > 0) then
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
@@ -790,11 +786,11 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
@@ -806,11 +802,11 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg + 1, is1_viscous%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
@@ -827,11 +823,11 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do k = is2_viscous%beg, is2_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
@@ -848,7 +844,7 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg + 1, is2_viscous%end
                             do k = is1_viscous%beg, is1_viscous%end
@@ -869,7 +865,7 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = is3_viscous%beg + 1, is3_viscous%end - 1
                         do j = is2_viscous%beg, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
@@ -890,11 +886,11 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
@@ -911,11 +907,11 @@ contains
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg + 1, is2_viscous%end - 1
                             do k = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
@@ -931,11 +927,11 @@ contains
                             end do
                         end do
                     end do
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg + 1, is3_viscous%end
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
@@ -951,11 +947,11 @@ contains
                             end do
                         end do
                     end do
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = is3_viscous%beg, is3_viscous%end - 1
                         do l = is2_viscous%beg, is2_viscous%end
                             do k = is1_viscous%beg + 1, is1_viscous%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
                                     dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
                                         (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
@@ -973,20 +969,20 @@ contains
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                                dq_prim_dx_qp(1)%vf(i), &
-                                                dq_prim_dy_qp(1)%vf(i), &
-                                                dq_prim_dz_qp(1)%vf(i), &
-                                                ix, iy, iz, buff_size)
+                                                   dq_prim_dx_qp(1)%vf(i), &
+                                                   dq_prim_dy_qp(1)%vf(i), &
+                                                   dq_prim_dz_qp(1)%vf(i), &
+                                                   ix, iy, iz, buff_size)
                     end do
 
                 else
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                                dq_prim_dx_qp(1)%vf(i), &
-                                                dq_prim_dy_qp(1)%vf(i), &
-                                                dq_prim_dy_qp(1)%vf(i), &
-                                                ix, iy, iz, buff_size)
+                                                   dq_prim_dx_qp(1)%vf(i), &
+                                                   dq_prim_dy_qp(1)%vf(i), &
+                                                   dq_prim_dy_qp(1)%vf(i), &
+                                                   ix, iy, iz, buff_size)
                     end do
 
                 end if
@@ -994,10 +990,10 @@ contains
             else
                 do i = iv%beg, iv%end
                     call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                            dq_prim_dx_qp(1)%vf(i), &
-                                            dq_prim_dx_qp(1)%vf(i), &
-                                            dq_prim_dx_qp(1)%vf(i), &
-                                            ix, iy, iz, buff_size)
+                                               dq_prim_dx_qp(1)%vf(i), &
+                                               dq_prim_dx_qp(1)%vf(i), &
+                                               dq_prim_dx_qp(1)%vf(i), &
+                                               ix, iy, iz, buff_size)
                 end do
 
             end if
@@ -1230,21 +1226,21 @@ contains
             if (p > 0) then
 
                 call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, weno_dir, &
-                                is1_viscous, is2_viscous, is3_viscous)
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                            norm_dir, weno_dir, &
+                            is1_viscous, is2_viscous, is3_viscous)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, weno_dir, &
-                                is1_viscous, is2_viscous, is3_viscous)
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                            norm_dir, weno_dir, &
+                            is1_viscous, is2_viscous, is3_viscous)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                        norm_dir, weno_dir, &
+                        is1_viscous, is2_viscous, is3_viscous)
         end if
 
         if (any(Re_size > 0)) then
@@ -1333,21 +1329,21 @@ contains
             if (p > 0) then
 
                 call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, weno_dir, &
-                                is1_viscous, is2_viscous, is3_viscous)
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                            norm_dir, weno_dir, &
+                            is1_viscous, is2_viscous, is3_viscous)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, weno_dir, &
-                                is1_viscous, is2_viscous, is3_viscous)
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                            norm_dir, weno_dir, &
+                            is1_viscous, is2_viscous, is3_viscous)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                        norm_dir, weno_dir, &
+                        is1_viscous, is2_viscous, is3_viscous)
         end if
 
         if (any(Re_size > 0)) then
@@ -1434,7 +1430,6 @@ contains
         iv = iv_in
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
-        
 
         ! First-Order Spatial Derivatives in x-direction ===================
         if (norm_dir == 1) then
@@ -1445,11 +1440,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1d0/((1d0 + wa_flg)*dL(j)) &
@@ -1473,11 +1468,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1d0/((1d0 + wa_flg)*dL(k)) &
@@ -1501,12 +1496,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1d0/((1d0 + wa_flg)*dL(l)) &
@@ -1561,7 +1555,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = is3_viscous%beg + 1, is3_viscous%end - 1
             do k = is2_viscous%beg + 1, is2_viscous%end - 1
                 do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1573,7 +1567,7 @@ contains
         end do
 
         if (n > 0) then
-    !$acc parallel loop collapse(3) gang vector
+            !$acc parallel loop collapse(3) gang vector
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1586,7 +1580,7 @@ contains
         end if
 
         if (p > 0) then
-    !$acc parallel loop collapse(3) gang vector
+            !$acc parallel loop collapse(3) gang vector
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
@@ -1613,7 +1607,7 @@ contains
 
         !$acc update device(is1_viscous, is2_viscous, is3_viscous)
 
-    !$acc parallel loop collapse(2) gang vector default(present)
+        !$acc parallel loop collapse(2) gang vector default(present)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 grad_x%sf(is1_viscous%beg, k, l) = &
@@ -1625,7 +1619,7 @@ contains
             end do
         end do
         if (n > 0) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
                     grad_y%sf(j, is2_viscous%beg, l) = &
@@ -1637,7 +1631,7 @@ contains
                 end do
             end do
             if (p > 0) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
                         grad_z%sf(j, k, is3_viscous%beg) = &
@@ -1652,7 +1646,7 @@ contains
         end if
 
         if (bc_x%beg <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     grad_x%sf(0, k, l) = (-3d0*var%sf(0, k, l) + 4d0*var%sf(1, k, l) - var%sf(2, k, l))/ &
@@ -1661,7 +1655,7 @@ contains
             end do
         end if
         if (bc_x%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     grad_x%sf(m, k, l) = (3d0*var%sf(m, k, l) - 4d0*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
@@ -1671,7 +1665,7 @@ contains
         end if
         if (n > 0) then
             if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
                         grad_y%sf(j, 0, l) = (-3d0*var%sf(j, 0, l) + 4d0*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
@@ -1680,7 +1674,7 @@ contains
                 end do
             end if
             if (bc_y%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
                         grad_y%sf(j, n, l) = (3d0*var%sf(j, n, l) - 4d0*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
@@ -1690,7 +1684,7 @@ contains
             end if
             if (p > 0) then
                 if (bc_z%beg <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                    !$acc parallel loop collapse(2) gang vector default(present)
                     do k = is2_viscous%beg, is2_viscous%end
                         do j = is1_viscous%beg, is1_viscous%end
                             grad_z%sf(j, k, 0) = &
@@ -1700,7 +1694,7 @@ contains
                     end do
                 end if
                 if (bc_z%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                    !$acc parallel loop collapse(2) gang vector default(present)
                     do k = is2_viscous%beg, is2_viscous%end
                         do j = is1_viscous%beg, is1_viscous%end
                             grad_z%sf(j, k, p) = &

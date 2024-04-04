@@ -44,7 +44,7 @@ module m_cbc
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsz_vf)
-    !$acc declare link(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf)
+!$acc declare link(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
@@ -53,7 +53,7 @@ module m_cbc
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), F_rs_vf, F_src_rs_vf)
-    !$acc declare link(F_rs_vf, F_src_rs_vf)
+!$acc declare link(F_rs_vf, F_src_rs_vf)
 #else
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 #endif
@@ -64,19 +64,18 @@ module m_cbc
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsx_vf, F_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsy_vf, F_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsz_vf, F_src_rsz_vf)
-    !$acc declare link(F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf)
+!$acc declare link(F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
 #endif
 
-
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-    !$acc declare link(flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
+!$acc declare link(flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
@@ -88,21 +87,20 @@ module m_cbc
     !$acc declare create(c, Re)
 
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    !$acc declare create(dpres_ds)
+!$acc declare create(dpres_ds)
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ds)
 !$acc declare link(ds)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
-#endif    
-
+#endif
 
     ! CBC Coefficients =========================================================
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_z)
-    !$acc declare link(fd_coef_x, fd_coef_y, fd_coef_z)
+!$acc declare link(fd_coef_x, fd_coef_y, fd_coef_z)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
@@ -117,7 +115,7 @@ module m_cbc
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_x)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_y)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
-    !$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
+!$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
@@ -135,13 +133,13 @@ module m_cbc
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
-    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
+!$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
 #ifndef CRAY_ACC_WAR
-    !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
-    !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
-    !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-    !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)    
+!$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
+!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
+!$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
+!$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
 #endif
 
 contains
@@ -178,28 +176,28 @@ contains
         is3%end = p - is3%beg
 
         @:ALLOCATE_GLOBAL(q_prim_rsx_vf(0:buff_size, &
-                                is2%beg:is2%end, &
-                                is3%beg:is3%end, 1:sys_size))
+            is2%beg:is2%end, &
+            is3%beg:is3%end, 1:sys_size))
 
         if (weno_order > 1) then
 
             @:ALLOCATE_GLOBAL(F_rsx_vf(0:buff_size, &
-                               is2%beg:is2%end, &
-                               is3%beg:is3%end, 1:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, 1:adv_idx%end))
 
             @:ALLOCATE_GLOBAL(F_src_rsx_vf(0:buff_size, &
-                                   is2%beg:is2%end, &
-                                   is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
         end if
 
         @:ALLOCATE_GLOBAL(flux_rsx_vf(-1:buff_size, &
-                              is2%beg:is2%end, &
-                              is3%beg:is3%end, 1:adv_idx%end))
+            is2%beg:is2%end, &
+            is3%beg:is3%end, 1:adv_idx%end))
 
         @:ALLOCATE_GLOBAL(flux_src_rsx_vf(-1:buff_size, &
-                                  is2%beg:is2%end, &
-                                  is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+            is2%beg:is2%end, &
+            is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
         if (n > 0) then
 
@@ -221,28 +219,28 @@ contains
             is3%end = p - is3%beg
 
             @:ALLOCATE_GLOBAL(q_prim_rsy_vf(0:buff_size, &
-                                    is2%beg:is2%end, &
-                                    is3%beg:is3%end, 1:sys_size))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, 1:sys_size))
 
             if (weno_order > 1) then
 
                 @:ALLOCATE_GLOBAL(F_rsy_vf(0:buff_size, &
-                                   is2%beg:is2%end, &
-                                   is3%beg:is3%end, 1:adv_idx%end))
+                    is2%beg:is2%end, &
+                    is3%beg:is3%end, 1:adv_idx%end))
 
                 @:ALLOCATE_GLOBAL(F_src_rsy_vf(0:buff_size, &
-                                       is2%beg:is2%end, &
-                                       is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is2%beg:is2%end, &
+                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
             end if
 
             @:ALLOCATE_GLOBAL(flux_rsy_vf(-1:buff_size, &
-                                  is2%beg:is2%end, &
-                                  is3%beg:is3%end, 1:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, 1:adv_idx%end))
 
             @:ALLOCATE_GLOBAL(flux_src_rsy_vf(-1:buff_size, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
         end if
 
@@ -266,28 +264,28 @@ contains
             is3%end = m - is3%beg
 
             @:ALLOCATE_GLOBAL(q_prim_rsz_vf(0:buff_size, &
-                                    is2%beg:is2%end, &
-                                    is3%beg:is3%end, 1:sys_size))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, 1:sys_size))
 
             if (weno_order > 1) then
 
                 @:ALLOCATE_GLOBAL(F_rsz_vf(0:buff_size, &
-                                   is2%beg:is2%end, &
-                                   is3%beg:is3%end, 1:adv_idx%end))
+                    is2%beg:is2%end, &
+                    is3%beg:is3%end, 1:adv_idx%end))
 
                 @:ALLOCATE_GLOBAL(F_src_rsz_vf(0:buff_size, &
-                                       is2%beg:is2%end, &
-                                       is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                    is2%beg:is2%end, &
+                    is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
             end if
 
             @:ALLOCATE_GLOBAL(flux_rsz_vf(-1:buff_size, &
-                                  is2%beg:is2%end, &
-                                  is3%beg:is3%end, 1:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, 1:adv_idx%end))
 
             @:ALLOCATE_GLOBAL(flux_src_rsz_vf(-1:buff_size, &
-                                      is2%beg:is2%end, &
-                                      is3%beg:is3%end, adv_idx%beg:adv_idx%end))
+                is2%beg:is2%end, &
+                is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
         end if
 
@@ -680,7 +678,6 @@ contains
                               ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
-
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$) then
@@ -1535,8 +1532,8 @@ contains
 
         ! Deallocating CBC Coefficients in x-direction =====================
         if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
-            @:DEALLOCATE_GLOBAL(fd_coef_x) 
-            if (weno_order > 1) then 
+            @:DEALLOCATE_GLOBAL(fd_coef_x)
+            if (weno_order > 1) then
                 @:DEALLOCATE_GLOBAL(pi_coef_x)
             end if
         end if
@@ -1546,7 +1543,7 @@ contains
         if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. &
             any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
             @:DEALLOCATE_GLOBAL(fd_coef_y)
-            if (weno_order > 1) then 
+            if (weno_order > 1) then
                 @:DEALLOCATE_GLOBAL(pi_coef_y)
             end if
         end if
@@ -1554,8 +1551,8 @@ contains
 
         ! Deallocating CBC Coefficients in z-direction =====================
         if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
-            @:DEALLOCATE_GLOBAL(fd_coef_z) 
-            if (weno_order > 1) then 
+            @:DEALLOCATE_GLOBAL(fd_coef_z)
+            if (weno_order > 1) then
                 @:DEALLOCATE_GLOBAL(pi_coef_z)
             end if
         end if
