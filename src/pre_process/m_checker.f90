@@ -172,12 +172,10 @@ contains
                     .or. &
                     (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real) &
                     .or. &
-                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real))
-then
+                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real)) then
                     call s_mpi_abort('domain are not dflt_real.'// &
                                      'Please, correct them')
-                elseif (m == dflt_int .or. n == dflt_int .or. p == dflt_int)
-then
+                elseif (m == dflt_int .or. n == dflt_int .or. p == dflt_int) then
                     call s_mpi_abort('m, n, and/or p are set to dflt_int.'// &
                                      'Please, correct them')
                 end if
