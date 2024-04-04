@@ -192,6 +192,13 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+        !Lagrangian solver
+        CALL MPI_BCAST(fd_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_BCAST(particleflag, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_BCAST(avgdensFlag, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_BCAST(do_particles, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_BCAST(solverapproach, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 #endif
 
     end subroutine s_mpi_bcast_user_inputs ! -------------------------------

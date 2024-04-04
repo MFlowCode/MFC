@@ -89,7 +89,14 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', "palpha_eps", "ptgalpha_eps", 'ib', 'num_ibs'
+    'num_integrals', 'cu_mpi', "palpha_eps", "ptgalpha_eps", 'ib', 'num_ibs',
+    'particleflag','avgdensFlag','particleoutFlag','particlestatFlag','RPflag',
+    'clusterflag','stillparticlesflag','heatflag','massflag',
+    'csonref','rholiqref','Lref','Tini','Runiv','gammagas','gammavapor',
+    'pvap','cpgas','cpvapor','kgas','kvapor','MWgas','MWvap','diffcoefvap',
+    'sigmabubble','viscref','RKeps','ratiodt','projectiontype','smoothtype',
+    'epsilonb','coupledFlag','solverapproach','correctpresFlag','charwidth',
+    'valmaxvoid','dtmaxpart'
 ]
 
 for ib_id in range(1, 10+1):
@@ -115,7 +122,8 @@ for wrt_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
 
-for probe_id in range(1,3+1):
+#for probe_id in range(1,3+1):
+for probe_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe({probe_id})%{cmp}')
 
@@ -141,6 +149,7 @@ for f_id in range(1,10+1):
             SIMULATION.append(f"integral({int_id})%{cmp}max")
 
 
+
 POST_PROCESS = COMMON + [
     't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
     'mixture_err', 'format', 'schlieren_wrt', 'schlieren_alpha', 'fd_order',
@@ -148,7 +157,7 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt'
+    'qm_wrt', 'particleflag', 'avgdensFlag', 'solverapproach'
 ]
 
 for cmp_id in range(1,3+1):

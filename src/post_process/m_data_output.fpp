@@ -288,6 +288,19 @@ contains
 
         end if
 
+        IF(particleflag .AND. proc_rank == 0 .and. num_procs.eq.1) THEN !Lagrangian solver
+           dbdir = TRIM(case_dir) // '/particles_data'
+           file_loc = TRIM(dbdir) // '/.'
+           !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
+           !        EXIST     = dir_check       )
+           INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
+           EXIST     = dir_check       )
+
+           IF(dir_check .NEQV. .TRUE.) THEN
+               CALL SYSTEM('mkdir ' // TRIM(dbdir))
+           END IF
+        END IF
+
         ! ==================================================================
 
         ! Contrary to the Silo-HDF5 database format, handles of the Binary

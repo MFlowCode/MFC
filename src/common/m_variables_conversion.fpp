@@ -37,6 +37,7 @@ module m_variables_conversion
  s_convert_primitive_to_conservative_variables, &
  s_convert_primitive_to_flux_variables, &
  s_compute_pressure, &
+ get_mixture_variables, &
  s_finalize_variables_conversion_module
 
     !> Abstract interface to two subroutines designed for the transfer/conversion
@@ -172,6 +173,51 @@ contains
         end if
 
     end subroutine s_compute_pressure
+
+        !> Lagrangian particle solver
+        !> Get mixture variables considering the Euler-Lagrangian interaction
+    subroutine get_mixture_variables(q_prim_vf, q_cons_vf, pres, j,k,l, rho, cson, Re, We, q_particle)
+
+        TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_prim_vf
+        TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN) :: q_cons_vf
+        TYPE(scalar_field), OPTIONAL :: q_particle
+	REAL(KIND(0d0)) :: rho
+	REAL(KIND(0d0)) :: pres
+	REAL(KIND(0d0)) :: cson
+	REAL(KIND(0d0)) :: gamma
+	REAL(KIND(0d0)) :: pi_inf
+	REAL(KIND(0d0)) :: E
+	REAL(KIND(0d0)) :: H
+	REAL(KIND(0d0)), DIMENSION(E_idx - mom_idx%beg ) :: vel
+        real(kind(0d0)) :: qv
+
+        !Shear and volume Reynolds numbers
+	REAL(KIND(0d0)), DIMENSION(2), INTENT(OUT) :: Re
+
+        ! Weber numbers
+	REAL(KIND(0d0)), DIMENSION( num_fluids, num_fluids ), INTENT(OUT) :: We
+
+        INTEGER :: i, j, k, l, j1, k1, l1
+
+        CALL s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
+
+        IF((solverapproach .EQ. 1) .AND. PRESENT(q_particle)) rho = rho/q_particle%sf(j,k,l)
+
+        ! Transferring the velocity
+        DO i = 1, E_idx - mom_idx%beg
+            vel(i) = q_prim_vf(i+cont_idx%end)%sf(j,k,l)
+        END DO
+
+        ! Computing the energy
+        E = gamma * pres + pi_inf + 0.5d0 * rho * DOT_PRODUCT(vel, vel)
+
+        ! Computing the enthalpy
+        H = ( E + pres ) / rho
+
+        ! Computing the speed of sound
+        cson = SQRT( (H - 0.5d0 * DOT_PRODUCT(vel, vel)) / gamma )
+
+    end subroutine get_mixture_variables
 
     !>  This subroutine is designed for the gamma/pi_inf model
         !!      and provided a set of either conservative or primitive
@@ -803,10 +849,12 @@ contains
         !! @param ix Index bounds in first coordinate direction
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
+        !! @param q_particle Lagrangian particle variables
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              qK_prim_vf, &
                                                              gm_alphaK_vf, &
-                                                             ix, iy, iz)
+                                                             ix, iy, iz, &
+                                                             q_particle)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_prim_vf
@@ -816,6 +864,7 @@ contains
             intent(IN) :: gm_alphaK_vf
 
         type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+        type(scalar_field), intent(IN), optional :: q_particle
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -883,6 +932,9 @@ contains
                         else if (bubbles) then
                             call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                                     alpha_K, alpha_rho_K, Re_K, j, k, l)
+                        else if (particleflag) then
+                            call s_convert_species_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                                rho_K, gamma_K, pi_inf_K, qv_K, Re_K)
                         else
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                             alpha_K, alpha_rho_K, Re_K, j, k, l)
@@ -908,8 +960,15 @@ contains
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
-                            dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
-                                         *qK_prim_vf(i)%sf(j, k, l)
+                            if (PRESENT(q_particle) .and. (solverapproach .EQ. 1)) THEN
+                              dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j,k,l) &
+                                                            *qK_prim_vf(i)%sf(j,k,l) &
+                                                            /q_particle%sf(j,k,l)
+                            else
+                              dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j,k,l) &
+                                                            *qK_prim_vf(i)%sf(j,k,l)
+                            end if
+
                         else
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /qK_cons_vf(1)%sf(j, k, l)
@@ -920,7 +979,14 @@ contains
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, pres)
 
-                    qK_prim_vf(E_idx)%sf(j, k, l) = pres
+                    if(PRESENT(q_particle) .and. (solverapproach .eq. 1)) then
+                        !lagrangian particle contribution in the pressure field
+                        qK_prim_vf(E_idx)%sf(j,k,l) = ( qK_cons_vf(E_idx)%sf(j,k,l)/q_particle%sf(j,k,l) &
+                                                                                            - dyn_pres_K &
+                                                                        - pi_inf_K) / MAX(gamma_K,sgm_eps) 
+                    else
+                        qK_prim_vf(E_idx)%sf(j, k, l) = pres
+                    end if
 
                     if (bubbles) then
                         !$acc loop seq
@@ -1212,6 +1278,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, E_idx)
+
                     if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
@@ -1264,6 +1331,7 @@ contains
                         do i = advxb, advxe
                             FK_src_vf(j, k, l, i) = vel_K(dir_idx(1))
                         end do
+
 
                     end if
                 end do
