@@ -755,7 +755,7 @@ contains
                         if (polytropic) then
                             pv = fluid_pp(1)%pv
                             pv = pv/pref
-                            @:ALLOCATE(pb0(nb))
+                            @:ALLOCATE_GLOBAL(pb0(nb))
                             if (Web == dflt_real) then
                                 pb0 = pref
                                 pb0 = pb0/pref
