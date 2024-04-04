@@ -20,7 +20,7 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
-#ifdef MFC_OPENACC
+#ifdef MFC_OpenACC
     use openacc
 #endif
 
@@ -359,7 +359,7 @@ module m_global_parameters
     !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma)
 
 
-#if CRAY_ACC_WAR
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:, :, :), mom_3d)
     !$acc declare link(mom_sp, mom_3d)
@@ -376,7 +376,7 @@ module m_global_parameters
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
     !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
-#if CRAY_ACC_WAR
+#ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
     !$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)

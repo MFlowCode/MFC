@@ -316,9 +316,7 @@ contains
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; pk(1:num_fluids) = 0.0d0
-
-        ig(1:num_fluids) = 0
+        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf;
 
         ! Performing tests before initializing the pT-equilibrium
         !$acc loop seq

@@ -214,7 +214,7 @@ module m_rhs
     !$acc declare link(nbub)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-    !$acc declare link(nbub)
+    !$acc declare create(nbub)
 #endif
 
 contains
