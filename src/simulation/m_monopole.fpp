@@ -220,10 +220,10 @@ contains
                                     !mono_mom_src(1,j,k,l) = s2
                                     !mono_mom_src(2,j,k,l) = s2
                                     if (support(q) == 5) then
-                                        !mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2*cos(abs(angle))
-                                        !mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) - s2*sin(abs(angle))
-                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
-                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
+                                        mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - s2*cos(abs(angle))
+                                        mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) - s2*sin(abs(angle))
+                                        !mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
+                                        !mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
                                     else
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(dir(q))
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(dir(q))
@@ -248,8 +248,9 @@ contains
 
                             if (model_eqns /= 4) then
                                 if (support(q) == 5) then
-!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
-                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                    !mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
+                                    !mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
+                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
                                 else
                                     mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
                                 end if

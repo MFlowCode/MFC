@@ -1263,14 +1263,17 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
-                        call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                            0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
-                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                            pi_inf, gamma, rho, qv, pres, &
-                            q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                            q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+                        !call s_compute_pressure( &
+                        !    q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                        !    q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                        !    0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
+                        !    q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                        !    pi_inf, gamma, rho, qv, pres, &
+                        !    q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
+                        !    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+
+                        call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
+                                0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, qv, pres)
 
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0

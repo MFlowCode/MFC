@@ -696,8 +696,6 @@ contains
                     send_size = adv_idx%end
                 END IF
 
-                if (proc_rank==0) print*, 'sys_size and send_size', sys_size, send_size
-
                 if (bubbles) then
                     bub_idx%beg = sys_size + 1
                     if (qbmm) then
