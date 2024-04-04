@@ -78,7 +78,7 @@ if (MFC_SILO)
                        -DHDF5_USE_STATIC_LIBRARIES=ON
                        "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                        $<$<NOT:$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>>:"-DSILO_HDF5_DIR=\"${CMAKE_INSTALL_PREFIX}\"">
-                       "-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake"
+                       $<$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>:"-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake">
     )
 
     if (MFC_HDF5 AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
