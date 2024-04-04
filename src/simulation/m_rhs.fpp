@@ -235,6 +235,7 @@ contains
         ! ==================================================================
 
         !$acc enter data copyin(ix, iy, iz)
+        !$acc update device(ix, iy, iz)
 
         ixt = ix; iyt = iy; izt = iz
 
@@ -682,7 +683,7 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-        !$acc enter data copyin(ix, iy, iz)
+        !$acc update device(ix, iy, iz)
 
         ! Association/Population of Working Variables ======================
         !$acc parallel loop collapse(4) gang vector default(present)
