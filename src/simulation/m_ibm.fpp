@@ -129,7 +129,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
 
-        integer :: i, j, k, l, q, r, i1, j1!< Iterator variables
+        integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
         real(kind(0d0)) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_K
@@ -154,7 +154,7 @@ contains
         real(kind(0d0)) :: buf
         type(ghost_point) :: gp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, i1, j1, q, coeff)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, q, coeff)
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -286,8 +286,6 @@ contains
                                                                         + pi_infs(q - intxb + 1))
                 end do
             end if
-            !print *, "GP", i, q_cons_vf(1)%sf(j, k, l), q_cons_vf(E_idx)%sf(j, k, l)
-            !print *, "COEFFS", i, ghost_points(i)%interp_coeffs
         end do
 
     end subroutine s_ibm_correct_state
