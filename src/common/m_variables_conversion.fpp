@@ -82,7 +82,6 @@ module m_variables_conversion
 
     integer, public :: ixb, ixe, iyb, iye, izb, ize
     !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
-    real(kind(0d0)) :: temp
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
