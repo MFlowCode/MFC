@@ -44,7 +44,7 @@ module m_start_up
 
     use m_qbmm                 !< Quadrature MOM
 
-    use m_derived_variables     !< Procedures used to compute quantites derived
+    use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
 
     use m_hypoelastic
