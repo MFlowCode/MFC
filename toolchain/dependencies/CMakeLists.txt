@@ -41,24 +41,19 @@ endif()
 
 # HDF5
 if (MFC_HDF5)
-    if (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        ExternalProject_Add(hdf5
-            GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
-            GIT_TAG        hdf5-1_12_2
-            GIT_SHALLOW    ON
-            GIT_PROGRESS   ON
-            CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                           -DBUILD_SHARED_LIBS=OFF
-                           -DFORTRAN_LIBRARIES=ON
-                           -DBUILD_TESTING=OFF
-                           -DHDF5_BUILD_UTILS=OFF
-                           -DHDF5_BUILD_TOOLS=ON
-                           -DHDF5_BUILD_EXAMPLES=OFF
-        )
-    else()
-        message(WARNING "The Fortran compiler vendor is Cray so HDF5 will not be built. We will use cray-hdf5 instead.")
-        add_custom_target(hdf5)
-    endif()
+    ExternalProject_Add(hdf5
+        GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
+        GIT_TAG        hdf5-1_12_2
+        GIT_SHALLOW    ON
+        GIT_PROGRESS   ON
+        CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                        -DBUILD_SHARED_LIBS=OFF
+                        -DFORTRAN_LIBRARIES=ON
+                        -DBUILD_TESTING=OFF
+                        -DHDF5_BUILD_UTILS=OFF
+                        -DHDF5_BUILD_TOOLS=ON
+                        -DHDF5_BUILD_EXAMPLES=OFF
+    )
 endif()
 
 
@@ -72,16 +67,16 @@ if (MFC_SILO)
         GIT_TAG        af955eb5dd009caf00c41ca51611b37c052b042c
         GIT_SHALLOW    ON
         GIT_PROGRESS   ON
-        CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
-                       -DSILO_ENABLE_SILOCK=OFF
-                       -DSILO_ENABLE_BROWSER=OFF
-                       -DHDF5_USE_STATIC_LIBRARIES=ON
+        CMAKE_ARGS      -DSILO_ENABLE_SHARED=OFF
+                        -DSILO_ENABLE_SILOCK=OFF
+                        -DSILO_ENABLE_BROWSER=OFF
+                        -DHDF5_USE_STATIC_LIBRARIES=ON
                        "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                       "$<$<NOT:$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>>:-DSILO_HDF5_DIR=${CMAKE_INSTALL_PREFIX}>"
+                       "-DSILO_HDF5_DIR=${CMAKE_INSTALL_PREFIX}"
                        "$<$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>:-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake>"
     )
 
-    if (MFC_HDF5 AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    if (MFC_HDF5)
         add_dependencies(silo hdf5)
     endif()
 endif()

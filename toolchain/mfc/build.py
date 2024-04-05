@@ -95,7 +95,7 @@ class MFCTarget:
         if ARG("no_build"):
             return False
 
-        if self.isDependency and ARG(f"no_{self.name}", False):
+        if self.isDependency and ARG(f"sys_{self.name}", False):
             return False
 
         return True
