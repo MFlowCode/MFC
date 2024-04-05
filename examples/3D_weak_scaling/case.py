@@ -199,7 +199,7 @@ print(json.dumps({
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
-    'weno_order'                   : 5,
+    'weno_order'                   : 3,
     'weno_eps'                     : 1.0E-16,
     'weno_Re_flux'                 : 'F',  
     'weno_avg'                     : 'F',

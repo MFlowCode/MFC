@@ -1276,9 +1276,7 @@ contains
 
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
-                    ! comment out above and it will run to completion
 
-                    ! have been using == 2
                     if (riemann_solver == 1) then
                         !$acc loop seq
                         do i = advxb, advxe

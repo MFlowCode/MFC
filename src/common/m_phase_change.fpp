@@ -74,7 +74,6 @@ contains
         !!      selecting the phase change module that will be used
         !!      (pT- or pTg-equilibrium)
     subroutine s_initialize_phasechange_module()
-!#ifndef _CRAYFTN
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
              + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0d0)*cvs(vp))
@@ -87,7 +86,6 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-!#endif
     end subroutine s_initialize_phasechange_module !-------------------------------
 
     !>  This subroutine is created to activate either the pT- (N fluids) or the
@@ -103,7 +101,7 @@ contains
         real(kind(0.0d0)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
         real(kind(0.0d0)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(kind(0.0d0)) :: TvF !< total volume fraction
-!#ifndef _CRAYFTN
+
         !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
 
         real(kind(0d0)), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
@@ -284,7 +282,7 @@ contains
                 end do
             end do
         end do
-!#endif
+
     end subroutine s_infinite_relaxation_k ! ----------------
 
     !>  This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
