@@ -54,4 +54,3 @@ echo
 % endfor
 
 ${helpers.template_epilogue()}
-
