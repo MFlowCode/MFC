@@ -1274,14 +1274,6 @@ contains
                             + pres_K*dir_flg(dir_idx(i))
                     end do
 
-                    if (j == 1) then
-#ifdef CRAY_PRINT_DEBUG
-                        print *, "cbc debug"
-                        print *, E_K
-                        print *, pres_K
-                        print *, vel_K(dir_idx(1))
-#endif
-                    end if
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
                     ! comment out above and it will run to completion
