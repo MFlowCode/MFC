@@ -17,10 +17,6 @@
 % if quality_of_service:
 #SBATCH --qos=${quality_of_service}
 % endif
-% if gpu:
-#SBATCH --gres=gpu:V100:${tasks_per_node}
-#SBATCH --mem-per-gpu=16G\
-% endif
 % if email:
 #SBATCH --mail-user=${email}
 #SBATCH --mail-type="BEGIN, END, FAIL"
@@ -31,7 +27,9 @@ ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOTDIR}"
-. ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
+% if engine == 'batch':
+. ./mfc.sh load -c c -m ${'g' if gpu else 'c'}
+% endif
 cd - > /dev/null
 echo
 
@@ -42,8 +40,8 @@ echo
         (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
     % else:
         (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
-            mpirun -np ${nodes*tasks_per_node}                 \
-                   --bind-to none                              \
+            srun -N ${nodes}                 \
+                   -n ${tasks_per_node}                              \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath()}")
     % endif
@@ -54,4 +52,3 @@ echo
 % endfor
 
 ${helpers.template_epilogue()}
-
