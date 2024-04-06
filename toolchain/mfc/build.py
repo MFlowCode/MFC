@@ -95,7 +95,7 @@ class MFCTarget:
         if ARG("no_build"):
             return False
 
-        if self.isDependency and ARG(f"no_{self.name}"):
+        if self.isDependency and ARG(f"sys_{self.name}", False):
             return False
 
         return True
@@ -106,6 +106,8 @@ class MFCTarget:
         install_dirpath = self.get_install_dirpath()
 
         install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath()])
+
+        mod_dirs = ';'.join(['build/install/dependencies/include/hipfort/amdgcn'])
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
@@ -133,7 +135,13 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
+            # Fortran .mod include directories. Currently used for the HIPFORT
+            # dependency that has this missing from its config files.
+            f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
         ]
+
+        if ARG("verbose"):
+            flags.append('--debug-find')
 
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
@@ -189,17 +197,17 @@ class MFCTarget:
         if system(command).returncode != 0:
             raise MFCException(f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
 
-
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 HDF5          = MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies([HDF5], [], []), -1)
+HIPFORT       = MFCTarget('hipfort',       ['-DMFC_HIPFORT=ON'],       True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 PRE_PROCESS   = MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], []), 0)
-SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], []), 1)
+SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], [HIPFORT]), 1)
 POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, SILO], [], []), 2)
-SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], []), -1)
+SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [HIPFORT]), -1)
 DOCUMENTATION = MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []), -1)
 
-TARGETS = { FFTW, HDF5, SILO, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
+TARGETS = { FFTW, HDF5, SILO, HIPFORT, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
 
 DEFAULT_TARGETS    = { target for target in TARGETS if target.isDefault }
 REQUIRED_TARGETS   = { target for target in TARGETS if target.isRequired }
@@ -242,7 +250,14 @@ def __build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str
 
     history.add(target.name)
 
-    build(target.requires.compute(), history)
+    for dep in target.requires.compute():
+        # If we have already built and installed this target,
+        # do not do so again. This can be inferred by whether
+        # the target requesting this dependency is already configured.
+        if dep.isDependency and target.is_configured():
+            continue
+
+        build([dep], history)
 
     if not target.is_configured():
         target.configure()

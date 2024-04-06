@@ -47,11 +47,13 @@ p-cpu gcc/10.3.0-o57x6h openmpi/4.1.4
 p-gpu cuda/11.7.0-7sdye3 nvhpc/22.11
 p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
 
-c     OLCF Crusher
-c-all cmake/3.23.2 cray-fftw/3.3.10.2 hdf5/1.12.1 cray-python/3.9.13.1
-c-all ninja/1.10.2 cray-mpich/8.1.23
-c-cpu
-c-gpu rocm/5.1.0 craype-accel-amd-gfx90a
+f     OLCF Frontier
+f-gpu rocm/5.5.1 craype-accel-amd-gfx90a
+f-all cpe/23.09
+f-all cray-fftw cray-hdf5 cray-mpich cce/16.0.1 
+f-all rocm/5.5.1 cray-python  omniperf
+f-cpu
+
 
 d     NCSA Delta
 d-all python/3.11.6

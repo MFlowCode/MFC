@@ -838,7 +838,7 @@ contains
 &                pTg-equilirium (relax = "T" activated)'
             end if
 
-            call s_relaxation_solver(q_cons_vf)
+            call s_infinite_relaxation_k(q_cons_vf)
         end if
 
         call s_write_data_files(q_cons_vf, ib_markers)
