@@ -55,12 +55,12 @@ module m_fftw
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
     @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
     @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
-!$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+    !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #else
     real(kind(0d0)), allocatable :: data_real_gpu(:)
     complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
-!$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
+    !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #endif
 
 #if defined(__PGI)
@@ -99,8 +99,8 @@ contains
         gpu_fft_size(1) = real_size; 
         iembed(1) = 0
         oembed(1) = 0
-!$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
-!$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
+        !$acc enter data copyin(real_size, cmplx_size, x_size, sys_size, batch_size, Nfq)
+        !$acc update device(real_size, cmplx_size, x_size, sys_size, batch_size)
 #else
         ! Allocate input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))

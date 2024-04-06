@@ -28,10 +28,10 @@ module m_qbmm
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
-!$acc declare link(momrhs)
+    !$acc declare link(momrhs)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
-!$acc declare create(momrhs)
+    !$acc declare create(momrhs)
 #endif
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
@@ -46,11 +46,11 @@ module m_qbmm
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
-!$acc declare link(bubrs, bubmoms)
+    !$acc declare link(bubrs, bubmoms)
 #else
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
-!$acc declare create(bubrs, bubmoms)
+    !$acc declare create(bubrs, bubmoms)
 #endif
 
 contains
@@ -668,7 +668,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
         real(kind(0.d0)), intent(IN) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
@@ -740,7 +740,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_coeff
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
 
         real(kind(0.d0)), intent(INOUT) :: pres, rho, c
@@ -1018,7 +1018,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_chyqmom
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
         real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
         real(kind(0d0)), dimension(nmom), intent(IN) :: momin
@@ -1085,7 +1085,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_hyqmom
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
         real(kind(0d0)), dimension(2), intent(INOUT) :: frho, fup
         real(kind(0d0)), dimension(3), intent(IN) :: fmom

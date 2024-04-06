@@ -34,7 +34,7 @@ module m_mpi_proxy
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
 
-!$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
+    !$acc declare link(q_cons_buff_recv, q_cons_buff_send, ib_buff_send, ib_buff_recv)
 #else
     real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
@@ -56,7 +56,7 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-!$acc declare create(q_cons_buff_send, q_cons_buff_recv, ib_buff_send, ib_buff_recv)
+    !$acc declare create(q_cons_buff_send, q_cons_buff_recv, ib_buff_send, ib_buff_recv)
 #endif
     !> @name Generic flags used to identify and report MPI errors
     !> @{
@@ -120,7 +120,7 @@ contains
             v_size = sys_size
         end if
 
-!$acc update device(v_size)
+        !$acc update device(v_size)
 
 #endif
 

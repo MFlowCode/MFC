@@ -44,7 +44,7 @@ module m_ibm
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
 
-!$acc declare link(levelset, levelset_norm, ghost_points)
+    !$acc declare link(levelset, levelset_norm, ghost_points)
 #else
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
@@ -55,7 +55,7 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: ghost_points
     !! Matrix of normal vector to IB
 
-!$acc declare create(levelset, levelset_norm, ghost_points)
+    !$acc declare create(levelset, levelset_norm, ghost_points)
 #endif
 
     integer :: gp_layers !< Number of ghost point layers

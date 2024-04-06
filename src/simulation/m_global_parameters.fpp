@@ -88,10 +88,10 @@ module m_global_parameters
     real(kind(0d0)) :: dt !< Size of the time-step
 
 #ifdef CRAY_ACC_WAR
-!$acc declare link(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz)
-!$acc declare create(m, n, p, dt)
+    !$acc declare link(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz)
+    !$acc declare create(m, n, p, dt)
 #else
-!$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
+    !$acc declare create(x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p)
 #endif
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -212,10 +212,10 @@ module m_global_parameters
 #endif
     !> @}
 #ifdef CRAY_ACC_WAR
-!$acc declare create(Re_size)
-!$acc declare link(Re_idx)
+    !$acc declare create(Re_size)
+    !$acc declare link(Re_idx)
 #else
-!$acc declare create(Re_size, Re_idx)
+    !$acc declare create(Re_size, Re_idx)
 #endif
 
     ! The WENO average (WA) flag regulates whether the calculation of any cell-
@@ -321,12 +321,12 @@ module m_global_parameters
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), weight)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), R0)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), V0)
-!$acc declare link(weight, R0, V0)
+    !$acc declare link(weight, R0, V0)
 #else
     real(kind(0d0)), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(kind(0d0)), dimension(:), allocatable :: R0     !< Bubble sizes
     real(kind(0d0)), dimension(:), allocatable :: V0     !< Bubble velocities
-!$acc declare create(weight, R0, V0)
+    !$acc declare create(weight, R0, V0)
 #endif
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
@@ -336,10 +336,10 @@ module m_global_parameters
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ptil)
-!$acc declare link(ptil)
+    !$acc declare link(ptil)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
-!$acc declare create(ptil)
+    !$acc declare create(ptil)
 #endif
     real(kind(0d0)) :: poly_sigma  !< log normal sigma for polydisperse PDF
 
@@ -358,11 +358,11 @@ module m_global_parameters
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:, :, :), mom_3d)
-!$acc declare link(mom_sp, mom_3d)
+    !$acc declare link(mom_sp, mom_3d)
 #else
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
-!$acc declare create(mom_sp, mom_3d)
+    !$acc declare create(mom_sp, mom_3d)
 #endif
     !> @}
 
@@ -373,11 +373,11 @@ module m_global_parameters
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
-!$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+    !$acc declare link( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 #else
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-!$acc declare create( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
+    !$acc declare create( k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
 #endif
     real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
@@ -404,10 +404,10 @@ module m_global_parameters
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-!$acc declare link(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare link(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -419,13 +419,13 @@ module m_global_parameters
 
     @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), mv_ts)
 
-!$acc declare link(pb_ts, mv_ts)
+    !$acc declare link(pb_ts, mv_ts)
 #else
     type(pres_field), allocatable, dimension(:) :: pb_ts
 
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-!$acc declare create(pb_ts, mv_ts)
+    !$acc declare create(pb_ts, mv_ts)
 #endif
     ! ======================================================================
 
