@@ -134,7 +134,7 @@ contains
 #ifndef MFC_POST_PROCESS
         if (present(ib_markers)) then
 
-#ifdef MPI_SIMULATION
+#ifdef MFC_PRE_PROCESS
             MPI_IO_IB_DATA%var%sf => ib_markers%sf
 #else
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)

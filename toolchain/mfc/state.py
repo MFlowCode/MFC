@@ -49,10 +49,15 @@ gCFG: MFCConfig = MFCConfig()
 gARG: dict      = {}
 
 
-def ARG(arg: str) -> typing.Any:
+def ARG(arg: str, dflt = None) -> typing.Any:
     # pylint: disable=global-variable-not-assigned
     global gARG
-    return gARG[arg]
+    if arg in gARG:
+        return gARG[arg]
+    if dflt is not None:
+        return dflt
+
+    raise KeyError(f"{arg} is not an argument.")
 
 def ARGS() -> dict:
     # pylint: disable=global-variable-not-assigned
