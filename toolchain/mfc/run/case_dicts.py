@@ -6,7 +6,8 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "file_per_process", "relax", "relax_model"
+    "Ca", "polydisperse", "file_per_process", "relax", "relax_model", 
+    "sigma"
 ]
 
 
@@ -48,7 +49,8 @@ for p_id in range(1, 10+1):
     for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp" ]:
+                      "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp",
+                      "cf_val"]:
         PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
 
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")
@@ -148,7 +150,7 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt'
+    'qm_wrt', 'cf_wrt'
 ]
 
 for cmp_id in range(1,3+1):

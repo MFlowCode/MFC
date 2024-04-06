@@ -26,17 +26,27 @@ module m_surface_tension
         s_get_capilary, &
         s_finalize_surface_tension_module
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), c_divs)
+    !$acc declare link(c_divs)
+#else
     !> @name color function gradient components and magnitude
     !> @{
-    type(vector_field) :: c_divs
+    type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
     !$acc declare create(c_divs)
+#endif
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:,:), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
+    !$acc declare link(gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
+#else
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @} 
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
+#endif
 
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
@@ -55,20 +65,21 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-        @:ALLOCATE(c_divs%vf(1:num_dims + 1))
+        @:ALLOCATE_GLOBAL(c_divs(1:num_dims + 1))
 
         do j = 1,num_dims + 1
-            @:ALLOCATE(c_divs%vf(j)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(c_divs(j)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ACC_SETUP_SFs(c_divs(j)) 
         end do
+        
+        @:ALLOCATE_GLOBAL(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE_GLOBAL(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
 
-        @:ALLOCATE(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE_GLOBAL(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE_GLOBAL(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
 
-        @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-
-        @:ALLOCATE(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
-        @:ALLOCATE(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+        @:ALLOCATE_GLOBAL(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+        @:ALLOCATE_GLOBAL(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
 
     end subroutine s_initialize_surface_tension_module
 
@@ -129,7 +140,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
+                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
 
                     end do
                 end do
@@ -174,7 +185,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
+                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
 
                     end do
                 end do
@@ -219,7 +230,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
+                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
 
                     end do
                 end do
@@ -245,7 +256,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
+                    c_divs(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
                         (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l))    
                 end do
             end do
@@ -255,7 +266,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(k+1) -y_cc(k-1)) * &
+                    c_divs(2)%sf(j, k, l) = 1d0/(y_cc(k+1) -y_cc(k-1)) * &
                         (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
                 end do
             end do
@@ -266,7 +277,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs%vf(3)%sf(j, k, l) = 1d0/(z_cc(l+1) - z_cc(l-1)) * &
+                        c_divs(3)%sf(j, k, l) = 1d0/(z_cc(l+1) - z_cc(l-1)) * &
                             (q_prim_vf(c_idx)%sf(j, k, l+1) - q_prim_vf(c_idx)%sf(j, k, l-1))
                     end do
                 end do
@@ -277,15 +288,15 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(num_dims + 1)%sf(j, k, l) = 0d0
+                    c_divs(num_dims + 1)%sf(j, k, l) = 0d0
                     !s$acc loop seq
                     do i = 1, num_dims
-                        c_divs%vf(num_dims + 1)%sf(j, k, l) = &
-                            c_divs%vf(num_dims + 1)%sf(j, k, l) + &
-                            c_divs%vf(i)%sf(j, k, l) ** 2d0
+                        c_divs(num_dims + 1)%sf(j, k, l) = &
+                            c_divs(num_dims + 1)%sf(j, k, l) + &
+                            c_divs(i)%sf(j, k, l) ** 2d0
                     end do
-                    c_divs%vf(num_dims + 1)%sf(j, k, l) = &
-                        sqrt(c_divs%vf(num_dims + 1)%sf(j, k, l))
+                    c_divs(num_dims + 1)%sf(j, k, l) = &
+                        sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                 end do
             end do
         end do
@@ -296,7 +307,7 @@ contains
 
         ! reconstruct gradient components at cell boundaries
         do i = 1, num_dims
-            call s_reconstruct_cell_boundary_values_capilary(c_divs%vf, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
+            call s_reconstruct_cell_boundary_values_capilary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
 
     end subroutine s_get_capilary
@@ -310,8 +321,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(-j, k, l) = &
-                                c_divs%vf(i)%sf(0, k, l)
+                            c_divs(i)%sf(-j, k, l) = &
+                                c_divs(i)%sf(0, k, l)
                         end do
                     end do
                 end do
@@ -322,8 +333,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(-j, k, l) = &
-                                c_divs%vf(i)%sf(j - 1, k, l)
+                            c_divs(i)%sf(-j, k, l) = &
+                                c_divs(i)%sf(j - 1, k, l)
                         end do
                     end do
                 end do
@@ -334,8 +345,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(-j, k, l) = &
-                                c_divs%vf(i)%sf(0, k, l)
+                            c_divs(i)%sf(-j, k, l) = &
+                                c_divs(i)%sf(0, k, l)
                         end do
                     end do
                 end do
@@ -346,14 +357,14 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(-j, k, l) = &
-                                c_divs%vf(i)%sf(m - (j - 1), k, l)
+                            c_divs(i)%sf(-j, k, l) = &
+                                c_divs(i)%sf(m - (j - 1), k, l)
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, -1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, -1)
         end if
 
         if (bc_x%end <= -3) then !< ghost-cell extrapolation
@@ -362,8 +373,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(m + j, k, l) = &
-                                c_divs%vf(i)%sf(m, k, l)
+                            c_divs(i)%sf(m + j, k, l) = &
+                                c_divs(i)%sf(m, k, l)
                         end do
                     end do
                 end do
@@ -374,8 +385,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(m + j, k, l) = &
-                                c_divs%vf(i)%sf(m - (j - 1), k, l)
+                            c_divs(i)%sf(m + j, k, l) = &
+                                c_divs(i)%sf(m - (j - 1), k, l)
                         end do
                     end do
                 end do
@@ -386,8 +397,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(m + j, k, l) = &
-                                c_divs%vf(i)%sf(m, k, l)
+                            c_divs(i)%sf(m + j, k, l) = &
+                                c_divs(i)%sf(m, k, l)
                         end do
                     end do
                 end do
@@ -398,14 +409,14 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs%vf(i)%sf(m + j, k, l) = &
-                                c_divs%vf(i)%sf(j - 1, k, l)
+                            c_divs(i)%sf(m + j, k, l) = &
+                                c_divs(i)%sf(j - 1, k, l)
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, 1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 1, 1)
         end if
 
         if (n == 0) then
@@ -416,8 +427,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, -j, k) = &
-                                c_divs%vf(i)%sf(l, 0, k)
+                            c_divs(i)%sf(l, -j, k) = &
+                                c_divs(i)%sf(l, 0, k)
                         end do
                     end do
                 end do
@@ -428,8 +439,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, -j, k) = &
-                                c_divs%vf(i)%sf(l, j - 1, k)
+                            c_divs(i)%sf(l, -j, k) = &
+                                c_divs(i)%sf(l, j - 1, k)
                         end do
                     end do
                 end do
@@ -440,8 +451,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, -j, k) = &
-                                c_divs%vf(i)%sf(l, 0, k)
+                            c_divs(i)%sf(l, -j, k) = &
+                                c_divs(i)%sf(l, 0, k)
                         end do
                     end do
                 end do
@@ -452,14 +463,14 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, -j, k) = &
-                                c_divs%vf(i)%sf(l, n - (j - 1), k)
+                            c_divs(i)%sf(l, -j, k) = &
+                                c_divs(i)%sf(l, n - (j - 1), k)
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, -1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
         endif
 
         if (bc_y%end <= -3) then !< ghost-cell extrapolation
@@ -468,8 +479,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, n + j, k) = &
-                                c_divs%vf(i)%sf(l, n, k)
+                            c_divs(i)%sf(l, n + j, k) = &
+                                c_divs(i)%sf(l, n, k)
                         end do
                     end do
                 end do
@@ -480,8 +491,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, n + j, k) = &
-                                c_divs%vf(i)%sf(l, n - (j - 1), k)
+                            c_divs(i)%sf(l, n + j, k) = &
+                                c_divs(i)%sf(l, n - (j - 1), k)
                         end do
                     end do
                 end do
@@ -492,8 +503,8 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, n + j, k) = &
-                                c_divs%vf(i)%sf(l, n, k)
+                            c_divs(i)%sf(l, n + j, k) = &
+                                c_divs(i)%sf(l, n, k)
                         end do
                     end do
                 end do
@@ -504,14 +515,14 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(l, n + j, k) = &
-                                c_divs%vf(i)%sf(l, j - 1, k)
+                            c_divs(i)%sf(l, n + j, k) = &
+                                c_divs(i)%sf(l, j - 1, k)
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, 1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, 1)
         end if
 
         if (p == 0) then
@@ -522,8 +533,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, -j) = &
-                                c_divs%vf(i)%sf(k, l, 0)
+                            c_divs(i)%sf(k, l, -j) = &
+                                c_divs(i)%sf(k, l, 0)
                         end do
                     end do
                 end do
@@ -534,8 +545,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, -j) = &
-                                c_divs%vf(i)%sf(k, l, 0)
+                            c_divs(i)%sf(k, l, -j) = &
+                                c_divs(i)%sf(k, l, 0)
                         end do
                     end do
                 end do
@@ -546,8 +557,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                                c_divs%vf(i)%sf(k, l, -j) = &
-                                    c_divs%vf(i)%sf(k, l, j - 1)
+                                c_divs(i)%sf(k, l, -j) = &
+                                    c_divs(i)%sf(k, l, j - 1)
                         end do
                     end do
                 end do
@@ -558,14 +569,14 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, -j) = &
-                                c_divs%vf(i)%sf(k, l, p - (j - 1))
+                            c_divs(i)%sf(k, l, -j) = &
+                                c_divs(i)%sf(k, l, p - (j - 1))
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, -1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         end if
         
         if (bc_z%end <= -3) then !< ghost-cell extrapolation
@@ -574,8 +585,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, p + j) = &
-                                c_divs%vf(i)%sf(k, l, p)
+                            c_divs(i)%sf(k, l, p + j) = &
+                                c_divs(i)%sf(k, l, p)
                         end do
                     end do
                 end do
@@ -586,8 +597,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, p+j) = &
-                                c_divs%vf(i)%sf(k, l, p)
+                            c_divs(i)%sf(k, l, p+j) = &
+                                c_divs(i)%sf(k, l, p)
                         end do
                     end do
                 end do
@@ -598,8 +609,8 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, p + j) = &
-                                c_divs%vf(i)%sf(k, l, p - (j - 1))
+                            c_divs(i)%sf(k, l, p + j) = &
+                                c_divs(i)%sf(k, l, p - (j - 1))
                         end do
                     end do
                 end do
@@ -610,14 +621,14 @@ contains
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs%vf(i)%sf(k, l, p + j) = &
-                                c_divs%vf(i)%sf(k, l, j - 1)
+                            c_divs(i)%sf(k, l, p + j) = &
+                                c_divs(i)%sf(k, l, j - 1)
                         end do
                     end do
                 end do
             end do
         else
-            call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, 1)
+            call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
         endif
 
     end subroutine s_populate_capillary_buffers
@@ -701,10 +712,10 @@ contains
     subroutine s_finalize_surface_tension_module()
 
         do j = 1,num_dims
-            @:DEALLOCATE(c_divs%vf(j)%sf)
+            @:DEALLOCATE(c_divs(j)%sf)
         end do
 
-        @:DEALLOCATE(c_divs%vf)
+        @:DEALLOCATE(c_divs)
 
         @:DEALLOCATE(gL_x, gR_x)
 
