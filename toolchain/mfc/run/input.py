@@ -158,7 +158,7 @@ class MFCInputFile:
             if print:
                 cons.print("Case optimization is enabled.")
 
-            nterms = -100
+            nterms = 1
 
             bubble_model = int(self.case_dict.get("bubble_model", "-100"))
 

@@ -272,7 +272,7 @@ module m_derived_types
 
         real(kind(0d0)), dimension(3) :: loc !< Physical location of the ghost point
         real(kind(0d0)), dimension(3) :: ip_loc !< Physical location of the image point
-        real(kind(0d0)), dimension(3) :: ip_grid !< Top left grid point of IP
+        integer, dimension(3) :: ip_grid !< Top left grid point of IP
         real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
