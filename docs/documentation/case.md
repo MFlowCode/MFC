@@ -319,8 +319,9 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 | `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
+| `sigma`   | Real   | Surface tension coefficient                    |
 
-Fluid material's parameters. All parameters should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
+Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
 *: Parameters that work only with `model_eqns`=2.
 
