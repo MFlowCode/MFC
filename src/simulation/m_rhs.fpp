@@ -105,11 +105,6 @@ module m_rhs
 #endif
     !> @}
 
-    !> @name Additional field for cylindrical source terms
-    !> @{
-    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !> @}
-
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
     !$acc declare link(tau_Re_vf)
@@ -289,17 +284,17 @@ contains
             !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
         end if
 
-        if (any(Re_size > 0) .and. cyl_coord) then
-            @:ALLOCATE(tau_Re_vf(1:sys_size))
-            do i = 1, num_dims
-                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                       &  iy%beg:iy%end, &
-                                                       &  iz%beg:iz%end))
-            end do
-            @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-                                         & iy%beg:iy%end, &
-                                         & iz%beg:iz%end))
-        end if
+        @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
+        do i = 1, num_dims
+            @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                                                   &  iy%beg:iy%end, &
+                                                   &  iz%beg:iz%end))
+            @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
+        end do
+        @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+                                     & iy%beg:iy%end, &
+                                     & iz%beg:iz%end))
+        @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
 
         ! ==================================================================
 
@@ -863,21 +858,21 @@ contains
             iv%beg = momxb; iv%end = momxe
             if (weno_Re_flux) then
                 call s_reconstruct_cell_boundary_values_visc_deriv( &
-                    dq_prim_dx_qp%vf(iv%beg:iv%end), &
+                    dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
                     dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                     dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                     id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
                     ix, iy, iz)
                 if (n > 0) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
-                        dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
+                        dq_prim_dy_qp(1)%vf(iv%beg:iv%end), &
                         dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                         dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                         id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
                         ix, iy, iz)
                     if (p > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv( &
-                            dq_prim_dy_qp(1)%vf(iv%beg:iv%end), &
+                            dq_prim_dz_qp(1)%vf(iv%beg:iv%end), &
                             dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                             dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
                             id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
@@ -953,9 +948,9 @@ contains
                                                         q_prim_qp%vf, &
                                                         rhs_vf, &
                                                         flux_src_n(id)%vf, &
-                                                        dq_prim_dx_qp%vf, &
-                                                        dq_prim_dy_qp%vf, &
-                                                        dq_prim_dz_qp%vf, &
+                                                        dq_prim_dx_qp(1)%vf, &
+                                                        dq_prim_dy_qp(1)%vf, &
+                                                        dq_prim_dz_qp(1)%vf, &
                                                         ixt, iyt, izt)
             end if
             call nvtxEndRange

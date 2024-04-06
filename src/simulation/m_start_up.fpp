@@ -154,7 +154,7 @@ contains
             polydisperse, poly_sigma, qbmm, &
              relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
-            R0_type, file_per_processi, sigma
+            R0_type, file_per_process, sigma
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
