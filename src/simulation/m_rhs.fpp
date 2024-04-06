@@ -883,9 +883,9 @@ contains
                                                                q_prim_qp%vf, &
                                                                rhs_vf, &
                                                                flux_src_n(id)%vf, &
-                                                               dq_prim_dx_qp%vf, &
-                                                               dq_prim_dy_qp%vf, &
-                                                               dq_prim_dz_qp%vf, &
+                                                               dq_prim_dx_qp(1)%vf, &
+                                                               dq_prim_dy_qp(1)%vf, &
+                                                               dq_prim_dz_qp(1)%vf, &
                                                                ixt, iyt, izt)
             call nvtxEndRange
 
