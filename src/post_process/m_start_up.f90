@@ -25,7 +25,7 @@ module m_start_up
     use m_data_output           !< Procedures that write the grid and chosen flow
                                 !! variable(s) to the formatted database file(s)
 
-    use m_derived_variables     !< Procedures used to compute quantites derived
+    use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
     use m_helper
 
