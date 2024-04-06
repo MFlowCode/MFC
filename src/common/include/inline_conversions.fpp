@@ -1,9 +1,9 @@
 #:def s_compute_speed_of_sound()
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
 #ifdef CRAY_ACC_WAR
-!DIR$ INLINEALWAYS s_compute_speed_of_sound
+        !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
         real(kind(0d0)), intent(IN) :: pres
         real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf

@@ -40,7 +40,7 @@ module m_bubbles
     !$acc declare create(divu)
 
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
-!$acc declare link(rs, vs, ms, ps)
+    !$acc declare link(rs, vs, ms, ps)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
@@ -50,7 +50,7 @@ module m_bubbles
     !$acc declare create(divu)
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
-!$acc declare create(rs, vs, ms, ps)
+    !$acc declare create(rs, vs, ms, ps)
 #endif
 
 contains
