@@ -32,6 +32,8 @@ module m_riemann_solvers
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< To get the bubble wall pressure function
+
+    use m_surface_tension      !< To get the capilary fluxes
     ! ==========================================================================
 
     implicit none
@@ -1055,6 +1057,11 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
+
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
@@ -1083,6 +1090,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                    end if 
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1119,6 +1131,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
 
                                     ! Compute right star solution state
                                 else
@@ -1157,6 +1174,11 @@ contains
                                                                                     dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
@@ -2219,6 +2241,16 @@ contains
             end if
         end if
 
+        if (sigma .ne. dflt_real) then
+            call s_compute_capilary_source_flux( &
+                q_prim_vf, &
+                vel_src_rsx_vf, &
+                vel_src_rsy_vf, &
+                vel_src_rsz_vf, &
+                flux_src_vf, &
+                norm_dir, isx, isy, isz)
+        end if
+
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
@@ -2782,7 +2814,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2815,7 +2847,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2846,7 +2878,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end

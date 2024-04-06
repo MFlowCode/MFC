@@ -44,7 +44,7 @@ module m_start_up
 
     use m_qbmm                 !< Quadrature MOM
 
-    use m_derived_variables     !< Procedures used to compute quantites derived
+    use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
 
     use m_hypoelastic
@@ -70,6 +70,8 @@ module m_start_up
     use m_compile_specific
 
     use m_checker
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -149,7 +151,7 @@ contains
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
             R0_type, file_per_process, relax, relax_model, &
-            palpha_eps, ptgalpha_eps
+            palpha_eps, ptgalpha_eps, sigma
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1225,10 +1227,14 @@ contains
         if (monopole) then
             call s_initialize_monopole_module()
         end if
+
         if (any(Re_size > 0)) then
             call s_initialize_viscous_module()
         end if
+
         call s_initialize_rhs_module()
+
+        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1364,6 +1370,7 @@ contains
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
+        !$acc update device(sigma)
     
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
@@ -1397,6 +1404,8 @@ contains
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
+
+        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

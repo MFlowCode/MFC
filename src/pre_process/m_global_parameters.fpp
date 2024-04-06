@@ -96,6 +96,7 @@ module m_global_parameters
     integer :: gamma_idx                  !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                 !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                 !< Indexes of elastic shear stress eqns.
+    integer :: c_idx            !< Index of the color function
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
@@ -199,6 +200,11 @@ module m_global_parameters
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
 
+    !> @}
+
+    !> @name Surface Tension Modeling
+    !> @{
+    real(kind(0d0)) :: sigma
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -375,6 +381,9 @@ contains
         phi_nv = dflt_real
         Pe_c = dflt_real
         Tw = dflt_real
+
+        ! surface tension modeling
+        sigma = dflt_real
 
         ! Immersed Boundaries
         ib = .false.
@@ -564,6 +573,11 @@ contains
                 sys_size = stress_idx%end
             end if
 
+            if (sigma .ne. dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
             ! ==================================================================
 
             ! Volume Fraction Model (6-equation model) =========================
@@ -582,6 +596,12 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+
+            if (sigma .ne. dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
             !========================
         else if (model_eqns == 4) then
             ! 4 equation model with subgrid bubbles

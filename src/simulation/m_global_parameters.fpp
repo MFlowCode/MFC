@@ -175,6 +175,7 @@ module m_global_parameters
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    integer :: c_idx         ! Index of the color function 
     !> @}
 
     !$acc declare create(bub_idx)
@@ -335,6 +336,12 @@ module m_global_parameters
     !> @}
     !$acc declare create(monopole, mono, num_mono)
 
+    !> @name Surface tension parameters
+    !> @{
+    real(kind(0d0)) :: sigma
+    !$acc declare create(sigma)
+    !> @}
+
     integer :: momxb, momxe
     integer :: advxb, advxe
     integer :: contxb, contxe
@@ -479,6 +486,10 @@ contains
         monopole = .false.
         num_mono = 1
 
+        ! Surface tension
+        sigma = dflt_real
+
+        ! Cuda aware MPI
         cu_tensor = .false.
 
         do j = 1, num_probes_max
@@ -693,6 +704,11 @@ contains
                     sys_size = stress_idx%end
                 end if
 
+                if (sigma .ne. dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
@@ -705,6 +721,12 @@ contains
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
+
+                if (sigma .ne. dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids

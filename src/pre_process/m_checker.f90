@@ -675,6 +675,15 @@ contains
 
         end do
 
+        ! Constraints on the surface tension model
+        if (sigma .ne. dflt_real .and. model_eqns .ne. 3) then
+            ! call s_mpi_abort('Surface tension is only compatible with '// &
+            !     'model_eqns = 3. Exiting ...')
+        elseif (sigma .ne. dflt_real .and. sigma < 0d0) then
+            call s_mpi_abort('The surface tension coefficient must be' // &
+                'greater than or equal to zero. Exiting ...')
+        endif
+
         ! Moving Boundaries Checks: x boundaries
         if (any((/bc_x%vb1, bc_x%vb2, bc_x%vb3/) /= 0d0)) then
             if (bc_x%beg == 15) then
