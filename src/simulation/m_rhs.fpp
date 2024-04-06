@@ -284,17 +284,19 @@ contains
             !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
         end if
 
-        @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
-        do i = 1, num_dims
-            @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                   &  iy%beg:iy%end, &
-                                                   &  iz%beg:iz%end))
-            @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
-        end do
-        @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-                                     & iy%beg:iy%end, &
-                                     & iz%beg:iz%end))
-        @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+        if (any(Re_size > 0)) then
+            @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
+            do i = 1, num_dims
+                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                                                    &  iy%beg:iy%end, &
+                                                    &  iz%beg:iz%end))
+                @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
+            end do
+            @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+                                        & iy%beg:iy%end, &
+                                        & iz%beg:iz%end))
+            @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+        end if 
 
         ! ==================================================================
 
@@ -419,7 +421,24 @@ contains
 
             end if
 
-        end if
+        else
+            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
+
+            do l = momxb, momxe
+                @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(0, 0, 0))
+                @:ACC_SETUP_VFs(dq_prim_dx_qp(1))
+                if (n > 0) then
+                    @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf(0, 0, 0))
+                    @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
+                    if (p > 0) then
+                        @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf(0, 0, 0))
+                        @:ACC_SETUP_VFs(dq_prim_dz_qp(1))
+                    end if
+                end if
+            end do
+        end if    
         ! END: Allocation of dq_prim_ds_qp =================================
 
         ! Allocation/Association of dqK_prim_ds_n =======================
@@ -1618,8 +1637,8 @@ contains
                             rhs_vf(c_idx)%sf(j, k, l) = &
                                 rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
-                                (flux_src_n(1)%sf(j, k, l) - &
-                                    flux_src_n(1)%sf(j - 1, k, l))
+                                (flux_src_n(advxb)%sf(j, k, l) - &
+                                    flux_src_n(advxb)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -1658,20 +1677,36 @@ contains
             end if
 
             if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
-                if (p > 0) then
-                    call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                         dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
-                                                         tau_Re_vf, &
-                                                         ixt, iyt, izt)
-                else
-                    call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                         dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         tau_Re_vf, &
-                                                         ixt, iyt, izt)
+                if (any(Re_size > 0)) then
+                    if (p > 0) then
+                        call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                            dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                            tau_Re_vf, &
+                                                            ixt, iyt, izt)
+                    else
+                        call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                            dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                            tau_Re_vf, &
+                                                            ixt, iyt, izt)
+                    end if
+
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, 0, l) = &
+                                    rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
+                                    (tau_Re_vf(i)%sf(j, -1, l) &
+                                    - tau_Re_vf(i)%sf(j, 1, l))
+                            end do
+                        end do
+                    end do
+
                 end if
 
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -1689,18 +1724,6 @@ contains
                     end do
                 end do
 
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = 0, p
-                    do j = 0, m
-                        !$acc loop seq
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, 0, l) = &
-                                rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
-                                (tau_Re_vf(i)%sf(j, -1, l) &
-                                 - tau_Re_vf(i)%sf(j, 1, l))
-                        end do
-                    end do
-                end do
             else
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -1737,19 +1760,20 @@ contains
                             end do
                         end do
                     end do
-
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do l = 0, p
-                        do j = 0, m
-                            !$acc loop seq
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, 0, l) = &
-                                    rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
-                                    tau_Re_vf(i)%sf(j, 0, l)
+                    
+                    if (any(Re_size > 0)) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, 0, l) = &
+                                        rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
+                                        tau_Re_vf(i)%sf(j, 0, l)
+                                end do
                             end do
                         end do
-                    end do
-
+                    end if
                 else
 
                     !$acc parallel loop collapse(3) gang vector default(present)

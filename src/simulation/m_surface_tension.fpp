@@ -261,7 +261,7 @@ contains
                 end do
             end do
         end do
-
+        
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -333,20 +333,13 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs(i)%sf(-j, k, l) = &
-                                c_divs(i)%sf(j - 1, k, l)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_x%beg == -14) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(-j, k, l) = &
-                                c_divs(i)%sf(0, k, l)
+                            if (i == 1) then
+                                c_divs(i)%sf(-j, k, l) = &
+                                    -c_divs(i)%sf(j - 1, k, l)
+                            else
+                                c_divs(i)%sf(-j, k, l) = &
+                                    c_divs(i)%sf(j - 1, k, l)
+                            end if
                         end do
                     end do
                 end do
@@ -385,20 +378,13 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
-                            c_divs(i)%sf(m + j, k, l) = &
-                                c_divs(i)%sf(m - (j - 1), k, l)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_x%end == -14) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = 1, num_dims + 1
-                do l = 0, p
-                    do k = 0, n
-                        do j = 1, buff_size
-                            c_divs(i)%sf(m + j, k, l) = &
-                                c_divs(i)%sf(m, k, l)
+                            if (i == 1) then
+                                c_divs(i)%sf(m + j, k, l) = &
+                                    -c_divs(i)%sf(m - (j - 1), k, l)
+                            else
+                                c_divs(i)%sf(m + j, k, l) = &
+                                    c_divs(i)%sf(m - (j - 1), k, l)
+                            end if
                         end do
                     end do
                 end do
@@ -439,20 +425,13 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, -j, k) = &
-                                c_divs(i)%sf(l, j - 1, k)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%beg == -14) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, -j, k) = &
-                                c_divs(i)%sf(l, 0, k)
+                            if (i == 2) then
+                                c_divs(i)%sf(l, -j, k) = &
+                                    -c_divs(i)%sf(l, j - 1, k)
+                            else
+                                c_divs(i)%sf(l, -j, k) = &
+                                    c_divs(i)%sf(l, j - 1, k)
+                            end if
                         end do
                     end do
                 end do
@@ -491,20 +470,13 @@ contains
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, n + j, k) = &
-                                c_divs(i)%sf(l, n - (j - 1), k)
-                        end do
-                    end do
-                end do
-            end do
-        elseif (bc_y%end == -14) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do k = 0, p
-                    do j = 1, buff_size
-                        do l = -buff_size, m + buff_size
-                            c_divs(i)%sf(l, n + j, k) = &
-                                c_divs(i)%sf(l, n, k)
+                            if (i == 2) then
+                                c_divs(i)%sf(l, n + j, k) = &
+                                    -c_divs(i)%sf(l, n - (j - 1), k)
+                            else
+                                c_divs(i)%sf(l, n + j, k) = &
+                                    c_divs(i)%sf(l, n - (j - 1), k) 
+                            end if
                         end do
                     end do
                 end do
@@ -539,26 +511,19 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_z%beg == -14) then !< slip wall
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, -j) = &
-                                c_divs(i)%sf(k, l, 0)
-                        end do
-                    end do
-                end do
-            end do
         elseif (bc_z%beg == -2) then !< symmetry
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1 
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
+                            if (i == 3) then
                                 c_divs(i)%sf(k, l, -j) = &
-                                    c_divs(i)%sf(k, l, j - 1)
+                                    -c_divs(i)%sf(k, l, j - 1)
+                            else
+                                c_divs(i)%sf(k, l, -j) = &
+                                    c_divs(i)%sf(k, l, j - 1) 
+                            end if
                         end do
                     end do
                 end do
@@ -591,26 +556,19 @@ contains
                     end do
                 end do
             end do
-        else if ( bc_Z%end == -14 ) then !< slip wall
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1
-                do j = 1, buff_size
-                    do l = -buff_size, n + buff_size
-                        do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, p+j) = &
-                                c_divs(i)%sf(k, l, p)
-                        end do
-                    end do
-                end do
-            end do
         elseif (bc_z%end == -2) then !< symmetry
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
-                            c_divs(i)%sf(k, l, p + j) = &
-                                c_divs(i)%sf(k, l, p - (j - 1))
+                            if (i == 3) then
+                                c_divs(i)%sf(k, l, p + j) = &
+                                    -c_divs(i)%sf(k, l, p - (j - 1))
+                            else
+                                c_divs(i)%sf(k, l, p + j) = &
+                                    c_divs(i)%sf(k, l, p - (j - 1))
+                            end if
                         end do
                     end do
                 end do
