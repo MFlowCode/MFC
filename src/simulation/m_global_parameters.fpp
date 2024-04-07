@@ -358,7 +358,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
+!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
@@ -695,7 +695,6 @@ contains
                     sys_size = bub_idx%end
                     ! print*, 'alf idx', alf_idx
                     ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
-
 
                     if (adv_n) then
                         n_idx = bub_idx%end + 1

@@ -950,10 +950,10 @@ contains
         ! Add bubles source term
         call nvtxStartRange("RHS_bubbles")
         if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source( &
-                                                                     q_cons_qp%vf(1:sys_size), &
-                                                                     q_prim_qp%vf(1:sys_size), &
-                                                                     t_step, &
-                                                                     rhs_vf)
+            q_cons_qp%vf(1:sys_size), &
+            q_prim_qp%vf(1:sys_size), &
+            t_step, &
+            rhs_vf)
         call nvtxEndRange
         ! END: Additional pphysics and source terms ============================
 
