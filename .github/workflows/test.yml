@@ -99,21 +99,34 @@ jobs:
       run:  sudo ./mfc.sh docker ./mfc.sh test -j $(nproc) -a
 
   self:
-    name: Georgia Tech | Phoenix (NVHPC)
+    name: Self Hosted
     if: github.repository == 'MFlowCode/MFC'
     continue-on-error: true
     strategy:
       matrix:
         device: ['cpu', 'gpu']
+        lbl: ['gt', 'frontier']
+        exclude:
+          - device:   cpu
+            lbl: frontier
     runs-on:
       group:  phoenix
-      labels: gt
+      labels: ${{ matrix.lbl }}
     steps:
       - name: Clone
         uses: actions/checkout@v3
 
       - name: Build & Test
+        if:   matrix.lbl == 'gt'
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+
+      - name: Build
+        if:   matrix.lbl == 'frontier'
+        run:  bash .github/workflows/frontier/build.sh
+
+      - name: Test
+        if:   matrix.lbl == 'frontier'
+        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}}
 
       - name: Print Logs
         if:   always()

@@ -17,14 +17,8 @@ done
 
 log "Formatting MFC:"
 
-if ! find ${@:-src} -type f | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' | \
-         parallel --jobs ${JOBS:-1} -- \
-             echo      "\> {}" \&\& \
-             python3   toolchain/indenter.py "{}" \&\& \
-             fprettify "{}" --silent --indent 4 --c-relations --enable-replacements \
-                       --enable-decl --whitespace-comma 1 --whitespace-multdiv 0    \
-                       --whitespace-plusminus 1 --case 1 1 1 1 --strict-indent      \
-                       --line-length 1000\;; then
+if ! find ${@:-src} -type f | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
+        | xargs -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
     error "Formatting MFC failed."
     exit 1
 fi

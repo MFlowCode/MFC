@@ -20,10 +20,30 @@ module m_monopole
     private; public :: s_initialize_monopole_module, s_monopole_calculations, &
  s_compute_monopole_rhs
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
+    !$acc declare link(pulse, support)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_mono)
+    !$acc declare link(loc_mono)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture, support_width)
+    !$acc declare link(foc_length, aperture, support_width)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, npulse, dir, delay)
+    !$acc declare link(mag, length, npulse, dir, delay)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mono_mass_src, mono_e_src)
+    !$acc declare link(mono_mass_src, mono_e_src)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
+    !$acc declare link(mono_mom_src)
+
+#else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: loc_mono
+    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_mono
     !$acc declare create(loc_mono)
 
     real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture, support_width
@@ -39,12 +59,14 @@ module m_monopole
     !> @}
     !$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
 
+#endif
+
 contains
 
     subroutine s_initialize_monopole_module()
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
+        @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
         do i = 1, num_mono
             mag(i) = mono(i)%mag
@@ -63,9 +85,9 @@ contains
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono, support_width)
 
-        @:ALLOCATE(mono_mass_src(0:m, 0:n, 0:p))
-        @:ALLOCATE(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
-        @:ALLOCATE(mono_E_src(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(mono_mass_src(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(mono_E_src(0:m, 0:n, 0:p))
 
     end subroutine
 
@@ -321,6 +343,7 @@ contains
         !! @param mono_loc Nominal source term location
         !! @param mono_leng Length of source term in space
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
+
         !$acc routine seq
         real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
         integer, intent(IN) :: nm

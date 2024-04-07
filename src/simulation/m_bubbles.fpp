@@ -24,10 +24,24 @@ module m_bubbles
     real(kind(0.d0)) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
-    !$acc declare create(chi_vw, k_mw, rho_mw)
+!$acc declare create(chi_vw, k_mw, rho_mw)
 
+#ifdef CRAY_ACC_WAR
     !> @name Bubble dynamic source terms
     !> @{
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), bub_adv_src)
+    !$acc declare link(bub_adv_src)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+    !$acc declare link(bub_r_src, bub_v_src, bub_p_src, bub_m_src)
+
+    type(scalar_field) :: divu !< matrix for div(u)
+    !$acc declare create(divu)
+
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
+    !$acc declare link(rs, vs, ms, ps)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
@@ -37,6 +51,7 @@ module m_bubbles
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
     !$acc declare create(rs, vs, ms, ps)
+#endif
 
 contains
 
@@ -53,11 +68,11 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-        @:ALLOCATE(rs(1:nb))
-        @:ALLOCATE(vs(1:nb))
+        @:ALLOCATE_GLOBAL(rs(1:nb))
+        @:ALLOCATE_GLOBAL(vs(1:nb))
         if (.not. polytropic) then
-            @:ALLOCATE(ps(1:nb))
-            @:ALLOCATE(ms(1:nb))
+            @:ALLOCATE_GLOBAL(ps(1:nb))
+            @:ALLOCATE_GLOBAL(ms(1:nb))
         end if
 
         do l = 1, nb
@@ -75,14 +90,15 @@ contains
         end if
 
         @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        @:ACC_SETUP_SFs(divu)
 
-        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
-        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE_GLOBAL(bub_adv_src(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(bub_r_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE_GLOBAL(bub_v_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE_GLOBAL(bub_p_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
-    end subroutine
+    end subroutine s_initialize_bubbles_module
 
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
@@ -137,7 +153,7 @@ contains
 
         end if
 
-    end subroutine
+    end subroutine s_compute_bubbles_rhs
 
     !>  The purpose of this procedure is to compute the source terms
         !!      that are needed for the bubble modeling
