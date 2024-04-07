@@ -6,13 +6,26 @@
     "files.exclude": {
         "**/.git":      true,
         "**/.DS_Store": true,
-        "**/build":     true
+        "**/build":     true,
+        "*.o":          true,
+        "*.mod":        true
     },
 
     "cmake.configureOnOpen": false,
 
     "python.defaultInterpreterPath": "${workspaceFolder}/build/venv/bin/python3",
 
+    "files.associations": {
+        "*.f90": "FortranFreeForm",
+        "*.fpp": "FortranFreeForm"
+    },
+
     "fortran.preferredCase":       "lowercase",
-    "fortran.linter.includePaths": [ "${workspacefolder}/src/**" ],
+    "fortran.linter.includePaths": [
+        "${workspacefolder}/src/${fileDirname}",
+        "${workspacefolder}/src/${fileDirname}/include",
+        "${workspacefolder}/src/common",
+        "${workspacefolder}/src/common/include"
+    ],
+    "fortran.linter.extraArgs":    ["--free-form"]
 }

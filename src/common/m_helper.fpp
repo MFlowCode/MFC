@@ -204,10 +204,15 @@ contains
 
         rhol0 = rhoref
         pl0 = pref
-
+#ifdef MFC_SIMULATION
+        @:ALLOCATE_GLOBAL(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
+        @:ALLOCATE_GLOBAL(k_n(nb), k_v(nb), omegaN(nb))
+        @:ALLOCATE_GLOBAL(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
+#else
         @:ALLOCATE(pb0(nb), mass_n0(nb), mass_v0(nb), Pe_T(nb))
         @:ALLOCATE(k_n(nb), k_v(nb), omegaN(nb))
         @:ALLOCATE(Re_trans_T(nb), Re_trans_c(nb), Im_trans_T(nb), Im_trans_c(nb))
+#endif
 
         pb0(:) = dflt_real
         mass_n0(:) = dflt_real

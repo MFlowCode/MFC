@@ -177,7 +177,7 @@ contains
         !!  @param q_sf Acceleration component
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                q_prim_vf2, q_prim_vf3, q_sf) ! ----------
-
+        !DIR$ INLINEALWAYS s_derive_acceleration_component
         integer, intent(IN) :: i
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf0
@@ -202,6 +202,7 @@ contains
 
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
+                                print *, q_sf(j, k, l), q_prim_vf0(mom_idx%beg)%sf(j, k, l), fd_coeff_x(r, j), q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
                                 q_sf(j, k, l) = q_sf(j, k, l) &
                                                 + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
                                                 q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)

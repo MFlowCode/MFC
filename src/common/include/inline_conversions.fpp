@@ -1,6 +1,10 @@
 #:def s_compute_speed_of_sound()
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
-
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_compute_speed_of_sound
+#else
+        !$acc routine seq
+#endif
         real(kind(0d0)), intent(IN) :: pres
         real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
         real(kind(0d0)), intent(IN) :: H
@@ -39,7 +43,6 @@
                     (pres + pi_inf/(gamma + 1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
-
         else
             c = ((H - 5d-1*vel_sum)/gamma)
         end if
@@ -49,7 +52,6 @@
         else
             c = sqrt(c)
         end if
-
     end subroutine s_compute_speed_of_sound
 #:enddef
 
