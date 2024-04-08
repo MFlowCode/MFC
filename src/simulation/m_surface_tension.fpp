@@ -202,18 +202,18 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        w1L = gL_z(l, j, k, 1)
-                        w2L = gL_z(l, j, k, 2)
+                        w1L = gL_z(l, k, j, 1)
+                        w2L = gL_z(l, k, j, 2)
                         w3L = 0d0
-                        if (p > 0) w3L = gL_z(l, j, k, 3)
+                        if (p > 0) w3L = gL_z(l, k, j, 3)
 
-                        w1R = gR_z(l + 1, j, k, 1)
-                        w2R = gR_z(l + 1, j, k, 2)
+                        w1R = gR_z(l + 1, k, j, 1)
+                        w2R = gR_z(l + 1, k, j, 2)
                         w3R = 0d0
-                        if (p > 0) w3R = gR_z(l + 1, j, k, 3)
+                        if (p > 0) w3R = gR_z(l + 1, k, j, 3)
 
-                        normWL = gL_z(l, j, k, num_dims + 1)
-                        normWR = gR_z(l + 1, j, k, num_dims + 1)
+                        normWL = gL_z(l, k, j, num_dims + 1)
+                        normWR = gR_z(l + 1, k, j, num_dims + 1)
 
                         w1 = (w1L + w1R)/2d0
                         w2 = (w2L + w2R)/2d0
@@ -228,12 +228,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(3,i)*vSrc_rsz_vf(l, j, k, i)
+                                Omega(3,i)*vSrc_rsz_vf(l, k, j, i)
                                 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
+                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, k, j, 3)
 
                     end do
                 end do

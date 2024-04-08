@@ -794,7 +794,7 @@ contains
                                                  ix, iy, iz)
         call nvtxEndRange()
 
-        call nvtxStartRange("Surface_Tensions")
+        call nvtxStartRange("Surface_Tension")
         if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
         call nvtxEndRange
 
@@ -874,8 +874,8 @@ contains
             end if
 
             ! Reconstruct viscous derivatives for viscosity
-            iv%beg = momxb; iv%end = momxe
             if (weno_Re_flux) then
+                iv%beg = momxb; iv%end = momxe 
                 call s_reconstruct_cell_boundary_values_visc_deriv( &
                     dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
                     dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
@@ -995,7 +995,8 @@ contains
             ! END: Additional physics and source terms =========================
 
         end do
-
+        ! END: Dimensional Splitting Loop =================================
+        
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
@@ -1010,8 +1011,6 @@ contains
                 end do
             end do
         end if
-
-        ! END: Dimensional Splitting Loop =================================
 
         ! Additional Physics and Source Temrs ==================================
         ! Additions for monopole
