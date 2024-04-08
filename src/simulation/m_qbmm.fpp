@@ -457,7 +457,7 @@ contains
                                         var = verysmall
                                     end if
 
-                                    if(q <= 2) then
+                                    if (q <= 2) then
                                         AX = R - dsqrt(var)
                                     else
                                         AX = R + dsqrt(var)
@@ -469,7 +469,6 @@ contains
 
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*AX*nb_q**2)* &
                                                             (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
-
 
                                     if (q <= 2) then
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dx(j)*AX*nb_q**2*dsqrt(var)*2d0)* &
@@ -529,44 +528,44 @@ contains
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
-                                        nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                        nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        if (R2 - R**2d0 > 0d0) then
-                                            var = R2 - R**2d0
-                                        else
-                                            var = verysmall
-                                        end if
+                                    if (R2 - R**2d0 > 0d0) then
+                                        var = R2 - R**2d0
+                                    else
+                                        var = verysmall
+                                    end if
 
-                                        if(q <= 2) then
-                                            AX = R - dsqrt(var)
-                                        else
-                                            AX = R + dsqrt(var)
-                                        end if
+                                    if (q <= 2) then
+                                        AX = R - dsqrt(var)
+                                    else
+                                        AX = R + dsqrt(var)
+                                    end if
 
-                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2)* &
-                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                    rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2)* &
+                                                            (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                        if (q <= 2) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                    if (q <= 2) then
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
-                                        else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                        end if
+                                    else
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                    end if
 
                                 end do
                             end do
@@ -586,44 +585,44 @@ contains
                             do l = 0, p
                                 do k = 0, n
                                     do j = 0, m
-                                            nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                            nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                            nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                            R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            if (R2 - R**2d0 > 0d0) then
-                                                var = R2 - R**2d0
-                                            else
-                                                var = verysmall
-                                            end if
+                                        if (R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
 
-                                            if(q <= 2) then
-                                                AX = R - dsqrt(var)
-                                            else
-                                                AX = R + dsqrt(var)
-                                            end if
+                                        if (q <= 2) then
+                                            AX = R - dsqrt(var)
+                                        else
+                                            AX = R + dsqrt(var)
+                                        end if
 
-                                            nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
-                                            nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
-                                            nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
+                                        nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
+                                        nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
 
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2)* &
-                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                            if (q <= 2) then
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
-                                            else
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                            end if
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
                                     end do
                                 end do
                             end do
@@ -637,44 +636,44 @@ contains
                             do l = 0, p
                                 do k = 0, n
                                     do j = 0, m
-                                            nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                            nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                            nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                            R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            if (R2 - R**2d0 > 0d0) then
-                                                var = R2 - R**2d0
-                                            else
-                                                var = verysmall
-                                            end if
+                                        if (R2 - R**2d0 > 0d0) then
+                                            var = R2 - R**2d0
+                                        else
+                                            var = verysmall
+                                        end if
 
-                                            if(q <= 2) then
-                                                AX = R - dsqrt(var)
-                                            else
-                                                AX = R + dsqrt(var)
-                                            end if
+                                        if (q <= 2) then
+                                            AX = R - dsqrt(var)
+                                        else
+                                            AX = R + dsqrt(var)
+                                        end if
 
-                                            nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                            nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                            nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2)* &
-                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                            if (q <= 2) then
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
-                                            else
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
-                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                            end if
+                                        else
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2d0)* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
 
                                     end do
                                 end do
