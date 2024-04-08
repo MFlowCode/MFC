@@ -1,6 +1,6 @@
 #:def compute_capilary_stress_tensor()
 
-    if (normW > 1d-6) then
+    if (normW > capilary_cutoff) then
         Omega(1,1) = -sigma*(w2*w2 + w3*w3) / normW
     
         Omega(2,1) = sigma*w1*w2 / normW

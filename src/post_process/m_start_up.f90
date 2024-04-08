@@ -524,17 +524,17 @@ contains
                     -offset_y%beg:n + offset_y%end, &
                     -offset_z%beg:p + offset_z%end)
 
-            do k = -offset_z%beg, p + offset_z%end
-                do j = -offset_y%beg, n + offset_y%end
-                    do i = -offset_x%beg, m + offset_x%end
-                        if (q_sf(i,j,k) > 0.5) then
-                            q_sf(i,j,k) = 100000 + 8/0.15
-                        else
-                            q_sf(i,j,k) = 100000
-                        end if
-                    end do
-                end do
-            end do
+            !do k = -offset_z%beg, p + offset_z%end
+            !    do j = -offset_y%beg, n + offset_y%end
+            !        do i = -offset_x%beg, m + offset_x%end
+            !            if (q_sf(i,j,k) > 0.5) then
+            !                q_sf(i,j,k) = 100000 + 8/0.15
+            !            else
+            !                q_sf(i,j,k) = 100000
+            !            end if
+            !        end do
+            !    end do
+            !end do
             
             write (varname,'(A,I0)') 'color_function'
             call s_write_variable_to_formatted_database_file(varname, t_step)
