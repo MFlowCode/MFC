@@ -369,8 +369,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
@@ -478,8 +476,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -550,8 +546,6 @@ contains
         end if
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -663,8 +657,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -737,8 +729,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -809,8 +799,6 @@ contains
         end if
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then

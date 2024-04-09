@@ -33,9 +33,8 @@ module m_helper
  f_cross, &
  f_create_transform_matrix, &
  f_create_bbox, &
- s_bubble_checker, &
  s_print_2D_array
-
+   
 contains
 
     !>  The purpose of this subroutine is to compute the finite-
@@ -136,21 +135,6 @@ contains
         !print *, "nbub", ntmp
 
     end subroutine s_comp_n_from_cons
-
-    ! Check if void fraction or nR has negative value which is non-physical
-        !! @param q_cons_vf is the conservative variable
-    subroutine s_bubble_checker(q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        integer :: i !< Generic loop iterator
-
-        do i = 1, nb
-            if (any(q_cons_vf(bub_idx%rs(i))%sf < 0d0)) call s_mpi_abort("nR < 0")
-            if (any(ieee_is_nan(q_cons_vf(bub_idx%rs(i))%sf))) call s_mpi_abort("nR is NaN")
-        end do
-        if (any(q_cons_vf(alf_idx)%sf < 0d0)) call s_mpi_abort("alpha_b < 0")
-        if (any(ieee_is_nan(q_cons_vf(alf_idx)%sf))) call s_mpi_abort("alpha_b is NaN")
-
-    end subroutine s_bubble_checker
 
     subroutine s_print_2D_array(A, div)
 
