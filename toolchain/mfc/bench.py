@@ -78,7 +78,9 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
-    cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('rhs'))}[/magenta].[/bold]")
+    cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta].[/bold]")
+    cons.print(f"2x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is twice as slow as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta].[/bold]")
+    cons.print(f"0.5x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is twice as fast as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta].[/bold]")
 
     if lhs["metadata"] != rhs["metadata"]:
         def _lock_to_str(lock):
@@ -116,7 +118,7 @@ def diff():
             if target.name not in lhs_summary or target.name not in rhs_summary:
                 continue
 
-            speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
+            speedups[i] = f"{rhs_summary[target.name] / lhs_summary[target.name]:.2f}x"
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
