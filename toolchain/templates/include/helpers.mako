@@ -86,7 +86,7 @@ unset CRAY_ACC_MODULE
 cd "${MFC_ROOTDIR}"
 
 cat >>"${output_summary}" <<EOL
-${target.name}: $(echo "scale = 2; ($t_${target.name}_stop - $t_${target.name}_start)*1.0/1000000000" | bc -l)
+${target.name}: $(echo "scale = 2; ($t_${target.name}_stop - $t_${target.name}_start)/1000000000" | bc -l)
 EOL
 
 cd - > /dev/null
