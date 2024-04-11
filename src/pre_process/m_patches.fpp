@@ -1607,7 +1607,12 @@ contains
         length_x = patch_icpp(patch_id)%length_x
         length_y = patch_icpp(patch_id)%length_y
         length_z = patch_icpp(patch_id)%length_z
-
+        
+        if (.not. ib) then
+            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        end if
+        
         ! Computing the beginning and the end x-, y- and z-coordinates of
         ! the cuboid based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5d0*length_x
@@ -1645,9 +1650,17 @@ contains
                         z_boundary%beg <= cart_z .and. &
                         z_boundary%end >= cart_z &
                         .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)) &
+                        .or. &
+                        patch_id_fp(i, j, k) == smooth_patch_id) &
                         then
 
+                        if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
+                            eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                                (max(abs(x_cc(i) - x_centroid), abs(y_cc(j) - y_centroid), abs(z_cc(k) - z_centroid)) &
+                                - length_x/2d0))*(-0.5d0) + 0.5d0
+                        end if
+                        
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                                 eta, q_prim_vf, patch_id_fp)
 

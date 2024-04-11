@@ -17,8 +17,6 @@
 !!                  1) Harten-Lax-van Leer (HLL)
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
-
-#:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
 #:include 'inline_conversions.fpp'
 
@@ -35,7 +33,7 @@ module m_riemann_solvers
 
     use m_bubbles              !< To get the bubble wall pressure function
 
-    use m_surface_tension      !< To get the capilary fluxes
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -158,75 +156,39 @@ module m_riemann_solvers
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
     !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-!$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-!$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-!$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-!$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
-#endif
     !> @}
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
+    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 
     !> The cell-boundary values of the geometrical source flux that are computed
     !! through the chosen Riemann problem solver by using the left and right
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsz_vf)
-!$acc declare link( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-!$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
-#endif
     !> @}
+    !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsz_vf)
-!$acc declare link(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
-!$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
-#endif
+    !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsz_vf)
-!$acc declare link(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
-!$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
-#endif
+    !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsz_vf)
-!$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-!$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
-#endif
+    !$acc declare create(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 
     procedure(s_abstract_riemann_solver), &
         pointer :: s_riemann_solver => null() !<
@@ -243,28 +205,15 @@ module m_riemann_solvers
     type(int_bounds_info) :: is1, is2, is3
     type(int_bounds_info) :: isx, isy, isz
     !> @}
+    !$acc declare create(is1, is2, is3, isx, isy, isz)
 
-!$acc declare create(is1, is2, is3, isx, isy, isz)
-
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
-!$acc declare link(Gs)
-#else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
-!$acc declare create(Gs)
-#endif
+    !$acc declare create(Gs)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-!$acc declare link(Res)
-#else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
-#endif
+    !$acc declare create(Res)
 
 contains
-
-    @:s_compute_speed_of_sound()
 
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
@@ -356,6 +305,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
+                
                 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
                 !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
                 do l = is3%beg, is3%end
@@ -572,6 +522,8 @@ contains
                                 s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                             (pres_L - pres_R)/ &
                                             (rho_avg*c_avg))
+                            else if (wave_speeds == 3) then
+                                
                             end if
 
                             s_M = min(0d0, s_L); s_P = max(0d0, s_R)
@@ -906,16 +858,15 @@ contains
             flux_vf, flux_src_vf, &
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
-
+        
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
-
+!$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
+!$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1107,12 +1058,12 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
-
+                                    
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
-
+                                    
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
@@ -1226,12 +1177,12 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
-                                    if (sigma .ne. dflt_real) then
-                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
-                                    end if
-
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+                                    
+                                    if (sigma .ne. dflt_Real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qR_prim_rs${XYZ}$_vf(j+1, k, l, c_idx)*s_S
+                                    end if
 
                                 end if
 
@@ -1954,7 +1905,7 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2258,7 +2209,6 @@ contains
 
                                     end if
                                 #:endif
-
                             end do
                         end do
                     end do
@@ -2319,7 +2269,7 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
+        allocate (Gs(1:num_fluids))
 
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
@@ -2327,7 +2277,7 @@ contains
         !$acc update device(Gs)
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
+            allocate (Res(1:2, 1:maxval(Re_size)))
         end if
 
         if (any(Re_size > 0)) then
@@ -2338,8 +2288,6 @@ contains
             end do
             !$acc update device(Res, Re_idx, Re_size)
         end if
-
-        !$acc enter data copyin(is1, is2, is3, isx, isy, isz)
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -2360,82 +2308,88 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE_GLOBAL(flux_rsx_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsx_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsx_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsx_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+        allocate (flux_rsx_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsx_vf(is1%beg:is1%end, &
+                                   is2%beg:is2%end, &
+                                   is3%beg:is3%end, 1:sys_size))
+        allocate (flux_src_rsx_vf(is1%beg:is1%end, &
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
+        allocate (vel_src_rsx_vf(is1%beg:is1%end, &
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsx_vf(is1%beg:is1%end, &
-                is2%beg:is2%end, &
-                is3%beg:is3%end, 1:2))
+            allocate (Re_avg_rsx_vf(is1%beg:is1%end, &
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
-        if (n == 0) return
+        if (n == 0) then
+            allocate (vel_src_rsy_vf(0,0,0,0))
+            return
+        end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        @:ALLOCATE_GLOBAL(flux_rsy_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsy_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsy_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsy_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+        allocate (flux_rsy_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsy_vf(is1%beg:is1%end, &
+                                   is2%beg:is2%end, &
+                                   is3%beg:is3%end, 1:sys_size))
+        allocate (flux_src_rsy_vf(is1%beg:is1%end, &
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
+        allocate (vel_src_rsy_vf(is1%beg:is1%end, &
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsy_vf(is1%beg:is1%end, &
-                is2%beg:is2%end, &
-                is3%beg:is3%end, 1:2))
+            allocate (Re_avg_rsy_vf(is1%beg:is1%end, &
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
-        if (p == 0) return
+        if (p == 0) then
+            allocate (vel_src_rsz_vf(0,0,0,0))
+            return
+        end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        @:ALLOCATE_GLOBAL(flux_rsz_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsz_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsz_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsz_vf(is1%beg:is1%end, &
-            is2%beg:is2%end, &
-            is3%beg:is3%end, 1:num_dims))
+        allocate (flux_rsz_vf(is1%beg:is1%end, &
+                              is2%beg:is2%end, &
+                              is3%beg:is3%end, 1:sys_size))
+        allocate (flux_gsrc_rsz_vf(is1%beg:is1%end, &
+                                   is2%beg:is2%end, &
+                                   is3%beg:is3%end, 1:sys_size))
+        allocate (flux_src_rsz_vf(is1%beg:is1%end, &
+                                  is2%beg:is2%end, &
+                                  is3%beg:is3%end, advxb:sys_size))
+        allocate (vel_src_rsz_vf(is1%beg:is1%end, &
+                                 is2%beg:is2%end, &
+                                 is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            allocate (mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsz_vf(is1%beg:is1%end, &
-                is2%beg:is2%end, &
-                is3%beg:is3%end, 1:2))
+            allocate (Re_avg_rsz_vf(is1%beg:is1%end, &
+                                    is2%beg:is2%end, &
+                                    is3%beg:is3%end, 1:2))
         end if
 
     end subroutine s_initialize_riemann_solvers_module ! -------------------
@@ -2502,8 +2456,6 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
         end if
 
-        !$acc update device(is1, is2, is3)
-
         if (hypoelasticity) then
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
@@ -2515,8 +2467,8 @@ contains
         end if
 
         isx = ix; isy = iy; isz = iz
-        !$acc update device(isx, isy, isz) ! for stuff in the same module
-        !$acc update device(dir_idx, dir_flg,  dir_idx_tau) ! for stuff in different modules
+
+        !$acc update device(is1, is2, is3, dir_idx, dir_flg, isx, isy, isz, dir_idx_tau)
 
         ! Population of Buffers in x-direction =============================
         if (norm_dir == 1) then
@@ -2870,7 +2822,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2903,7 +2855,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2934,7 +2886,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
@@ -3986,6 +3938,8 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
 
+    @:s_compute_speed_of_sound()
+
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
         !!  @param flux_vf       Intercell fluxes
@@ -4175,40 +4129,40 @@ contains
         ! s_convert_to_mixture_variables => null()
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)
+            deallocate (Re_avg_rsx_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsx_vf)
+        deallocate (vel_src_rsx_vf)
+        deallocate (flux_rsx_vf)
+        deallocate (flux_src_rsx_vf)
+        deallocate (flux_gsrc_rsx_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsx_vf)
+            deallocate (mom_sp_rsx_vf)
         end if
 
         if (n == 0) return
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsy_vf)
+            deallocate (Re_avg_rsy_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsy_vf)
+        deallocate (vel_src_rsy_vf)
+        deallocate (flux_rsy_vf)
+        deallocate (flux_src_rsy_vf)
+        deallocate (flux_gsrc_rsy_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsy_vf)
+            deallocate (mom_sp_rsy_vf)
         end if
 
         if (p == 0) return
 
         if (Re_size(1) > 0) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsz_vf)
+            deallocate (Re_avg_rsz_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsz_vf)
+        deallocate (vel_src_rsz_vf)
+        deallocate (flux_rsz_vf)
+        deallocate (flux_src_rsz_vf)
+        deallocate (flux_gsrc_rsz_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
+            deallocate (mom_sp_rsz_vf)
         end if
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
