@@ -890,6 +890,8 @@ contains
             y_centroid = patch_icpp(patch_id)%y_centroid
             length_x = patch_icpp(patch_id)%length_x
             length_y = patch_icpp(patch_id)%length_y
+            smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         else
             x_centroid = patch_ib(patch_id)%x_centroid
             y_centroid = patch_ib(patch_id)%y_centroid
@@ -916,14 +918,22 @@ contains
         ! variables of the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. &
+                if ((x_boundary%beg <= x_cc(i) .and. &
                     x_boundary%end >= x_cc(i) .and. &
                     y_boundary%beg <= y_cc(j) .and. &
                     y_boundary%end >= y_cc(j) &
                     .and. &
                     patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    .or. &
+                    patch_id_fp(i, j, 0) == smooth_patch_id) &
                     then
-
+                    
+                    if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
+                        eta = tanh(smooth_coeff/min(dx, dy)* &
+                            (max(abs(x_cc(i) - x_centroid), abs(y_cc(j) - y_centroid)) &
+                            - length_x/2d0))*(-0.5d0) + 0.5d0
+                    end if
+                    
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                             eta, q_prim_vf, patch_id_fp)
 
