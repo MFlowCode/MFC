@@ -573,7 +573,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (sigma .ne. dflt_real) then
+            if (sigma /= dflt_real) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -597,7 +597,7 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
 
-            if (sigma .ne. dflt_real) then
+            if (sigma /= dflt_real) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if

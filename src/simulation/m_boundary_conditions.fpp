@@ -19,7 +19,7 @@ module m_boundary_conditions
     implicit none
 
     private; public :: s_populate_primitive_variables_buffers, &
-        s_populate_capillary_buffers
+ s_populate_capillary_buffers
 
 contains
 
@@ -1352,7 +1352,7 @@ contains
         integer :: i, j, k, l
 
         ! x - direction
-        if (bc_x%beg <= -3) then !< ghost cell extrapolation   
+        if (bc_x%beg <= -3) then !< ghost cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -1487,7 +1487,7 @@ contains
             end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 2, -1)
-        endif
+        end if
 
         if (bc_y%end <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -1512,7 +1512,7 @@ contains
                                     -c_divs(i)%sf(l, n - (j - 1), k)
                             else
                                 c_divs(i)%sf(l, n + j, k) = &
-                                    c_divs(i)%sf(l, n - (j - 1), k) 
+                                    c_divs(i)%sf(l, n - (j - 1), k)
                             end if
                         end do
                     end do
@@ -1550,7 +1550,7 @@ contains
             end do
         elseif (bc_z%beg == -2) then !< symmetry
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims + 1 
+            do i = 1, num_dims + 1
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
@@ -1559,7 +1559,7 @@ contains
                                     -c_divs(i)%sf(k, l, j - 1)
                             else
                                 c_divs(i)%sf(k, l, -j) = &
-                                    c_divs(i)%sf(k, l, j - 1) 
+                                    c_divs(i)%sf(k, l, j - 1)
                             end if
                         end do
                     end do
@@ -1580,7 +1580,7 @@ contains
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, -1)
         end if
-        
+
         if (bc_z%end <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
@@ -1624,7 +1624,7 @@ contains
             end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs, 3, 1)
-        endif
+        end if
 
     end subroutine s_populate_capillary_buffers
 

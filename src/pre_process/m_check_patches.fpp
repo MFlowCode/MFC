@@ -116,6 +116,9 @@ contains
                              patch_icpp(i)%geometry == 4 .or. &
                              patch_icpp(i)%geometry == 5 .or. &
                              patch_icpp(i)%geometry == 8 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 9 .or. &
                              patch_icpp(i)%geometry == 10 .or. &
                              patch_icpp(i)%geometry == 11 .or. &
                              patch_icpp(i)%geometry == 12)) then
@@ -208,6 +211,12 @@ contains
                              'geometric parameters of rectangle '// &
                              'patch '//trim(iStr)//'. Exiting ...')
 
+        end if
+
+        if (patch_icpp(patch_id)%smoothen .and. &
+            (patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y)) then
+            call s_mpi_abort('Patch smoothing of retangle patch '//trim(iStr)// &
+                             'requires the patch to be a square. Exiting ...')
         end if
 
     end subroutine s_check_rectangle_patch_geometry ! ----------------------
@@ -473,6 +482,17 @@ contains
                              'geometric parameters of cuboid '// &
                              'patch '//trim(iStr)//'. Exiting ...')
 
+        end if
+
+        if (patch_icpp(patch_id)%smoothen .and. &
+            ((patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y) &
+             .or. &
+             (patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y) &
+             .or. &
+             (patch_icpp(patch_id)%length_y /= patch_icpp(patch_id)%length_z))) &
+            then
+            call s_mpi_abort('Patch smoothing of cuboid patch '//trim(iStr)// &
+                             'requires the patch to be a cube. Exiting ...')
         end if
 
     end subroutine s_check_cuboid_patch_geometry ! -------------------------

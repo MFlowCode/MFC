@@ -520,9 +520,9 @@ contains
         ! Adding the color function to formatted database file
         if (cf_wrt) then
             q_sf = q_cons_vf(c_idx)%sf( &
-                    -offset_x%beg:m + offset_x%end, &
-                    -offset_y%beg:n + offset_y%end, &
-                    -offset_z%beg:p + offset_z%end)
+                   -offset_x%beg:m + offset_x%end, &
+                   -offset_y%beg:n + offset_y%end, &
+                   -offset_z%beg:p + offset_z%end)
 
             !do k = -offset_z%beg, p + offset_z%end
             !    do j = -offset_y%beg, n + offset_y%end
@@ -535,8 +535,8 @@ contains
             !        end do
             !    end do
             !end do
-            
-            write (varname,'(A,I0)') 'color_function'
+
+            write (varname, '(A,I0)') 'color_function'
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
 

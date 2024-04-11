@@ -35,9 +35,9 @@ module m_mpi_proxy
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_send)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_recv)
-!$acc declare link(q_cons_buff_recv, q_cons_buff_send)
-!$acc declare link(ib_buff_send, ib_buff_recv)
-!$acc declare link(c_divs_buff_send, c_divs_buff_recv)
+    !$acc declare link(q_cons_buff_recv, q_cons_buff_send)
+    !$acc declare link(ib_buff_send, ib_buff_recv)
+    !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
 #else
     real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
@@ -78,7 +78,6 @@ module m_mpi_proxy
     integer, private :: err_code, ierr, v_size
     !> @}
     !$acc declare create(v_size)
-    
 
     !real :: s_time, e_time
     !real :: compress_time, mpi_time, decompress_time
@@ -137,7 +136,7 @@ contains
             v_size = sys_size
         end if
 
-        if (sigma .ne. dflt_real) then
+        if (sigma /= dflt_real) then
             if (n > 0) then
                 if (p > 0) then
                     @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
@@ -152,7 +151,7 @@ contains
             else
                 @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
             end if
-    
+
             @:ALLOCATE_GLOBAL(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
         !$acc update device(v_size)
@@ -3252,7 +3251,7 @@ contains
 
     subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
 
-        type(scalar_field), dimension(num_dims+1), intent(INOUT) :: c_divs_vf
+        type(scalar_field), dimension(num_dims + 1), intent(INOUT) :: c_divs_vf
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
 
@@ -3266,12 +3265,12 @@ contains
                 if (bc_x%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_x%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
                                 do i = 1, num_dims + 1
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j - m - 1) + buff_size*((k + 1) + (n + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
                                 end do
@@ -3283,20 +3282,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
 
@@ -3305,10 +3304,10 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3319,12 +3318,12 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_x%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, num_dims+1
-                                    r = (i - 1) + (num_dims+1)* &
+                                do i = 1, num_dims + 1
+                                    r = (i - 1) + (num_dims + 1)* &
                                         (j + buff_size*(k + (n + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
                                 end do
@@ -3336,31 +3335,31 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-!$acc update host(c_divs_buff_send)
+                        !$acc update host(c_divs_buff_send)
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3377,12 +3376,12 @@ contains
 #endif
 
                 ! Unpacking buffer received from bc_x%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
                 do l = 0, p
                     do k = 0, n
                         do j = -buff_size, -1
                             do i = 1, num_dims + 1
-                                r = (i - 1) + (num_dims+1)* &
+                                r = (i - 1) + (num_dims + 1)* &
                                     (j + buff_size*((k + 1) + (n + 1)*l))
                                 c_divs_vf(i)%sf(j, k, l) = c_divs_buff_recv(r)
                             end do
@@ -3394,13 +3393,13 @@ contains
 
                 if (bc_x%beg >= 0) then      ! PBC at the end and beginning
 
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     ! Packing buffer to be sent to bc_x%beg
                     do l = 0, p
                         do k = 0, n
                             do j = 0, buff_size - 1
-                                do i = 1, num_dims+1
-                                    r = (i - 1) + (num_dims+1)* &
+                                do i = 1, num_dims + 1
+                                    r = (i - 1) + (num_dims + 1)* &
                                         (j + buff_size*(k + (n + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
                                 end do
@@ -3412,30 +3411,30 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-                        
+
                         !$acc update host(c_divs_buff_send)
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3446,12 +3445,12 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_x%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, n
                             do j = m - buff_size + 1, m
-                                do i = 1, num_dims+1
-                                    r = (i - 1) + (num_dims+1)* &
+                                do i = 1, num_dims + 1
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j - m - 1) + buff_size*((k + 1) + (n + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
                                 end do
@@ -3463,31 +3462,31 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-            
+
                         !$acc update host(c_divs_buff_send)
-                        
+
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(n + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(n + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3502,12 +3501,12 @@ contains
                 end if
 
                 ! Unpacking buffer received from bc_x%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
                 do l = 0, p
                     do k = 0, n
                         do j = m + 1, m + buff_size
-                            do i = 1, num_dims+1
-                                r = (i - 1) + (num_dims+1)* &
+                            do i = 1, num_dims + 1
+                                r = (i - 1) + (num_dims + 1)* &
                                     ((j - m - 1) + buff_size*(k + (n + 1)*l))
                                 c_divs_vf(i)%sf(j, k, l) = c_divs_buff_recv(r)
                             end do
@@ -3526,12 +3525,12 @@ contains
                 if (bc_y%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_y%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, p
                             do k = n - buff_size + 1, n
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k - n + buff_size - 1) + buff_size*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3544,20 +3543,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
-                        
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
 
@@ -3566,13 +3565,13 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                            
+
 #if defined(_OPENACC) && defined(__PGI)
                     end if
 #endif
@@ -3580,12 +3579,12 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_y%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, p
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3598,20 +3597,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
 
@@ -3620,10 +3619,10 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3640,12 +3639,12 @@ contains
 #endif
 
                 ! Unpacking buffer received from bc_y%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                do i = 1, num_dims+1
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                do i = 1, num_dims + 1
                     do l = 0, p
                         do k = -buff_size, -1
                             do j = -buff_size, m + buff_size
-                                r = (i - 1) + (num_dims+1)* &
+                                r = (i - 1) + (num_dims + 1)* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + buff_size*l))
                                 c_divs_vf(i)%sf(j, k, l) = c_divs_buff_recv(r)
@@ -3659,12 +3658,12 @@ contains
                 if (bc_y%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_y%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, p
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3677,20 +3676,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
 
@@ -3699,10 +3698,10 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3713,12 +3712,12 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_y%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, p
                             do k = n - buff_size + 1, n
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k - n + buff_size - 1) + buff_size*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3731,20 +3730,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
 
@@ -3753,10 +3752,10 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(p + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(p + 1), &
                             MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3773,12 +3772,12 @@ contains
 #endif
 
                 ! Unpacking buffer received form bc_y%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                do i = 1, num_dims+1
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                do i = 1, num_dims + 1
                     do l = 0, p
                         do k = n + 1, n + buff_size
                             do j = -buff_size, m + buff_size
-                                r = (i - 1) + (num_dims+1)* &
+                                r = (i - 1) + (num_dims + 1)* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k - n - 1) + buff_size*l))
                                 c_divs_vf(i)%sf(j, k, l) = c_divs_buff_recv(r)
@@ -3798,12 +3797,12 @@ contains
                 if (bc_z%end >= 0) then      ! PBC at the beginning and end
 
                     ! Packing buffer to be sent to bc_z%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = p - buff_size + 1, p
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l - p + buff_size - 1)))
@@ -3817,32 +3816,32 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-                        
+
                         !$acc update host(c_divs_buff_send)
-                        
+
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3853,12 +3852,12 @@ contains
                 else                        ! PBC at the beginning only
 
                     ! Packing buffer to be sent to bc_z%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3871,32 +3870,32 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-            
+
                         !$acc update host(c_divs_buff_send)
-                        
+
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -3913,12 +3912,12 @@ contains
 #endif
 
                 ! Unpacking buffer from bc_z%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                do i = 1, num_dims+1
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                do i = 1, num_dims + 1
                     do l = -buff_size, -1
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                r = (i - 1) + (num_dims+1)* &
+                                r = (i - 1) + (num_dims + 1)* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l + buff_size)))
@@ -3933,12 +3932,12 @@ contains
                 if (bc_z%beg >= 0) then      ! PBC at the end and beginning
 
                     ! Packing buffer to be sent to bc_z%beg
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                     c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l)
@@ -3951,20 +3950,20 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
                         !$acc update host(c_divs_buff_send)
@@ -3972,13 +3971,13 @@ contains
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                        
+
 #if defined(_OPENACC) && defined(__PGI)
                     end if
 #endif
@@ -3986,12 +3985,12 @@ contains
                 else                        ! PBC at the end only
 
                     ! Packing buffer to be sent to bc_z%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, num_dims+1
+                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                    do i = 1, num_dims + 1
                         do l = p - buff_size + 1, p
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
-                                    r = (i - 1) + (num_dims+1)* &
+                                    r = (i - 1) + (num_dims + 1)* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l - p + buff_size - 1)))
@@ -4005,31 +4004,31 @@ contains
 
 #if defined(_OPENACC) && defined(__PGI)
                     if (cu_mpi) then
-!$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
+                        !$acc host_data use_device( c_divs_buff_recv, c_divs_buff_send )
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-!$acc end host_data
-!$acc wait
+                        !$acc end host_data
+                        !$acc wait
                     else
 #endif
-!$acc update host(c_divs_buff_send)
+                        !$acc update host(c_divs_buff_send)
 
                         ! Send/receive buffer to/from bc_x%end/bc_x%beg
                         call MPI_SENDRECV( &
                             c_divs_buff_send(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 0, &
                             c_divs_buff_recv(0), &
-                            buff_size*(num_dims+1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
+                            buff_size*(num_dims + 1)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1), &
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -4046,12 +4045,12 @@ contains
 #endif
 
                 ! Unpacking buffer received from bc_z%end
-!$acc parallel loop collapse(4) gang vector default(present) private(r)
-                do i = 1, num_dims+1
+                !$acc parallel loop collapse(4) gang vector default(present) private(r)
+                do i = 1, num_dims + 1
                     do l = p + 1, p + buff_size
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
-                                r = (i - 1) + (num_dims+1)* &
+                                r = (i - 1) + (num_dims + 1)* &
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l - p - 1)))
@@ -4079,7 +4078,7 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (sigma .ne. dflt_real) then
+        if (sigma /= dflt_real) then
             @:DEALLOCATE(c_divs_buff_send, c_divs_buff_recv)
         end if
 

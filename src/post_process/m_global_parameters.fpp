@@ -481,7 +481,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (sigma .ne. dflt_real) then
+            if (sigma /= dflt_real) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -507,7 +507,7 @@ contains
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
-            if (sigma .ne. dflt_real) then
+            if (sigma /= dflt_real) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if

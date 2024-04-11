@@ -1108,7 +1108,7 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
-                                    if (sigma .ne. dflt_real) then
+                                    if (sigma /= dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
@@ -1142,10 +1142,10 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
 
-                                    if (sigma .ne. dflt_real) then
+                                    if (sigma /= dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
-                                    end if 
+                                    end if
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1183,7 +1183,7 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
-                                    if (sigma .ne. dflt_real) then
+                                    if (sigma /= dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
@@ -1226,7 +1226,7 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
-                                    if (sigma .ne. dflt_real) then
+                                    if (sigma /= dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
@@ -2293,7 +2293,7 @@ contains
             end if
         end if
 
-        if (sigma .ne. dflt_real) then
+        if (sigma /= dflt_real) then
             call s_compute_capilary_source_flux( &
                 q_prim_vf, &
                 vel_src_rsx_vf, &
@@ -2870,7 +2870,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. (sigma /= dflt_real)) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2903,7 +2903,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. (sigma /= dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2934,7 +2934,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0) .or. (sigma /= dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end

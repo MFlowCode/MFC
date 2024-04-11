@@ -979,7 +979,7 @@ contains
 
         end if
 
-    end subroutine s_get_viscous 
+    end subroutine s_get_viscous
 
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)

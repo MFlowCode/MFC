@@ -24,9 +24,9 @@ module m_surface_tension
     implicit none
 
     private; public :: s_initialize_surface_tension_module, &
-        s_compute_capilary_source_flux, &
-        s_get_capilary, &
-        s_finalize_surface_tension_module
+ s_compute_capilary_source_flux, &
+ s_get_capilary, &
+ s_finalize_surface_tension_module
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), c_divs)
@@ -45,15 +45,15 @@ module m_surface_tension
 #else
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
-    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
-    !> @} 
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
+    !> @}
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 #endif
 
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
 
-    integer :: j, k, l, i  
+    integer :: j, k, l, i
 
 contains
 
@@ -69,17 +69,17 @@ contains
 
         @:ALLOCATE_GLOBAL(c_divs(1:num_dims + 1))
 
-        do j = 1,num_dims + 1
+        do j = 1, num_dims + 1
             @:ALLOCATE(c_divs(j)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-            @:ACC_SETUP_SFs(c_divs(j)) 
+            @:ACC_SETUP_SFs(c_divs(j))
         end do
-        
+
         @:ALLOCATE_GLOBAL(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE_GLOBAL(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
 
         @:ALLOCATE_GLOBAL(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE_GLOBAL(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-        
+
         if (p > 0) then
             @:ALLOCATE_GLOBAL(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
             @:ALLOCATE_GLOBAL(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
@@ -93,9 +93,9 @@ contains
 
         type(int_bounds_info) :: isx, isy, isz
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsz_vf
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsx_vf
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsy_vf
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
@@ -104,7 +104,7 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
-        
+
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
             !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
@@ -135,15 +135,15 @@ contains
                         do i = 1, num_dims
 
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                             Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
 
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
 
                     end do
                 end do
@@ -180,15 +180,15 @@ contains
                         do i = 1, num_dims
 
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
-                                
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                             Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
+
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
 
                     end do
                 end do
@@ -225,15 +225,15 @@ contains
                         do i = 1, num_dims
 
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(3,i)*vSrc_rsz_vf(l, k, j, i)
-                                
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                             Omega(3, i)*vSrc_rsz_vf(l, k, j, i)
+
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, k, j, 3)
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
 
                     end do
                 end do
@@ -259,18 +259,18 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
-                        (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l))    
+                    c_divs(1)%sf(j, k, l) = 1d0/(x_cc(j + 1) - x_cc(j - 1))* &
+                                            (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
         end do
-        
+
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(2)%sf(j, k, l) = 1d0/(y_cc(k+1) -y_cc(k-1)) * &
-                        (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
+                    c_divs(2)%sf(j, k, l) = 1d0/(y_cc(k + 1) - y_cc(k - 1))* &
+                                            (q_prim_vf(c_idx)%sf(j, k + 1, l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
         end do
@@ -280,8 +280,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs(3)%sf(j, k, l) = 1d0/(z_cc(l+1) - z_cc(l-1)) * &
-                            (q_prim_vf(c_idx)%sf(j, k, l+1) - q_prim_vf(c_idx)%sf(j, k, l-1))
+                        c_divs(3)%sf(j, k, l) = 1d0/(z_cc(l + 1) - z_cc(l - 1))* &
+                                                (q_prim_vf(c_idx)%sf(j, k, l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -296,7 +296,7 @@ contains
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = &
                             c_divs(num_dims + 1)%sf(j, k, l) + &
-                            c_divs(i)%sf(j, k, l) ** 2d0
+                            c_divs(i)%sf(j, k, l)**2d0
                     end do
                     c_divs(num_dims + 1)%sf(j, k, l) = &
                         sqrt(c_divs(num_dims + 1)%sf(j, k, l))
@@ -316,11 +316,11 @@ contains
     end subroutine s_get_capilary
 
     subroutine s_reconstruct_cell_boundary_values_capilary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                             norm_dir)
+                                                           norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
@@ -349,20 +349,20 @@ contains
         !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end 
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            end do
+            !$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-                !$acc end parallel loop
+            end do
+            !$acc end parallel loop
         else if (recon_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -375,7 +375,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -393,7 +393,7 @@ contains
 
     subroutine s_finalize_surface_tension_module()
 
-        do j = 1,num_dims
+        do j = 1, num_dims
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 
