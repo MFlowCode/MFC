@@ -162,14 +162,14 @@ module m_riemann_solvers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-!$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-!$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
+    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-!$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-!$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
+    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #endif
     !> @}
 
@@ -181,12 +181,12 @@ module m_riemann_solvers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsz_vf)
-!$acc declare link( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
+    !$acc declare link( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
-!$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
+    !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 #endif
     !> @}
 
@@ -196,36 +196,36 @@ module m_riemann_solvers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsz_vf)
-!$acc declare link(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
+    !$acc declare link(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
-!$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
+    !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsz_vf)
-!$acc declare link(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
+    !$acc declare link(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
-!$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
+    !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsz_vf)
-!$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
+    !$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
-!$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
+    !$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 #endif
 
     procedure(s_abstract_riemann_solver), &
@@ -248,18 +248,18 @@ module m_riemann_solvers
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
-!$acc declare link(Gs)
+    !$acc declare link(Gs)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
-!$acc declare create(Gs)
+    !$acc declare create(Gs)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-!$acc declare link(Res)
+    !$acc declare link(Res)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+    !$acc declare create(Res)
 #endif
 
 contains

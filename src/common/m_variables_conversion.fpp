@@ -86,19 +86,19 @@ module m_variables_conversion
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
     @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-!$acc declare link(bubrs, Gs, Res)
+    !$acc declare link(bubrs, Gs, Res)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(bubrs, Gs, Res)
+    !$acc declare create(bubrs, Gs, Res)
 #endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
@@ -458,7 +458,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -540,7 +540,7 @@ contains
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
-!$acc routine seq
+        !$acc routine seq
 #endif
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K, qv_K

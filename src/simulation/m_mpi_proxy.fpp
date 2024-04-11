@@ -155,6 +155,7 @@ contains
     
             @:ALLOCATE_GLOBAL(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
+        !$acc update device(v_size)
 
 #endif
 

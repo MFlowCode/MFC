@@ -28,10 +28,10 @@ module m_viscous
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
-!$acc declare link(Res_viscous)
+    !$acc declare link(Res_viscous)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
-!$acc declare create(Re_viscous)
+    !$acc declare create(Re_viscous)
 #endif
 
 contains

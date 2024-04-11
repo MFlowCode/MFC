@@ -37,7 +37,7 @@ module m_monopole
     !$acc declare link(mono_mass_src, mono_e_src)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
-!$acc declare link(mono_mom_src)
+    !$acc declare link(mono_mom_src)
 
 #else
     integer, allocatable, dimension(:) :: pulse, support
@@ -57,7 +57,7 @@ module m_monopole
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
     !> @}
-!$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
+    !$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
 
 #endif
 
