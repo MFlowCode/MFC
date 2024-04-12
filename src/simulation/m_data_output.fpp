@@ -1170,7 +1170,7 @@ contains
                                 nR3 = nR3 + weight(s)*(nR(s)**3d0)
                             end do
 
-                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                            nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
                         end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
@@ -1262,7 +1262,7 @@ contains
                                     nR3 = nR3 + weight(s)*(nR(s)**3d0)
                                 end do
 
-                                nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                                nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
                             end if
 
                             R(:) = nR(:)/nbub
