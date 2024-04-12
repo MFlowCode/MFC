@@ -64,13 +64,13 @@ fi
 
 cd "${os.path.dirname(input)}"
 
-t_${target.name}_start=$(date +%s%n)
+t_${target.name}_start=$(date +%s)
 </%def>
 
 <%def name="run_epilogue(target)">
 code=$?
 
-t_${target.name}_stop=$(date +%s%n)
+t_${target.name}_stop=$(date +%s)
 
 if [ $code -ne 0 ]; then
     echo
@@ -86,7 +86,7 @@ unset CRAY_ACC_MODULE
 cd "${MFC_ROOTDIR}"
 
 cat >>"${output_summary}" <<EOL
-${target.name}: $(echo "scale = 2; ($t_${target.name}_stop - $t_${target.name}_start)/1000000000" | bc -l)
+${target.name}: $(expr $t_${target.name}_stop - $t_${target.name}_start)
 EOL
 
 cd - > /dev/null
