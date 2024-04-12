@@ -339,8 +339,8 @@ contains
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-                            d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
-                            d1 = DSQRT((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
+                            d0 = dsqrt((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
+                            d1 = dsqrt((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
                             if (d0 < 1d-5 .or. d1 < 1d-5) then
                                 h0 = 1d-6
                             else
@@ -355,7 +355,7 @@ contains
                                                  bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-                            d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
+                            d2 = dsqrt(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
 
                             ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
                             !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
@@ -412,7 +412,7 @@ contains
                                             /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
                                     err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                                             /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-                                    err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
+                                    err = dsqrt((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
 
                                     ! Determine acceptance/rejection and update step size
                                     if ((err <= 1d0) .and. myR_tmp(4) > 0d0) then
@@ -545,7 +545,7 @@ contains
         tmp = (fCpinf/(1.d0 + fBtait) + 1.d0)**((fntait - 1.d0)/fntait)
         tmp = fntait*(1.d0 + fBtait)*tmp
 
-        f_cgas = DSQRT(tmp + (fntait - 1.d0)*fH)
+        f_cgas = dsqrt(tmp + (fntait - 1.d0)*fH)
 
     end function f_cgas
 
@@ -649,7 +649,7 @@ contains
             ! Keller-Miksis bubbles
             fCpinf = fP
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            c_liquid = DSQRT(fntait*(fP + fBtait)/(fRho*(1.d0 - alf)))
+            c_liquid = dsqrt(fntait*(fP + fBtait)/(fRho*(1.d0 - alf)))
             f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
