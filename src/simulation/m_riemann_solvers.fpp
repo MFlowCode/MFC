@@ -1228,7 +1228,7 @@ contains
 
                                     if (sigma /= dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
                                     end if
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
