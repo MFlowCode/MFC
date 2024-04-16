@@ -12,8 +12,7 @@ cmake_minimum_required(VERSION 3.20)
 # We include C as a language because - for some reason -
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
 
-project(MFC LANGUAGES C Fortran)
-
+project(MFC LANGUAGES C CXX Fortran)
 
 # Build options exposed to users and their default values.
 
@@ -109,10 +108,11 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
-            -fcheck=all,no-array-temps 
+            -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
-        )
+            #-ffpe-trap=invalid,zero,denormal,overflow
+	)
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
@@ -124,11 +124,22 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
         "SHELL:-h nomessage=296:878:1391:1069"
-        "SHELL:-h msgs" "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h static" "SHELL:-h keepfiles"
+        "SHELL:-h acc_model=auto_async_none"
+        "SHELL: -h acc_model=no_fast_addr"
+        "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
     )
 
+    add_link_options("SHELL:-hkeepfiles")
+    
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-e D "SHELL:-h func_trace")
+        add_compile_options(
+                "SHELL:-h acc_model=auto_async_none"
+                "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -K trap=fp" "SHELL: -G2"
+
+        )
+        add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -153,10 +164,19 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran:-minline>
         )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran:-O0>
+        )
     endif()
-    
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+    endif()
+
+    if (DEFINED ENV{MFC_CUDA_CC})
+        string(REGEX MATCHALL "[0-9]+" MFC_CUDA_CC $ENV{MFC_CUDA_CC})
+        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for ${MFC_CUDA_CC}.")
     endif()
 endif()
 
@@ -187,13 +207,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 
+
 # HANDLE_SOURCES: Given a target (herein <target>):
 #
 # *  Locate all source files for <target> of the type
 #
 #               src/[<target>,common]/[.,include]/*.[f90,fpp].
-# 
-# *  For each .fpp file found with filepath <dirpath>/<filename>.fpp, using a 
+#
+# *  For each .fpp file found with filepath <dirpath>/<filename>.fpp, using a
 #    custom command, instruct CMake how to generate a file with path
 #
 #                     src/<target>/fypp/<filename>.f90
@@ -214,7 +235,7 @@ endif()
 #    file is modified, but also when any file with filepath of the form
 #
 #                     src/[<target>,common]/include/*.fpp
-#    
+#
 #    is modified. This is a reasonable compromise as modifications to .fpp files
 #    in the include directories will be rare - by design. Other approaches would
 #    have required a more complex CMakeLists.txt file (perhaps parsing the .fpp
@@ -323,11 +344,11 @@ function(MFC_SETUP_TARGET)
 
     set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
 
-    target_include_directories(${ARGS_TARGET} PRIVATE 
+    target_include_directories(${ARGS_TARGET} PRIVATE
         "${CMAKE_SOURCE_DIR}/src/common"
         "${CMAKE_SOURCE_DIR}/src/common/include"
         "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
-    
+
     if (EXISTS "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
         target_include_directories(${ARGS_TARGET} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
@@ -357,9 +378,14 @@ function(MFC_SETUP_TARGET)
     endif()
 
     if (ARGS_FFTW)
-        if (MFC_OpenACC AND ARGS_OpenACC AND (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
-            find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::cudart CUDA::cufft)
+        if (MFC_OpenACC AND ARGS_OpenACC)
+            if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+                find_package(CUDAToolkit REQUIRED)
+                target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::cudart CUDA::cufft)
+            else()
+                find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
+                target_link_libraries(${ARGS_TARGET} PRIVATE hipfort::hipfft)
+            endif()
         else()
             find_package(FFTW REQUIRED)
             target_link_libraries(${ARGS_TARGET} PRIVATE FFTW::FFTW)
@@ -395,15 +421,24 @@ function(MFC_SETUP_TARGET)
                 target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_cuTENSOR)
             endif()
 
-            if     (CMAKE_BUILD_TYPE STREQUAL "Release")
+            foreach (cc ${MFC_CUDA_CC})
                 target_compile_options(${ARGS_TARGET}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE -gpu=cc${cc}
                 )
-            elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            endforeach()
+
+            target_compile_options(${ARGS_TARGET}
+                PRIVATE -gpu=keep,ptxinfo,lineinfo
+            )
+
+            if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo,autocompare,debug -O0
+                    PRIVATE -gpu=autocompare,debug
                 )
             endif()
+        elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+            find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+            target_link_libraries(${ARGS_TARGET} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
         endif()
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(${ARGS_TARGET} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
@@ -422,19 +457,31 @@ if (MFC_PRE_PROCESS)
     MFC_SETUP_TARGET(TARGET  pre_process
                      SOURCES "${pre_process_SRCs}"
                      MPI)
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        target_compile_options(pre_process PRIVATE -hfp0)
+    endif()
 endif()
 
 if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI OpenACC FFTW)
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND MFC_OpenACC)
+        add_custom_command(TARGET simulation POST_BUILD
+            COMMAND           "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cce_simulation_workgroup_256.sh"
+                              "${CMAKE_CURRENT_BINARY_DIR}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT           "Patching & Rebuilding with Cray hacks"
+        )
+    endif()
 endif()
 
 if (MFC_POST_PROCESS)
     MFC_SETUP_TARGET(TARGET  post_process
                      SOURCES "${post_process_SRCs}"
                      MPI SILO HDF5 FFTW)
-    
+
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
 endif()
@@ -452,7 +499,7 @@ if (MFC_DOCUMENTATION)
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh;${examples_DOCs}"
-        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh" 
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh"
                        "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMENT "Generating examples.md"
         VERBATIM
@@ -470,8 +517,12 @@ if (MFC_DOCUMENTATION)
 
     macro(GEN_DOCS target name)
         set(DOXYGEN_PROJECT_NAME     "\"${name}\"")
-        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/src/${target}\"\
-                                     \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+        set(DOXYGEN_INPUT            "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
+
+        foreach (f90 ${${target}_SRCs})
+            set(DOXYGEN_INPUT "${DOXYGEN_INPUT} \"${f90}\"")
+        endforeach()
+
         set(DOXYGEN_HTML_HEADER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/header.html\"")
         set(DOXYGEN_HTML_FOOTER      "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/footer.html\"")
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
@@ -480,7 +531,7 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
-        file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}") 
+        file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}")
 
         configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
@@ -517,7 +568,7 @@ if (MFC_DOCUMENTATION)
     endmacro()
 
     add_custom_target(documentation)
-    
+
     find_package(Doxygen REQUIRED dot REQUIRED)
 
     # > Fetch CSS Theme
@@ -545,6 +596,9 @@ if (MFC_DOCUMENTATION)
 
     # > Copy Resources (main landing page & assets)
     install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
+            DESTINATION "docs/mfc")
+
+    install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/robots.txt"
             DESTINATION "docs/mfc")
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"

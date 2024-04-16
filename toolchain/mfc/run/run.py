@@ -45,6 +45,18 @@ def __profiler_prepend() -> typing.List[str]:
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
+    if ARG("omni") is not None:
+        if not does_command_exist("omniperf"):
+            raise MFCException("Failed to locate [bold red]ROCM Omniperf[/bold red] (omniperf).")
+
+        return ["omniperf", "profile"] + ARG("omni") + ["--"]
+
+    if ARG("roc") is not None:
+        if not does_command_exist("rocprof"):
+            raise MFCException("Failed to locate [bold red]ROCM rocprof[/bold red] (rocprof).")
+
+        return ["rocprof"] + ARG("roc")
+
     return []
 
 

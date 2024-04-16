@@ -7,7 +7,6 @@
 !> @brief This module is used to handle all operations related to immersed
 !!              boundary methods (IBMs)
 module m_ibm
-
     ! Dependencies =============================================================
 
     use m_derived_types        !< Definitions of the derived types
@@ -38,22 +37,30 @@ module m_ibm
  s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
-    !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
+!$acc declare create(ib_markers)
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
+    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
+
+    !$acc declare link(levelset, levelset_norm, ghost_points)
+#else
+
+    !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
     real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
     !! Matrix of distance to IB
-
     real(kind(0d0)), dimension(:, :, :, :, :), allocatable :: levelset_norm
     !! Matrix of normal vector to IB
-
     type(ghost_point), dimension(:), allocatable :: ghost_points
     !! Matrix of normal vector to IB
 
+    !$acc declare create(levelset, levelset_norm, ghost_points)
+#endif
+
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
-
-    !$acc declare create(ib_markers, levelset, levelset_norm)
-    !$acc declare create(ghost_points, gp_layers, num_gps)
+    !$acc declare create(gp_layers, num_gps)
 
 contains
 
@@ -69,16 +76,21 @@ contains
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0))
         end if
+        @:ACC_SETUP_SFs(ib_markers)
 
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
-        @:ALLOCATE(levelset(0:m, 0:n, 0:p, num_ibs))
-        @:ALLOCATE(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
+        @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
+        @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
+
+        !$acc enter data copyin(gp_layers, num_gps)
 
     end subroutine s_initialize_ibm_module
 
     subroutine s_ibm_setup()
 
-        integer :: i, j
+        integer :: i, j, k
+
+        !$acc update device(ib_markers%sf)
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
@@ -86,7 +98,8 @@ contains
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps)
-        @:ALLOCATE(ghost_points(num_gps))
+        @:ALLOCATE_GLOBAL(ghost_points(num_gps))
+        !$acc enter data copyin(ghost_points)
 
         call s_find_ghost_points(ghost_points)
         !$acc update device(ghost_points)
@@ -116,7 +129,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
 
-        integer :: i, j, k, l, q, r !< Iterator variables
+        integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
         real(kind(0d0)) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_K
@@ -124,7 +137,8 @@ contains
         real(kind(0d0)) :: qv_K
         real(kind(0d0)), dimension(num_fluids) :: Gs
 
-        real(kind(0d0)) :: pres_IP, vel_IP(3), vel_norm_IP(3)
+        real(kind(0d0)) :: pres_IP, coeff
+        real(kind(0d0)), dimension(3) :: vel_IP, vel_norm_IP
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
         real(kind(0d0)), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
         real(kind(0d0)), dimension(nb*nmom) :: nmom_IP
@@ -140,14 +154,14 @@ contains
         real(kind(0d0)) :: buf
         type(ghost_point) :: gp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, q, coeff)
         do i = 1, num_gps
 
             gp = ghost_points(i)
             j = gp%loc(1)
             k = gp%loc(2)
             l = gp%loc(3)
-            patch_id = gp%ib_patch_id
+            patch_id = ghost_points(i)%ib_patch_id
 
             ! Calculate physical location of GP
             if (p > 0) then
@@ -156,7 +170,7 @@ contains
                 physical_loc = [x_cc(j), y_cc(k), 0d0]
             end if
 
-            ! Interpolate primitive variables at image point associated w/ GP
+            !Interpolate primitive variables at image point associated w/ GP
             if (bubbles .and. .not. qbmm) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
@@ -174,9 +188,10 @@ contains
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP)
             end if
 
-            dyn_pres = 0
+            dyn_pres = 0d0
 
             ! Set q_prim_vf params at GP so that mixture vars calculated properly
+            !$acc loop seq
             do q = 1, num_fluids
                 q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                 q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
@@ -383,7 +398,6 @@ contains
     end subroutine s_compute_image_points
 
     subroutine s_find_num_ghost_points()
-
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -629,7 +643,6 @@ contains
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
-
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
@@ -777,9 +790,10 @@ contains
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
     subroutine s_finalize_ibm_module()
-        deallocate (ib_markers%sf)
-        deallocate (levelset)
-        deallocate (levelset_norm)
+
+        @:DEALLOCATE(ib_markers%sf)
+        @:DEALLOCATE_GLOBAL(levelset)
+        @:DEALLOCATE_GLOBAL(levelset_norm)
     end subroutine s_finalize_ibm_module
 
 end module m_ibm

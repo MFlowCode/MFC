@@ -72,11 +72,12 @@
         };
     
         const sims = [
-            new FS("Shedding water droplet - Vorticity", "res/simulations/a.png", "Summit", "2016 V100s", "1h", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Cavitating bubble cloud - Wall pressure", "res/simulations/b.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Cavitating bubble cloud - Streamlines", "res/simulations/c.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Kidney stone near a collapsing bubble cloud - Maximum principal stresses", "res/simulations/d.png", "Summit", "576 V100s", "30 min", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Breakup of vibrated interface", "res/simulations/f.png", "Summit", "128 V100s", "4h","https://youtu.be/qQV2ZRDpf2M")
+            new FS("Shedding water droplet", "res/simulations/a.png", "Summit", "960 V100s", "4h", "https://player.vimeo.com/video/905208069"),
+            new FS("Flow over an airfoil (vorticity)", "res/simulations/g.png", "Delta", "128 A100s", "19h", "https://vimeo.com/917305340/c05fd414c8?share=copy"),
+            new FS("Cavitation fragments kidney stone", "res/simulations/d.png", "Summit", "576 V100s", "30 min", "https://doi.org/10.48550/arXiv.2305.09163"),
+            new FS("Breakup of vibrated interface", "res/simulations/f.png", "Summit", "128 V100s", "4h","https://player.vimeo.com/video/922022757"), 
+            new FS("Collapsing bubbles (pressure)", "res/simulations/b.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
+            new FS("Collapsing bubbles (streamlines)", "res/simulations/c.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
         ];
 
         /*
@@ -198,8 +199,8 @@
         };
     
         scalings = [
-            new FScale("res/weakScaling/frontier.svg", "Frontier"),
-            new FScale("res/weakScaling/summit.svg", "Summit")
+            new FScale("res/weakScaling/frontier.svg", "Oak Ridge Frontier"),
+            new FScale("res/weakScaling/summit.svg", "Oak Ridge Summit")
             ]
 
 
@@ -257,8 +258,7 @@
                     <img src="res/banner.png" class="h-20 md:h-24 mx-auto">
                 </div>
                 <div class="w-full flex flex-col text-white text-md md:text-lg text-justify font-semibold">
-                    MFC simulates compressible multi-component and multi-phase flows, amongst other things.
-                    It scales ideally to tens of thousands of GPUs.
+                    An exascale compressible multiphase and multiphysics flow code.
                 </div>
             </div>
             <div class="flex mx-auto">
@@ -276,7 +276,7 @@
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/md_getting-started.html">
                         <i class="pr-4 fa-solid fa-rocket"></i>
-                        <span class="flex-1">Start</span>
+                        <span class="flex-1">Quick Start</span>
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/index.html">
                         <i class="pr-4 fa-solid fa-book"></i>
@@ -333,10 +333,11 @@
     </main>
     <div class="flex flex-col w-full px-4 md:px-0 text-white py-8 gap-4 container mx-auto">
         <div class="font-bold text-center text-sm md:text-md md:text-left">
-            &copy; 2022-2023 <a href="https://comp-physics.group/">Computational Physics Group at the Georgia Institute of Technology</a>
+            &copy; 2021-2024 <a href="https://comp-physics.group/">Spencer Bryngelson and Tim Colonius</a>
         </div>
         <div class="text-justify flex-1 text-xs md:text-sm text-neutral-300">
-            MFC development was supported by multiple current and past grants from the US Office of Naval Research (ONR), the US National Institute of Health (NIH), and the US National Science Foundation (NSF). MFC computations utilize the Extreme Science and Engineering Discovery Environment (XSEDE), under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson) and OLCF Summit under allocation CFD154 (PI Bryngelson).
+            Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
+            MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
         </div>
     </div>
 </body>

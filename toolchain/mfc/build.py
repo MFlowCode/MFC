@@ -31,20 +31,20 @@ class MFCTarget:
     def __hash__(self) -> int:
         return hash(self.name)
 
-    # Get path to directory that will store the build files
-    def get_build_dirpath(self) -> str:
+    def get_slug(self) -> str:
         if self.isDependency:
-            slug = self.name
-        else:
-            slug = f"{CFG().make_slug()}-{self.name}"
+            return self.name
 
-            if ARG("case_optimization"):
-                m = hashlib.sha256()
-                m.update(input.load().get_fpp(self).encode())
+        m = hashlib.sha256()
+        m.update(self.name.encode())
+        m.update(CFG().make_slug().encode())
+        m.update(input.load({}).get_fpp(self, False).encode())
 
-                slug = f"{slug}-{m.hexdigest()[:6]}"
+        return m.hexdigest()[:10]
 
-        return os.sep.join([os.getcwd(), "build", slug ])
+    # Get path to directory that will store the build files
+    def get_staging_dirpath(self) -> str:
+        return os.sep.join([os.getcwd(), "build", "staging", self.get_slug() ])
 
     # Get the directory that contains the target's CMakeLists.txt
     def get_cmake_dirpath(self) -> str:
@@ -58,13 +58,13 @@ class MFCTarget:
 
     def get_install_dirpath(self) -> str:
         # The install directory is located:
-        # Regular:    <root>/build/install/<configuration_slug>
+        # Regular:    <root>/build/install/<slug>
         # Dependency: <root>/build/install/dependencies (shared)
         return os.sep.join([
             os.getcwd(),
             "build",
             "install",
-            'dependencies' if self.isDependency else CFG().make_slug()
+            'dependencies' if self.isDependency else self.get_slug(),
         ])
 
     def get_install_binpath(self) -> str:
@@ -75,14 +75,14 @@ class MFCTarget:
         # We assume that if the CMakeCache.txt file exists, then the target is
         # configured. (this isn't perfect, but it's good enough for now)
         return os.path.isfile(
-            os.sep.join([self.get_build_dirpath(), "CMakeCache.txt"])
+            os.sep.join([self.get_staging_dirpath(), "CMakeCache.txt"])
         )
 
     def get_configuration_txt(self) -> typing.Optional[dict]:
         if not self.is_configured():
             return None
 
-        configpath = os.path.join(self.get_build_dirpath(), "configuration.txt")
+        configpath = os.path.join(self.get_staging_dirpath(), "configuration.txt")
         if not os.path.exists(configpath):
             return None
 
@@ -95,17 +95,19 @@ class MFCTarget:
         if ARG("no_build"):
             return False
 
-        if self.isDependency and ARG(f"no_{self.name}"):
+        if self.isDependency and ARG(f"sys_{self.name}", False):
             return False
 
         return True
 
     def configure(self):
-        build_dirpath   = self.get_build_dirpath()
+        build_dirpath   = self.get_staging_dirpath()
         cmake_dirpath   = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath()
 
         install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath()])
+
+        mod_dirs = ';'.join(['build/install/dependencies/include/hipfort/amdgcn'])
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
@@ -133,7 +135,13 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
+            # Fortran .mod include directories. Currently used for the HIPFORT
+            # dependency that has this missing from its config files.
+            f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
         ]
+
+        if ARG("verbose"):
+            flags.append('--debug-find')
 
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
@@ -154,7 +162,7 @@ class MFCTarget:
     def build(self):
         input.load({}).generate_fpp(self)
 
-        command = ["cmake", "--build",    self.get_build_dirpath(),
+        command = ["cmake", "--build",    self.get_staging_dirpath(),
                             "--target",   self.name,
                             "--parallel", ARG("jobs"),
                             "--config",   'Debug' if ARG('debug') else 'Release']
@@ -167,7 +175,7 @@ class MFCTarget:
         cons.print(no_indent=True)
 
     def install(self):
-        command = ["cmake", "--install", self.get_build_dirpath()]
+        command = ["cmake", "--install", self.get_staging_dirpath()]
 
         if system(command).returncode != 0:
             raise MFCException(f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
@@ -175,7 +183,7 @@ class MFCTarget:
         cons.print(no_indent=True)
 
     def clean(self):
-        build_dirpath = self.get_build_dirpath()
+        build_dirpath = self.get_staging_dirpath()
 
         if not os.path.isdir(build_dirpath):
             return
@@ -189,17 +197,17 @@ class MFCTarget:
         if system(command).returncode != 0:
             raise MFCException(f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
 
-
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 HDF5          = MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies([HDF5], [], []), -1)
+HIPFORT       = MFCTarget('hipfort',       ['-DMFC_HIPFORT=ON'],       True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 PRE_PROCESS   = MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], []), 0)
-SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], []), 1)
+SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], [HIPFORT]), 1)
 POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, SILO], [], []), 2)
-SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], []), -1)
+SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [HIPFORT]), -1)
 DOCUMENTATION = MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []), -1)
 
-TARGETS = { FFTW, HDF5, SILO, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
+TARGETS = { FFTW, HDF5, SILO, HIPFORT, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
 
 DEFAULT_TARGETS    = { target for target in TARGETS if target.isDefault }
 REQUIRED_TARGETS   = { target for target in TARGETS if target.isRequired }
@@ -242,7 +250,14 @@ def __build_target(target: typing.Union[MFCTarget, str], history: typing.Set[str
 
     history.add(target.name)
 
-    build(target.requires.compute(), history)
+    for dep in target.requires.compute():
+        # If we have already built and installed this target,
+        # do not do so again. This can be inferred by whether
+        # the target requesting this dependency is already configured.
+        if dep.isDependency and target.is_configured():
+            continue
+
+        build([dep], history)
 
     if not target.is_configured():
         target.configure()

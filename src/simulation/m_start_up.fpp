@@ -44,7 +44,7 @@ module m_start_up
 
     use m_qbmm                 !< Quadrature MOM
 
-    use m_derived_variables     !< Procedures used to compute quantites derived
+    use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
 
     use m_hypoelastic
@@ -121,11 +121,13 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
+        CHARACTER(len=511) :: CRAY_ACC_MODULE
+
         character(len=1000) :: line
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, &
+            t_step_start, t_step_stop, t_step_save, t_step_print, &
             model_eqns, num_fluids, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, cu_mpi, cu_tensor, &
@@ -148,8 +150,9 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, file_per_process, relax, relax_model, &
-            palpha_eps, ptgalpha_eps
+             relax, relax_model, &
+            palpha_eps, ptgalpha_eps, &
+            R0_type, file_per_process
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -166,7 +169,7 @@ contains
                 backspace (1)
                 read (1, fmt='(A)') line
                 print *, 'Invalid line in namelist: '//trim(line)
-                call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
+                call s_mpi_abort('Invalid line in simulation.inp. It is '// &
                                  'likely due to a datatype mismatch. Exiting ...')
             end if
 
@@ -180,6 +183,16 @@ contains
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
+
+#ifdef _CRAYFTN
+#ifdef MFC_OpenACC
+        call get_environment_variable("CRAY_ACC_MODULE", CRAY_ACC_MODULE)
+
+        if (CRAY_ACC_MODULE == "") then
+            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
+        end if
+#endif        
+#endif        
 
     end subroutine s_read_input_file ! -------------------------------------
 
@@ -317,39 +330,23 @@ contains
         end if
         ! ==================================================================
 
-        ! Cell-average Conservative Variables ==============================
-        if ((bubbles .neqv. .true.) .and. (hypoelasticity .neqv. .true.)) then
-            do i = 1, adv_idx%end
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/q_cons_vf', i, '.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-            end do
-        else
-            !make sure to read bubble variables
-            do i = 1, sys_size
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/q_cons_vf', i, '.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-            end do
-            !Read pb and mv for non-polytropic qbmm
+        do i = 1, sys_size
+            write (file_path, '(A,I0,A)') &
+                trim(t_step_dir)//'/q_cons_vf', i, '.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+        end do
+
+        if ((bubbles .eqv. .true.) .or. (hypoelasticity .eqv. .true.)) then
+            ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -484,7 +481,7 @@ contains
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
-
+        
         ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         ! Computing the cell width distribution
@@ -1068,7 +1065,7 @@ contains
 
         integer :: i, j, k, l
 
-        if (proc_rank == 0) then
+        if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
             print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
                 int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                 t_step - t_step_start + 1, &
@@ -1097,9 +1094,7 @@ contains
         elseif (time_stepper == 3) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
-
-        if (relax) call s_relaxation_solver(q_cons_ts(1)%vf)
-
+        if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
@@ -1250,7 +1245,7 @@ contains
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (hypoelasticity) call s_initialize_hypoelastic_module()      
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1366,30 +1361,25 @@ contains
     subroutine s_initialize_gpu_vars()
         integer :: i
         !Update GPU DATA
-        !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
-        !$acc update device(sys_size, buff_size)
-        !$acc update device(m, n, p)
-        !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
         do i = 1, sys_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
-        !$acc update device(dt, sys_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, nb, weight, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-        !$acc update device(monopole, num_mono)
-    
+        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)    
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
 
-        !$acc update device(relax)
+        !$acc update device(relax, relax_model)
         if (relax) then
             !$acc update device(palpha_eps, ptgalpha_eps)
         end if
+
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules()
@@ -1409,7 +1399,6 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()      
-
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if

@@ -18,7 +18,7 @@ jobs:
       cancel-in-progress: true
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     # We build doxygen from source because of
     # https://github.com/doxygen/doxygen/issues/9016
@@ -35,6 +35,22 @@ jobs:
         pip3 install fypp
         cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
         ninja -C build install
+
+    # From here https://github.com/cicirello/generate-sitemap
+    - name: Generate the sitemap
+      id: sitemap
+      uses: cicirello/generate-sitemap@v1
+      with:
+        base-url-path: https://mflowcode.github.io/
+        path-to-root: build/install/docs/mfc
+        include-pdf: false
+        sitemap-format: txt
+
+    - name: Output stats
+      run: |
+        echo "sitemap-path = ${{ steps.sitemap.outputs.sitemap-path }}"
+        echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
+        echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
 
     - name: Publish Documentation
       run:  |

@@ -20,8 +20,8 @@
 </p>
 
 Welcome to the home of MFC!
-MFC simulates compressible multi-component and multi-phase flows, amongst other things. 
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU Machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
+MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
 MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   
 Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
@@ -39,24 +39,37 @@ MFC can execute high-fidelity simulations of shock-droplet interaction (see `exa
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
+Another example is the high-Mach flow over an airfoil, shown below.
+
+<p align="center">
+    <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+</p>
+
+
 ## Getting started
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
-
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```console
-brew install wget make python make cmake coreutils gcc openmpi
+brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
-Clone it to a convenient directory via
+Put it to a convenient directory via
 ```console
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
-then build and test!
+and make sure MFC knows what compilers to use by putting the following in your `~/.profile`
 ```console
+export CC=gcc-13
+export CXX=g++-13
+export FC=gfortran-13
+```
+and source that file, build, and test!
+```console
+source ~/.profile
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
 ```
@@ -96,7 +109,7 @@ They are organized below, just click the drop-downs!
 * Multi- and single-phase 
 	* Phase change via p, pT, and pTg schemes
 * Grids
-	* 1-3D Cartesian, Cylindrical, Axi-symmetric. 
+	* 1-3D Cartesian, cylindrical, axi-symmetric. 
 	* Arbitrary grid stretching for multiple domain regions available.
 	* Complex/arbitrary geometries via immersed boundary methods 
 	* STL geometry files supported
@@ -162,12 +175,10 @@ If you use MFC, consider citing it:
 
 ## License
  
-Copyright 2021-2024.
+Copyright 2021-2024 Spencer Bryngelson and Tim Colonius.
 MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
 
 ## Acknowledgements
- 
-<p align="justify">
-  MFC development was supported by multiple current and past grants from the US Department of Defense, National Institute of Health (NIH), Department of Energy (DOE), and the National Science Foundation (NSF).
-  MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
-</p>
+
+Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
+MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).

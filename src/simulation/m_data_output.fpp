@@ -67,19 +67,24 @@ module m_data_output
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
-
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
+    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
-
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#endif
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-
     !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
@@ -93,6 +98,8 @@ module m_data_output
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
+
+    @:s_compute_speed_of_sound()
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
@@ -249,7 +256,7 @@ contains
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -364,6 +371,20 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
+#ifdef CRAY_ACC_WAR
+        !$acc update host(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            !$acc update host(vcfl_sf, Rc_sf)
+        end if
+
+        icfl_max_loc = maxval(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        end if
+#else
         !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
@@ -374,6 +395,7 @@ contains
             Rc_min_loc = minval(Rc_sf)
             !$acc end kernels
         end if
+#endif
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
@@ -978,18 +1000,6 @@ contains
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        if (ib) then
-            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-
-            ! Initial displacement to skip at beginning of file
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                    MPI_DOUBLE_PRECISION, status, ierr)
         end if
 
         call MPI_FILE_CLOSE(ifile, ierr)
@@ -1598,8 +1608,6 @@ contains
 
     end subroutine s_write_probe_files ! -----------------------------------
 
-    @:s_compute_speed_of_sound()
-
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
@@ -1649,12 +1657,12 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0d0
             Rc_min = 1d3
@@ -1688,9 +1696,9 @@ contains
         integer :: i !< Generic loop iterator
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE(icfl_sf)
+        @:DEALLOCATE_GLOBAL(icfl_sf)
         if (any(Re_size > 0)) then
-            @:DEALLOCATE(vcfl_sf, Rc_sf)
+            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to
