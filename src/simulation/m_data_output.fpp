@@ -616,7 +616,7 @@ contains
         integer :: i, j!< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        real(kind(0d0)) ::  Elk, Elp, Egk, Egie
+        real(kind(0d0)) ::  Elk, Egk, Eint
         real(kind(0d0)) ::  nondim_time
 
         if (t_step_old /= dflt_int) then
@@ -626,37 +626,52 @@ contains
         end if
         root = 0
         
-        call s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
+        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         
-        write (21520, '(F12.9,1X,F12.9,1X,F12.9,1X, F12.9, 1X, F12.9)') &
-                            Elp, Elk, Egie, Egk, nondim_time
+        write (21520, '(F12.9,1X,F12.9,1X, F12.9, 1X, F12.9)') &
+                            Eint, Elk, Egk, nondim_time
                    
 
         end subroutine s_write_eng_data_file    
         
-    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Elp, Egk, Egie)
+    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), intent(OUT) :: Elk, Elp, Egk, Egie
-        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb, tmp
+        real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
+        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb, tmp, pk, alph_k, gammak, pi_infk, rhoe
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
         Elk = 0d0
-        Elp = 0d0
         Egk = 0d0
-        Egie = 0d0
         rho = 0d0
         Vb = 0d0
         pres = 0d0
+        rhoe = 0d0
+        gamma = 0d0
+        qv = 0d0
+        pi_inf = 0d0
+        pk = 0d0
+        alph_k = 0d0
+        Eint = 0d0
+        gammak = 0d0
+        pi_infk = 0d0
 
         if (p > 0) then
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+
                         do l = 1, num_fluids
+                           call s_convert_to_mixture_variables(q_prim_vf, i, j, k, &
+                                                            rhoe, gamma, pi_inf, qv)
+                           alph_k = q_prim_vf(E_idx+l)%sf(i, j, k)
+                           pk = alph_k*pres
+                           gammak = alph_k*gamma
+                           pi_infk = alph_k*pi_inf
+                           Eint = Eint+alph_k*(pk-gammak*pi_infk)/(gammak-1)
                            rho = rho + q_prim_vf(l)%sf(i, j, k)
                         end do
-                        pres = q_prim_vf(E_idx)%sf(i, j, k)
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
                             vel(s) =  q_prim_vf(num_fluids + s)%sf(i, j, k)
@@ -666,27 +681,17 @@ contains
                                 Egk = Egk + 0.5d0*rho*vel(s)*vel(s)
                             endif
                         end do
-                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) .lt. 0.9d0) then
-                                Vb = Vb + dV
-                                Egie = Egie + pres*dV
-                        else
-                                Elp = Elp + pres*dV
-                        endif
                     end do
                 end do
             end do
         end if
         tmp = Elk
         call s_mpi_allreduce_sum(tmp, Elk)
-        tmp = Elp
-        call s_mpi_allreduce_sum(tmp, Elp)
-        tmp = Egie
-        call s_mpi_allreduce_sum(tmp, Egie)
+        tmp = Eint
+        call s_mpi_allreduce_sum(tmp, Eint)
         tmp = Egk
         call s_mpi_allreduce_sum(tmp, Egk)
         tmp = Vb
-        call s_mpi_allreduce_sum(tmp, Vb)
-        Elp = Elp + Vb
 
     end subroutine s_calculate_energy_contributions
 
