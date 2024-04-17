@@ -11,6 +11,10 @@ module m_helper
 
     use m_global_parameters    !< Definitions of the global parameters
 
+    use m_mpi_common           !< MPI modules
+
+    use ieee_arithmetic        !< For checking NaN
+
     ! ==========================================================================
 
     implicit none

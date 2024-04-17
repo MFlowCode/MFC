@@ -79,6 +79,7 @@ There are multiple sets of parameters that must be specified in the python input
 8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
 9. [(Optional) Velocity Field Setup Parameters](#9-velocity-field-setup)
 10. [(Optional) Phase Change Parameters](#10-Phase-Change-Model)
+11. [(Optional) Artificial Mach Number Parameters](#11-artificial-Mach-number)
 
 Items 7, 8, 9, and 10 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, and phase change, respectively.
 Definition of the parameters is described in the following subsections.
@@ -348,9 +349,11 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation\\%;%[4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
+| `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
-| `time_stepper`         | Integer | Runge-Kutta order [1-3] |
+| `time_stepper`         | Integer | Runge--Kutta order [1-3] |
+| `adap_dt`              | Loginal | Strang splitting scheme with adaptive time stepping |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	           | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO with mapping of nonlinear weights |
@@ -396,12 +399,16 @@ $$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
 where $\alpha_i$ is the void fraction of $i$-th component.
 When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
 
+- `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
+
 - `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that $\alpha_i>\varepsilon$ is satisfied at each time step.
 
 - `mixture_err` activates correction of solutions to avoid imaginary speed of sound at each grid cell.
 
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
+
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires `bubbles = 'T'`, `polytropic = 'T'`, `adv_n = 'T'` and `time_stepper = 3`.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
@@ -636,8 +643,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile.
-This option only works for 2D and 3D cases, together with `vel_profile = 'T'`.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and `vel_profile = 'T'`.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -654,6 +660,14 @@ This option only works for 2D and 3D cases, together with `vel_profile = 'T'`.
 - `palpha_eps` Specifies the tolerance used for the Newton Solvers used in the pT-equilibrium model. 
 
 - `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model. 
+
+### 11. Artificial Mach Number
+| Parameter              | Type    | Description                                    |
+| ---:                   | :----:  |          :---                                  |
+| `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
+
+- `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`). This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
+
 
 ## Enumerations
 

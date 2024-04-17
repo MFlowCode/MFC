@@ -1161,15 +1161,17 @@ contains
                             nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
-                        !call comp_n_from_cons(alf, nR, nbub)
 
-                        nR3 = 0d0
-                        do s = 1, nb
-                            nR3 = nR3 + weight(s)*(nR(s)**3d0)
-                        end do
+                        if (adv_n) then
+                            nbub = q_cons_vf(n_idx)%sf(j - 2, k, l)
+                        else
+                            nR3 = 0d0
+                            do s = 1, nb
+                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                            end do
 
-                        nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
-
+                            nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                        end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
@@ -1251,14 +1253,17 @@ contains
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
                                 nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
-                            !call comp_n_from_cons(alf, nR, nbub)
 
-                            nR3 = 0d0
-                            do s = 1, nb
-                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
-                            end do
+                            if (adv_n) then
+                                nbub = q_cons_vf(n_idx)%sf(j - 2, k - 2, l)
+                            else
+                                nR3 = 0d0
+                                do s = 1, nb
+                                    nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                                end do
 
-                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                                nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                            end if
 
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub

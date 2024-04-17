@@ -975,7 +975,12 @@ contains
 #endif
 
                         else
-                            call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                            if (adv_n) then
+                                qK_prim_vf(n_idx)%sf(j, k, l) = qK_cons_vf(n_idx)%sf(j, k, l)
+                                nbub_sc = qK_prim_vf(n_idx)%sf(j, k, l)
+                            else
+                                call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                            end if
 
                             !$acc loop seq
                             do i = bubxb, bubxe
@@ -1117,7 +1122,12 @@ contains
                         end do
 
                         if (.not. qbmm) then
-                            call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                            if (adv_n) then
+                                q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
+                                nbub = q_prim_vf(n_idx)%sf(j, k, l)
+                            else
+                                call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                            end if
                         else
                             !Initialize R3 averaging over R0 and R directions
                             R3tmp = 0d0
@@ -1133,9 +1143,6 @@ contains
 
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
-                            ! IF( j==0 .and. k==0 .and. l==0) THEN
-                            !     PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
-                            ! END IF
                         end do
                     end if
 
