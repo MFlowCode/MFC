@@ -637,7 +637,7 @@ contains
     subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
-        real(kind(0d0)) :: rho, pres, dV, Vb, tmp, pk, alph_k 
+        real(kind(0d0)) :: rho, pres, dV, Vb, tmp, pk, alph_k, Elks, Egks, Eints 
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
@@ -654,23 +654,29 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
+                        Elks = 0d0
+                        Egks = 0d0
+                        Eints = 0d0
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-
+                        
                         do l = 1, num_fluids
                            alph_k = q_prim_vf(E_idx+l)%sf(i, j, k)
                            pk = alph_k*pres
-                           Eint = Eint+alph_k*(pk+gammas(l)*pi_infs(l))/(gammas(l)-1)
+                           Eints = Eints + alph_k*(pk+gammas(l)*pi_infs(l))/(gammas(l)-1)
                            rho = rho + q_prim_vf(l)%sf(i, j, k)
                         end do
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
                             vel(s) =  q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9d0) then
-                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)
+                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                                Elks = Elks + 0.5d0*rho*vel(s)*vel(s)
                             else
-                                Egk = Egk + 0.5d0*rho*vel(s)*vel(s)
+                                Egks = Egks + 0.5d0*rho*vel(s)*vel(s)
                             endif
                         end do
+                        Elk = Elk + Elks*dV
+                        Egk = Egk + Egks*dV
+                        Eint = Eint + Eints*dV
                     end do
                 end do
             end do
