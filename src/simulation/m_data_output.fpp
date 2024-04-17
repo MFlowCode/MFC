@@ -628,7 +628,7 @@ contains
         
         call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         
-        write (21520, '(F12.9,1X,F12.9,1X, F12.9, 1X, F12.9)') &
+        write (21520, '(F19.3,1X,F19.3,1X, F19.3, 1X, F12.9)') &
                             Eint, Elk, Egk, nondim_time
                    
 
@@ -659,7 +659,7 @@ contains
                         do l = 1, num_fluids
                            alph_k = q_prim_vf(E_idx+l)%sf(i, j, k)
                            pk = alph_k*pres
-                           Eint = Eint+alph_k*(pk-gammas(l)*pi_infs(l))/(gammas(l)-1)
+                           Eint = Eint+alph_k*(pk+gammas(l)*pi_infs(l))/(gammas(l)-1)
                            rho = rho + q_prim_vf(l)%sf(i, j, k)
                         end do
                         dV = dx(i)*dy(j)*dz(k)
@@ -681,7 +681,6 @@ contains
         call s_mpi_allreduce_sum(tmp, Eint)
         tmp = Egk
         call s_mpi_allreduce_sum(tmp, Egk)
-        tmp = Vb
 
     end subroutine s_calculate_energy_contributions
 
