@@ -637,7 +637,7 @@ contains
     subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
-        real(kind(0d0)) :: rho, pres, pi_inf, qv, gamma, dV, Vb, tmp, pk, alph_k, gammak, pi_infk, rhoe
+        real(kind(0d0)) :: rho, pres, dV, Vb, tmp, pk, alph_k 
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
@@ -646,15 +646,9 @@ contains
         rho = 0d0
         Vb = 0d0
         pres = 0d0
-        rhoe = 0d0
-        gamma = 0d0
-        qv = 0d0
-        pi_inf = 0d0
         pk = 0d0
         alph_k = 0d0
         Eint = 0d0
-        gammak = 0d0
-        pi_infk = 0d0
 
         if (p > 0) then
             do k = 0, p
@@ -663,13 +657,9 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
                         do l = 1, num_fluids
-                           call s_convert_to_mixture_variables(q_prim_vf, i, j, k, &
-                                                            rhoe, gamma, pi_inf, qv)
                            alph_k = q_prim_vf(E_idx+l)%sf(i, j, k)
                            pk = alph_k*pres
-                           gammak = alph_k*gamma
-                           pi_infk = alph_k*pi_inf
-                           Eint = Eint+alph_k*(pk-gammak*pi_infk)/(gammak-1)
+                           Eint = Eint+alph_k*(pk-gammas(l)*pi_infs(l))/(gammas(l)-1)
                            rho = rho + q_prim_vf(l)%sf(i, j, k)
                         end do
                         dV = dx(i)*dy(j)*dz(k)
