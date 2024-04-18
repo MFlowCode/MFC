@@ -78,7 +78,7 @@ else
     module purge > /dev/null 2>&1
 fi
 
-ELEMENTS=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
+ELEMENTS=($(__extract "$u_c-all") $(__extract "$u_c-$cg"))
 
 for element in ${ELEMENTS[@]}; do
     if [[ "$element" != *'='* ]]; then
