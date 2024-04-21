@@ -137,20 +137,6 @@ contains
                     print *, 'Processing patch', i
                 end if
 
-                !> IB Patches
-                !> @{
-                ! Spherical patch
-                if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
-                    ! Cylindrical patch
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
-
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                end if
-                !> @}
-
                 !> ICPP Patches
                 !> @{
                 ! Spherical patch
@@ -194,6 +180,26 @@ contains
             end do
             !> @}
 
+            !> IB Patches
+            !> @{
+            ! Spherical patch
+            do i = 1, num_ibs
+                if (proc_rank == 0) then
+                    print *, 'Processing 3D ib patch ', i
+                end if
+
+                if (patch_ib(i)%geometry == 8) then
+                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
+                    ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 10) then
+                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 11) then
+                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+            end do
+            !> @}
+
             ! ==================================================================
 
             ! 2D Patch Geometries ==============================================
@@ -204,21 +210,6 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
                 end if
-
-                !> IB Patches
-                !> @{
-                ! Circular patch
-                if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
-
-                    ! Rectangular patch
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
-
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                end if
-                !> @}
 
                 !> ICPP Patches
                 !> @{
@@ -266,6 +257,25 @@ contains
                 end if
                 !> @}
             end do
+
+            !> IB Patches
+            !> @{
+            do i = 1, num_ibs
+                if (proc_rank == 0) then
+                    print *, 'Processing 2D ib patch ', i
+                end if
+                if (patch_ib(i)%geometry == 2) then
+                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                    ! Rectangular patch
+                elseif (patch_ib(i)%geometry == 3) then
+                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 4) then
+                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+            end do
+            !> @}
 
             ! ==================================================================
 
