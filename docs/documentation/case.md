@@ -662,7 +662,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model. 
 
-### 11. Artificial Mach Number
+### 12. Artificial Mach Number
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
