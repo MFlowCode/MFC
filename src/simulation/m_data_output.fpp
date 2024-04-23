@@ -637,18 +637,18 @@ contains
     subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
-        real(kind(0d0)) :: rho, pres, dV, Vb, tmp, pk, alph_k, Elks, Egks, Eints 
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, qv, Elks, Egks, Eints
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
         
         Elk = 0d0
         Egk = 0d0
         rho = 0d0
-        Vb = 0d0
         pres = 0d0
-        pk = 0d0
-        alph_k = 0d0
         Eint = 0d0
+        gamma = 0d0
+        pi_inf = 0d0
+        qv = 0d0
 
         if (p > 0) then
             do k = 0, p
@@ -658,13 +658,9 @@ contains
                         Egks = 0d0
                         Eints = 0d0
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        
-                        do l = 1, num_fluids
-                           alph_k = q_prim_vf(E_idx+l)%sf(i, j, k)
-                           pk = alph_k*pres
-                           Eints = Eints + alph_k*(pk+gammas(l)*pi_infs(l))/(gammas(l)-1)
-                           rho = rho + q_prim_vf(l)%sf(i, j, k)
-                        end do
+                        call s_convert_to_mixture_variables(q_prim_vf, i, j, k, &
+                                                            rho, gamma, pi_inf, qv) 
+                        Eints = gamma*pres+pi_inf
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
                             vel(s) =  q_prim_vf(num_fluids + s)%sf(i, j, k)
