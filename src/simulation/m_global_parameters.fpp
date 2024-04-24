@@ -189,6 +189,7 @@ module m_global_parameters
     type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
     integer :: E_idx                     !< Index of energy equation
+    integer :: n_idx                     !< Index of number density
     type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -248,7 +249,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, stress_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -331,6 +332,8 @@ module m_global_parameters
     logical :: bubbles      !< Bubbles on/off
     logical :: polytropic   !< Polytropic  switch
     logical :: polydisperse !< Polydisperse bubbles
+    logical :: adv_n        !< Solve the number density equation and compute alpha from number density
+    logical :: adap_dt      !< Adaptive step size control
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -349,11 +352,13 @@ module m_global_parameters
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
+    real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
+
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma)
+!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
@@ -540,6 +545,11 @@ contains
 
         R0_type = dflt_int
 
+        adv_n = .false.
+        adap_dt = .false.
+
+        pi_fac = 1d0
+
         ! User inputs for qbmm for simulation code
         qbmm = .false.
 
@@ -685,6 +695,11 @@ contains
                     sys_size = bub_idx%end
                     ! print*, 'alf idx', alf_idx
                     ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
+
+                    if (adv_n) then
+                        n_idx = bub_idx%end + 1
+                        sys_size = n_idx
+                    end if
 
                     @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
@@ -963,7 +978,7 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, strxb, strxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)

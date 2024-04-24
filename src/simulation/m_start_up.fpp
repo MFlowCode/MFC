@@ -65,8 +65,6 @@ module m_start_up
 
     use m_ibm
 
-    use m_helper
-
     use m_compile_specific
 
     use m_checker
@@ -150,9 +148,10 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-             relax, relax_model, &
+            relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
-            R0_type, file_per_process
+            R0_type, file_per_process, &
+            pi_fac, adv_n, adap_dt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1091,8 +1090,10 @@ contains
             call s_1st_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3) then
-            call s_3rd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
+            call s_3rd_order_tvd_rk(t_step, time_avg, dt)
+        elseif (time_stepper == 3 .and. adap_dt) then
+            call s_strang_splitting(t_step, time_avg)
         end if
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
@@ -1367,7 +1368,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)    
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)

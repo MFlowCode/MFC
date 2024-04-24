@@ -71,8 +71,8 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model
+            polydisperse, poly_sigma, file_per_process, relax, relax_model, &
+            adv_n
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -576,6 +576,17 @@ contains
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                     varname(:) = ' '
                 end do
+            end if
+
+            ! number density
+            if (adv_n) then
+                q_sf = q_cons_vf(n_idx)%sf( &
+                       -offset_x%beg:m + offset_x%end, &
+                       -offset_y%beg:n + offset_y%end, &
+                       -offset_z%beg:p + offset_z%end)
+                write (varname, '(A)') 'n'
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+                varname(:) = ' '
             end if
         end if
 
