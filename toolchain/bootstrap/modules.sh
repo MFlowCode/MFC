@@ -19,11 +19,11 @@ done
 # Get computer (if not supplied in command-line)
 if [ -v $u_c ]; then
     log   "Select a system:"
-    log   "$G""ORNL$W:    Ascent     (a) | Crusher (c) | Summit (s) | Wombat (w)"
+    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Summit (s) | Wombat (w)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
-    log   "$Y""GaTech$W:  Phoenix    (p)"
-    log   "$R""CALTECH$W: Richardson (r)"
-    log_n "($G""a$W/$G""c$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
+    log   "$Y""Gatech$W:  Phoenix    (p)"
+    log   "$R""Caltech$W: Richardson (r)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
     read u_c
     log
 fi
@@ -78,7 +78,7 @@ else
     module purge > /dev/null 2>&1
 fi
 
-ELEMENTS=($(__extract "$u_c-$cg") $(__combine $(__extract "$u_c-all")))
+ELEMENTS=($(__extract "$u_c-all") $(__extract "$u_c-$cg"))
 
 for element in ${ELEMENTS[@]}; do
     if [[ "$element" != *'='* ]]; then

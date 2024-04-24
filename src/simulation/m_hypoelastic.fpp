@@ -22,6 +22,18 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    !$acc declare link(Gs)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), du_dx, du_dy, du_dz)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dv_dx, dv_dy, dv_dz)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dw_dx, dw_dy, dw_dz)
+    !$acc declare link(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rho_K_field, G_K_field)
+    !$acc declare link(rho_K_field, G_K_field)
+#else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 
@@ -33,20 +45,22 @@ module m_hypoelastic
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
 
+#endif
+
 contains
 
     subroutine s_initialize_hypoelastic_module() ! --------------------
 
         integer :: i
 
-        @:ALLOCATE(Gs(1:num_fluids))
-        @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:ALLOCATE(du_dx(0:m,0:n,0:p))
+        @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
+        @:ALLOCATE_GLOBAL(du_dx(0:m,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+            @:ALLOCATE_GLOBAL(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
             if (p > 0) then
-                @:ALLOCATE(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
-                @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+                @:ALLOCATE_GLOBAL(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
+                @:ALLOCATE_GLOBAL(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
             end if
         end if
 

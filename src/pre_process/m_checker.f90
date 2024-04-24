@@ -63,9 +63,9 @@ contains
                 call s_mpi_abort('Unsupported combination of values of '// &
                                  'model_eqns and num_fluids. '// &
                                  'Exiting ...')
-            elseif (R0ref == dflt_real) then
+            elseif ((.not. polytropic) .and. R0ref == dflt_real) then
                 call s_mpi_abort('Unsupported combination of values of '// &
-                                 'bubbles and R0ref. '// &
+                                 'polytropic and R0ref. '// &
                                  'Exiting ...')
             elseif (nb == dflt_int) then
                 call s_mpi_abort('unsupported combination of values of '// &
@@ -77,6 +77,19 @@ contains
                                  'exiting ...')
             end if
 
+        end if
+
+        if (adv_n) then
+            if (bubbles .neqv. .true.) then
+                call s_mpi_abort('adv_n requires bubbles = true.'// &
+                                 'Exiting ...')
+            else if (num_fluids > 1) then
+                call s_mpi_abort('adv_n requires num_fluids = 1. '// &
+                                 'Exiting ...')
+            else if (qbmm .eqv. .true.) then
+                call s_mpi_abort('adv_n is incompatible with qbmm.'// &
+                                 'Exiting ...')
+            end if
         end if
 
         if (qbmm .and. dist_type == dflt_int) then
@@ -165,16 +178,31 @@ contains
 
         if (cyl_coord) then ! Cartesian coordinates
 
-            ! Constraints on domain boundaries for cylindrical coordinates
-            if (n == 0 &
-                .or. &
-                y_domain%beg /= 0d0 &
-                .or. &
-                y_domain%end == dflt_real &
-                .or. &
-                y_domain%end < 0d0 &
-                .or. &
-                y_domain%beg >= y_domain%end) then
+            ! in case restart of a simulation
+            if (old_grid .and. old_ic) then
+                ! checking of there is any input to the domains
+                if ((x_domain%beg /= dflt_real .or. x_domain%end /= dflt_real) &
+                    .or. &
+                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real) &
+                    .or. &
+                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real)) then
+                    call s_mpi_abort('domain are not dflt_real.'// &
+                                     'Please, correct them')
+                elseif (m == dflt_int .or. n == dflt_int .or. p == dflt_int) then
+                    call s_mpi_abort('m, n, and/or p are set to dflt_int.'// &
+                                     'Please, correct them')
+                end if
+                ! in case it is NOT restart
+                ! Constraints on domain boundaries for cylindrical coordinates
+            elseif (n == 0 &
+                    .or. &
+                    y_domain%beg /= 0d0 &
+                    .or. &
+                    y_domain%end == dflt_real &
+                    .or. &
+                    y_domain%end < 0d0 &
+                    .or. &
+                    y_domain%beg >= y_domain%end) then
                 call s_mpi_abort('Unsupported choice of the combination of '// &
                                  'cyl_coord and n, y_domain%beg, or         '// &
                                  'y_domain%end. Exiting ...')

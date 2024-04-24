@@ -74,7 +74,6 @@ contains
         !!      selecting the phase change module that will be used
         !!      (pT- or pTg-equilibrium)
     subroutine s_initialize_phasechange_module()
-
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
              + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0d0)*cvs(vp))
@@ -87,14 +86,6 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-        ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution to the selected relaxation system
-        if ((relax_model == 5) .or. (relax_model == 6)) then
-            s_relaxation_solver => s_infinite_relaxation_k
-        else
-            call s_mpi_abort('relaxation solver was not set!')
-        end if
-
     end subroutine s_initialize_phasechange_module !-------------------------------
 
     !>  This subroutine is created to activate either the pT- (N fluids) or the
@@ -103,6 +94,7 @@ contains
         !!      state conditions.
         !!  @param q_cons_vf Cell-average conservative variables
     subroutine s_infinite_relaxation_k(q_cons_vf) ! ----------------
+
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         real(kind(0.0d0)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
         real(kind(0.0d0)) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
@@ -305,6 +297,7 @@ contains
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+
         !$acc routine seq
 
         ! initializing variables
@@ -321,10 +314,7 @@ contains
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; pk(1:num_fluids) = 0.0d0
-
-        ig(1:num_fluids) = 0
-
+        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; 
         ! Performing tests before initializing the pT-equilibrium
         !$acc loop seq
         do i = 1, num_fluids
@@ -409,6 +399,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
+
         !$acc routine seq
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
@@ -424,7 +415,6 @@ contains
 
         !< Generic loop iterators
         integer :: i, ns
-
         ! pTg-equilibrium solution procedure
         ! Newton Solver parameters
         ! counter
@@ -517,7 +507,6 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
-
     end subroutine s_infinite_ptg_relaxation_k ! -----------------------
 
     !>  This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative
@@ -538,7 +527,6 @@ contains
         real(kind(0.0d0)), intent(OUT) :: MCT
         integer, intent(IN) :: j, k, l
         !> @}
-
         if (rM < 0.0d0) then
 
             if ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) >= -1.0d0*mixM) .and. &
@@ -572,7 +560,6 @@ contains
             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = MCT*rM
 
         end if
-
     end subroutine s_correct_partial_densities
 
     !>  This auxiliary subroutine calculates the 2 x 2 Jacobian and, its inverse and transpose
@@ -785,9 +772,6 @@ contains
 
     !>  This subroutine finalizes the phase change module
     subroutine s_finalize_relaxation_solver_module()
-
-        s_relaxation_solver => null()
-
     end subroutine
 
 #endif

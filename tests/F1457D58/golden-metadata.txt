@@ -1,51 +1,18 @@
-This file was created on 2023-11-21 08:17:55.088655.
+This file was created on 2024-04-08 18:58:35.720921.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate
+    Invocation: test -o F1457D58 --generate
     Lock:       mpi=Yes & gpu=No & debug=No
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.27.7 on shb-m1pro-3.local
-    
-        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
-        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/homebrew/bin/gcc-13
-        CXX      : g++-13
-        FC       : /opt/homebrew/bin/gfortran-13
-        OMPI_CC  : 
-        OMPI_CXX : g++-13
-        OMPI_FC  : gfortran-13
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.27.7 on shb-m1pro-3.local
+        CMake v3.23.2 on lawn-128-61-11-198.lawn.gatech.edu
     
-        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
-        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+        C       : AppleClang v15.0.0.15000040 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -57,28 +24,61 @@ syscheck:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
+        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/homebrew/bin/gcc-13
-        CXX      : g++-13
-        FC       : /opt/homebrew/bin/gfortran-13
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
-        OMPI_CXX : g++-13
-        OMPI_FC  : gfortran-13
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.23.2 on lawn-128-61-11-198.lawn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000040 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.27.7 on shb-m1pro-3.local
+        CMake v3.23.2 on lawn-128-61-11-198.lawn.gatech.edu
     
-        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
-        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+        C       : AppleClang v15.0.0.15000040 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -90,27 +90,27 @@ pre_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /Users/spencer/Downloads/master/MFC/build/venv/bin/fypp
+        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/homebrew/bin/gcc-13
-        CXX      : g++-13
-        FC       : /opt/homebrew/bin/gfortran-13
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
-        OMPI_CXX : g++-13
-        OMPI_FC  : gfortran-13
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 CPU:
 
-    CPU Info: 
+    CPU Info:
     From sysctl -a 
-    machdep.cpu.cores_per_package: 10
-    machdep.cpu.core_count: 10
-    machdep.cpu.logical_per_package: 10
-    machdep.cpu.thread_count: 10
-    machdep.cpu.brand_string: Apple M1 Max
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M1
 
