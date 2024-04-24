@@ -627,10 +627,10 @@ contains
         root = 0
         
         call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
-        
-        write (21520, '(F19.3,1X,F19.3,1X, F19.3, 1X, F12.9)') &
+        if (t_step > t_step_start) then 
+            write (21520, '(F19.3,1X,F19.3,1X, F19.3, 1X, F12.9)') &
                             Eint, Elk, Egk, nondim_time
-                   
+         end if           
 
         end subroutine s_write_eng_data_file    
         
@@ -643,13 +643,7 @@ contains
         
         Elk = 0d0
         Egk = 0d0
-        rho = 0d0
-        pres = 0d0
         Eint = 0d0
-        gamma = 0d0
-        pi_inf = 0d0
-        qv = 0d0
-
         if (p > 0) then
             do k = 0, p
                 do j = 0, n
@@ -657,9 +651,16 @@ contains
                         Elks = 0d0
                         Egks = 0d0
                         Eints = 0d0
+                        pres = 0d0
+                        rho = 0d0
+                        gamma = 0d0
+                        pi_inf = 0d0
+                        do l = 1, num_fluids
+                             rho = rho + q_prim_vf(E_idx+l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
+                             gamma = gamma + q_prim_vf(E_idx+l)%sf(i, j, k)*gammas(l)
+                             pi_inf = pi_inf + q_prim_vf(E_idx+l)%sf(i, j, k)*pi_infs(l)
+                        end do
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        call s_convert_to_mixture_variables(q_prim_vf, i, j, k, &
-                                                            rho, gamma, pi_inf, qv) 
                         Eints = gamma*pres+pi_inf
                         dV = dx(i)*dy(j)*dz(k)
                         do s = 1, num_dims
