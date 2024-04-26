@@ -11,6 +11,7 @@ __Authors:__ Spencer Bryngleson (Georgia Tech), Henry Le Berre (Georgia Tech), S
 * CAST-31898, Case 5370334261
 * PE-47678
 * PE-47679 'CCE-15.0.1,16.0.0 Unsupported OpenACC construct '!$acc routine seq''
+* PE-53844 'CCE >17 crashes on host_data use_device for module variables'
 
 ## NVHPC - NVIDIA
 
