@@ -542,13 +542,19 @@ contains
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-        if (mod(p, 2) > 0) then
-            cent = p/2 + 1/2
-        elseif (mod(p, 2) == 0) then
-            cent = p/2
+        
+!        if ()
+!        if (mod(p, 2) > 0) then
+!        !    cent = p/2 + 1/2
+!        elseif (mod(p, 2) == 0) then
+!            cent = p/2
+        if (p > 0) then
+            cent = 0
         elseif (p == 0) then
             cent = 0
         endif
+        !$acc data copyin(x_d1, y_d1) copy(counter)
+        !$acc parallel loop gang default(present) private(axp, axm, ayp, aym, i)
            do k = 0, n
                 OLoop: do j = 0, m
                     axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
@@ -564,6 +570,7 @@ contains
                             x_d1(counter) = x_cc(j)
                             y_d1(counter) = y_cc(k)
                         else
+                            !$acc loop vector
                             do i = 1, counter
                                 if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
                                     y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
@@ -581,6 +588,8 @@ contains
                     end if
                 end do OLoop
             end do
+            !$acc end parallel loop
+            !$acc end data
         !    endif
         !    end do
 
@@ -645,6 +654,7 @@ contains
         Egk = 0d0
         Eint = 0d0
         if (p > 0) then
+            !$acc parallel loop collapse(3) gang vector default(present) private(Elks, Egks, Eints, pres, rho, gamma, pi_inf, vel, dV)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -655,6 +665,7 @@ contains
                         rho = 0d0
                         gamma = 0d0
                         pi_inf = 0d0
+                        !$acc loop seq
                         do l = 1, num_fluids
                              rho = rho + q_prim_vf(E_idx+l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
                              gamma = gamma + q_prim_vf(E_idx+l)%sf(i, j, k)*gammas(l)
@@ -663,6 +674,7 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
                         Eints = gamma*pres+pi_inf
                         dV = dx(i)*dy(j)*dz(k)
+                        !$acc loop vector
                         do s = 1, num_dims
                             vel(s) =  q_prim_vf(num_fluids + s)%sf(i, j, k)
                             if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
@@ -677,6 +689,7 @@ contains
                     end do
                 end do
             end do
+            !$acc end parallel loop
         end if
         tmp = Elk
         call s_mpi_allreduce_sum(tmp, Elk)
