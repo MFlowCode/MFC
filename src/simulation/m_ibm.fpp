@@ -85,7 +85,7 @@ contains
         @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
         @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
 
-        !$acc enter data copyin(gp_layers, num_gps)
+        !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
 
     end subroutine s_initialize_ibm_module
 
