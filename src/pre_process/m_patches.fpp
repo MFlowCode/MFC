@@ -1365,7 +1365,7 @@ contains
 
         real(kind(0d0)) :: r, x_p, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, eps, phi
         real(kind(0d0)) :: a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
-        real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid
+        real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid, eta, smooth_coeff
         logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
@@ -1401,7 +1401,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        if (p > 0) then
+        if (p > 0 .and. .not. non_axis_sym) then
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1413,48 +1413,69 @@ contains
                         end if
 
                         r = dsqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) + eps
-                        x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        if (x_cc(i)-x_centroid <= 0) then
+                            x_p = -dabs(x_cc(i) - x_centroid + eps)/r
+                        else
+                            x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        end if
+
                         P2 = unassociated_legendre(x_p, 2)
                         P3 = unassociated_legendre(x_p, 3)
                         P4 = unassociated_legendre(x_p, 4)
                         P5 = unassociated_legendre(x_p, 5)
                         P6 = unassociated_legendre(x_p, 6)
                         P7 = unassociated_legendre(x_p, 7)
-
-                        if (x_cc(i) - x_centroid >= 0 &
+                        if ((x_cc(i) - x_centroid >= 0 &
                             .and. &
                             r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7 <= radius &
                             .and. &
-                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                            (patch_id_fp(i, j, k) == smooth_patch_id)) &
                             then
                             if (patch_icpp(patch_id)%smoothen) then
                                 eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                      (sqrt((x_cc(i) - x_centroid)**2 &
-                                     + (cart_y - y_centroid)**2 &
-                                     + (cart_z - z_centroid)**2) &
-                                     -(r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7)))*(-0.5d0) + 0.5d0
-                            end if
-
-                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                    eta, q_prim_vf, patch_id_fp)
-
-                        elseif (x_cc(i) - x_centroid < 0 &
-                                .and. &
-                                r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7 <= radius &
-                                .and. &
-                                patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
-                            then
-                            if (patch_icpp(patch_id)%smoothen) then
-                                eta = tanh(smooth_coeff/min(dx, dy, dz)* &
-                                      (sqrt((x_cc(i) - x_centroid)**2 &
-                                     + (cart_y - y_centroid)**2 &
-                                     + (cart_z - z_centroid)**2) &
-                                     -(r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7)))*(-0.5d0) + 0.5d0
+                                      ((r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7) &
+                                     - radius))*(-0.5d0) + 0.5d0
                             end if
 
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                                     eta, q_prim_vf, patch_id_fp)
                         end if
+                   !     if ((x_cc(i) - x_centroid >= 0 &
+                   !         .and. &
+                   !         r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7 <= radius &
+                   !         .and. &
+                   !         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                   !         (patch_id_fp(i, j, k) == smooth_patch_id)) &
+                   !         then
+                   !         if (patch_icpp(patch_id)%smoothen) then
+                   !             eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                   !                   ((r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7) &
+                   !                  - radius))*(-0.5d0) + 0.5d0
+                   !         end if
+!
+ !                           call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                        !                                            eta, q_prim_vf, patch_id_fp)
+                           ! @:analytical()
+
+                       ! elseif ((x_cc(i) - x_centroid < 0 &
+                         !       .and. &
+                         !       r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7 <= radius &
+                         !       .and. &
+                         !       patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                         !      (patch_id_fp(i, j, k) == smooth_patch_id)) &
+                         !   then
+                         !   if (patch_icpp(patch_id)%smoothen) then
+                         !        eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                         !             ((r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7) &
+                         !            - radius))*(-0.5d0) + 0.5d0
+                         !   end if
+
+                        !    call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                        !                                            eta, q_prim_vf, patch_id_fp)
+                           ! @:analytical()
+
+                       ! end if
                     end do
                 end do
             end do
