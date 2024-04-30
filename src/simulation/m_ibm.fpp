@@ -43,8 +43,9 @@ module m_ibm
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
+    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), inner_points)
 
-    !$acc declare link(levelset, levelset_norm, ghost_points)
+    !$acc declare link(levelset, levelset_norm, ghost_points, inner_points)
 #else
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
@@ -53,14 +54,16 @@ module m_ibm
     real(kind(0d0)), dimension(:, :, :, :, :), allocatable :: levelset_norm
     !! Matrix of normal vector to IB
     type(ghost_point), dimension(:), allocatable :: ghost_points
+    type(ghost_point), dimension(:), allocatable :: inner_points
     !! Matrix of normal vector to IB
 
-    !$acc declare create(levelset, levelset_norm, ghost_points)
+    !$acc declare create(levelset, levelset_norm, ghost_points, inner_points)
 #endif
 
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
-    !$acc declare create(gp_layers, num_gps)
+    integer :: num_inner_gps !< Number of ghost points
+    !$acc declare create(gp_layers, num_gps, num_inner_gps)
 
 contains
 
@@ -82,7 +85,7 @@ contains
         @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
         @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
 
-        !$acc enter data copyin(gp_layers, num_gps)
+        !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
 
     end subroutine s_initialize_ibm_module
 
@@ -97,12 +100,14 @@ contains
 
         call s_find_num_ghost_points()
 
-        !$acc update device(num_gps)
+        !$acc update device(num_gps, num_inner_gps)
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
-        !$acc enter data copyin(ghost_points)
+        @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
 
-        call s_find_ghost_points(ghost_points)
-        !$acc update device(ghost_points)
+        !$acc enter data copyin(ghost_points, inner_points)
+
+        call s_find_ghost_points(ghost_points, inner_points)
+        !$acc update device(ghost_points, inner_points)
 
         call s_compute_levelset(levelset, levelset_norm)
         !$acc update device(levelset, levelset_norm)
@@ -153,8 +158,9 @@ contains
         real(kind(0d0)) :: nbub
         real(kind(0d0)) :: buf
         type(ghost_point) :: gp
+        type(ghost_point) :: innerp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, q, coeff)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, innerp, norm, buf, j, k, l, q, coeff)
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -288,6 +294,43 @@ contains
             end if
         end do
 
+        !Correct the state of the inner points in IBs
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, vel_g, rho, gamma, pi_inf, Re_K, innerp, j, k, l, q)
+        do i = 1, num_inner_gps
+
+            vel_g = 0d0
+            innerp = inner_points(i)
+            j = innerp%loc(1)
+            k = innerp%loc(2)
+            l = innerp%loc(3)
+            patch_id = inner_points(i)%ib_patch_id
+
+            ! Calculate physical location of GP
+            if (p > 0) then
+                physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
+            else
+                physical_loc = [x_cc(j), y_cc(k), 0d0]
+            end if
+
+            !$acc loop seq
+            do q = 1, num_fluids
+                q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+            end do
+
+            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                                            alpha_rho_IP, Re_K, j, k, l)
+
+            dyn_pres = 0d0
+
+            !$acc loop seq
+            do q = momxb, momxe
+                q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
+                dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
+                           vel_g(q - momxb + 1)/2d0
+            end do
+        end do
+
     end subroutine s_ibm_correct_state
 
     !>  Function that computes that bubble wall pressure for Gilmore bubbles
@@ -413,6 +456,8 @@ contains
                                         j - gp_layers:j + gp_layers, 0)
                         if (any(subsection_2D == 0)) then
                             num_gps = num_gps + 1
+                        else
+                            num_inner_gps = num_inner_gps + 1
                         end if
                     end if
                 else
@@ -424,6 +469,8 @@ contains
                                             k - gp_layers:k + gp_layers)
                             if (any(subsection_3D == 0)) then
                                 num_gps = num_gps + 1
+                            else
+                                num_inner_gps = num_inner_gps + 1
                             end if
                         end if
                     end do
@@ -433,18 +480,20 @@ contains
 
     end subroutine s_find_num_ghost_points
 
-    subroutine s_find_ghost_points(ghost_points)
+    subroutine s_find_ghost_points(ghost_points, inner_points)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
+        type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
         integer :: i, j, k !< Iterator variables
-        integer :: count
+        integer :: count, count_i
         integer :: patch_id
 
         count = 1
+        count_i = 1
 
         do i = 0, m
             do j = 0, n
@@ -460,6 +509,13 @@ contains
                                 patch_id
                             ghost_points(count)%slip = patch_ib(patch_id)%slip
                             count = count + 1
+                        else
+                            inner_points(count_i)%loc = [i, j, 0]
+                            patch_id = ib_markers%sf(i, j, 0)
+                            inner_points(count_i)%ib_patch_id = &
+                                patch_id
+                            inner_points(count_i)%slip = patch_ib(patch_id)%slip
+                            count_i = count_i + 1
                         end if
                     end if
                 else
@@ -476,6 +532,13 @@ contains
                                     ib_markers%sf(i, j, k)
                                 ghost_points(count)%slip = patch_ib(patch_id)%slip
                                 count = count + 1
+                            else
+                                inner_points(count_i)%loc = [i, j, k]
+                                patch_id = ib_markers%sf(i, j, k)
+                                inner_points(count_i)%ib_patch_id = &
+                                    ib_markers%sf(i, j, k)
+                                inner_points(count_i)%slip = patch_ib(patch_id)%slip
+                                count_i = count_i + 1
                             end if
                         end if
                     end do
