@@ -548,19 +548,22 @@ contains
 !        !    cent = p/2 + 1/2
 !        elseif (mod(p, 2) == 0) then
 !            cent = p/2
-        if (p > 0) then
-            cent = 0
-        elseif (p == 0) then
-            cent = 0
-        endif
-        !$acc data copyin(x_d1, y_d1) copy(counter)
-        !$acc parallel loop gang default(present) private(axp, axm, ayp, aym, i)
+!        if (p > 0) then
+!            cent = 0
+!        elseif (p == 0) then
+!            cent = 0
+!        endif
+        do l = 0,p
+            if (z_cc(l) .lt. dz(l) .and. z_cc(l) .gt. 0) then
+                    cent = l
+            endif
+        enddo
            do k = 0, n
-                OLoop: do j = 0, m
-                    axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
-                    axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
-                    ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
-                    aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, cent)
+              OLoop: do j = 0, m
+                    axp = q_prim_vf(E_idx + 1)%sf(j + 1, k, cent)
+                    axm = q_prim_vf(E_idx + 1)%sf(j - 1, k, cent)
+                    ayp = q_prim_vf(E_idx + 1)%sf(j, k + 1, cent)
+                    aym = q_prim_vf(E_idx + 1)%sf(j, k - 1, cent)
  
 
                     if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
@@ -570,7 +573,6 @@ contains
                             x_d1(counter) = x_cc(j)
                             y_d1(counter) = y_cc(k)
                         else
-                            !$acc loop vector
                             do i = 1, counter
                                 if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
                                     y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
@@ -588,10 +590,7 @@ contains
                     end if
                 end do OLoop
             end do
-            !$acc end parallel loop
-            !$acc end data
-        !    endif
-        !    end do
+       
 
         allocate (y_d(counter))
         allocate (x_d(counter))
@@ -599,7 +598,7 @@ contains
             y_d(i) = y_d1(i)
             x_d(i) = x_d1(i)
         end do
-        if (num_procs > 1) then
+       ! if (num_procs > 1) then
             call s_mpi_gather_data(x_d, counter, x_td, root)
             call s_mpi_gather_data(y_d, counter, y_td, root)
             if (proc_rank == 0) then
@@ -613,8 +612,8 @@ contains
                     end if
                 end do
             end if
-        end if
-
+       ! end if
+        print*, x_d
 
     end subroutine s_write_sim_data_file ! -----------------------------------
 
