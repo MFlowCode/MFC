@@ -1374,6 +1374,8 @@ contains
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         radius = patch_icpp(patch_id)%radius
         a2 = patch_icpp(patch_id)%a2
         a3 = patch_icpp(patch_id)%a3
@@ -1425,6 +1427,14 @@ contains
                             .and. &
                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                             then
+                            if (patch_icpp(patch_id)%smoothen) then
+                                eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                                      (sqrt((x_cc(i) - x_centroid)**2 &
+                                     + (cart_y - y_centroid)**2 &
+                                     + (cart_z - z_centroid)**2) &
+                                     -(r - a2*P2 - a3*P3 - a4*P4 - a5*P5 - a6*P6 - a7*P7)))*(-0.5d0) + 0.5d0
+                            end if
+
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                                     eta, q_prim_vf, patch_id_fp)
 
@@ -1434,6 +1444,14 @@ contains
                                 .and. &
                                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                             then
+                            if (patch_icpp(patch_id)%smoothen) then
+                                eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                                      (sqrt((x_cc(i) - x_centroid)**2 &
+                                     + (cart_y - y_centroid)**2 &
+                                     + (cart_z - z_centroid)**2) &
+                                     -(r - a2*P2 + a3*P3 - a4*P4 + a5*P5 - a6*P6 + a7*P7)))*(-0.5d0) + 0.5d0
+                            end if
+
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                                     eta, q_prim_vf, patch_id_fp)
                         end if

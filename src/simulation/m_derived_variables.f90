@@ -121,7 +121,7 @@ contains
 
         integer, intent(IN) :: t_step
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        
+
         integer :: i, j, k !< Generic loop iterators
 
         if (probe_wrt) then
@@ -165,9 +165,9 @@ contains
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
             call s_write_com_files(t_step, c_mass)
         end if
-        
+
         if ((sim_data) .and. (mod(t_step - t_step_start, t_step_save) == 0 .or. &
-               t_step > t_step_stop)) then
+                              t_step > t_step_stop)) then
             call s_write_sim_data_file(q_prim_vf, t_step)
             call s_write_eng_data_file(q_prim_vf, t_step)
         end if
