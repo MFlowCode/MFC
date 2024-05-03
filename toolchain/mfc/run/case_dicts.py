@@ -6,7 +6,8 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "file_per_process", "relax", "relax_model"
+    "Ca", "polydisperse", "file_per_process", "relax", "relax_model",
+    "adv_n"
 ]
 
 
@@ -15,7 +16,7 @@ PRE_PROCESS = COMMON + [
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-    'ib', 'num_ibs'
+    'pi_fac', 'ib', 'num_ibs'
 ]
 
 for ib_id in range(1, 10+1):
@@ -89,7 +90,8 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', "palpha_eps", "ptgalpha_eps", 'ib', 'num_ibs'
+    'num_integrals', 'cu_mpi', 'palpha_eps', 'ptgalpha_eps', 
+    'pi_fac', 'adap_dt', 'ib', 'num_ibs'
 ]
 
 for ib_id in range(1, 10+1):
