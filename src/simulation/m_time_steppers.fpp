@@ -27,6 +27,10 @@ module m_time_steppers
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_boundary_conditions
+
+    use m_helper
+
     use m_fftw
 
     use m_nvtx
@@ -167,6 +171,12 @@ contains
                     iz_t%beg:iz_t%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
+            if (adv_n) then
+                @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+            end if
         end if
 
         if (hypoelasticity) then
@@ -283,6 +293,7 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 1 =====================================================
 
@@ -362,6 +373,8 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
@@ -393,6 +406,7 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -466,6 +480,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -535,6 +551,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
@@ -559,20 +577,23 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in) ! --------------------------------
 
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
+        real(kind(0d0)), intent(IN) :: dt_in
 
-        integer :: i, j, k, l, q
+        integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
-        call cpu_time(start)
-
-        call nvtxStartRange("Time_Step")
+        if (.not. adap_dt) then
+            call cpu_time(start)
+            call nvtxStartRange("Time_Step")
+        end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
 
@@ -593,7 +614,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + dt_in*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -609,7 +630,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_pb(j, k, l, q, i)
+                                    + dt_in*rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -626,7 +647,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt*rhs_mv(j, k, l, q, i)
+                                    + dt_in*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -639,6 +660,8 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
+
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -662,7 +685,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
                     end do
                 end do
             end do
@@ -678,7 +701,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -696,7 +719,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -709,6 +732,8 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
+
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -731,7 +756,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
                     end do
                 end do
             end do
@@ -747,7 +772,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -765,7 +790,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -779,6 +804,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
@@ -786,6 +813,47 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
         end if
+
+        if (.not. adap_dt) then
+            call nvtxEndRange
+            call cpu_time(finish)
+
+            time = time + (finish - start)
+
+            if (t_step >= 4) then
+                time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+            else
+                time_avg = 0d0
+            end if
+        end if
+        ! ==================================================================
+
+    end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+
+    !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
+        !!      the flux term and adaptive time stepping algorithm for
+        !!      the source term
+        !! @param t_step Current time-step
+    subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
+        integer :: i, j, k, l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+
+        call cpu_time(start)
+
+        call nvtxStartRange("Time_Step")
+
+        ! Stage 1 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
+
+        ! Stage 2 of 3 =====================================================
+        call s_adaptive_dt_bubble(t_step)
+
+        ! Stage 3 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         call nvtxEndRange
 
@@ -801,7 +869,30 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+    end subroutine s_strang_splitting ! ------------------------------------
+
+    !> Bubble source part in Strang operator splitting scheme
+        !! @param q_cons_vf conservative variables
+    subroutine s_adaptive_dt_bubble(t_step) ! ------------------------
+
+        integer, intent(IN) :: t_step
+
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp
+
+        integer :: i, j, k, l, q !< Generic loop iterator
+
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+
+    end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

@@ -188,16 +188,16 @@ contains
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax', 'ib',  &
-            & 'num_ibs']
+            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',        &
+            & 'adv_n', 'adap_dt', 'ib', 'num_ibs' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca',     &
-            & 'Re_inv','poly_sigma','bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1',&
-            & 'bc_x%ve2','bc_x%ve2','bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1',  &
-            & 'bc_y%ve2','bc_y%ve3','bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1',  &
-            & 'bc_z%ve2','bc_z%ve3', 'palpha_eps', 'ptgalpha_eps', 'sigma']
+        #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca', 'sigma', &
+            & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
+            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
+            & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
+            & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
