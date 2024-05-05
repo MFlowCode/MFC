@@ -213,12 +213,6 @@ contains
 
         end if
 
-        if (patch_icpp(patch_id)%smoothen .and. &
-            (patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y)) then
-            call s_mpi_abort('Patch smoothing of retangle patch '//trim(iStr)// &
-                             'requires the patch to be a square. Exiting ...')
-        end if
-
     end subroutine s_check_rectangle_patch_geometry ! ----------------------
 
     !> This subroutine verifies that the geometric parameters of
@@ -482,17 +476,6 @@ contains
                              'geometric parameters of cuboid '// &
                              'patch '//trim(iStr)//'. Exiting ...')
 
-        end if
-
-        if (patch_icpp(patch_id)%smoothen .and. &
-            ((patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y) &
-             .or. &
-             (patch_icpp(patch_id)%length_x /= patch_icpp(patch_id)%length_y) &
-             .or. &
-             (patch_icpp(patch_id)%length_y /= patch_icpp(patch_id)%length_z))) &
-            then
-            call s_mpi_abort('Patch smoothing of cuboid patch '//trim(iStr)// &
-                             'requires the patch to be a cube. Exiting ...')
         end if
 
     end subroutine s_check_cuboid_patch_geometry ! -------------------------
