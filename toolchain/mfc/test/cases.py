@@ -75,7 +75,7 @@ def generate_cases() -> typing.List[TestCase]:
             cases.append(create_case(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_capillary():
-        cases.append(create_case(stack, f"capillary=T",{'sigma':1}))
+        cases.append(create_case(stack, [f"capillary=T","model_eqns=3"],{'sigma':1,'model_eqns':3}))
 
     def alter_weno():
         for weno_order in [3, 5]:

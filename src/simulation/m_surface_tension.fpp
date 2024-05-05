@@ -1,5 +1,5 @@
 #:include 'macros.fpp'
-#:include 'inline_capilary.fpp'
+#:include 'inline_capillary.fpp'
 
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_surface_tension
@@ -176,7 +176,7 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        if (normW > capillaryCutoff) then
+                        if (normW > capillary_cutoff) then
                             @:compute_capilary_stress_tensor()
 
                             do i = 1, num_dims
@@ -222,7 +222,7 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        if (normW > capillaryCutoff) then
+                        if (normW > capillary_cutoff) then
                             @:compute_capilary_stress_tensor()
 
                             do i = 1, num_dims
