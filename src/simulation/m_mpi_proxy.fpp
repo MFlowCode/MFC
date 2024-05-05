@@ -3257,6 +3257,8 @@ contains
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
+#ifdef MFC_MPI
+
         ! MPI Communication in x-direction =================================
         if (mpi_dir == 1) then
 
@@ -4064,6 +4066,8 @@ contains
 
         end if
         ! END: MPI Communication in z-direction ============================
+
+#endif
 
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
