@@ -130,21 +130,22 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        @:compute_capilary_stress_tensor()
+                        if (normW > capillary_cutoff) then
+                            @:compute_capilary_stress_tensor()
 
-                        do i = 1, num_dims
+                            do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
+
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                                 Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
+
+                            end do
 
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                             Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
-
-                        end do
-
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
-
+                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
+                        end if
                     end do
                 end do
             end do
@@ -175,21 +176,22 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        @:compute_capilary_stress_tensor()
+                        if (normW > capillaryCutoff) then
+                            @:compute_capilary_stress_tensor()
 
-                        do i = 1, num_dims
+                            do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                                 Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
+
+                            end do
 
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                             Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
-
-                        end do
-
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
-
+                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                        end if
                     end do
                 end do
             end do
@@ -220,21 +222,22 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        @:compute_capilary_stress_tensor()
+                        if (normW > capillaryCutoff) then
+                            @:compute_capilary_stress_tensor()
 
-                        do i = 1, num_dims
+                            do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
+
+                                flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                                 Omega(3, i)*vSrc_rsz_vf(l, k, j, i)
+
+                            end do
 
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                             Omega(3, i)*vSrc_rsz_vf(l, k, j, i)
-
-                        end do
-
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                         sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
-
+                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
+                        end if
                     end do
                 end do
             end do
