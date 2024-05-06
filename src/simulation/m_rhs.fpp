@@ -2154,7 +2154,6 @@ contains
             recon_order = weno_order
         end if
 
-
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             weno_dir = 1; is1%beg = is1%beg + weno_polyn

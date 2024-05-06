@@ -327,69 +327,47 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
+        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
-            recon_dir = 1; is1%beg = is1%beg + weno_polyn
+            weno_dir = 1; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
-            recon_dir = 2; is1%beg = is1%beg + weno_polyn
+            weno_dir = 2; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         else
             is1 = iz; is2 = iy; is3 = ix
-            recon_dir = 3; is1%beg = is1%beg + weno_polyn
+            weno_dir = 3; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
+        if (n > 0) then
+            if (p > 0) then
 
-        if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
+                call s_weno(v_vf(iv%beg:iv%end), &
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                            norm_dir, weno_dir, &
+                            is1, is2, is3, 1)
+            else
+                call s_weno(v_vf(iv%beg:iv%end), &
+                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                            norm_dir, weno_dir, &
+                            is1, is2, is3, 1)
+            end if
+        else
+
+            call s_weno(v_vf(iv%beg:iv%end), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                        norm_dir, weno_dir, &
+                        is1, is2, is3, 1)
         end if
 
     end subroutine s_reconstruct_cell_boundary_values_capilary
