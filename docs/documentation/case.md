@@ -72,16 +72,17 @@ There are multiple sets of parameters that must be specified in the python input
 1. [Runtime Parameters](#1-runtime)
 2. [Computational Domain Parameters](#2-computational-domain)
 3. [Patch Parameters](#3-patches)
-4. [Fluid Material's Parameters](#4-fluid-materials)
-5. [Simulation Algorithm Parameters](#5-simulation-algorithm)
-6. [Formatted Database and Structure Parameters](#6-formatted-output)
-7. [(Optional) Acoustic Source Parameters](#7-acoustic-source)
-8. [(Optional) Ensemble-Averaged Bubble Model Parameters](#8-ensemble-averaged-bubble-model)
-9. [(Optional) Velocity Field Setup Parameters](#9-velocity-field-setup)
-10. [(Optional) Phase Change Parameters](#10-Phase-Change-Model)
-11. [(Optional) Artificial Mach Number Parameters](#11-artificial-Mach-number)
+4. [Immersed Boundary Patches](#4-immersed-boundary-patches)
+5. [Fluid Material's Parameters](#5-fluid-materials)
+6. [Simulation Algorithm Parameters](#6-simulation-algorithm)
+7. [Formatted Database and Structure Parameters](#7-formatted-output)
+8. [(Optional) Acoustic Source Parameters](#8-acoustic-source)
+9. [(Optional) Ensemble-Averaged Bubble Model Parameters](#9-ensemble-averaged-bubble-model)
+10. [(Optional) Velocity Field Setup Parameters](#10-velocity-field-setup)
+11. [(Optional) Phase Change Parameters](#11-Phase-Change-Model)
+12. [(Optional) Artificial Mach Number Parameters](#12-artificial-Mach-number)
 
-Items 7, 8, 9, and 10 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, and phase change, respectively.
+Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
@@ -662,7 +663,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model. 
 
-### 11. Artificial Mach Number
+### 12. Artificial Mach Number
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
