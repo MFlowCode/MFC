@@ -30,7 +30,8 @@ sudo apt update
 sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++ \
                    python3 python3-dev         \
-                   "openmpi-*" libopenmpi-dev
+                   "openmpi-*" libopenmpi-dev \
+                   python3-venv
 ```
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
@@ -111,26 +112,19 @@ Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS:
 We do *not* support `clang` due to conflicts with the Silo dependency.
 
 ```console
-# === MFC MPI Installation ===
 export MFC_GCC_VER=13
-export OMPI_MPICC=gcc-$MFC_GCC_VER
-export OMPI_CXX=g++-$MFC_GCC_VER
-export OMPI_FC=gfortran-$MFC_GCC_VER
 export CC=gcc-$MFC_GCC_VER
 export CXX=g++-$MFC_GCC_VER
 export FC=gfortran-$MFC_GCC_VER
-# === MFC MPI Installation ===
 ```
 
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
 ```console
-brew install wget make python make cmake coreutils gcc@$MFC_GCC_VER
-HOMEBREW_MAKE_JOBS=$(nproc) brew install --cc=gcc-$MFC_GCC_VER --verbose --build-from-source open-mpi
+brew install wget python cmake gcc@$MFC_GCC_VER mpich
 ```
 
-They will download the dependencies MFC requires to build itself. `open-mpi` will be compiled from source, using the version of GCC we specified above with the environment variables `HOMEBREW_CC` and `HOMEBREW_CXX`.
-Building this package might take a while.
+They will download the dependencies MFC requires to build itself.
 
 </details>
 
