@@ -100,6 +100,7 @@ module m_global_parameters
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
     integer :: E_idx                               !< Index of energy equation
+    integer :: n_idx                               !< Index of number density
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -223,6 +224,7 @@ module m_global_parameters
     logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
+    logical :: adv_n
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
@@ -341,6 +343,7 @@ contains
         polydisperse = .false.
         poly_sigma = dflt_real
         sigR = dflt_real
+        adv_n = .false.
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
@@ -414,6 +417,11 @@ contains
                     end if
                 end if
                 sys_size = bub_idx%end
+
+                if (adv_n) then
+                    n_idx = bub_idx%end + 1
+                    sys_size = n_idx
+                end if
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))

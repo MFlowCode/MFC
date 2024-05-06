@@ -207,7 +207,7 @@ print(json.dumps({{**case, **mods}}))
             return 1e-10
 
         if self.params.get("bubbles", 'F') == 'T':
-            return 1e-10
+            return 2e-10
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7

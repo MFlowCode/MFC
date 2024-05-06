@@ -81,19 +81,34 @@ As an example, one might request GPUs on a SLURM system using the following:
 **Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
 allocate resources. Therefore, the MFC constructs equivalent resource sets in the task and GPU count.
 
-### Profiling with NVIDIA Nsight
+### GPU Profiling 
+
+#### NVIDIA GPUs
 
 MFC provides two different arguments to facilitate profiling with NVIDIA Nsight.
 **Please ensure the used argument is placed at the end so their respective flags can be appended.**
-- Nsight Systems (Nsys): `./mfc.sh run ... --nsys [nsys flags]` allows one to visualize MFC's system-wide performance with [NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems).
+- Nsight Systems (Nsys): `./mfc.sh run ... -t simulation --nsys [nsys flags]` allows one to visualize MFC's system-wide performance with [NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems).
 NSys is best for understanding the order and execution times of major subroutines (WENO, Riemann, etc.) in MFC.
 When used, `--nsys` will run the simulation and generate `.nsys-rep` files in the case directory for all targets.
 These files can then be imported into Nsight System's GUI, which can be downloaded [here](https://developer.nvidia.com/nsight-systems/get-started#latest-Platforms). It is best to run case files with a few timesteps to keep the report files small. Learn more about NVIDIA Nsight Systems [here](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
-- Nsight Compute (NCU): `./mfc.sh run ... --ncu [ncu flags]` allows one to conduct kernel-level profiling with [NVIDIA Nsight Compute](https://developer.nvidia.com/nsight-compute).
+- Nsight Compute (NCU): `./mfc.sh run ... -t simulation --ncu [ncu flags]` allows one to conduct kernel-level profiling with [NVIDIA Nsight Compute](https://developer.nvidia.com/nsight-compute).
 NCU provides profiling information for every subroutine called and is more detailed than NSys.
 When used, `--ncu` will output profiling information for all subroutines, including elapsed clock cycles, memory used, and more after the simulation is run.
 Adding this argument will significantly slow the simulation and should only be used on case files with a few timesteps.
 Learn more about NVIDIA Nsight Compute [here](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html).
+
+
+#### AMD GPUs
+- Rocprof (ROC): `./mfc.sh run ... -t simulation --roc --hip-trace [rocprof flags]` allows one to visualize MFC's system-wide performance with [Perfetto UI](https://ui.perfetto.dev/).
+When used, `--roc` will run the simulation and generate files in the case directory for all targets.
+`results.json` can then be imported in [Perfetto's UI](https://ui.perfetto.dev/).
+Learn more about AMD Rocprof [here](https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.5.1/rocprof.html)
+It is best to run case files with a few timesteps to keep the report files small.
+- Omniperf (OMNI): `./mfc.sh run ... -t simulation --omni [omniperf flags]`allows one to conduct kernel-level profiling with [AMD Omniperf](https://rocm.github.io/omniperf/introduction.html#what-is-omniperf).
+When used, `--omni` will output profiling information for all subroutines, including rooflines, cache usage, register usage, and more after the simulation is run.
+Adding this argument will moderately slow down the simulation and run the MFC executable several times.
+For this reason it should only be used with case files that have a few timesteps.
+
 
 ### Restarting Cases
 

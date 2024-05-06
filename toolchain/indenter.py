@@ -15,9 +15,10 @@ def main():
     adjust_indentation(filepath, temp_filepath)
     os.replace(temp_filepath, filepath)
 
-BLOCK_STARTERS  = ('if', 'do', '#:if', '#:else')
-BLOCK_ENDERS    = ('end', 'contains', 'else', '#:end', '#:else')
+BLOCK_STARTERS  = ('if', 'do', '#:if', '#:else', "#ifdef", "#else")
+BLOCK_ENDERS    = ('end', 'contains', 'else', '#:end', '#:else', '#else', '#endif')
 LOOP_DIRECTIVES = ('!$acc loop', '!$acc parallel loop')
+INDENTERS       = ('!DIR', '!$acc')
 
 # pylint: disable=too-many-branches
 def adjust_indentation(input_file, output_file):
@@ -33,7 +34,7 @@ def adjust_indentation(input_file, output_file):
             # loop through file
             # pylint: disable=consider-using-enumerate
             for i in range(len(lines)):
-                if lines[i].lstrip().startswith('!$acc') and i + 1 < len(lines):
+                if lines[i].lstrip().startswith(INDENTERS) and i + 1 < len(lines):
                     j = i + 1
                     empty_lines = 0
                     # look down to see how to indent a line
@@ -45,7 +46,7 @@ def adjust_indentation(input_file, output_file):
                         elif lines[j].strip() == '':
                             empty_lines += 1
                         # indent acc lines
-                        elif not lines[j].lstrip().startswith('!$acc'):
+                        elif not lines[j].lstrip().startswith(INDENTERS):
                             indent = len(lines[j]) - len(lines[j].lstrip())
                             lines[i] = ' ' * indent + lines[i].lstrip()
                             break
