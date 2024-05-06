@@ -165,9 +165,8 @@ contains
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
             call s_write_com_files(t_step, c_mass)
         end if
-
-        if ((sim_data) .and. (mod(t_step - t_step_start, t_step_save) == 0 .or. &
-                              t_step > t_step_stop)) then
+        if (sim_data .and. mod(t_step - t_step_start, t_step_save) == 0 .or. &
+            t_step > t_step_stop) then
             call s_write_sim_data_file(q_prim_vf, t_step)
             call s_write_eng_data_file(q_prim_vf, t_step)
         end if
@@ -474,11 +473,9 @@ contains
             end if
         end if
 
-        if (proc_rank == 0) then
-            if (sim_data) then
-                call s_close_sim_data_file()
-                call s_close_eng_data_file()
-            end if
+        if (proc_rank == 0 .and. sim_data) then
+            call s_close_sim_data_file()
+            call s_close_eng_data_file()
         end if
 
         if (probe_wrt) then

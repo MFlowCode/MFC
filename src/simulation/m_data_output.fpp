@@ -218,16 +218,14 @@ contains
 
     subroutine s_open_sim_data_file() ! ------------------------
 
-        character(LEN=path_len + 5*name_len) :: file_path !<
+        character(LEN=path_len + 3*name_len) :: file_path !<
              !! Relative path to a file in the case directory
-        character(LEN=8) :: file_date !<
-             !! Creation date of the run-time information file
 
-        write (file_path, '(A)') '/sim_data.txt'
+        write (file_path, '(A)') '/sim_data.dat'
         file_path = trim(case_dir)//trim(file_path)
 
         ! Opening the simulation data file
-        open (21519, FILE=trim(file_path), &
+        open (211, FILE=trim(file_path), &
               FORM='formatted', &
               POSITION='append', &
               STATUS='unknown')
@@ -236,16 +234,14 @@ contains
 
     subroutine s_open_eng_data_file() ! ------------------------
 
-        character(LEN=path_len + 5*name_len) :: file_path !<
+        character(LEN=path_len + 3*name_len) :: file_path !<
              !! Relative path to a file in the case directory
-        character(LEN=8) :: file_date !<
-             !! Creation date of the run-time information file
 
-        write (file_path, '(A)') '/eng_data.txt'
+        write (file_path, '(A)') '/eng_data.dat'
         file_path = trim(case_dir)//trim(file_path)
 
         ! Opening the simulation data file
-        open (21520, FILE=trim(file_path), &
+        open (251, FILE=trim(file_path), &
               FORM='formatted', &
               POSITION='append', &
               STATUS='unknown')
@@ -564,16 +560,6 @@ contains
         allocate (y_d1(m*n))
         counter = 0
 
-!        if ()
-!        if (mod(p, 2) > 0) then
-!        !    cent = p/2 + 1/2
-!        elseif (mod(p, 2) == 0) then
-!            cent = p/2
-!        if (p > 0) then
-!            cent = 0
-!        elseif (p == 0) then
-!            cent = 0
-!        endif
         do l = 0, p
             if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
                 cent = l
@@ -622,10 +608,10 @@ contains
         if (proc_rank == 0) then
             do i = 1, size(x_td)
                 if (i == size(x_td)) then
-                    write (21519, '(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
+                    write (211, '(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
                         x_td(i), y_td(i), size(x_td), xcom(2), nondim_time
                 else
-                    write (21519, '(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
+                    write (211, '(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
                         x_td(i), y_td(i), 0d0, 0d0, 0d0
                 end if
             end do
@@ -636,10 +622,11 @@ contains
     subroutine s_write_eng_data_file(q_prim_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
-        integer :: i, j!< Generic loop iterators
-        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
-
         real(kind(0d0)) :: Elk, Egk, Elint, Egint
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, qv, Elks, Egks, Elints, Egints
+        real(kind(0d0)), dimension(num_dims) :: vel
+        integer :: i, j, k, l, s !looping indicies
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
         real(kind(0d0)) :: nondim_time
 
         if (t_step_old /= dflt_int) then
@@ -649,10 +636,68 @@ contains
         end if
         root = 0
 
-        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Elint, Egint)
-        if (t_step > t_step_start) then
-            write (21520, '(F19.3,1X,F19.3,1X, F19.3,1X,F19.3, 1X, F12.9)') &
-                Elint, Egint, Elk, Egk, nondim_time
+!        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Elint, Egint)
+
+        Elk = 0d0
+        Egk = 0d0
+        Elint = 0d0
+        Egint = 0d0
+        if (p > 0) then
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        Elks = 0d0
+                        Egks = 0d0
+                        Elints = 0d0
+                        Egints = 0d0
+                        pres = 0d0
+                        rho = 0d0
+                        gamma = 0d0
+                        pi_inf = 0d0
+                        do l = 1, num_fluids
+                            rho = rho + q_prim_vf(E_idx + l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
+                            gamma = gamma + q_prim_vf(E_idx + l)%sf(i, j, k)*gammas(l)
+                            pi_inf = pi_inf + q_prim_vf(E_idx + l)%sf(i, j, k)*pi_infs(l)
+                        end do
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+                        dV = dx(i)*dy(j)*dz(k)
+                        do s = 1, num_dims
+                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                                Elks = Elks + 0.5d0*rho*vel(s)*vel(s)
+                            else
+                                Egks = Egks + 0.5d0*rho*vel(s)*vel(s)
+                            end if
+                        end do
+                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                            Elints = gamma*pres + pi_inf
+                        else
+                            Egints = gamma*pres + pi_inf
+                        end if
+                        Elk = Elk + Elks*dV
+                        Egk = Egk + Egks*dV
+                        Egint = Egint + Egints*dV
+                        Elint = Elint + Elints*dV
+                    end do
+                end do
+            end do
+        end if
+        tmp = Elk
+        call s_mpi_allreduce_sum(tmp, Elk)
+        tmp = Elint
+        call s_mpi_allreduce_sum(tmp, Elint)
+        tmp = Egint
+        call s_mpi_allreduce_sum(tmp, Egint)
+        tmp = Egk
+        call s_mpi_allreduce_sum(tmp, Egk)
+        call s_mpi_barrier()
+        if (proc_rank == 0) then
+            write (251, '(6X, 6F24.12)') &
+                Elint, &
+                Egint, &
+                Elk, &
+                Egk, &
+                nondim_time
         end if
 
     end subroutine s_write_eng_data_file
@@ -669,7 +714,6 @@ contains
         Elint = 0d0
         Egint = 0d0
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(Elks, Egks, Egints, Elints, pres, rho, gamma, pi_inf, vel, dV)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -681,7 +725,6 @@ contains
                         rho = 0d0
                         gamma = 0d0
                         pi_inf = 0d0
-                        !$acc loop seq
                         do l = 1, num_fluids
                             rho = rho + q_prim_vf(E_idx + l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
                             gamma = gamma + q_prim_vf(E_idx + l)%sf(i, j, k)*gammas(l)
@@ -689,7 +732,6 @@ contains
                         end do
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
                         dV = dx(i)*dy(j)*dz(k)
-                        !$acc loop vector
                         do s = 1, num_dims
                             vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                             if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
@@ -699,9 +741,9 @@ contains
                             end if
                         end do
                         if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
-                                Elints = gamma*pres + pi_inf
+                            Elints = gamma*pres + pi_inf
                         else
-                                Egints = gamma*pres + pi_inf
+                            Egints = gamma*pres + pi_inf
                         end if
                         Elk = Elk + Elks*dV
                         Egk = Egk + Egks*dV
@@ -710,7 +752,6 @@ contains
                     end do
                 end do
             end do
-            !$acc end parallel loop
         end if
         tmp = Elk
         call s_mpi_allreduce_sum(tmp, Elk)
@@ -2195,26 +2236,26 @@ contains
     subroutine s_close_sim_data_file() ! -----------------------
 
         ! Writing the footer of and closing the run-time information file
-        write (21519, '(A)') '----------------------------------------'// &
+        write (211, '(A)') '----------------------------------------'// &
             '----------------------------------------'
-        write (21519, '(A)') ''
-        write (21519, '(A)') ''
-        write (21519, '(A)') '========================================'// &
+        write (211, '(A)') ''
+        write (211, '(A)') ''
+        write (211, '(A)') '========================================'// &
             '========================================'
-        close (21519)
+        close (211)
 
     end subroutine s_close_sim_data_file !---------------------
 
     subroutine s_close_eng_data_file() ! -----------------------
 
         ! Writing the footer of and closing the run-time information file
-        write (21520, '(A)') '----------------------------------------'// &
+        write (251, '(A)') '----------------------------------------'// &
             '----------------------------------------'
-        write (21520, '(A)') ''
-        write (21520, '(A)') ''
-        write (21520, '(A)') '========================================'// &
+        write (251, '(A)') ''
+        write (251, '(A)') ''
+        write (251, '(A)') '========================================'// &
             '========================================'
-        close (21520)
+        close (251)
 
     end subroutine s_close_eng_data_file !---------------------
 
