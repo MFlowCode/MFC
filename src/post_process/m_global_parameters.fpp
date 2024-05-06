@@ -280,7 +280,7 @@ contains
         relax_model = dflt_int
 
         hypoelasticity = .false.
-        hyperelastictiy = .false.
+        hyperelasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
