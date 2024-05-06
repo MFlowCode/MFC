@@ -1023,19 +1023,19 @@ contains
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                            is1_viscous, is2_viscous, is3_viscous, weno_order)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                            is1_viscous, is2_viscous, is3_viscous, weno_order)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         norm_dir, weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
+                        is1_viscous, is2_viscous, is3_viscous, weno_order)
         end if
 
         if (any(Re_size > 0)) then
@@ -1126,19 +1126,19 @@ contains
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                            is1_viscous, is2_viscous, is3_viscous, weno_order)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
+                            is1_viscous, is2_viscous, is3_viscous, weno_order)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         norm_dir, weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
+                        is1_viscous, is2_viscous, is3_viscous, weno_order)
         end if
 
         if (any(Re_size > 0)) then

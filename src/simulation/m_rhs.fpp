@@ -826,11 +826,11 @@ contains
             ! Reconstruction pressure
             iv%beg = E_idx; iv%end = E_idx
             if (sigma /= dflt_real) then
-                call s_reconstruct_cell_boundary_values_first_order( &
+                call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
+                    id, 1)
             else
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
@@ -2121,83 +2121,7 @@ contains
 
     end subroutine s_pressure_relaxation_procedure ! -----------------------
 
-    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                              norm_dir)
-
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
-
-        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
-
-        integer :: i, j, k, l
-        ! Reconstruction in s1-direction ===================================
-
-        if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            recon_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            recon_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        else
-            is1 = iz; is2 = iy; is3 = ix
-            recon_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
-
-        end if
-
-        !$acc enter data copyin(is1, is2, is3)
-
-        if (recon_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (recon_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        end if
-
-    end subroutine s_reconstruct_cell_boundary_values_first_order
-
-    !>  The purpose of this subroutine is to WENO-reconstruct the
+        !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
         !!      at the Gaussian quadrature points, from the cell-averaged
         !!      variables.
@@ -2208,7 +2132,7 @@ contains
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                  norm_dir)
+                                                  norm_dir, local_order)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
@@ -2216,10 +2140,20 @@ contains
 
         integer, intent(IN) :: norm_dir
 
+        integer, optional :: local_order
+        integer :: recon_order
+
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
+
+        if (present(local_order)) then
+            recon_order = local_order
+        else
+            recon_order = weno_order
+        end if
+
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
@@ -2244,19 +2178,19 @@ contains
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3)
+                            is1, is2, is3, recon_order)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3)
+                            is1, is2, is3, recon_order)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         norm_dir, weno_dir, &
-                        is1, is2, is3)
+                        is1, is2, is3, recon_order)
         end if
 
         ! ==================================================================
