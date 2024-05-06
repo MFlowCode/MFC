@@ -254,15 +254,9 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        if (sigma /= dflt_real) then
-            do l = adv_idx%end + 1, sys_size - 1
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-            end do
-        else
-            do l = adv_idx%end + 1, sys_size
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-            end do
-        end if
+        do l = adv_idx%end + 1, sys_size
+            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end do
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
@@ -281,6 +275,7 @@ contains
         if (sigma /= dflt_real) then
             q_prim_qp%vf(c_idx)%sf => &
                 q_cons_qp%vf(c_idx)%sf
+            !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
             !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
         end if
 
@@ -995,7 +990,7 @@ contains
                                                       ixt, iyt, izt)
             end if
             call nvtxEndRange
-
+            print *, "HERE HERE HERE HERE HERE"
             ! RHS additions for sub-grid bubbles
             call nvtxStartRange("RHS_bubbles")
             if (bubbles) call s_compute_bubbles_rhs(id, &
@@ -1838,8 +1833,8 @@ contains
                         !$acc loop seq
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
-                                (flux_src_n(i)%sf(j, k, l - 1) &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
+                                (flux_src_n(i)%sf(j - 1, k, l) &
                                  - flux_src_n(i)%sf(j, k, l))
                         end do
                     end do
@@ -2121,7 +2116,7 @@ contains
 
     end subroutine s_pressure_relaxation_procedure ! -----------------------
 
-        !>  The purpose of this subroutine is to WENO-reconstruct the
+    !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
         !!      at the Gaussian quadrature points, from the cell-averaged
         !!      variables.

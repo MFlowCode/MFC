@@ -23,7 +23,7 @@ contains
         integer :: i
         character(len=5) :: iStr
 
-        bub_fac = 0;
+        bub_fac = 0; 
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
         ! Constraints on dimensionality and the number of cells for the grid
@@ -478,8 +478,8 @@ contains
             call s_mpi_abort('The surface tension coefficient must be'// &
                              'greater than or equal to zero. Exiting ...')
         elseif (sigma /= dflt_real .and. model_eqns /= 3) then
-            call s_mpi_abort("The surface tension model requires" // &
-                            'model_eqns=3. Exiting ...')
+            call s_mpi_abort("The surface tension model requires"// &
+                             'model_eqns=3. Exiting ...')
         elseif (sigma == dflt_real .and. cf_wrt) then
             call s_mpi_abort('cf_wrt can only be anabled if the surface'// &
                              'coefficient is set')

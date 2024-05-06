@@ -428,10 +428,10 @@ contains
         if (sigma /= dflt_real .and. sigma < 0d0) then
             call s_mpi_abort('The surface tension coefficient must be'// &
                              'greater than or equal to zero. Exiting ...')
-         elseif (sigma /= dflt_real .and. model_eqns /= 3) then
-            call s_mpi_abort("The surface tension model requires" // &
-                            'model_eqns=3. Exiting ...')
-         end if
+        elseif (sigma /= dflt_real .and. model_eqns /= 3) then
+            call s_mpi_abort("The surface tension model requires"// &
+                             'model_eqns=3. Exiting ...')
+        end if
 
         ! Moving Boundaries Checks: x boundaries
         if (any((/bc_x%vb1, bc_x%vb2, bc_x%vb3/) /= 0d0)) then
