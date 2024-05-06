@@ -587,7 +587,6 @@ contains
                 end if
             end do OLoop
         end do
-
         allocate (y_d(counter))
         allocate (x_d(counter))
         do i = 1, counter
@@ -608,7 +607,6 @@ contains
                 end if
             end do
         end if
-        ! end if
 
     end subroutine s_write_sim_data_file ! -----------------------------------
 
@@ -618,7 +616,7 @@ contains
         integer :: i, j!< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        real(kind(0d0)) :: Elk, Egk, Eint
+        real(kind(0d0)) :: Elk, Egk, Elint, Egint
         real(kind(0d0)) :: nondim_time
 
         if (t_step_old /= dflt_int) then
@@ -628,32 +626,34 @@ contains
         end if
         root = 0
 
-        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
+        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Elint, Egint)
         if (t_step > t_step_start) then
-            write (21520, '(F19.3,1X,F19.3,1X, F19.3, 1X, F12.9)') &
-                Eint, Elk, Egk, nondim_time
+            write (21520, '(F19.3,1X,F19.3,1X, F19.3,1X,F19.3, 1X, F12.9)') &
+                Elint, Egint, Elk, Egk, nondim_time
         end if
 
     end subroutine s_write_eng_data_file
 
-    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
+    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Elint, Egint)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, qv, Elks, Egks, Eints
+        real(kind(0d0)), intent(OUT) :: Elk, Egk, Elint, Egint
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, qv, Elks, Egks, Elints, Egints
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i, j, k, l, s !looping indicies
 
         Elk = 0d0
         Egk = 0d0
-        Eint = 0d0
+        Elint = 0d0
+        Egint = 0d0
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(Elks, Egks, Eints, pres, rho, gamma, pi_inf, vel, dV)
+            !$acc parallel loop collapse(3) gang vector default(present) private(Elks, Egks, Egints, Elints, pres, rho, gamma, pi_inf, vel, dV)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
                         Elks = 0d0
                         Egks = 0d0
-                        Eints = 0d0
+                        Elints = 0d0
+                        Egints = 0d0
                         pres = 0d0
                         rho = 0d0
                         gamma = 0d0
@@ -665,7 +665,6 @@ contains
                             pi_inf = pi_inf + q_prim_vf(E_idx + l)%sf(i, j, k)*pi_infs(l)
                         end do
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Eints = gamma*pres + pi_inf
                         dV = dx(i)*dy(j)*dz(k)
                         !$acc loop vector
                         do s = 1, num_dims
@@ -676,9 +675,15 @@ contains
                                 Egks = Egks + 0.5d0*rho*vel(s)*vel(s)
                             end if
                         end do
+                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                                Elints = gamma*pres + pi_inf
+                        else
+                                Egints = gamma*pres + pi_inf
+                        end if
                         Elk = Elk + Elks*dV
                         Egk = Egk + Egks*dV
-                        Eint = Eint + Eints*dV
+                        Egint = Egint + Egints*dV
+                        Elint = Elint + Elints*dV
                     end do
                 end do
             end do
@@ -686,8 +691,10 @@ contains
         end if
         tmp = Elk
         call s_mpi_allreduce_sum(tmp, Elk)
-        tmp = Eint
-        call s_mpi_allreduce_sum(tmp, Eint)
+        tmp = Elint
+        call s_mpi_allreduce_sum(tmp, Elint)
+        tmp = Egint
+        call s_mpi_allreduce_sum(tmp, Egint)
         tmp = Egk
         call s_mpi_allreduce_sum(tmp, Egk)
 
