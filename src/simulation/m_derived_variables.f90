@@ -110,6 +110,7 @@ contains
 
         if (sim_data .and. proc_rank == 0) then
             call s_open_sim_data_file()
+            call s_open_eng_data_file()
         end if
 
     end subroutine s_initialize_derived_variables ! -----------------------------
@@ -164,8 +165,11 @@ contains
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
             call s_write_com_files(t_step, c_mass)
         end if
-        if (sim_data) then
+
+        if ((sim_data) .and. (mod(t_step - t_step_start, t_step_save) == 0 .or. &
+                              t_step > t_step_stop)) then
             call s_write_sim_data_file(q_prim_vf, t_step)
+            call s_write_eng_data_file(q_prim_vf, t_step)
         end if
 
     end subroutine s_compute_derived_variables ! ---------------------------
@@ -184,7 +188,7 @@ contains
         !!  @param q_sf Acceleration component
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                q_prim_vf2, q_prim_vf3, q_sf) ! ----------
-
+        !DIR$ INLINEALWAYS s_derive_acceleration_component
         integer, intent(IN) :: i
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf0
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf1
@@ -205,6 +209,7 @@ contains
 
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
+                                print *, q_sf(j, k, l), q_prim_vf0(mom_idx%beg)%sf(j, k, l), fd_coeff_x(r, j), q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
                                 q_sf(j, k, l) = q_sf(j, k, l) &
                                                 + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
                                                 q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
@@ -472,6 +477,7 @@ contains
         if (proc_rank == 0) then
             if (sim_data) then
                 call s_close_sim_data_file()
+                call s_close_eng_data_file()
             end if
         end if
 

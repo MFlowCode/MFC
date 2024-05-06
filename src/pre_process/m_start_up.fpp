@@ -126,7 +126,7 @@ contains
             adv_alphan, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
             hypoelasticity, patch_icpp, fluid_pp, &
-            precision, parallel_io, vel_profile, instability_wave, &
+            precision, parallel_io, vel_profile, instability_wave, pi_fac, &
             perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
@@ -135,7 +135,8 @@ contains
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
-            palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib
+            palpha_eps, ptgalpha_eps, adv_n, &
+            ib, num_ibs, patch_ib
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -837,7 +838,7 @@ contains
 &                pTg-equilirium (relax = "T" activated)'
             end if
 
-            call s_relaxation_solver(q_cons_vf)
+            call s_infinite_relaxation_k(q_cons_vf)
         end if
 
         call s_write_data_files(q_cons_vf, ib_markers)

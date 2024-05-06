@@ -58,6 +58,10 @@ exit $code
 <%def name="run_prologue(target)">
 ok ":) Running$MAGENTA ${target.name}$COLOR_RESET:\n"
 
+if [ '${target.name}' == 'simulation' ]; then
+    export CRAY_ACC_MODULE='${target.get_staging_dirpath()}/simulation-wg256.lld.exe'
+fi
+
 cd "${os.path.dirname(input)}"
 
 t_${target.name}_start=$(date +%s)
@@ -74,6 +78,8 @@ if [ $code -ne 0 ]; then
     echo
     exit 1
 fi
+
+unset CRAY_ACC_MODULE
 
 % if output_summary:
 

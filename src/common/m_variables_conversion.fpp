@@ -88,14 +88,20 @@ module m_variables_conversion
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    !$acc declare link(bubrs, Gs, Res)
+#else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
-
+#endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
@@ -473,7 +479,11 @@ contains
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
+#else
         !$acc routine seq
+#endif
 
         real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
 
@@ -552,7 +562,11 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
+#else
         !$acc routine seq
+#endif
 
         real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K, qv_K
 
@@ -637,8 +651,20 @@ contains
         end if
 #endif
 
-        !$acc update device(ixb, ixe, iyb, iye, izb, ize)
+!$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
+!$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
+!$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
+#ifdef MFC_SIMULATION
+        @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
+        @:ALLOCATE_GLOBAL(gs_min (1:num_fluids))
+        @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
+        @:ALLOCATE_GLOBAL(ps_inf(1:num_fluids))
+        @:ALLOCATE_GLOBAL(cvs    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(qvs    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(qvps    (1:num_fluids))
+        @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
+#else
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
@@ -647,6 +673,7 @@ contains
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs     (1:num_fluids))
+#endif
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
@@ -663,8 +690,7 @@ contains
 #ifdef MFC_SIMULATION
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
-
+            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
@@ -676,7 +702,11 @@ contains
 #endif
 
         if (bubbles) then
+#ifdef MFC_SIMULATION
+            @:ALLOCATE_GLOBAL(bubrs(1:nb))
+#else
             @:ALLOCATE(bubrs(1:nb))
+#endif
 
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
@@ -866,7 +896,7 @@ contains
 
         real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, k, l, q !< Generic loop iterators
 
         real(kind(0.d0)) :: ntmp
 
@@ -974,7 +1004,12 @@ contains
 #endif
 
                         else
-                            call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                            if (adv_n) then
+                                qK_prim_vf(n_idx)%sf(j, k, l) = qK_cons_vf(n_idx)%sf(j, k, l)
+                                nbub_sc = qK_prim_vf(n_idx)%sf(j, k, l)
+                            else
+                                call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                            end if
 
                             !$acc loop seq
                             do i = bubxb, bubxe
@@ -1021,6 +1056,7 @@ contains
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
                 end do
             end do
         end do
@@ -1057,7 +1093,7 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
-        real(kind(0d0)) :: G
+        real(kind(0d0)) :: G = 0d0
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: detG, e_e
         real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
@@ -1131,7 +1167,12 @@ contains
                         end do
 
                         if (.not. qbmm) then
-                            call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                            if (adv_n) then
+                                q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
+                                nbub = q_prim_vf(n_idx)%sf(j, k, l)
+                            else
+                                call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                            end if
                         else
                             !Initialize R3 averaging over R0 and R directions
                             R3tmp = 0d0
@@ -1147,9 +1188,6 @@ contains
 
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
-                            ! IF( j==0 .and. k==0 .and. l==0) THEN
-                            !     PRINT*, 'nmom', i, q_cons_vf(i)%sf(j,k,l)
-                            ! END IF
                         end do
                     end if
 
@@ -1300,7 +1338,6 @@ contains
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
 
-                    ! have been using == 2
                     if (riemann_solver == 1) then
                         !$acc loop seq
                         do i = advxb, advxe
@@ -1321,6 +1358,7 @@ contains
                         end do
 
                     end if
+
                 end do
             end do
         end do
@@ -1336,11 +1374,17 @@ contains
         deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 #endif
 
+#ifdef MFC_SIMULATION
+        @:DEALLOCATE_GLOBAL(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        if (bubbles) then
+            @:DEALLOCATE_GLOBAL(bubrs)
+        end if
+#else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
-
         if (bubbles) then
             @:DEALLOCATE(bubrs)
         end if
+#endif
 
         ! Nullifying the procedure pointer to the subroutine transferring/
         ! computing the mixture/species variables to the mixture variables

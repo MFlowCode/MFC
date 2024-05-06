@@ -49,7 +49,10 @@ module m_data_output
  s_close_probe_files, &
  s_finalize_data_output_module, &
  s_open_sim_data_file, &
+ s_open_eng_data_file, &
  s_write_sim_data_file, &
+ s_write_eng_data_file, &
+ s_close_eng_data_file, &
  s_close_sim_data_file
     abstract interface ! ===================================================
 
@@ -73,7 +76,13 @@ module m_data_output
         end subroutine s_write_abstract_data_files ! -------------------
 
     end interface ! ========================================================
-
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
+    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
@@ -81,12 +90,12 @@ module m_data_output
     real(kind(0d0)), public, allocatable, dimension(:, :) :: c_mass
 
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#endif
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
     real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-
     !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
@@ -100,6 +109,8 @@ module m_data_output
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
+
+    @:s_compute_speed_of_sound()
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
@@ -220,13 +231,26 @@ contains
               FORM='formatted', &
               POSITION='append', &
               STATUS='unknown')
-!         call date_and_time(DATE=file_date)
 
-!         write (21519, '(A)') 'Date: '//file_date(5:6)//'/'// &
-!                file_date(7:8)//'/'// &
-!                file_date(3:4)
+    end subroutine s_open_sim_data_file ! ---------------------------------------
 
-    end subroutine s_open_sim_data_file ! ----------------------------------------
+    subroutine s_open_eng_data_file() ! ------------------------
+
+        character(LEN=path_len + 5*name_len) :: file_path !<
+             !! Relative path to a file in the case directory
+        character(LEN=8) :: file_date !<
+             !! Creation date of the run-time information file
+
+        write (file_path, '(A)') '/eng_data.txt'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (21520, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_eng_data_file ! ----------------------------------------
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -316,7 +340,7 @@ contains
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -431,6 +455,20 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
+#ifdef CRAY_ACC_WAR
+        !$acc update host(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            !$acc update host(vcfl_sf, Rc_sf)
+        end if
+
+        icfl_max_loc = maxval(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        end if
+#else
         !$acc kernels
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
@@ -441,6 +479,7 @@ contains
             Rc_min_loc = minval(Rc_sf)
             !$acc end kernels
         end if
+#endif
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
@@ -502,39 +541,50 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
-        integer :: i, j, k, l, w !< Generic loop iterators
-        integer :: ierr, counter, counter2, counter3, root !< number of data points extracted to fit shape to SH perturbations
+        integer :: i, j, k, l, w, cent !< Generic loop iterators
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        real(kind(0d0)) :: u, m_a_x, m_a_y, m_a_z, eps
-        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_x, d_magdalphax, d_magdalphay, f_NS, rho, alpha_rhob
-        real(kind(0d0)), dimension(0:m, 0:n) :: d_alpha_y, mag_d_alpha, d_rho_x, d_rho_y, mag_d_rho, alpha_b
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: d_alph_mpi_barrier_x3, d_alpha_y3, d_alpha_z3
-        real(kind(0d0)) :: xdv, ydv, mag_d_alpha3, nondim_time, alphaxm, alphaxp, alphaym, alphayp
+        real(kind(0d0)) :: u, eps, Elk, Elp, Egk, Egie
+        real(kind(0d0)) :: nondim_time
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
-        real(kind(0d0)) :: alpha_t, concavity_x_prior, concavity_x_post, concavity_y_prior, concavity_y_post
-        real(kind(0d0)), allocatable :: q(:), maxdalphy(:), maxdalphx(:)
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
-        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_tdf(:), y_tdf(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
+        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
 
-        real(kind(0d0)) :: axp, axm, ayp, aym
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp
 
         call s_calculate_COM(q_prim_vf, xcom, ycom, vol_fluid)
 
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, kind(0d0))*dt
         else
-            nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
+            nondim_time = real(t_step, kind(0d0))*dt
         end if
         root = 0
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
+
+!        if ()
+!        if (mod(p, 2) > 0) then
+!        !    cent = p/2 + 1/2
+!        elseif (mod(p, 2) == 0) then
+!            cent = p/2
+!        if (p > 0) then
+!            cent = 0
+!        elseif (p == 0) then
+!            cent = 0
+!        endif
+        do l = 0, p
+            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                cent = l
+            end if
+        end do
         do k = 0, n
             OLoop: do j = 0, m
-                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, 0)
-                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, 0)
-                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, 0)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, 0)
+                axp = q_prim_vf(E_idx + 1)%sf(j + 1, k, cent)
+                axm = q_prim_vf(E_idx + 1)%sf(j - 1, k, cent)
+                ayp = q_prim_vf(E_idx + 1)%sf(j, k + 1, cent)
+                aym = q_prim_vf(E_idx + 1)%sf(j, k - 1, cent)
 
                 if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
                     .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
@@ -567,23 +617,104 @@ contains
             y_d(i) = y_d1(i)
             x_d(i) = x_d1(i)
         end do
-        if (num_procs > 1) then
-            call s_mpi_gather_data(x_d, counter, x_td, root)
-            call s_mpi_gather_data(y_d, counter, y_td, root)
-            if (proc_rank == 0) then
-                do i = 1, size(x_td)
-                    if (i == size(x_td)) then
-                        write (21519, '(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
-                            x_td(i), y_td(i), size(x_td), xcom(2), nondim_time
-                    else
-                        write (21519, '(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
-                            x_td(i), y_td(i), 0d0, 0d0, 0d0
-                    end if
-                end do
-            end if
+        ! if (num_procs > 1) then
+        call s_mpi_gather_data(x_d, counter, x_td, root)
+        call s_mpi_gather_data(y_d, counter, y_td, root)
+        if (proc_rank == 0) then
+            do i = 1, size(x_td)
+                if (i == size(x_td)) then
+                    write (21519, '(F12.9,1X,F12.9,1X,I4, 1X, F12.9, 1X, F12.9)') &
+                        x_td(i), y_td(i), size(x_td), xcom(2), nondim_time
+                else
+                    write (21519, '(F12.9,1X,F12.9,1X,F3.1,1X,F3.1,1X,F3.1)') &
+                        x_td(i), y_td(i), 0d0, 0d0, 0d0
+                end if
+            end do
         end if
+        ! end if
 
     end subroutine s_write_sim_data_file ! -----------------------------------
+
+    subroutine s_write_eng_data_file(q_prim_vf, t_step)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer, intent(IN) :: t_step
+        integer :: i, j!< Generic loop iterators
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+
+        real(kind(0d0)) :: Elk, Egk, Eint
+        real(kind(0d0)) :: nondim_time
+
+        if (t_step_old /= dflt_int) then
+            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+        else
+            nondim_time = real(t_step, kind(0d0))*dt
+        end if
+        root = 0
+
+        call s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
+        if (t_step > t_step_start) then
+            write (21520, '(F19.3,1X,F19.3,1X, F19.3, 1X, F12.9)') &
+                Eint, Elk, Egk, nondim_time
+        end if
+
+    end subroutine s_write_eng_data_file
+
+    subroutine s_calculate_energy_contributions(q_prim_vf, Elk, Egk, Eint)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), intent(OUT) :: Elk, Egk, Eint
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, qv, Elks, Egks, Eints
+        real(kind(0d0)), dimension(num_dims) :: vel
+        integer :: i, j, k, l, s !looping indicies
+
+        Elk = 0d0
+        Egk = 0d0
+        Eint = 0d0
+        if (p > 0) then
+            !$acc parallel loop collapse(3) gang vector default(present) private(Elks, Egks, Eints, pres, rho, gamma, pi_inf, vel, dV)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        Elks = 0d0
+                        Egks = 0d0
+                        Eints = 0d0
+                        pres = 0d0
+                        rho = 0d0
+                        gamma = 0d0
+                        pi_inf = 0d0
+                        !$acc loop seq
+                        do l = 1, num_fluids
+                            rho = rho + q_prim_vf(E_idx + l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
+                            gamma = gamma + q_prim_vf(E_idx + l)%sf(i, j, k)*gammas(l)
+                            pi_inf = pi_inf + q_prim_vf(E_idx + l)%sf(i, j, k)*pi_infs(l)
+                        end do
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+                        Eints = gamma*pres + pi_inf
+                        dV = dx(i)*dy(j)*dz(k)
+                        !$acc loop vector
+                        do s = 1, num_dims
+                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                                Elks = Elks + 0.5d0*rho*vel(s)*vel(s)
+                            else
+                                Egks = Egks + 0.5d0*rho*vel(s)*vel(s)
+                            end if
+                        end do
+                        Elk = Elk + Elks*dV
+                        Egk = Egk + Egks*dV
+                        Eint = Eint + Eints*dV
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        end if
+        tmp = Elk
+        call s_mpi_allreduce_sum(tmp, Elk)
+        tmp = Eint
+        call s_mpi_allreduce_sum(tmp, Eint)
+        tmp = Egk
+        call s_mpi_allreduce_sum(tmp, Egk)
+
+    end subroutine s_calculate_energy_contributions
 
     subroutine s_calculate_numerical_schlieran(q_prim_vf, f_NS)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -1357,18 +1488,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        if (ib) then
-            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-
-            ! Initial displacement to skip at beginning of file
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
-
-            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                    MPI_DOUBLE_PRECISION, status, ierr)
-        end if
-
         call MPI_FILE_CLOSE(ifile, ierr)
 
 #endif
@@ -1473,7 +1592,7 @@ contains
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
         real(kind(0d0)) :: tmp !<
-            !! Temporary variable to store quantity for mpi_allreduce
+            !! Temporary                         variable to store quantity for mpi_allreduce
 
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
@@ -1579,15 +1698,17 @@ contains
                             nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
                             nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
                         end do
-                        !call comp_n_from_cons(alf, nR, nbub)
 
-                        nR3 = 0d0
-                        do s = 1, nb
-                            nR3 = nR3 + weight(s)*(nR(s)**3d0)
-                        end do
+                        if (adv_n) then
+                            nbub = q_cons_vf(n_idx)%sf(j - 2, k, l)
+                        else
+                            nR3 = 0d0
+                            do s = 1, nb
+                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                            end do
 
-                        nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
-
+                            nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                        end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
@@ -1669,14 +1790,17 @@ contains
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
                                 nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
-                            !call comp_n_from_cons(alf, nR, nbub)
 
-                            nR3 = 0d0
-                            do s = 1, nb
-                                nR3 = nR3 + weight(s)*(nR(s)**3d0)
-                            end do
+                            if (adv_n) then
+                                nbub = q_cons_vf(n_idx)%sf(j - 2, k - 2, l)
+                            else
+                                nR3 = 0d0
+                                do s = 1, nb
+                                    nR3 = nR3 + weight(s)*(nR(s)**3d0)
+                                end do
 
-                            nbub = DSQRT((4.d0*pi/3.d0)*nR3/alf)
+                                nbub = dsqrt((4.d0*pi/3.d0)*nR3/alf)
+                            end if
 
                             R(:) = nR(:)/nbub
                             Rdot(:) = nRdot(:)/nbub
@@ -2023,8 +2147,6 @@ contains
 
     end subroutine s_write_probe_files ! -----------------------------------
 
-    @:s_compute_speed_of_sound()
-
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
@@ -2076,6 +2198,19 @@ contains
 
     end subroutine s_close_sim_data_file !---------------------
 
+    subroutine s_close_eng_data_file() ! -----------------------
+
+        ! Writing the footer of and closing the run-time information file
+        write (21520, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (21520, '(A)') ''
+        write (21520, '(A)') ''
+        write (21520, '(A)') '========================================'// &
+            '========================================'
+        close (21520)
+
+    end subroutine s_close_eng_data_file !---------------------
+
     !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------
 
@@ -2099,12 +2234,12 @@ contains
         allocate (c_mass(1:num_fluids, 1:5))
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
         if (any(Re_size > 0)) then
-            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0d0
             Rc_min = 1d3
@@ -2140,9 +2275,9 @@ contains
         deallocate (c_mass)
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE(icfl_sf)
+        @:DEALLOCATE_GLOBAL(icfl_sf)
         if (any(Re_size > 0)) then
-            @:DEALLOCATE(vcfl_sf, Rc_sf)
+            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 
         ! Disassociating the pointer to the procedure that was utilized to
