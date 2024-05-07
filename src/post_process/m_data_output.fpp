@@ -1038,6 +1038,7 @@ contains
             y_d(i) = y_d1(i)
             x_d(i) = x_d1(i)
         end do
+        root = 0
         ! if (num_procs > 1) then
         call s_mpi_gather_data(x_d, counter, x_td, root)
         call s_mpi_gather_data(y_d, counter, y_td, root)

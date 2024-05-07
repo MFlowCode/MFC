@@ -72,7 +72,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, relax_model, &
-            adv_n
+            adv_n, sim_data
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -599,15 +599,14 @@ contains
                 varname(:) = ' '
             end if
         end if
-
+        
+        if (proc_rank == 0 .and. sim_data) then
+            close(211)
+            close(251)
+        endif
         ! Closing the formatted database file
         call s_close_formatted_database_file()
         
-        if (sim_data .and. proc_rank == 0) then
-            call s_close_intf_data_file()
-            call s_close_energy_data_file()
-        end if
-
     end subroutine s_save_data
 
     subroutine s_initialize_modules()
@@ -662,6 +661,11 @@ contains
     subroutine s_finalize_modules()
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_close_intf_data_file()
+            call s_close_energy_data_file()
+        endif
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()
