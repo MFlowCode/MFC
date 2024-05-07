@@ -990,7 +990,7 @@ contains
                                                       ixt, iyt, izt)
             end if
             call nvtxEndRange
-            print *, "HERE HERE HERE HERE HERE"
+
             ! RHS additions for sub-grid bubbles
             call nvtxStartRange("RHS_bubbles")
             if (bubbles) call s_compute_bubbles_rhs(id, &
@@ -1833,8 +1833,8 @@ contains
                         !$acc loop seq
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
-                                (flux_src_n(i)%sf(j - 1, k, l) &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                (flux_src_n(i)%sf(j, k, l - 1) &
                                  - flux_src_n(i)%sf(j, k, l))
                         end do
                     end do
