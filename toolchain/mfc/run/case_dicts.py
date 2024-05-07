@@ -84,7 +84,7 @@ for p_id in range(1, 10+4):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
 
 SIMULATION = COMMON + [
-    'run_time_info','sim_data', 't_step_old', 't_tol', 'dt', 't_step_start',
+    'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 't_step_print', 'time_stepper', 'weno_eps',
     'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
     'riemann_solver', 'wave_speeds', 'avg_state', 'prim_vars_wrt',
@@ -151,7 +151,7 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt'
+    'qm_wrt', 'sim_data'
 ]
 
 for cmp_id in range(1,3+1):

@@ -173,6 +173,16 @@ contains
         ! Opening a new formatted database file
         call s_open_formatted_database_file(t_step)
 
+        if (sim_data .and. proc_rank == 0) then
+            call s_open_intf_data_file()
+            call s_open_energy_data_file()
+        endif
+
+        if (sim_data) then
+           call s_write_intf_data_file(q_prim_vf, t_step)
+           call s_write_energy_data_file(q_prim_vf, t_step)
+        endif
+
         ! Adding the grid to the formatted database file
         call s_write_grid_to_formatted_database_file(t_step)
 
@@ -592,6 +602,12 @@ contains
 
         ! Closing the formatted database file
         call s_close_formatted_database_file()
+        
+        if (sim_data .and. proc_rank == 0) then
+            call s_close_intf_data_file()
+            call s_close_energy_data_file()
+        end if
+
     end subroutine s_save_data
 
     subroutine s_initialize_modules()
