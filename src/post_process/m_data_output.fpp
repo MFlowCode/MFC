@@ -27,9 +27,15 @@ module m_data_output
 
     private; public :: s_initialize_data_output_module, &
  s_open_formatted_database_file, &
+ s_open_intf_data_file, &
+ s_open_energy_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
+ s_write_intf_data_file, &
+ s_write_energy_data_file, &
  s_close_formatted_database_file, &
+ s_close_intf_data_file, &
+ s_close_energy_data_file, &
  s_finalize_data_output_module
 
     ! Including the Silo Fortran interface library that features the subroutines
@@ -531,6 +537,38 @@ contains
 
     end subroutine s_open_formatted_database_file ! ------------------------
 
+    subroutine s_open_intf_data_file() ! ------------------------
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/intf_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (211, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_intf_data_file ! ---------------------------------------
+
+    subroutine s_open_energy_data_file() ! ------------------------
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/eng_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (251, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_energy_data_file ! ----------------------------------------
+
     subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
@@ -939,6 +977,152 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file ! -----------
 
+    subroutine s_write_intf_data_file(q_prim_vf, t_step)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer, intent(IN) :: t_step
+        integer :: i, j, k, l, w, cent !< Generic loop iterators
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+        real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
+        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp
+
+        allocate (x_d1(m*n))
+        allocate (y_d1(m*n))
+        counter = 0
+
+        do l = 0, p
+            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                cent = l
+            end if
+        end do
+        do k = 0, n
+            OLoop: do j = 0, m
+                axp = q_prim_vf(E_idx + 1)%sf(j + 1, k, cent)
+                axm = q_prim_vf(E_idx + 1)%sf(j - 1, k, cent)
+                ayp = q_prim_vf(E_idx + 1)%sf(j, k + 1, cent)
+                aym = q_prim_vf(E_idx + 1)%sf(j, k - 1, cent)
+
+                if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
+                    .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
+                    if (counter == 0) then
+                        counter = counter + 1
+                        x_d1(counter) = x_cc(j)
+                        y_d1(counter) = y_cc(k)
+                    else
+                        do i = 1, counter
+                            if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                                               y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
+                                                                                      + dy(k)**2)) then
+                                cycle OLoop
+                            elseif (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
+                                                                   y_d1(i))**2) > 2*sqrt(dx(j)**2 &
+                                                                                         + dy(k)**2) .and. i == counter) then
+                                counter = counter + 1
+                                x_d1(counter) = x_cc(j)
+                                y_d1(counter) = y_cc(k)
+                            end if
+                        end do
+                    end if
+                end if
+            end do OLoop
+        end do
+        allocate (y_d(counter))
+        allocate (x_d(counter))
+        do i = 1, counter
+            y_d(i) = y_d1(i)
+            x_d(i) = x_d1(i)
+        end do
+        root = 0
+        ! if (num_procs > 1) then
+        call s_mpi_gather_data(x_d, counter, x_td, root)
+        call s_mpi_gather_data(y_d, counter, y_td, root)
+        if (proc_rank == 0) then
+            do i = 1, size(x_td)
+                if (i == size(x_td)) then
+                    write (211, '(F12.9,1X,F12.9,1X,I4)') &
+                        x_td(i), y_td(i), size(x_td)
+                else
+                    write (211, '(F12.9,1X,F12.9,1X,F3.1)') &
+                        x_td(i), y_td(i), 0d0
+                end if
+            end do
+        end if
+
+    end subroutine s_write_intf_data_file ! -----------------------------------
+
+    subroutine s_write_energy_data_file(q_prim_vf, t_step)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer, intent(IN) :: t_step
+        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf
+        real(kind(0d0)), dimension(num_dims) :: vel
+        real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs
+        integer :: i, j, k, l, s !looping indicies
+        integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
+
+        Elk = 0d0
+        Egk = 0d0
+        Elint = 0d0
+        Egint = 0d0
+        Vb = 0d0
+        if (p > 0) then
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        pres = 0d0
+                        dV = dx(i)*dy(j)*dz(k)
+                        rho = 0d0
+                        gamma = 0d0
+                        pi_inf = 0d0
+                        do l = 1, num_fluids
+                            gammas(l) = fluid_pp(l)%gamma
+                            pi_infs(l) = fluid_pp(l)%pi_inf
+                            rho = rho + q_prim_vf(E_idx + l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
+                            gamma = gamma + q_prim_vf(E_idx + l)%sf(i, j, k)*gammas(l)
+                            pi_inf = pi_inf + q_prim_vf(E_idx + l)%sf(i, j, k)*pi_infs(l)
+                        end do
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+                        do s = 1, num_dims
+                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)*dV
+                            else
+                                Egk = Egk + 0.5d0*rho*vel(s)*vel(s)*dV
+                            end if
+                        end do
+                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
+                            Elint = Elint + (gamma*pres + pi_inf)*dV
+                        else
+                            Egint = Egint + (gamma*pres + pi_inf)*dV
+                            Vb = Vb + dV
+                        end if
+                    end do
+                end do
+            end do
+        end if
+        tmp = Elk
+        call s_mpi_allreduce_sum(tmp, Elk)
+        tmp = Elint
+        call s_mpi_allreduce_sum(tmp, Elint)
+        tmp = Egint
+        call s_mpi_allreduce_sum(tmp, Egint)
+        tmp = Egk
+        call s_mpi_allreduce_sum(tmp, Egk)
+        tmp = Vb
+        call s_mpi_allreduce_sum(tmp, Vb)
+        if (proc_rank == 0) then
+            write (251, '(6X, 5F24.12)') &
+                Elint, &
+                Egint, &
+                Elk, &
+                Egk, &
+                Vb
+        end if
+
+    end subroutine s_write_energy_data_file
+
     subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
@@ -965,6 +1149,32 @@ contains
         end if
 
     end subroutine s_close_formatted_database_file ! -----------------------
+
+    subroutine s_close_intf_data_file() ! -----------------------
+
+        ! Writing the footer of and closing the run-time information file
+        write (211, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (211, '(A)') ''
+        write (211, '(A)') ''
+        write (211, '(A)') '========================================'// &
+            '========================================'
+        close (211)
+
+    end subroutine s_close_intf_data_file !---------------------
+
+    subroutine s_close_energy_data_file() ! -----------------------
+
+        ! Writing the footer of and closing the run-time information file
+        write (251, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (251, '(A)') ''
+        write (251, '(A)') ''
+        write (251, '(A)') '========================================'// &
+            '========================================'
+        close (251)
+
+    end subroutine s_close_energy_data_file !---------------------
 
     subroutine s_finalize_data_output_module() ! -------------------------
         ! Description: Deallocation procedures for the module

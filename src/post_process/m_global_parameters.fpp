@@ -117,6 +117,7 @@ module m_global_parameters
     !> @}
 
     logical :: parallel_io    !< Format of the data files
+    logical :: sim_data
     logical :: file_per_process !< output format
 
     integer, allocatable, dimension(:) :: proc_coords !<
@@ -329,6 +330,7 @@ contains
         omega_wrt = .false.
         qm_wrt = .false.
         schlieren_wrt = .false.
+        sim_data = .false.
 
         schlieren_alpha = dflt_real
 
