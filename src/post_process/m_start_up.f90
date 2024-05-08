@@ -176,12 +176,12 @@ contains
         if (sim_data .and. proc_rank == 0) then
             call s_open_intf_data_file()
             call s_open_energy_data_file()
-        endif
+        end if
 
         if (sim_data) then
-           call s_write_intf_data_file(q_prim_vf, t_step)
-           call s_write_energy_data_file(q_prim_vf, t_step)
-        endif
+            call s_write_intf_data_file(q_prim_vf, t_step)
+            call s_write_energy_data_file(q_prim_vf, t_step)
+        end if
 
         ! Adding the grid to the formatted database file
         call s_write_grid_to_formatted_database_file(t_step)
@@ -599,14 +599,14 @@ contains
                 varname(:) = ' '
             end if
         end if
-        
+
         if (proc_rank == 0 .and. sim_data) then
-            close(211)
-            close(251)
-        endif
+            close (211)
+            close (251)
+        end if
         ! Closing the formatted database file
         call s_close_formatted_database_file()
-        
+
     end subroutine s_save_data
 
     subroutine s_initialize_modules()
@@ -665,7 +665,7 @@ contains
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()
             call s_close_energy_data_file()
-        endif
+        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()

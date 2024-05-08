@@ -48,7 +48,7 @@ module m_data_output
  s_close_com_files, &
  s_close_probe_files, &
  s_finalize_data_output_module
-  abstract interface ! ===================================================
+    abstract interface ! ===================================================
 
         !> Write data files
         !! @param q_cons_vf Conservative variables
@@ -495,7 +495,7 @@ contains
 
     end subroutine s_write_run_time_information ! --------------------------
 
-   subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inOUT) :: q_prim_vf
@@ -1737,7 +1737,7 @@ contains
 
     end subroutine s_close_com_files ! -------------------------------------
 
-   !> Closes probe files
+    !> Closes probe files
     subroutine s_close_probe_files() ! -------------------------------------
 
         integer :: i !< Generic loop iterator

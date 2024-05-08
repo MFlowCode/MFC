@@ -537,40 +537,37 @@ contains
 
     end subroutine s_open_formatted_database_file ! ------------------------
 
+    subroutine s_open_intf_data_file() ! ------------------------
 
-     subroutine s_open_intf_data_file() ! ------------------------
-
-         character(LEN=path_len + 3*name_len) :: file_path !<
+        character(LEN=path_len + 3*name_len) :: file_path !<
               !! Relative path to a file in the case directory
 
-         write (file_path, '(A)') '/intf_data.dat'
-         file_path = trim(case_dir)//trim(file_path)
+        write (file_path, '(A)') '/intf_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
 
-         ! Opening the simulation data file
-         open (211, FILE=trim(file_path), &
-               FORM='formatted', &
-               POSITION='append', &
-               STATUS='unknown')
-
-     end subroutine s_open_intf_data_file ! ---------------------------------------
-
-     subroutine s_open_energy_data_file() ! ------------------------
-
-         character(LEN=path_len + 3*name_len) :: file_path !<
-              !! Relative path to a file in the case directory
-
-         write (file_path, '(A)') '/eng_data.dat'
-         file_path = trim(case_dir)//trim(file_path)
-
-         ! Opening the simulation data file
-         open (251, FILE=trim(file_path), &
+        ! Opening the simulation data file
+        open (211, FILE=trim(file_path), &
               FORM='formatted', &
-               POSITION='append', &
-               STATUS='unknown')
+              POSITION='append', &
+              STATUS='unknown')
 
-     end subroutine s_open_energy_data_file ! ----------------------------------------
+    end subroutine s_open_intf_data_file ! ---------------------------------------
 
+    subroutine s_open_energy_data_file() ! ------------------------
 
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/eng_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (251, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+    end subroutine s_open_energy_data_file ! ----------------------------------------
 
     subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
@@ -980,7 +977,6 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file ! -----------
 
-
     subroutine s_write_intf_data_file(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -1051,8 +1047,8 @@ contains
                     write (211, '(F12.9,1X,F12.9,1X,F3.1)') &
                         x_td(i), y_td(i), 0d0
                 end if
-            end do 
-        endif 
+            end do
+        end if
 
     end subroutine s_write_intf_data_file ! -----------------------------------
 
@@ -1060,7 +1056,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
         real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf 
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs
         integer :: i, j, k, l, s !looping indicies
@@ -1115,7 +1111,7 @@ contains
         tmp = Egk
         call s_mpi_allreduce_sum(tmp, Egk)
         tmp = Vb
-        call s_mpi_allreduce_sum(tmp, Vb)        
+        call s_mpi_allreduce_sum(tmp, Vb)
         if (proc_rank == 0) then
             write (251, '(6X, 5F24.12)') &
                 Elint, &
@@ -1126,7 +1122,6 @@ contains
         end if
 
     end subroutine s_write_energy_data_file
-
 
     subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
@@ -1180,8 +1175,6 @@ contains
         close (251)
 
     end subroutine s_close_energy_data_file !---------------------
-
-
 
     subroutine s_finalize_data_output_module() ! -------------------------
         ! Description: Deallocation procedures for the module
