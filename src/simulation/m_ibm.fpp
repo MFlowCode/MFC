@@ -392,10 +392,10 @@ contains
                     bound = p
                 end if
 
-                if (norm(dim) == 0) then
+                if (norm(dim) == 0 .or. ghost_points(q)%DB(dim) == 0) then
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
                 else
-                    if (norm(dim) > 0 .and. ghost_points(q)%DB(dim) == 0) then
+                    if (norm(dim) > 0) then
                         dir = 1
                     else
                         dir = -1
