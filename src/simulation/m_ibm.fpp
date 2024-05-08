@@ -395,7 +395,7 @@ contains
                 if (norm(dim) == 0) then
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
                 else
-                    if (norm(dim) > 0) then
+                    if (norm(dim) > 0 .and. ghost_points(q)%DB(dim) == 0) then
                         dir = 1
                     else
                         dir = -1
@@ -508,14 +508,45 @@ contains
                             ghost_points(count)%ib_patch_id = &
                                 patch_id
                             ghost_points(count)%slip = patch_ib(patch_id)%slip
+
+                            if ((x_cc(i) - dx(i)) < x_domain%beg .or. &
+                                (x_cc(i) + dx(i)) > x_domain%end) then
+                                ghost_points(count)%DB(1) = 1
+                            else
+                                ghost_points(count)%DB(1) = 0
+                            end if
+                            
+                            if ((y_cc(j) - dy(j)) < y_domain%beg .or. &
+                                (y_cc(j) + dy(j)) > y_domain%end) then
+                                ghost_points(count)%DB(2) = 1
+                            else
+                                ghost_points(count)%DB(2) = 0
+                            end if
+
                             count = count + 1
+                            !  print*, i, j, (y_cc(j) + dy(j)), ghost_points(count)%DB(2)
                         else
                             inner_points(count_i)%loc = [i, j, 0]
                             patch_id = ib_markers%sf(i, j, 0)
                             inner_points(count_i)%ib_patch_id = &
                                 patch_id
                             inner_points(count_i)%slip = patch_ib(patch_id)%slip
+                            if ((x_cc(i) - dx(i)) < x_domain%beg .or. &
+                                (x_cc(i) + dx(i)) > x_domain%end) then
+                                ghost_points(count)%DB(1) = 1
+                            else
+                                ghost_points(count)%DB(1) = 0
+                            end if
+                            
+                            if ((y_cc(j) - dy(j)) < y_domain%beg .or. &
+                                (y_cc(j) + dy(j)) > y_domain%end) then
+                                ghost_points(count)%DB(2) = 1
+                            else
+                                ghost_points(count)%DB(2) = 0
+                            end if
+
                             count_i = count_i + 1
+
                         end if
                     end if
                 else

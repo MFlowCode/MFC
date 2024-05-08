@@ -159,6 +159,7 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    type(bounds_info) :: x_domain, y_domain, z_domain
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -500,9 +501,9 @@ contains
             #:endfor
         #:endfor
 
-        ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
-        ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
-        ! z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
+        x_domain%beg =  dflt_int; x_domain%end =  dflt_int
+        y_domain%beg =  dflt_int; y_domain%end =  dflt_int
+        z_domain%beg =  dflt_int; z_domain%end =  dflt_int
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
