@@ -2,7 +2,7 @@ from ..state import ARG
 
 
 COMMON = [
-    "hypoelasticity", "cyl_coord", "pref", "p", "parallel_io",
+    "hypoelasticity",'hyperelasticity', "cyl_coord", "pref", "p", "parallel_io",
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
