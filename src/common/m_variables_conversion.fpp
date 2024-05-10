@@ -861,16 +861,21 @@ contains
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              qK_prim_vf, &
                                                              gm_alphaK_vf, &
-                                                             ix, iy, iz)
+                                                             ix, iy, iz, &
+                                                             qK_btensor_vf)
+
 
         type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_prim_vf
-
         type(scalar_field), &
             allocatable, optional, dimension(:), &
             intent(IN) :: gm_alphaK_vf
 
         type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+
+        type(scalar_field), & 
+            optional, dimension(num_dims**2), & 
+            intent(IN) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -1038,18 +1043,23 @@ contains
                         end do
                     end if
 
-                    !$acc loop seq
-                    do i = strxb, strxe
-                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                    end do
+                    if (hyperelasticity .and. .not. bubbles) then
+                        !$acc loop seq
+                        do i = strxb, strxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                        /rho_K
+                        end do
+                        ! MAURO TODO REMOVE THE ELASTIC ENERGY FROM THE PRESSURE
+                        !if(present(qK_btensor_vf)) then
+                        ! use the btensor information to calculate
 
-                    if (hyperelasticity) then
-                        !   call s_allocate_tensor(qK_prim_vf,j,k,l,gtensor)
-                        !   call s_calculate_atransposea(gtensor,getge) ! getge is G^e
-                        !   detG =  f_determinant(getge) ! determinant of G^e
-                        !   ghat(:) = getge(:)*detG**(-1.d0/3.d0)
-                        e_e = (G_K/(4.d0*rho_K))!*f_elastic_energy(ghat)
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - e_e/gamma_k
+                        !else
+                        ! call the code to then generate the btensor, this will have to be in common
+
+                        !end if
+                        !e_e = (G_K/(4.d0*rho_K))!*f_elastic_energy(ghat)
+                        !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - e_e/gamma_k
+
                     end if
 
                     !$acc loop seq
@@ -1207,6 +1217,14 @@ contains
                                 end if
                             end if
                         end do
+                    end if
+
+                    if (hyperelasticity) then
+                        do i = stress_idx%beg, stress_idx%end
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+                        ! MAURO!! TODO ADD THE ELASTIC ENERGY TO THIS PART OF THE CODE!
+
                     end if
 
                     !if (hyperelasticity .and. G .gt. 0.d0 ) then

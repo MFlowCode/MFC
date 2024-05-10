@@ -71,6 +71,11 @@ module m_rhs
     type(vector_field) :: q_prim_qp !<
     !$acc declare create(q_prim_qp)
 
+    !! The btensor at the cell-interior Gaussian quadrature points. 
+    !! These tensor is needed to be calculated once and make the code DRY.
+    type(vector_field) :: q_btensor !<
+    !$acc declare create(q_btensor)
+
     !> @name The first-order spatial derivatives of the primitive variables at cell-
     !! interior Gaussian quadrature points. These are WENO-reconstructed from
     !! their respective cell-average values, obtained through the application
@@ -235,6 +240,7 @@ contains
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
+        @:ALLOCATE(q_btensor%vf(1:num_dims**2))
 
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -248,7 +254,11 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
+        do l = 1, num_dims**2
+            @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        end do
+
+        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp, q_btensor)
 
         do l = 1, cont_idx%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
@@ -691,6 +701,23 @@ contains
 
         ! ==================================================================
 
+        ! Computing Btensor needed for conservative to primitive variables later ==
+
+        call nvtxStartRange("Hyperelasticity: Btensor")
+        ! create the Btensor and save in a large vector field
+        !if (hyperelasticity) call s_get_Btensor(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+        !                                         dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+        !                                         qL_prim, &
+        !                                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+        !                                         dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+        !                                         qR_prim, &
+        !                                         q_prim_qp, &
+        !                                         dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+        !                                         ix, iy, iz)
+        call nvtxEndRange()
+
+        ! ==================================================================
+
         ! Converting Conservative to Primitive Variables ==================
 
         if (mpp_lim .and. bubbles) then
@@ -718,7 +745,9 @@ contains
             q_cons_qp%vf, &
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
-            ix, iy, iz)
+            ix, iy, iz, &
+            q_btensor%vf)
+
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
@@ -741,6 +770,7 @@ contains
                                                  dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                                  ix, iy, iz)
         call nvtxEndRange()
+
 
         ! Dimensional Splitting Loop =======================================
 
@@ -884,6 +914,14 @@ contains
             if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
                                                                q_prim_qp%vf, &
                                                                rhs_vf)
+            call nvtxEndRange
+
+            ! RHS additions for hyperelasticity
+            call nvtxStartRange("RHS_Hyperelasticity")
+            ! use the calculated Btensor and compute the Cauchy stress tensor in common
+            !if (hyperelasticity) call s_compute_hyperelastic_rhs(id, &
+            !                                                   q_prim_qp%vf, &
+            !                                                   rhs_vf)
             call nvtxEndRange
 
             ! RHS additions for viscosity

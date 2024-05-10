@@ -25,9 +25,9 @@ module m_rmt_tensor_calc
 
 contains
 
-    subroutine s_calculate_btensor(q_cons_vf, j, k, l, btensor)
+    subroutine s_calculate_btensor(q_prim_vf, j, k, l, btensor)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(num_dims**2 + 1), intent(OUT) :: btensor
         integer, intent(IN) :: j, k, l
 
@@ -36,7 +36,7 @@ contains
 
         ! Converting the primitive variables to the conservative variables
         do i = 1, num_dims
-            tensor(i) = q_cons_vf(stress_idx%beg + i - 1)%sf(j, k, l)
+            tensor(i) = q_prim_vf(stress_idx%beg + i - 1)%sf(j, k, l)
         end do
         ! need to calculate gradxi then calculate btensor and J = det(F)
 
@@ -64,7 +64,7 @@ contains
                             + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
         end if
         ! error checking
-        if (f_determinant == 0) then 
+        if (f_determinant == 0) then
             print *, 'ERROR: Determinant was zero'
             call s_mpi_abort()
         end if
@@ -125,22 +125,22 @@ contains
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: dja
 
         if (num_dims == 1) then
-           dja(1) = 1 
+            dja(1) = 1
         elseif (num_dims == 2) then
-           dja(1) = tensor(4)
-           dja(2) = -tensor(3)
-           dja(3) = -tensor(2)
-           dja(4) = tensor(1)
+            dja(1) = tensor(4)
+            dja(2) = -tensor(3)
+            dja(3) = -tensor(2)
+            dja(4) = tensor(1)
         elseif (num_dims == 3) then
-           dja(1) =   tensor(5)*tensor(9) - tensor(6)*tensor(8)
-           dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
-           dja(3) =   tensor(2)*tensor(6) - tensor(3)*tensor(5)
-           dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
-           dja(5) =   tensor(1)*tensor(9) - tensor(3)*tensor(7)
-           dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
-           dja(7) =   tensor(4)*tensor(8) - tensor(5)*tensor(7)
-           dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
-           dja(9) =   tensor(1)*tensor(5) - tensor(2)*tensor(4)
+            dja(1) = tensor(5)*tensor(9) - tensor(6)*tensor(8)
+            dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
+            dja(3) = tensor(2)*tensor(6) - tensor(3)*tensor(5)
+            dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
+            dja(5) = tensor(1)*tensor(9) - tensor(3)*tensor(7)
+            dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
+            dja(7) = tensor(4)*tensor(8) - tensor(5)*tensor(7)
+            dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
+            dja(9) = tensor(1)*tensor(5) - tensor(2)*tensor(4)
         end if
     end subroutine s_calculate_adjointa
 
@@ -150,7 +150,7 @@ contains
         real(kind(0d0)), dimension(num_dims**2) :: dja
         real(kind(0d0)) :: det
 
-        call s_calculate_adjointa(tensor,dja)
+        call s_calculate_adjointa(tensor, dja)
         det = f_determinant(tensor)
         ainv(:) = tensor(:)/det
     end subroutine s_calculate_ainverse
@@ -167,10 +167,10 @@ contains
         do i = 1, num_dims**2
             tensorb(i) = btensor(i)%sf(j, k, l)
         end do
-        jacobian = btensor(num_dims**2+1)%sf(j,k,l)
+        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
         invariant1 = f_trace(tensorb)
         ! compute the invariant without the elastic modulus
-        f_elastic_energy = 0.5d0*(invariant1-3)/jacobian
+        f_elastic_energy = 0.5d0*(invariant1 - 3)/jacobian
     end function f_elastic_energy
 
     subroutine s_calculate_cauchy_stress(btensor, j, k, l, sigma)
@@ -186,10 +186,10 @@ contains
         do i = 1, num_dims**2
             tensorb(i) = btensor(i)%sf(j, k, l)
         end do
-        jacobian = btensor(num_dims**2+1)%sf(j,k,l)
-        call s_calculate_deviatoric(tensorb,devbtensor)
-        sigma(:) = devbtensor(:)/jacobian      
+        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
+        call s_calculate_deviatoric(tensorb, devbtensor)
+        sigma(:) = devbtensor(:)/jacobian
 
     end subroutine s_calculate_cauchy_stress
- 
+
 end module m_rmt_tensor_calc
