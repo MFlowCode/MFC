@@ -394,7 +394,18 @@ contains
 
                 if (norm(dim) == 0 .or. ghost_points(q)%DB(dim) == 0) then
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
+                    ! if (ghost_points(q)%DB(dim) == -1) then
+                    !     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)+1
+                    ! else if (ghost_points(q)%DB(dim) == 1) then
+                    !     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)-1
+                    ! end if
                 else
+                    ! if (ghost_points(q)%DB(dim) == -1) then
+                    !     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)+1
+                    ! else if (ghost_points(q)%DB(dim) == 1) then
+                    !     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)-1
+                    ! end if
+
                     if (norm(dim) > 0) then
                         dir = 1
                     else
@@ -411,6 +422,9 @@ contains
                     ghost_points(q)%ip_grid(dim) = index
                 end if
             end do
+
+            print*, ghost_points(q)%loc(:)
+            print*, ghost_points(q)%ip_grid(:)
 
             ! print *, "GP Loc: ", ghost_points(q)%loc(:)
             ! print *, "Norm: ", norm(:)
@@ -509,15 +523,17 @@ contains
                                 patch_id
                             ghost_points(count)%slip = patch_ib(patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg .or. &
-                                (x_cc(i) + dx(i)) > x_domain%end) then
+                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                                ghost_points(count)%DB(1) = -1
+                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
                                 ghost_points(count)%DB(1) = 1
                             else
                                 ghost_points(count)%DB(1) = 0
                             end if
-                            
-                            if ((y_cc(j) - dy(j)) < y_domain%beg .or. &
-                                (y_cc(j) + dy(j)) > y_domain%end) then
+
+                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                                ghost_points(count)%DB(2) = -1
+                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
                                 ghost_points(count)%DB(2) = 1
                             else
                                 ghost_points(count)%DB(2) = 0
@@ -537,7 +553,7 @@ contains
                             else
                                 ghost_points(count)%DB(1) = 0
                             end if
-                            
+
                             if ((y_cc(j) - dy(j)) < y_domain%beg .or. &
                                 (y_cc(j) + dy(j)) > y_domain%end) then
                                 ghost_points(count)%DB(2) = 1
@@ -606,6 +622,16 @@ contains
                 i1 = gp%ip_grid(1); i2 = i1 + 1
                 j1 = gp%ip_grid(2); j2 = j1 + 1
 
+                ! if (gp%DB(1) == -1) then
+                !     i2 = i1 + 1
+                ! else if (gp%DB(1) == 1) then
+                !     i2 = i1 - 1
+                ! else if (gp%DB(2) == -1) then
+                !     j2 = j1 + 1
+                ! else if (gp%DB(2) == 1) then
+                !     j2 = j1 - 1
+                ! end if
+
                 dist = 0d0
                 buf = 1d0
                 dist(1, 1, 1) = sqrt( &
@@ -622,6 +648,7 @@ contains
                                 (y_cc(j2) - gp%ip_loc(2))**2)
 
                 interp_coeffs = 0d0
+
                 if (dist(1, 1, 1) <= 1d-16) then
                     interp_coeffs(1, 1, 1) = 1d0
                 else if (dist(2, 1, 1) <= 1d-16) then
@@ -646,6 +673,14 @@ contains
                         interp_coeffs(:, :, 1) = eta(:, :, 1)/buf
                     end if
                 end if
+
+                ! if (gp%DB(1) == 1) then
+                !     interp_coeffs(2, 1, 1) = 1d0
+                ! else if (gp%DB(2) == 1) then
+                !     interp_coeffs(1, 2, 1) = 1d0
+                ! else if (gp%DB(1) == 1 .and. gp%DB(2) == 1) then
+                !     interp_coeffs(2, 2, 1) = 1d0
+                ! end if
 
                 ghost_points(i)%interp_coeffs = interp_coeffs
             end do
@@ -757,6 +792,16 @@ contains
         i1 = gp%ip_grid(1); i2 = i1 + 1
         j1 = gp%ip_grid(2); j2 = j1 + 1
         k1 = gp%ip_grid(3); k2 = k1 + 1
+
+        if (gp%DB(1) == -1) then
+            i2 = i1 + 1
+        else if (gp%DB(1) == 1) then
+            i2 = i1 - 1
+        else if (gp%DB(2) == -1) then
+            j2 = j1 + 1
+            ! else if (gp%DB(2) == 1) then
+            !     j2 = j1 - 1
+        end if
 
         if (p == 0) then
             k1 = 0
