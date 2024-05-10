@@ -189,18 +189,12 @@ contains
         !!  @param bub_p_src   Bubble pressure equation source
         !!  @param bub_m_src   Bubble mass equation source
     subroutine s_compute_bubble_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
-
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
-                           c_gas, c_liquid, &
-                           Cpbw, Cpinf, Cpinf_dot, &
-                           myH, myHdot, rddot, alf_gas
-
-        real(kind(0d0)) :: pb, mv, vflux, pldot, pbdot
-
+        real(kind(0d0)) :: rddot
+        real(kind(0d0)) :: pb, mv, vflux, pbdot
         real(kind(0d0)) :: n_tait, B_tait
 
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
@@ -215,11 +209,10 @@ contains
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
-        real(kind(0d0)) :: err_R, err_V, err !< Error estimates for adaptive time stepping
+        real(kind(0d0)) :: err1, err2, err3 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
-        real(kind(0d0)) :: h, h0, h1, h_min !< Time step size
-        real(kind(0d0)) :: d0, d1, d2 !< norms
-        real(kind(0d0)), dimension(4) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration for the inner loop
+        real(kind(0d0)) :: h !< Time step size
+        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3!< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -331,120 +324,73 @@ contains
                         ! Adaptive time stepping
                         if (adap_dt) then
                             ! Determine the starting time step
-                            ! Evaluate f(x0,y0)
-                            myR_tmp(1) = myR
-                            myV_tmp(1) = myV
-                            myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                 pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
-
-                            ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-                            d0 = dsqrt((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
-                            d1 = dsqrt((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
-                            if (d0 < 1d-5 .or. d1 < 1d-5) then
-                                h0 = 1d-6
-                            else
-                                h0 = 1d-2*(d0/d1)
-                            end if
-
-                            ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
-                            myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
-                            myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
-                            myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                                 pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
-
-                            ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-                            d2 = dsqrt(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
-
-                            ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
-                            !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-                            if (max(d1, d2) < 1d-15) then
-                                h1 = max(1d-6, h0*1d-3)
-                            else
-                                h1 = (1d-2/max(d1, d2))**(1d0/3d0)
-                            end if
-
-                            ! Set h = min(100*h0,h1)
-                            h = min(100d0*h0, h1)
+                            call s_initialize_adap_dt(myRho, myP, myR, myV, R0(q), &
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), h)
 
                             ! Advancing one step
                             t_new = 0d0
-                            h_min = h
                             do while (.true.)
-                                if (t_new + h > dt) then
-                                    h = dt - t_new
+                                if (t_new + h > 0.5d0*dt) then
+                                    h = 0.5d0*dt - t_new
                                 end if
 
                                 ! Advancing one sub-step
                                 do while (.true.)
-                                    ! Advance one sub-step and evaluate the error
-                                    ! Stage 0
-                                    myR_tmp(1) = myR
-                                    myV_tmp(1) = myV
-                                    myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
-                                                         pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                    ! Advance one sub-step
+                                    call s_advance_substep(myRho, myP, myR, myV, R0(q), &
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
+                                                      myR_tmp1, myV_tmp1, err1)
 
-                                    ! Stage 1
-                                    myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
-                                    myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
-                                    myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
-                                                         pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                    ! Advance one sub-step by advancing two half steps
+                                    call s_advance_substep(myRho, myP, myR, myV, R0(q), &
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                      myR_tmp2, myV_tmp2, err2)
 
-                                    ! Stage 2
-                                    myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
-                                    myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
-                                    myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
-                                                         pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
-
-                                    ! Stage 3
-                                    myR_tmp(4) = myR + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
-                                    myV_tmp(4) = myV + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
-                                    myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
-                                                         pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
-
-                                    ! Estimate error
-                                    err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
-                                            /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
-                                    err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
-                                            /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-                                    err = dsqrt((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
+                                    call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                      myR_tmp2, myV_tmp2, err3)
 
                                     ! Determine acceptance/rejection and update step size
-                                    if ((err <= 1d0) .and. myR_tmp(4) > 0d0) then
+                                    !   Rule 1: err1, err2, err3 < tol
+                                    !   Rule 2: myR_tmp1(4) > 0d0
+                                    !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
+                                    !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
+                                    if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
+                                            .and. myR_tmp1(4) > 0d0 &
+                                            .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
+                                            .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
                                         ! Accepted. Finalize the sub-step
-                                        myR = myR_tmp(4)
-                                        myV = myV_tmp(4)
+                                        myR = myR_tmp1(4)
+                                        myV = myV_tmp1(4)
                                         t_new = t_new + h
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2d0, max(0.5d0, (1d0/err)**(1d0/3d0)))
+                                        h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (myR_tmp(4) > 0d0) then
-                                            h = h*min(2d0, max(0.5d0, (1d0/err)**(1d0/3d0)))
-                                        else
+                                        if (err2 <= 1d-4) then
                                             h = 0.5d0*h
+                                        else
+                                            h = 0.25d0*h
                                         end if
-                                    end if
 
-                                    if (h < h_min) h_min = h
+                                    end if
                                 end do
 
                                 ! Exit the loop if the final time reached dt
-                                if (t_new == dt) exit
+                                if (t_new == 0.5d0*dt) exit
 
                             end do
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
+                            
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
@@ -489,6 +435,103 @@ contains
             end do
         end if
     end subroutine s_compute_bubble_source
+
+    subroutine s_initialize_adap_dt(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                    fntait, fBtait, f_bub_adv_src, f_divu, h)
+        real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
+        real(kind(0d0)), intent(out) :: h
+
+        real(kind(0d0)) :: h0, h1, h_min !< Time step size
+        real(kind(0d0)) :: d0, d1, d2 !< norms
+        real(kind(0d0)), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
+
+        ! Determine the starting time step
+        ! Evaluate f(x0,y0)
+        myR_tmp(1) = fR
+        myV_tmp(1) = fV
+        myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
+                                fpb, fpbdot, alf, fntait, fBtait, &
+                                f_bub_adv_src, f_divu)
+
+        ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
+        d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
+        d1 = DSQRT((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
+        if (d0 < 1d-5 .or. d1 < 1d-5) then
+            h0 = 1d-6
+        else
+            h0 = 1d-2*(d0/d1)
+        end if
+
+        ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
+        myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
+        myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
+        myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
+                                fpb, fpbdot, alf, fntait, fBtait, &
+                                f_bub_adv_src, f_divu)
+
+        ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
+        d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
+
+        ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
+        !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
+        if (max(d1, d2) < 1d-15) then
+            h1 = max(1d-6, h0*1d-3)
+        else
+            h1 = (1d-2/max(d1, d2))**(1d0/3d0)
+        end if
+
+        ! Set h = min(100*h0,h1)
+        h = min(100d0*h0, h1)
+        
+    end subroutine s_initialize_adap_dt
+
+    subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
+                                    fntait, fBtait, f_bub_adv_src, f_divu, h, &
+                                    myR_tmp, myV_tmp, err)
+        real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
+        real(kind(0d0)), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
+        real(kind(0d0)), dimension(4) :: myA_tmp
+        real(kind(0d0)), intent(OUT) :: err
+        real(kind(0d0)) :: err_R, err_V
+
+        ! Stage 0
+        myR_tmp(1) = fR
+        myV_tmp(1) = fV
+        myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
+
+        ! Stage 1
+        myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
+        myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
+        myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
+
+        ! Stage 2
+        myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
+        myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
+        myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
+
+        ! Stage 3
+        myR_tmp(4) = myR_tmp(1) + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4d0*myV_tmp(3))
+        myV_tmp(4) = myV_tmp(1) + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4d0*myA_tmp(3))
+        myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
+
+        ! Estimate error
+        err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
+                /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
+        err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
+                /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
+        err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
+
+    end subroutine s_advance_substep
 
     !>  Function that computes that bubble wall pressure for Gilmore bubbles
         !!  @param fR0 Equilibrium bubble radius
