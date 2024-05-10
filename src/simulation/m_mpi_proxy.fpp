@@ -4083,7 +4083,7 @@ contains
         end if
 
         if (sigma /= dflt_real) then
-            @:DEALLOCATE(c_divs_buff_send, c_divs_buff_recv)
+            @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 
 #endif

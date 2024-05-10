@@ -254,9 +254,19 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        do l = adv_idx%end + 1, sys_size
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        end do
+        if (sigma /= dflt_real) then
+            ! This assumes that the color function advection equation is
+            ! the last equation. If this changes then this logic will
+            ! need updated
+            do l = adv_idx%end + 1, sys_size - 1
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+        else
+            do l = adv_idx%end + 1, sys_size
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+
+        end if
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 

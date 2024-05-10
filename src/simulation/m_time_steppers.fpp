@@ -202,6 +202,7 @@ contains
             @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(c_idx))
         end if
 
         @:ALLOCATE_GLOBAL(pb_ts(1:2))

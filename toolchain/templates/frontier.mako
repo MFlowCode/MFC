@@ -39,9 +39,9 @@ echo
     % if not mpi:
         (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
     % else:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
-            srun -N ${nodes}                 \
+            (srun -N ${nodes}                 \
                    -n ${tasks_per_node}                              \
+                    set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath()}")
     % endif

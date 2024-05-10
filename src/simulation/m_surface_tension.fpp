@@ -378,13 +378,13 @@ contains
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 
-        @:DEALLOCATE(c_divs)
+        @:DEALLOCATE_GLOBAL(c_divs)
 
-        @:DEALLOCATE(gL_x, gR_x)
+        @:DEALLOCATE_GLOBAL(gL_x, gR_x)
 
-        @:DEALLOCATE(gL_y, gR_y)
+        @:DEALLOCATE_GLOBAL(gL_y, gR_y)
         if (p > 0) then
-            @:DEALLOCATE(gL_z, gR_z)
+            @:DEALLOCATE_GLOBAL(gL_z, gR_z)
         end if
 
     end subroutine s_finalize_surface_tension_module
