@@ -339,20 +339,20 @@ contains
                                 do while (.true.)
                                     ! Advance one sub-step
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                      pb, pbdot, alf, n_tait, B_tait, &
-                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
-                                                      myR_tmp1, myV_tmp1, err1)
+                                                           pb, pbdot, alf, n_tait, B_tait, &
+                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
+                                                           myR_tmp1, myV_tmp1, err1)
 
                                     ! Advance one sub-step by advancing two half steps
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                      pb, pbdot, alf, n_tait, B_tait, &
-                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                      myR_tmp2, myV_tmp2, err2)
+                                                           pb, pbdot, alf, n_tait, B_tait, &
+                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                           myR_tmp2, myV_tmp2, err2)
 
                                     call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
-                                                      pb, pbdot, alf, n_tait, B_tait, &
-                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                      myR_tmp2, myV_tmp2, err3)
+                                                           pb, pbdot, alf, n_tait, B_tait, &
+                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                           myR_tmp2, myV_tmp2, err3)
 
                                     ! Determine acceptance/rejection and update step size
                                     !   Rule 1: err1, err2, err3 < tol
@@ -360,9 +360,9 @@ contains
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                            .and. myR_tmp1(4) > 0d0 &
-                                            .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
-                                            .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
+                                        .and. myR_tmp1(4) > 0d0 &
+                                        .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
+                                        .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
                                         ! Accepted. Finalize the sub-step
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
@@ -390,7 +390,7 @@ contains
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-                            
+
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
@@ -451,8 +451,8 @@ contains
         myR_tmp(1) = fR
         myV_tmp(1) = fV
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
-                                fpb, fpbdot, alf, fntait, fBtait, &
-                                f_bub_adv_src, f_divu)
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
 
         ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
         d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
@@ -467,8 +467,8 @@ contains
         myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
         myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
-                                fpb, fpbdot, alf, fntait, fBtait, &
-                                f_bub_adv_src, f_divu)
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
 
         ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
         d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
@@ -483,12 +483,12 @@ contains
 
         ! Set h = min(100*h0,h1)
         h = min(100d0*h0, h1)
-        
+
     end subroutine s_initialize_adap_dt
 
     subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                    fntait, fBtait, f_bub_adv_src, f_divu, h, &
-                                    myR_tmp, myV_tmp, err)
+                                 fntait, fBtait, f_bub_adv_src, f_divu, h, &
+                                 myR_tmp, myV_tmp, err)
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
         real(kind(0d0)), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
