@@ -52,7 +52,8 @@ examples/*/*.err
 examples/*/viz/
 examples/*.jpg
 examples/*.png
-examples/*/workloads
+examples/*/workloads/
+workloads/
 
 benchmarks/*batch/*/
 benchmarks/*/D/*
