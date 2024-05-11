@@ -440,6 +440,29 @@ contains
             end do
         end if
 
+        ! Elastic Shear Stress
+        if (hyperelasticity) then
+            do i = 1, (stress_idx%end - stress_idx%beg) + 1
+                !q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
+                !    (eta*patch_icpp(patch_id)%tau_e(i) &
+                !     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+            end do
+            ! TODO MIRELYS 
+            ! STEP 1: Calculate r_o, initial position and theta and psi
+            ! r_o = (x^2 + y^2 + z^2)^1/2
+            ! \theta = itan(y/x)
+            ! \psi = arccos(z/r_o)
+            ! STEP 2: Calculate the equilibrium radius from the input file
+            ! Req = Rmax/(p_L/p_b), where Rmax is the initial radius, p_L and p_b is the initial liquid and bubble pressure 
+            ! STEP 3: Calculate the current grid position, i.e., \xi
+            ! \xi_s = (r_o^3 - Req^3 + Rmax^3)^(1/3) This is in spherical coordinates
+            ! STEP 4: map \xi back to x, y, z coordinate system
+            ! \xi_cartesian_x = \xi_s*sin(psi)*cos(theta) 
+            ! \xi_cartesian_y = \xi_s*sin(psi)*sin(theta)
+            ! \xi_cartesian_z = \xi_s*cos(psi)
+            ! STEP 5: Update q_prim_vf(i + stress_idx%beg - 1)
+        end if
+
         if (mpp_lim .and. bubbles) then
             !adjust volume fractions, according to modeled gas void fraction
             alf_sum%sf = 0d0

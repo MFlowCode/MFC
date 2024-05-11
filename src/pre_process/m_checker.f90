@@ -104,6 +104,8 @@ contains
             call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
                              'exiting ...')
         end if
+        ! TODO MIRELYS ADD CHECKER FLAG FOR THIS
+     
         ! phase change checkers.
         if (relax) then
             if (model_eqns /= 3) then

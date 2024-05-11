@@ -133,7 +133,7 @@ contains
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             hypoelasticity, &
-            ib, num_ibs, patch_ib, &
+            ib, num_ibs, hyperelasticity, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
