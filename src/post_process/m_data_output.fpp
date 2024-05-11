@@ -21,6 +21,8 @@ module m_data_output
     use m_compile_specific
 
     use m_helper
+
+    use m_mpi_common
     ! ==========================================================================
 
     implicit none
@@ -986,39 +988,41 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
         real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, maxalph_loc, maxalph_glb, thres
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-
+        maxalph_loc = maxval(q_prim_vf(E_idx + 2)%sf(:,:,:))
+        call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         do l = 0, p
-            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+            if (z_cc(l) < dz(l) .and. z_cc(l) >= 0) then
                 cent = l
             end if
         end do
+        thres = 0.9d0*maxalph_glb
         do k = 0, n
             OLoop: do j = 0, m
-                axp = q_prim_vf(E_idx + 1)%sf(j + 1, k, cent)
-                axm = q_prim_vf(E_idx + 1)%sf(j - 1, k, cent)
-                ayp = q_prim_vf(E_idx + 1)%sf(j, k + 1, cent)
-                aym = q_prim_vf(E_idx + 1)%sf(j, k - 1, cent)
+                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
+                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
+                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
+                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, cent)
 
-                if ((axp > 0.9 .and. axm < 0.9) .or. (axp < 0.9 .and. axm > 0.9) &
-                    .or. (ayp > 0.9 .and. aym < 0.9) .or. (ayp < 0.9 .and. aym > 0.9)) then
+                if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
+                    .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
                         y_d1(counter) = y_cc(k)
+                        euc_d  = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = 2*sqrt(dx(j)**2 + dy(k)**2)
                     else
                         do i = 1, counter
-                            if (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
-                                                               y_d1(i))**2) <= 2*sqrt(dx(j)**2 &
-                                                                                      + dy(k)**2)) then
+                            if (euc_d <= tgp) then
                                 cycle OLoop
-                            elseif (sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - &
-                                                                   y_d1(i))**2) > 2*sqrt(dx(j)**2 &
-                                                                                         + dy(k)**2) .and. i == counter) then
+                            elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
+                                !artificial bounding on the interface for bubble at a centroid.
+                                !need to remove eventually. 
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)
@@ -1055,13 +1059,17 @@ contains
     subroutine s_write_energy_data_file(q_prim_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
-        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf
+        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb, maxalph_loc, maxalph_glb
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, thres
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs
         integer :: i, j, k, l, s !looping indicies
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
-
+        
+        maxalph_loc = maxval(q_prim_vf(E_idx + 2)%sf(:,:,:))
+        call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
+        thres = 0.9d0*maxalph_glb
+ 
         Elk = 0d0
         Egk = 0d0
         Elint = 0d0
@@ -1086,17 +1094,17 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
                         do s = 1, num_dims
                             vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
-                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)*dV
-                            else
+                            if (q_prim_vf(E_idx+2)%sf(i, j, k) > thres) then
                                 Egk = Egk + 0.5d0*rho*vel(s)*vel(s)*dV
+                            else
+                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)*dV
                             end if
                         end do
-                        if (q_prim_vf(E_idx + 1)%sf(i, j, k) > 0.9) then
-                            Elint = Elint + (gamma*pres + pi_inf)*dV
-                        else
+                        if (q_prim_vf(E_idx+2)%sf(i, j, k) > thres) then
                             Egint = Egint + (gamma*pres + pi_inf)*dV
                             Vb = Vb + dV
+                        else
+                           Elint = Elint + (gamma*pres + pi_inf)*dV
                         end if
                     end do
                 end do
