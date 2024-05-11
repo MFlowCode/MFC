@@ -1000,7 +1000,7 @@ contains
                 cent = l
             end if
         end do
-        thres = 0.9d0*maxalph_glb
+        thres = 0.75d0*maxalph_glb
         do k = 0, n
             OLoop: do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
@@ -1068,7 +1068,7 @@ contains
         
         maxalph_loc = maxval(q_prim_vf(E_idx + 2)%sf(:,:,:))
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
-        thres = 0.9d0*maxalph_glb
+        thres = 0.75d0*maxalph_glb
  
         Elk = 0d0
         Egk = 0d0
