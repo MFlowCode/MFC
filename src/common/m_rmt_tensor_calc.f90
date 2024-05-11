@@ -20,15 +20,15 @@ module m_rmt_tensor_calc
     implicit none
 
     private; public :: s_calculate_btensor, &
- s_calculate_cauchy_stress, &
- f_elastic_energy
+ f_elastic_energy, &
+ s_calculate_deviatoric
 
 contains
 
     subroutine s_calculate_btensor(q_prim_vf, j, k, l, btensor)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(num_dims**2 + 1), intent(OUT) :: btensor
+        type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(OUT) :: btensor
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)), dimension(num_dims**2) :: ftensor, ftransposef, tensorb, tensor
@@ -38,7 +38,9 @@ contains
         do i = 1, num_dims
             tensor(i) = q_prim_vf(stress_idx%beg + i - 1)%sf(j, k, l)
         end do
+        ! NOTE: btensor is symmetric, save the data space
         ! need to calculate gradxi then calculate btensor and J = det(F)
+        ! store in btensor
 
         ! extracting the nxn tensor for the calculation
         !do i = 1, num_dims**2
@@ -152,11 +154,15 @@ contains
 
         call s_calculate_adjointa(tensor, dja)
         det = f_determinant(tensor)
-        ainv(:) = tensor(:)/det
+        ainv(:) = dja(:)/det
     end subroutine s_calculate_ainverse
 
+    ! neo-Hookean only at this time, will need to be changed later
     function f_elastic_energy(btensor, j, k, l)
-        type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
+        type(scalar_field), & 
+            dimension(num_dims*(num_dims+1)/2 + 1), &
+            intent(IN) :: btensor
+
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)), dimension(num_dims**2) :: ftransposef, tensorb
@@ -164,32 +170,17 @@ contains
         integer :: i !< Generic loop iterators
 
         ! extracting the nxn tensor for the calculation
-        do i = 1, num_dims**2
+        !TODO COPY SPRATT CODE FOR SYMMETRIC TENSOR
+        do i = 1, num_dims*(num_dims+1)/2
             tensorb(i) = btensor(i)%sf(j, k, l)
         end do
-        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
+        tensorb(1) = btensor(1)%sf(j, k, l)
+        
+        jacobian = btensor(num_dims*(num_dims+1)/2 + 1)%sf(j, k, l)
         invariant1 = f_trace(tensorb)
         ! compute the invariant without the elastic modulus
         f_elastic_energy = 0.5d0*(invariant1 - 3)/jacobian
     end function f_elastic_energy
 
-    subroutine s_calculate_cauchy_stress(btensor, j, k, l, sigma)
-        type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: sigma
-        integer, intent(IN) :: j, k, l
-
-        real(kind(0d0)), dimension(num_dims**2) :: tensorb, devbtensor
-        real(kind(0d0)) :: jacobian
-        integer :: i !< Generic loop iterators
-
-        ! extracting the nxn tensor for the calculation
-        do i = 1, num_dims**2
-            tensorb(i) = btensor(i)%sf(j, k, l)
-        end do
-        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
-        call s_calculate_deviatoric(tensorb, devbtensor)
-        sigma(:) = devbtensor(:)/jacobian
-
-    end subroutine s_calculate_cauchy_stress
 
 end module m_rmt_tensor_calc

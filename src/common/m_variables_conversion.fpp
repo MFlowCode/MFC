@@ -875,7 +875,7 @@ contains
 
         type(scalar_field), & 
             optional, dimension(num_dims**2), & 
-            intent(IN) :: qK_btensor_vf
+            intent(OUT) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -1043,22 +1043,21 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity .and. .not. bubbles) then
+                    if (hyperelasticity .and. .not. bubbles .and. G_K > 100 ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
                         end do
-                        ! MAURO TODO REMOVE THE ELASTIC ENERGY FROM THE PRESSURE
-                        !if(present(qK_btensor_vf)) then
-                        ! use the btensor information to calculate
 
-                        !else
-                        ! call the code to then generate the btensor, this will have to be in common
+                        !call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
 
-                        !end if
-                        !e_e = (G_K/(4.d0*rho_K))!*f_elastic_energy(ghat)
-                        !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - e_e/gamma_k
+                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 
+                             !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+
+                    else
+                        ! Mostly in the non-solid material
+                        qK_btensor_vf(:)%sf(j,k,l) = 0d0
 
                     end if
 
@@ -1092,6 +1091,8 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+        type(scalar_field), dimension(num_dims**2) :: q_btensor_vf
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1220,22 +1221,15 @@ contains
                     end if
 
                     if (hyperelasticity) then
+                        ! adding the elastic contribution
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        ! MAURO!! TODO ADD THE ELASTIC ENERGY TO THIS PART OF THE CODE!
-
+                        !call s_calculate_btensor(qK_prim_vf, j, k, l, q_btensor_vf)
+                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ & 
+                             !G*f_elastic_energy(q_btensor_vf, j, k, l)
                     end if
-
-                    !if (hyperelasticity .and. G .gt. 0.d0 ) then
-                    !    call s_allocate_tensor(q_cons_vf,j,k,l,gtensor)
-                    !    call s_calculate_atransposea(gtensor,getge) ! getge is G^e
-                    !    detG =  f_determinant(getge) ! determinant of G^e
-                    !    ghat(:) = getge(:)*detG**(-1.d0/3.d0)
-                    !    e_e = (G/(4.d0*rho))*f_elastic_energy(ghat)
-                    !    q_cons_vf(E_idx)%sf(j,k,l) = q_cons_vf(E_idx)%sf(j,k,l) + e_e
-                    !end if
-
+  
                 end do
             end do
         end do
@@ -1323,7 +1317,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, E_idx)
-                    if (hypoelasticity) then
+                    if (hypoelasticity .or. hyperelasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
                                                                         j, k, l, G_K, Gs)

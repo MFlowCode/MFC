@@ -1,0 +1,61 @@
+!>
+!! @file m_hyperelastic.f90
+!! @brief Contains module m_hyperelastic
+
+#:include 'macros.fpp'
+
+!> @brief This module is used to compute source terms for hyperelastic model
+module m_hyperelastic
+
+    ! Dependencies =============================================================
+
+    use m_derived_types        !< Definitions of the derived types
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use m_rmt_tensor_calc !< State variables type conversion procedures
+
+    ! ==========================================================================
+
+    implicit none
+
+    private; public :: s_initialize_hyperelastic_module, &
+ s_compute_hyperelastic_rhs, &
+ s_calculate_cauchy_stress
+
+contains
+
+    subroutine s_initialize_hyperelastic_module()
+
+    end subroutine s_initialize_hyperelastic_module
+
+    subroutine s_compute_hyperelastic_rhs()
+
+    end subroutine s_compute_hyperelastic_rhs
+
+    subroutine s_calculate_cauchy_stress(btensor, j, k, l, sigma)
+        type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: sigma
+        integer, intent(IN) :: j, k, l
+
+        real(kind(0d0)), dimension(num_dims**2) :: tensorb, devbtensor
+        real(kind(0d0)) :: jacobian
+        integer :: i !< Generic loop iterators
+
+        ! extracting the nxn tensor for the calculation
+        do i = 1, num_dims**2
+            tensorb(i) = btensor(i)%sf(j, k, l)
+        end do
+        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
+        call s_calculate_deviatoric(tensorb, devbtensor)
+        sigma(:) = devbtensor(:)/jacobian
+
+    end subroutine s_calculate_cauchy_stress
+
+
+
+end module m_hyperelastic
+
+

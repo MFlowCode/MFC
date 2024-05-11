@@ -39,6 +39,8 @@ module m_rhs
 
     use m_hypoelastic
 
+    use m_hyperelastic
+
     use m_monopole
 
     use m_viscous
@@ -705,15 +707,7 @@ contains
 
         call nvtxStartRange("Hyperelasticity: Btensor")
         ! create the Btensor and save in a large vector field
-        !if (hyperelasticity) call s_get_Btensor(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-        !                                         dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-        !                                         qL_prim, &
-        !                                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-        !                                         dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-        !                                         qR_prim, &
-        !                                         q_prim_qp, &
-        !                                         dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-        !                                         ix, iy, iz)
+
         call nvtxEndRange()
 
         ! ==================================================================
@@ -921,6 +915,7 @@ contains
             ! use the calculated Btensor and compute the Cauchy stress tensor in common
             !if (hyperelasticity) call s_compute_hyperelastic_rhs(id, &
             !                                                   q_prim_qp%vf, &
+            !                                                   
             !                                                   rhs_vf)
             call nvtxEndRange
 
