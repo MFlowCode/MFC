@@ -231,7 +231,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -438,6 +438,7 @@ contains
 
     subroutine s_initialize_adap_dt(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                     fntait, fBtait, f_bub_adv_src, f_divu, h)
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(kind(0d0)), intent(out) :: h
@@ -489,6 +490,7 @@ contains
     subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                  fntait, fBtait, f_bub_adv_src, f_divu, h, &
                                  myR_tmp, myV_tmp, err)
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
         real(kind(0d0)), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
