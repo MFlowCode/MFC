@@ -16,7 +16,7 @@ PRE_PROCESS = COMMON + [
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-    'pi_fac', 'ib', 'num_ibs'
+    'pi_fac', 'ib', 'num_ibs',
 ]
 
 for ib_id in range(1, 10+1):
@@ -52,6 +52,9 @@ for p_id in range(1, 10+1):
                       "pi_inf", "r0", "v0", "p0", "m0", "hcid", "cv", "qv", "qvp" ]:
         PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
 
+    for i in range(100):
+        PRE_PROCESS.append(f"patch_icpp({p_id})%Y({i})")
+
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")
 
     for attribute in ["translate", "scale", "rotate"]:
@@ -82,6 +85,11 @@ for p_id in range(1, 10+1):
         for alter_id in range(1, p_id):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
 
+
+for f_id in range(1, 10+1):
+    PRE_PROCESS.append(f"spec_pp({f_id})")
+
+
 SIMULATION = COMMON + [
     'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
     't_step_stop', 't_step_save', 't_step_print', 'time_stepper', 'weno_eps',
@@ -93,6 +101,9 @@ SIMULATION = COMMON + [
     'num_integrals', 'cu_mpi', 'palpha_eps', 'ptgalpha_eps', 
     'pi_fac', 'adap_dt', 'ib', 'num_ibs'
 ]
+
+for var in [ 'advection', 'diffusion', 'reactions' ]:
+    SIMULATION.append(f'chem_params%{var}')
 
 for ib_id in range(1, 10+1):
     for attribute in ["geometry", "radius", "theta","slip", "c", "m", "t", "p"]:
@@ -150,7 +161,7 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt'
+    'qm_wrt', 'chem_wrt'
 ]
 
 for cmp_id in range(1,3+1):
@@ -161,6 +172,9 @@ for cmp_id in range(1,3+1):
 
     for attribute in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS.append(f'{attribute}({cmp_id})')
+
+for cmp_id in range(100):
+    POST_PROCESS.append(f'chem_wrt({cmp_id})')
 
 for fl_id in range(1,10+1):
     for append in ["schlieren_alpha", "alpha_rho_wrt", "alpha_wrt", "kappa_wrt"]:
