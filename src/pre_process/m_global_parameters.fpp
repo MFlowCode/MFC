@@ -85,6 +85,7 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity  !< activate hypoelasticity
     logical :: hyperelasticity !< activate hyperelasticity
+    logical :: pre_stress      !< activate pre_stressed domain
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx                   !< Indexes of first & last continuity eqns.
@@ -277,6 +278,7 @@ contains
 
         hypoelasticity = .false.
         hyperelasticity = .false.
+        pre_stress = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

@@ -104,8 +104,17 @@ contains
             call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
                              'exiting ...')
         end if
-        ! TODO MIRELYS ADD CHECKER FLAG FOR THIS
-     
+ 
+        if (hyperelasticity .and. (model_eqns /= 2)) then
+            call s_mpi_abort('hyperelasticity requires model_eqns =2'// &
+                             'exiting ...')
+        end if
+
+        if (pre_stress .and. .not. hyperelasticity) then
+            call s_mpi_abort('pre_stress requires hyperelasticity'// &
+                             'exiting ...')
+        end if
+
         ! phase change checkers.
         if (relax) then
             if (model_eqns /= 3) then

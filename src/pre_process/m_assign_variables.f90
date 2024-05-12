@@ -443,17 +443,22 @@ contains
         ! Elastic Shear Stress
         if (hyperelasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
-                !q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
+               ! STEP 1: Calculate r_o (initial position) and theta and phi
+                !r_o = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
+                !theta = atan2(y_cc(k), x_cc(j))
+                !phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
+               ! STEP 2: Calculate the equilibrium radius from the initial bubble radius,
+               ! initial liquid pressure and initial bubble pressure specified in input file
+               ! Req = Rmax/( p_l / p_b)**(1d0 / 3d0)                
+
+                !  q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
                 !    (eta*patch_icpp(patch_id)%tau_e(i) &
                 !     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
             ! TODO MIRELYS 
-            ! STEP 1: Calculate r_o, initial position and theta and psi
-            ! r_o = (x^2 + y^2 + z^2)^1/2
-            ! \theta = itan(y/x)
             ! \psi = arccos(z/r_o)
             ! STEP 2: Calculate the equilibrium radius from the input file
-            ! Req = Rmax/(p_L/p_b), where Rmax is the initial radius, p_L and p_b is the initial liquid and bubble pressure 
+            ! Req = Rmax/((p_L/p_b)^(1/3)), where Rmax is the initial radius, p_L and p_b is the initial liquid and bubble pressure 
             ! STEP 3: Calculate the current grid position, i.e., \xi
             ! \xi_s = (r_o^3 - Req^3 + Rmax^3)^(1/3) This is in spherical coordinates
             ! STEP 4: map \xi back to x, y, z coordinate system
