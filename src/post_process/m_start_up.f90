@@ -72,7 +72,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, relax_model, &
-            adv_n, sim_data
+            adv_n, sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -313,21 +313,24 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the elastic shear stresses to the formatted database file -----
-        if (hypoelasticity) then
+        if (hypoelasticity .or. hyperelasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then
                     q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-
-                    write (varname, '(A,I0)') 'tau', i
+                    if (hypoelasticity) then
+                        write (varname, '(A,I0)') 'tau', i
+                    else
+                        write (varname, '(A,I0)') 'xi', i
+                    end if
                     call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                 end if
                 varname(:) = ' '
             end do
         end if
-        ! ----------------------------------------------------------------------
+       ! ----------------------------------------------------------------------
 
         ! Adding the pressure to the formatted database file -------------------
         if (pres_wrt .or. prim_vars_wrt) then
