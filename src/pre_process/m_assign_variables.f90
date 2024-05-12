@@ -260,6 +260,8 @@ contains
         real(kind(0d0)) :: orig_qv
         real(kind(0d0)) :: muR, muV
         real(kind(0d0)) :: R3bar
+        real(kind(0d0)) :: rcoord, theta, phi, xi_sph
+        real(kind(0d0)), dimension(3) :: xi_cart
 
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
         real(kind(0d0)) :: pres   !< pressure
@@ -442,30 +444,22 @@ contains
 
         ! Elastic Shear Stress
         if (hyperelasticity) then
+                xi_cart(1) = x_cc(j)
+                xi_cart(2) = y_cc(k)
+                xi_cart(3) = z_cc(l)
+            if (pre_stress) then ! pre stressed initial condition in spatial domain
+                   rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
+                   phi = atan2(y_cc(k), x_cc(j))
+                   theta = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
+                   xi_sph = (rcoord**3 - R0ref**3 + 1)**( 1d0 / 3d0 ) !spherical coord, assuming Rmax=1 
+                   xi_cart(1) = xi_sph*sin(theta)*cos(phi)
+                   xi_cart(2) = xi_sph*sin(theta)*sin(phi)
+                   xi_cart(3) = xi_sph*cos(theta)
+            end if
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
-               ! STEP 1: Calculate r_o (initial position) and theta and phi
-                !r_o = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
-                !theta = atan2(y_cc(k), x_cc(j))
-                !phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
-               ! STEP 2: Calculate the equilibrium radius from the initial bubble radius,
-               ! initial liquid pressure and initial bubble pressure specified in input file
-               ! Req = Rmax/( p_l / p_b)**(1d0 / 3d0)                
-
-                !  q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
-                !    (eta*patch_icpp(patch_id)%tau_e(i) &
-                !     + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+                    q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
+                       (eta*xi_cart(i) + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))                       
             end do
-            ! TODO MIRELYS 
-            ! \psi = arccos(z/r_o)
-            ! STEP 2: Calculate the equilibrium radius from the input file
-            ! Req = Rmax/((p_L/p_b)^(1/3)), where Rmax is the initial radius, p_L and p_b is the initial liquid and bubble pressure 
-            ! STEP 3: Calculate the current grid position, i.e., \xi
-            ! \xi_s = (r_o^3 - Req^3 + Rmax^3)^(1/3) This is in spherical coordinates
-            ! STEP 4: map \xi back to x, y, z coordinate system
-            ! \xi_cartesian_x = \xi_s*sin(psi)*cos(theta) 
-            ! \xi_cartesian_y = \xi_s*sin(psi)*sin(theta)
-            ! \xi_cartesian_z = \xi_s*cos(psi)
-            ! STEP 5: Update q_prim_vf(i + stress_idx%beg - 1)
         end if
 
         if (mpp_lim .and. bubbles) then

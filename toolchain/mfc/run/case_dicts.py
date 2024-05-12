@@ -16,7 +16,7 @@ PRE_PROCESS = COMMON + [
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-    'pi_fac', 'ib', 'num_ibs'
+    'pi_fac', 'ib', 'num_ibs', 'pre_stress'
 ]
 
 for ib_id in range(1, 10+1):
