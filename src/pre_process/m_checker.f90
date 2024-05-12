@@ -115,6 +115,11 @@ contains
                              'exiting ...')
         end if
 
+        if (pre_stress .and. R0ref == dflt_int) then
+            call s_mpi_abort('pre_stress hyperelasticity requires R0ref'// &
+                             'exiting ...')
+        end if
+
         ! phase change checkers.
         if (relax) then
             if (model_eqns /= 3) then
