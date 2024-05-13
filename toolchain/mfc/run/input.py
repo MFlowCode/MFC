@@ -31,7 +31,6 @@ class MFCInputFile(Case):
         cons.print("Writing a (new) custom case.fpp file.")
         common.file_write(fpp_path, contents, True)
 
-    # pylint: disable=too-many-locals
     def generate_fpp(self, target) -> None:
         if target.isDependency:
             return
