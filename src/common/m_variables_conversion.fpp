@@ -1043,13 +1043,14 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity .and. .not. bubbles .and. G_K > 100 ) then
+                    if ( hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
+                            !if (proc_rank == 0) print *, 'q(',i,') :: ',qK_prim_vf(i)%sf(j, k, l)
                         end do
-
+                        !if (proc_rank == 0) stop
                         !call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
 
                         qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 
@@ -1057,7 +1058,7 @@ contains
 
                     else
                         ! Mostly in the non-solid material
-                        qK_btensor_vf(:)%sf(j,k,l) = 0d0
+                        !qK_btensor_vf(:)%sf(j,k,l) = 0d0
 
                     end if
 
