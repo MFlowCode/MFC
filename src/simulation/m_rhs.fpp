@@ -647,7 +647,7 @@ contains
         real(kind(0d0)) :: gp_sum
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
         integer, intent(IN) :: t_step
-        
+
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
@@ -669,7 +669,7 @@ contains
 
         integer :: i, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
-        
+
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
 
@@ -978,12 +978,12 @@ contains
                 end do
             end do
         end if
-    call cpu_time(t_finish)
-    if (t_step >= 4) then
-        time_avg = (abs(t_finish - t_start)/((ix%end-ix%beg)*(iy%end-iy%beg)*(iz%end-iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
-    else
-        time_avg = 0d0
-    end if
+        call cpu_time(t_finish)
+        if (t_step >= 4) then
+            time_avg = (abs(t_finish - t_start)/((ix%end - ix%beg)*(iy%end - iy%beg)*(iz%end - iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
         ! ==================================================================
 
     end subroutine s_compute_rhs ! -----------------------------------------
