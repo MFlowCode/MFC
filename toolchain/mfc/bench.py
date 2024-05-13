@@ -78,7 +78,9 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
-    cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('rhs'))}[/magenta].[/bold]")
+    cons.print(f"[bold]Comparing Bencharks:[/bold]")
+    cons.print(f"[bold]\t1.5x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is 1.5-times as fast as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] (so [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is faster than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta]).[/bold]")
+    cons.print(f"[bold]\t0.5x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is 0.5-times as fast as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] (so [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is slower than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta]).[/bold]")
 
     if lhs["metadata"] != rhs["metadata"]:
         def _lock_to_str(lock):
