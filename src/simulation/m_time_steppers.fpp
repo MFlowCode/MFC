@@ -286,16 +286,13 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 1 =====================================================
 
-        call cpu_time(start)
-
         call nvtxStartRange("Time_Step")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -387,14 +384,6 @@ contains
 
         call nvtxEndRange
 
-        call cpu_time(finish)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
-
         ! ==================================================================
 
     end subroutine s_1st_order_tvd_rk ! ------------------------------------
@@ -416,7 +405,7 @@ contains
 
         call nvtxStartRange("Time_Step")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -503,7 +492,7 @@ contains
 
         ! Stage 2 of 2 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -605,7 +594,7 @@ contains
             call nvtxStartRange("Time_Step")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -693,7 +682,7 @@ contains
 
         ! Stage 2 of 3 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -764,7 +753,7 @@ contains
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size

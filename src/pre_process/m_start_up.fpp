@@ -850,7 +850,7 @@ contains
         logical, intent(INOUT) :: file_exists
         real(kind(0d0)), intent(INOUT) :: time_avg, time_final
         real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
-
+        character(len=20) :: time_str
         call s_mpi_barrier()
 
         if (num_procs > 1) then
@@ -861,10 +861,15 @@ contains
             time_final = 0d0
             if (num_procs == 1) then
                 time_final = time_avg
-                print *, "Final Time", time_final
+                write(time_str, '(F20.6)') time_final
+                time_str=trim(adjustl(time_str))
+                print *, "Final Time                 ", time_str
+                print *, "Final Time                 ", time_final
             else
                 time_final = maxval(proc_time)
-                print *, "Final Time", time_final
+                write(time_str, '(F20.6)') time_final
+                time_str=trim(adjustl(time_str))
+                print *, "Final Time                 ", time_str
             end if
             inquire (FILE='pre_time_data.dat', EXIST=file_exists)
             if (file_exists) then
