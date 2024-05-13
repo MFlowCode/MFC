@@ -3,7 +3,7 @@ import re, os.path, argparse, dataclasses
 from .run.run      import get_baked_templates
 from .build        import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
 from .common       import MFCException, format_list_to_string
-from .test.cases   import generate_cases
+from .test.cases   import list_cases
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config):
@@ -77,7 +77,7 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(clean, "jg")
 
     # === TEST ===
-    test_cases = generate_cases()
+    test_cases = list_cases()
 
     add_common_arguments(test, "t")
     test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
@@ -124,6 +124,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("-f", "--flags",              metavar="FLAGS", dest="--", nargs=argparse.REMAINDER, type=str, default=[], help="Arguments to forward to the MPI invocation.")
     run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
     run.add_argument("-o", "--output-summary",     metavar="OUTPUT",             type=str, default=None,       help="Output file (YAML) for summary.")
+    run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
 
     # === BENCH ===
     add_common_arguments(bench)
