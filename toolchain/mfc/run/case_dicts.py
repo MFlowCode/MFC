@@ -186,7 +186,7 @@ for fl_id in range(1,10+1):
 
 ALL = list(set(PRE_PROCESS + SIMULATION + POST_PROCESS))
 
-CASE_OPTIMIZATION = [ "nb", "weno_order" ]
+CASE_OPTIMIZATION = [ "nb", "weno_order", "num_fluids"]
 
 
 def get_input_dict_keys(target_name: str) -> list:
