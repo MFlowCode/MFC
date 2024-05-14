@@ -132,6 +132,7 @@ contains
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
+            x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
