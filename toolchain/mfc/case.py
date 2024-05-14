@@ -176,7 +176,7 @@ class Case:
 #:set nb                    = {int(self.params.get("nb", 1))}
 #:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
 #:set nterms                = {nterms}
-#:set num_fluids            = {int(self.case_dict["num_fluids"])}
+#:set num_fluids            = {int(self.params["num_fluids"])}
 """
 
         return """\
