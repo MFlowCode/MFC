@@ -78,29 +78,31 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
-    cons.print(f"[bold]Comparing Benchmarks:[/bold]")
-    cons.print(f"[bold]\t1.5x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is 1.5-times as fast as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] (so [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is faster than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta]).[/bold]")
-    cons.print(f"[bold]\t0.5x indicates [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is 0.5-times as fast as [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] (so [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is slower than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta]).[/bold]")
-
+    cons.print(f"[bold]Comparing Benchmarks: Numbers < 1 indicate the [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is faster than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta], > 1 indicate [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is slower.[/bold]")
     if lhs["metadata"] != rhs["metadata"]:
         def _lock_to_str(lock):
             return ' '.join([f"{k}={v}" for k, v in lock.items()])
 
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.")
-        cons.print(f" This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).")
-        cons.print(f" lhs:")
-        cons.print(f" * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]")
-        cons.print(f" * Modes:      {_lock_to_str(lhs['metadata']['lock'])}")
-        cons.print(f" rhs:")
-        cons.print(f" * Invocation: {' '.join(rhs['metadata']['invocation'])}")
-        cons.print(f" * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]")
+        cons.print(f"""\
+        [bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
+         This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
+         lhs:
+         * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]
+         * Modes:      {_lock_to_str(lhs['metadata']['lock'])}
+         rhs:
+         * Invocation: {' '.join(rhs['metadata']['invocation'])}
+         * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]
+        """)
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.")
-        cons.print(f" * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.")
-        cons.print(f" * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.")
-        cons.print(f" Using intersection: {slugs} with {len(slugs)} elements.")
+
+        cons.print(f"""\
+        [bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.
+         * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.
+         * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.
+         Using intersection: {slugs} with {len(slugs)} elements.
+        """)
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]",    justify="left")
