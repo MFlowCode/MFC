@@ -5,7 +5,7 @@ This page shows a summary of these results.
 
 ## Expected time-steps/hour
 
-The following table outlines observed performance as nanoseconds per grid point (ns/GP) per right-hand side evaluation (lower is better).
+The following table outlines observed performance as nanoseconds per grid point (ns/GP) per equation (eq) per right-hand side evaluation (lower is better).
 We solve an example 3D, inviscid, 5-equation model problem with two advected species (a total of 8 PDEs).
 The numerics are WENO5 and the HLLC approximate Riemann solver.
 We report results for various numbers of grid points per CPU die (or GPU device) and hardware.
@@ -19,7 +19,7 @@ We report results for various numbers of grid points per CPU die (or GPU device)
 | Intel Xeon Gold 6226 | 12 cores     | 1963           | 1688           | 1686         | GNU 10.3.0  | PACE Phoenix  |
 | Apple M2     | 6 cores      | 2919           | 245          | 4500        | GNU 13.2.0  | N/A           |
 
-__All results are in nanoseconds (ns) per grid point (gp) per right-hand side (rhs) evaluation. Lower is better.__
+__All results are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation. Lower is better.__
 
 ## Weak scaling
 
