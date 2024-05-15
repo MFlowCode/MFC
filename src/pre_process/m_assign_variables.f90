@@ -443,23 +443,21 @@ contains
         end if
 
         ! Elastic Shear Stress
-        !if(proc_rank == 0) print *, 'I got to before hyperelasticity for patch :: ', patch_id
-         if (hyperelasticity) then
-               !if (proc_rank ==0) print *, 'x ::', x_cc(j), 'y ::', y_cc(k), 'z ::', z_cc(l)
-               xi_cart(1) = x_cc(j)
-               xi_cart(2) = y_cc(k)
-               xi_cart(3) = z_cc(l)
-            if (pre_stress) then ! pre stressed initial condition in spatial domain
-                   rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
-                   phi = atan2(y_cc(k), x_cc(j))
-                   theta = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
-                   xi_sph = (rcoord**3 - R0ref**3 + 1)**( 1d0 / 3d0 ) !spherical coord, assuming Rmax=1 
-                   xi_cart(1) = xi_sph*sin(theta)*cos(phi)
-                   xi_cart(2) = xi_sph*sin(theta)*sin(phi)
-                   xi_cart(3) = xi_sph*cos(theta)
-            end if
-            do i = 1, (stress_idx%end - stress_idx%beg) + 1
-                    q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = xi_cart(i) 
+        if (hyperelasticity) then
+           xi_cart(1) = x_cc(j)
+           xi_cart(2) = y_cc(k)
+           xi_cart(3) = z_cc(l)
+           if (pre_stress) then ! pre stressed initial condition in spatial domain
+               rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
+               theta = atan2(y_cc(k), x_cc(j))
+               phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
+               xi_sph = (rcoord**3 - R0ref**3 + 1d0 )**( 1d0 / 3d0 ) !spherical coord, assuming Rmax=1 
+               xi_cart(1) = xi_sph*sin(phi)*cos(theta)
+               xi_cart(2) = xi_sph*sin(phi)*sin(theta)
+               xi_cart(3) = xi_sph*cos(phi) 
+           end if
+           do i = 1, (stress_idx%end - stress_idx%beg) + 1
+                      q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = xi_cart(i) 
                        !(eta*xi_cart(i) + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
                        
                !if (proc_rank ==0) print *, 'q(',i') ::', q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l)
@@ -467,7 +465,7 @@ contains
                  !       write(*,*) 'q(',i,') :: ',q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l)&
                   !      ,', xi_cart :: ',xi_cart(i)
                 !end if
-            end do
+           end do
          end if
         !if (proc_rank ==0) stop
         !if(proc_rank == 0) print *, 'I got to after hyperelasticity for patch :: ', patch_id

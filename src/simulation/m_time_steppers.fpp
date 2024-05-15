@@ -179,8 +179,7 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
-
+        if (hypoelasticity .or. hyperelasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
@@ -986,7 +985,7 @@ contains
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
-        if (hypoelasticity) then
+        if (hypoelasticity .or. hyperelasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do

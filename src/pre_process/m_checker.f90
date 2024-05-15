@@ -715,14 +715,14 @@ contains
                 call s_mpi_abort('Unsupported value of '// &
                                  'fluid_pp('//trim(iStr)//')%'// &
                                  'cv. Make sure cv is positive. Exiting ...')
-            elseif (hyperelasticity .or. hypoelasticity &
-                    .and. &
-                    fluid_pp(i)%G /= dflt_real) then
-                call s_mpi_abort('Unsupported combination '// &
-                                 'of values of model_eqns '// &
-                                 'and fluid_pp('//trim(iStr)//')%'// &
-                                 'hyperelasticity. Exiting ...')
-            end if 
+           ! elseif ((hyperelasticity .or. hypoelasticity) &
+           !         .and. &
+           !         fluid_pp(i)%G /= dflt_real) then
+           !     call s_mpi_abort('Unsupported combination '// &
+           !                      'of values of model_eqns '// &
+           !                      'and fluid_pp('//trim(iStr)//')%'// &
+           !                      'hyperelasticity. Exiting ...')
+           end if 
         end do
 
         ! Moving Boundaries Checks: x boundaries
