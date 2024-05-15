@@ -35,4 +35,8 @@
   path: benchmarks/hypo_hll/case.py
   args: []
 
+- slug: default
+  path: benchmarks/default/case.py
+  args: []
+
 

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 
-import json
+import json, argparse
+parser = argparse.ArgumentParser(
+    prog="Default Benchmarking Case",
+    description="This MFC case was created for the purposes of benchmarking MFC.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================

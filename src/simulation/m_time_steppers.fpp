@@ -563,13 +563,6 @@ contains
         call nvtxEndRange
 
         call cpu_time(finish)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
-
         ! ==================================================================
 
     end subroutine s_2nd_order_tvd_rk ! ------------------------------------
@@ -826,12 +819,6 @@ contains
             call cpu_time(finish)
 
             time = time + (finish - start)
-
-            if (t_step >= 4) then
-                time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-            else
-                time_avg = 0d0
-            end if
         end if
         ! ==================================================================
 
@@ -867,12 +854,6 @@ contains
         call cpu_time(finish)
 
         time = time + (finish - start)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
 
         ! ==================================================================
 
