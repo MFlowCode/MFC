@@ -59,7 +59,7 @@ exit $code
 ok ":) Running$MAGENTA ${target.name}$COLOR_RESET:\n"
 
 if [ '${target.name}' == 'simulation' ]; then
-    export CRAY_ACC_MODULE='${target.get_staging_dirpath()}/simulation-wg256.lld.exe'
+    export CRAY_ACC_MODULE='${target.get_staging_dirpath(case)}/simulation-wg256.lld.exe'
 fi
 
 cd "${os.path.dirname(input)}"
@@ -74,7 +74,7 @@ t_${target.name}_stop=$(date +%s)
 
 if [ $code -ne 0 ]; then
     echo
-    error ":( $MAGENTA${target.get_install_binpath()}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
+    error ":( $MAGENTA${target.get_install_binpath(case)}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
     echo
     exit 1
 fi
