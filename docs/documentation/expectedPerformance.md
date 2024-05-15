@@ -19,7 +19,7 @@ We report results for various numbers of grid points per CPU die (or GPU device)
 | Intel Xeon Gold 6226 | 12 cores     | 1963           | 1688           | 1686         | GNU 10.3.0  | PACE Phoenix  |
 | Apple M2     | 6 cores      | 2919           | 245          | 4500        | GNU 13.2.0  | N/A           |
 
-__All results are in nanoseconds (ns) per grid point (gp) per right-hand side (rhs) evaluation. Lower is better.__
+__All results are in nanoseconds (ns) per grid point (gp) per equation (eqn) per right-hand side (rhs) evaluation. Lower is better.__
 
 ## Weak scaling
 

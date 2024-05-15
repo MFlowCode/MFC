@@ -1124,6 +1124,7 @@ contains
         if (proc_rank == 0) then
             time_final = 0d0
             io_time_final = 0d0
+
             if (num_procs == 1) then
                 time_final = time_avg
                 io_time_final = io_time_avg
@@ -1131,7 +1132,9 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Final Time", time_final*1.0d9, " ns/gp/rhs"
+
+            print *, "Final Time", time_final * 1.0d9, "ns/gp/eqn/rhs"
+
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
