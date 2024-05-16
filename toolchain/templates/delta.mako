@@ -43,9 +43,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rh
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
+        (${profiler} "${target.get_install_binpath()}")
     % else:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
+        (${profiler}    \
             mpirun -np ${nodes*tasks_per_node}                 \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath()}")

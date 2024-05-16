@@ -101,7 +101,7 @@ def __generate_job_script(targets):
         env=env,
         MFC_ROOTDIR=MFC_ROOTDIR,
         qsystem=queues.get_system(),
-        profiler=__profiler_prepend(),
+        profiler=' '.join(__profiler_prepend()),
     )
 
     file_write(__job_script_filepath(), content)

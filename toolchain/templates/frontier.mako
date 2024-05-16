@@ -37,11 +37,11 @@ echo
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
+        (${profiler} "${target.get_install_binpath()}")
     % else:
             (srun -N ${nodes}                 \
                    -n ${tasks_per_node}                              \
-                    set -x; ${' '.join([f"'{x}'" for x in profiler ])}    \
+                   ${profiler}  \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath()}")
     % endif
