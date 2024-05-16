@@ -1016,12 +1016,12 @@ contains
         @:ALLOCATE_GLOBAL(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE_GLOBAL(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return;
+        if (n == 0) return; 
         @:ALLOCATE_GLOBAL(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE_GLOBAL(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE_GLOBAL(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return;
+        if (p == 0) return; 
         @:ALLOCATE_GLOBAL(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
@@ -1084,15 +1084,13 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 
-
-
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
 
-        if (n == 0) return;
+        if (n == 0) return; 
         @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
 
-        if (p == 0) return;
+        if (p == 0) return; 
         @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module ! -------------------

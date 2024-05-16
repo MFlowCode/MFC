@@ -160,7 +160,7 @@ contains
 
             @:ALLOCATE_GLOBAL(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
-        !$acc update device(v_sizei, nVars)
+        !$acc update device(v_size, nVars)
 
 #endif
 
@@ -2171,7 +2171,7 @@ contains
                                         (j + buff_size*((k + 1) + (n + 1)*l))
                                     c_divs_vf(i)%sf(j + unpack_offset, k, l) = c_divs_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
@@ -2181,7 +2181,7 @@ contains
                         end do
                     end do
 
-                 #:elif mpi_dir == 2
+                #:elif mpi_dir == 2
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, nVars
                         do l = 0, p
@@ -2192,7 +2192,7 @@ contains
                                          ((k + buff_size) + buff_size*l))
                                     c_divs_vf(i)%sf(j, k + unpack_offset, l) = c_divs_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
@@ -2215,7 +2215,7 @@ contains
                                           (l + buff_size)))
                                     c_divs_vf(i)%sf(j, k, l + unpack_offset) = c_divs_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
