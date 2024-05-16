@@ -1094,11 +1094,11 @@ contains
                         gamma = 0d0
                         pi_inf = 0d0
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Egint = Egint + q_prim_vf(E_idx+2)%sf(i, j, k)**2.0d0*(fluid_pp(2)%gamma*pres)*dV
+                        Egint = Egint + q_prim_vf(E_idx+2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                         do s = 1, num_dims
                             vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)**2.0d0*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)**2.0d0*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                             if (dabs(vel(s)) .gt. maxvel) then
                                 maxvel = dabs(vel(s))
                             endif
@@ -1122,7 +1122,7 @@ contains
                         endif
                         Vl = Vl + adv(1)*dV
                         Vb = Vb + adv(2)*dV
-                        pres_av = pres_av + adv(1)**2.0d0*pres*dV
+                        pres_av = pres_av + adv(1)*pres*dV
                     end do
                 end do
             end do
