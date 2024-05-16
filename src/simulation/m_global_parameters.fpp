@@ -110,7 +110,6 @@ module m_global_parameters
     #:else
         integer :: num_dims       !< Number of spatial dimensions
     #:endif
-    integer :: num_fluids
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
@@ -119,9 +118,11 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: num_fluids     !< number of fluids in the simulation
     #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -141,10 +142,10 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order)
+        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids)
     #:endif
 
-    !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -159,6 +160,7 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    type(bounds_info) :: x_domain, y_domain, z_domain
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -462,7 +464,6 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        num_fluids = dflt_int
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
@@ -500,9 +501,9 @@ contains
             #:endfor
         #:endfor
 
-        ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
-        ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
-        ! z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
+        x_domain%beg = dflt_int; x_domain%end = dflt_int
+        y_domain%beg = dflt_int; y_domain%end = dflt_int
+        z_domain%beg = dflt_int; z_domain%end = dflt_int
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -541,6 +542,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
             weno_order = dflt_int
+            num_fluids = dflt_int
         #:endif
 
         R0_type = dflt_int
@@ -633,9 +635,6 @@ contains
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
-
-            ! Setting number of fluids
-            num_fluids = 1
 
             ! Annotating structure of the state and flux vectors belonging
             ! to the system of equations defined by the selected number of

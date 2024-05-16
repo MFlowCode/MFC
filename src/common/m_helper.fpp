@@ -33,7 +33,9 @@ module m_helper
  f_cross, &
  f_create_transform_matrix, &
  f_create_bbox, &
- s_print_2D_array
+ s_print_2D_array, &
+ f_xor, &
+ f_logical_to_int
 
 contains
 
@@ -515,5 +517,23 @@ contains
         end do
 
     end function f_create_bbox
+
+    function f_xor(lhs, rhs) result(res)
+        logical, intent(in) :: lhs, rhs
+        logical :: res
+
+        res = (lhs .and. .not. rhs) .or. (.not. lhs .and. rhs)
+    end function f_xor
+
+    function f_logical_to_int(predicate) result(int)
+        logical, intent(in) :: predicate
+        integer :: int
+
+        if (predicate) then
+            int = 1
+        else
+            int = 0
+        end if
+    end function f_logical_to_int
 
 end module m_helper
