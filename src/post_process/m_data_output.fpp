@@ -1069,34 +1069,21 @@ contains
     subroutine s_write_energy_data_file(q_prim_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
-        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb, maxalph_loc, maxalph_glb
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, thres, MaxMa, MaxMa_glb, maxvel, c1, c2, c, crat, Ma, H
+        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb, Vl, pres_av
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf,  MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs, adv
         integer :: i, j, k, l, s !looping indicies
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
-       
-        maxalph_loc = 0d0
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m 
-                if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
-                    end if
-                end do
-            end do
-        end do
- 
-        call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
-        thres = 0.6d0*maxalph_glb
- 
-        Elk = 0d0
+
         Egk = 0d0
         Elint = 0d0
         Egint = 0d0
         Vb = 0d0
         maxvel = 0d0
         MaxMa = 0d0
+        Vl = 0d0
+        Elk = 0d0
         if (p > 0) then
             do k = 0, p
                 do j = 0, n
@@ -1107,12 +1094,11 @@ contains
                         gamma = 0d0
                         pi_inf = 0d0
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Elint = Elint + q_prim_vf(E_idx+1)%sf(i, j, k)*(fluid_pp(1)%gamma*pres+fluid_pp(1)%pi_inf)*dV
-                        Egint = Egint + q_prim_vf(E_idx+2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres+fluid_pp(2)%pi_inf)*dV
+                        Egint = Egint + q_prim_vf(E_idx+2)%sf(i, j, k)**2.0d0*(fluid_pp(2)%gamma*pres)*dV
                         do s = 1, num_dims
                             vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)**2.0d0*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)**2.0d0*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                             if (dabs(vel(s)) .gt. maxvel) then
                                 maxvel = dabs(vel(s))
                             endif
@@ -1130,64 +1116,42 @@ contains
                                                       gamma, pi_inf, &
                                                       H, adv, 0d0, c)
 
-                       ! c1 = dsqrt((1/fluid_pp(1)%gamma+1)*(pres+fluid_pp(1)%pi_inf)/q_prim_vf(1)%sf(i, j, k))
-                       ! c2 = dsqrt((1/fluid_pp(2)%gamma+1)*(pres+fluid_pp(2)%pi_inf)/q_prim_vf(2)%sf(i, j, k))
-                       ! crat = q_prim_vf(E_idx+1)%sf(i, j, k)/(q_prim_vf(1)%sf(i, j, k)*c1**2.0d0) + &
-                       !        q_prim_vf(E_idx+2)%sf(i, j, k)/(q_prim_vf(2)%sf(i, j, k)*c2**2.0d0)
-                       ! rho = q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k) + &
-                       !       q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)
-                       ! c = dsqrt(1/(crat*rho))
                         Ma = maxvel/c
-                        if (Ma > MaxMa) then
+                        if (Ma > MaxMa .and. adv(1) > 1.0d0-0.5d-6) then
                                 MaxMa = Ma
                         endif
-                        if (q_prim_vf(E_idx + 2)%sf(i, j, k) > thres) then
-                               Vb = Vb + dV
-                        endif
-!                        do l = 1, num_fluids
-!                            gammas(l) = fluid_pp(l)%gamma
-!                            pi_infs(l) = fluid_pp(l)%pi_inf
-!                            rho = rho + q_prim_vf(E_idx + l)%sf(i, j, k)*q_prim_vf(l)%sf(i, j, k)
-!                            gamma = gamma + q_prim_vf(E_idx + l)%sf(i, j, k)*gammas(l)
-!                            pi_inf = pi_inf + q_prim_vf(E_idx + l)%sf(i, j, k)*pi_infs(l)
-!                        end do
-!                        pres = q_prim_vf(E_idx)%sf(i, j, k)
-!                        do s = 1, num_dims
-!                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-!                            if (q_prim_vf(E_idx+2)%sf(i, j, k) > thres) then
-!                                Egk = Egk + 0.5d0*rho*vel(s)*vel(s)*dV
-!                            else
-!                                Elk = Elk + 0.5d0*rho*vel(s)*vel(s)*dV
-!                            end if
-!                        end do
-!                        if (q_prim_vf(E_idx+2)%sf(i, j, k) > thres) then
-!                            Egint = Egint + (gamma*pres + pi_inf)*dV
-!                            Vb = Vb + dV
-!                        else
-!                            Elint = Elint + (gamma*pres + pi_inf)*dV
-!                        end if
+                        Vl = Vl + adv(1)*dV
+                        Vb = Vb + adv(2)*dV
+                        pres_av = pres_av + adv(1)**2.0d0*pres*dV
                     end do
                 end do
             end do
         end if
+        tmp = pres_av
+        call s_mpi_allreduce_sum(tmp, pres_av)
+        tmp = Vl
+        call s_mpi_allreduce_sum(tmp, Vl)
+
         call s_mpi_allreduce_max(MaxMa, MaxMa_glb)
         tmp = Elk
         call s_mpi_allreduce_sum(tmp, Elk)
-        tmp = Elint
-        call s_mpi_allreduce_sum(tmp, Elint)
         tmp = Egint
         call s_mpi_allreduce_sum(tmp, Egint)
         tmp = Egk
         call s_mpi_allreduce_sum(tmp, Egk)
         tmp = Vb
         call s_mpi_allreduce_sum(tmp, Vb)
+
+        Elint = pres_av/Vl*Vb
+
         if (proc_rank == 0) then
-            write (251, '(6X, 6F24.12)') &
+            write (251, '(6X, 7F24.12)') &
                 Elint, &
                 Egint, &
                 Elk, &
                 Egk, &
                 Vb, &
+                Vl, &
                 MaxMa_glb
         end if
 
