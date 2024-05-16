@@ -12,12 +12,12 @@ We report results for various numbers of grid points per CPU die (or GPU device)
 
 | Hardware             |  | 1M GPs      | 4M GPs      | 8M GPs | Compiler    | Computer      |
 | ---:                 | :----:  |    :----:      |  :---:         | :---:        | :----:      | :---          |
-| NVIDIA V100          | 1 device       | 96         | 104          | 104        | NVHPC 22.11 | PACE Phoenix  |
-| NVIDIA V100          | 1 device      | 101         |  104         | 104        | NVHPC 22.11 | OLCF Summit   |
-| NVIDIA A100          | 1 device      | 71         | 56          | 59        | NVHPC 23.5  | Wingtip       |
-| AMD MI250X           | 1 GCD      | 108          | 90       | 96      | CCE 16.0.1  | OLCF Frontier |
-| Intel Xeon Gold 6226 | 12 cores     | 1963           | 1688           | 1686         | GNU 10.3.0  | PACE Phoenix  |
-| Apple M2     | 6 cores      | 2919           | 245          | 4500        | GNU 13.2.0  | N/A           |
+| NVIDIA V100          | 1 device       | 12.0         | 13.0          | 13.0        | NVHPC 22.11 | PACE Phoenix  |
+| NVIDIA V100          | 1 device      | 12.6         |  13.0        | 13.0        | NVHPC 22.11 | OLCF Summit   |
+| NVIDIA A100          | 1 device      | 8.9        | 7.0          | 7.4        | NVHPC 23.5  | Wingtip       |
+| AMD MI250X           | 1 GCD      | 13.5          | 11.3       | 12      | CCE 16.0.1  | OLCF Frontier |
+| Intel Xeon Gold 6226 | 12 cores     | 245.4           | 211.0           | 210.8         | GNU 10.3.0  | PACE Phoenix  |
+| Apple M2     | 6 cores      | 364.9           | 30.6          | 562.5        | GNU 13.2.0  | N/A           |
 
 __All results are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation. Lower is better.__
 
