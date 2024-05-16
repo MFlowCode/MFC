@@ -77,7 +77,7 @@ contains
         real(kind(0d0)) :: f_determinant
 
         if (num_dims == 1) then
-            f_determinant = tensor(1) ! TODO: Mirelys: does this make sense?
+            f_determinant = tensor(1)
         elseif (num_dims == 2) then
             f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
         else
@@ -123,7 +123,7 @@ contains
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
 
-        ata(1) = tensor(1)**2 ! TODO: Mirelys: Does this make sense?
+        ata(1) = tensor(1)**2
         if (num_dims == 2) then
             ata(1) = ata(1) + tensor(3)**2
             ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
