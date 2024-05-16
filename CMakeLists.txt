@@ -263,22 +263,30 @@ macro(HANDLE_SOURCES target useCommon)
 
     string(TOUPPER ${target} ${target}_UPPER)
 
-    # Gather src/[<target>,common]/*.f90
-    file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90")
+    # Gather: 
+    # *          src/[<target>,(common)]/*.f90
+    # * (if any) <build>/modules/<target>/*.f90
+    file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90"
+                                               "${CMAKE_BINARY_DIR}/modules/${target}/*.f90")
     set(${target}_SRCs ${${target}_F90s})
     if (${useCommon})
         file(GLOB common_F90s CONFIGURE_DEPENDS "${common_DIR}/*.f90")
         list(APPEND ${target}_SRCs ${common_F90s})
     endif()
 
-    # src/[<target>,common]/*.fpp -> src/<target>/fypp/*.f90
-    file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp")
+    # Gather:
+    # *          src/[<target>,(common)]/*.fpp]
+    # * (if any) <build>/modules/<target>/*.fpp
+    file(GLOB ${target}_FPPs CONFIGURE_DEPENDS "${${target}_DIR}/*.fpp"
+                                               "${CMAKE_BINARY_DIR}/modules/${target}/*.fpp")
     if (${useCommon})
         file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
         list(APPEND ${target}_FPPs ${common_FPPs})
     endif()
 
-    # Locate src/[<target>,common]/include/*.fpp
+    # Gather:
+    # *          src/[<target>,common]/include/*.fpp
+    # * (if any) <build>/include/<target>/*.fpp
     file(GLOB ${target}_incs CONFIGURE_DEPENDS "${${target}_DIR}/include/*.fpp"
                                                "${CMAKE_BINARY_DIR}/include/${target}/*.fpp")
 
@@ -287,6 +295,7 @@ macro(HANDLE_SOURCES target useCommon)
         list(APPEND ${target}_incs ${common_incs})
     endif()
 
+    # /path/to/*.fpp (used by <target>) -> <build>/fypp/<target>/*.f90
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fypp/${target}")
     foreach(fpp ${${target}_FPPs})
         cmake_path(GET fpp FILENAME fpp_filename)

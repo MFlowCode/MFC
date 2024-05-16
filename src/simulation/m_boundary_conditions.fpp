@@ -46,7 +46,7 @@ contains
         case (-16)    ! No-slip wall BC at beginning
             call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1)
         case default ! Processor BC at beginning
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 1, -1)
         end select
 
@@ -62,7 +62,7 @@ contains
         case (-16)    ! No-slip wall bc at end
             call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1)
         case default ! Processor BC at end
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 1, 1)
         end select
 
@@ -106,7 +106,7 @@ contains
         case (-16)    ! No-slip wall BC at beginning
             call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1)
         case default ! Processor BC at beginning
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 2, -1)
         end select
 
@@ -122,7 +122,7 @@ contains
         case (-16)    ! No-slip wall BC at end
             call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1)
         case default ! Processor BC at end
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 2, 1)
         end select
 
@@ -166,7 +166,7 @@ contains
         case (-16)    ! No-slip wall BC at beginning
             call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1)
         case default ! Processor BC at beginning
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 3, -1)
         end select
 
@@ -182,7 +182,7 @@ contains
         case (-16)    ! No-slip wall BC at end
             call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1)
         case default ! Processor BC at end
-            call s_mpi_sendrecv_conservative_variables_buffers( &
+            call s_mpi_sendrecv_variables_buffers( &
                 q_prim_vf, pb, mv, 3, 1)
         end select
 

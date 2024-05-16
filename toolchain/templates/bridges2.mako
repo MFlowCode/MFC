@@ -44,7 +44,7 @@ echo
         ${profiler}             \
             mpirun -np ${nodes*tasks_per_node}                 \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                   "${target.get_install_binpath()}")
+                   "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}

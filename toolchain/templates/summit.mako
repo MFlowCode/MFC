@@ -34,7 +34,7 @@ echo
                 --gpu_per_rs   ${1 if gpu else 0}           \
                 --tasks_per_rs 1                            \
                 ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                "${target.get_install_binpath()}")
+                "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
