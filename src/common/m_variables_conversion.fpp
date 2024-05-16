@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
-#:include '../simulation/include/case.fpp'
+#:include 'case.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
