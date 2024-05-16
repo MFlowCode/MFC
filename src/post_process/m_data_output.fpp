@@ -1117,7 +1117,7 @@ contains
                                                       H, adv, 0d0, c)
 
                         Ma = maxvel/c
-                        if (Ma > MaxMa .and. adv(1) > 1.0d0-0.5d-6) then
+                        if (Ma > MaxMa .and. adv(1) > 1.0d0-1.0d-6) then
                                 MaxMa = Ma
                         endif
                         Vl = Vl + adv(1)*dV
