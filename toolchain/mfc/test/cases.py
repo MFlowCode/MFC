@@ -75,7 +75,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_capillary():
-        cases.append(create_case(stack, [f"capillary=T","model_eqns=3"],{'sigma':1,'model_eqns':3}))
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
+        stack.pop()
 
     def alter_weno():
         for weno_order in [3, 5]:
