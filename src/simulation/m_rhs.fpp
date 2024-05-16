@@ -242,7 +242,7 @@ contains
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
-        @:ALLOCATE(q_btensor%vf(1:num_dims**2))
+        @:ALLOCATE(q_btensor%vf(1:b_size))
 
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -256,7 +256,7 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        do l = 1, num_dims**2
+        do l = 1, b_size
             @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
@@ -700,15 +700,6 @@ contains
                 end do
             end do
         end do
-
-        ! ==================================================================
-
-        ! Computing Btensor needed for conservative to primitive variables later ==
-
-        call nvtxStartRange("Hyperelasticity: Btensor")
-        ! create the Btensor and save in a large vector field
-
-        call nvtxEndRange()
 
         ! ==================================================================
 

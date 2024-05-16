@@ -874,7 +874,7 @@ contains
         type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
 
         type(scalar_field), & 
-            optional, dimension(num_dims**2), & 
+            optional, dimension(num_dims*(num_dims+1)/2 + 1), & 
             intent(OUT) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
@@ -1023,7 +1023,7 @@ contains
                         end if
                     end if
 
-                    if (hypoelasticity) then
+                    if ( hypoelasticity .and. .not. bubbles ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1043,14 +1043,12 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
+                    if ( hyperelasticity .and. .not. bubbles ) then ! .and. G_K > 100 ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
-                            !if (proc_rank == 0) print *, 'q(',i,') :: ',qK_prim_vf(i)%sf(j, k, l)
                         end do
-                        !if (proc_rank == 0) stop
                         !call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
 
                         qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 

@@ -46,7 +46,6 @@ module m_start_up
 
     use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
-
     use m_hypoelastic
 
     use m_phase_change          !< Phase-change module

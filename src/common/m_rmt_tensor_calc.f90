@@ -1,6 +1,7 @@
 !>
 !! @file m_variables_conversion.f90
 !! @brief Contains module m_variables_conversion
+#:include 'macros.fpp'
 
 !> @brief This module consists of subroutines used in the calculation of matrix
 !!              operations for the reference map tensor
@@ -23,6 +24,21 @@ module m_rmt_tensor_calc
  f_elastic_energy, &
  s_calculate_deviatoric
 
+#ifdef CRAY_ACC_WAR
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), du_dx, du_dy, du_dz)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dv_dx, dv_dy, dv_dz)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dw_dx, dw_dy, dw_dz)
+    !$acc declare link(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+#else
+
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
+    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+
+#endif
+
 contains
 
     subroutine s_calculate_btensor(q_prim_vf, j, k, l, btensor)
@@ -31,13 +47,17 @@ contains
         type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(OUT) :: btensor
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0)), dimension(num_dims**2) :: ftensor, ftransposef, tensorb, tensor
+        real(kind(0d0)), dimension(num_dims**2) :: ftensor, ftransposef, tensorb
+        real(kind(0d0)), dimension(num_dims) :: xi_vec
         integer :: i !< Generic loop iterators
 
-        ! Converting the primitive variables to the conservative variables
+        ! building the xi vector
         do i = 1, num_dims
-            tensor(i) = q_prim_vf(stress_idx%beg + i - 1)%sf(j, k, l)
+            xi_vec(i) = q_prim_vf(stress_idx%beg + i - 1)%sf(j, k, l)
         end do
+        ! feed data into function to calculate the grad_xi
+
+
         ! NOTE: btensor is symmetric, save the data space
         ! need to calculate gradxi then calculate btensor and J = det(F)
         ! store in btensor
@@ -183,4 +203,128 @@ contains
     end function f_elastic_energy
 
 
+    subroutine s_initialize_hypoelastic_module_b() ! --------------------
+
+        integer :: i
+
+        !@:ALLOCATE_GLOBAL(du_dx(0:m,0:n,0:p))
+        !if (n > 0) then
+        !    @:ALLOCATE_GLOBAL(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+        !    if (p > 0) then
+        !        @:ALLOCATE_GLOBAL(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
+        !        @:ALLOCATE_GLOBAL(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+        !    end if
+        !end if
+
+    end subroutine s_initialize_hypoelastic_module_b
+
+    !>  The purpose of this procedure is to compute the source terms
+        !!      that are needed for the elastic stress equations
+        !!  @param idir Dimension splitting index
+        !!  @param q_prim_vf Primitive variables
+        !!  @param rhs_vf rhs variables
+    subroutine s_compute_grad_xi(idir, q_prim_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        integer, intent(IN) :: idir
+
+        real(kind(0d0)) :: rho_K, G_K
+
+        integer :: i, k, l, q !< Loop variables
+        integer :: ndirs  !< Number of coordinate directions
+
+        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+
+        if (idir == 1) then
+            ! calculate velocity gradients + rho_K and G_K
+            ! TODO: re-organize these loops one by one for GPU efficiency if possible?
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        du_dx(k, l, q) = &
+                            (q_prim_vf(momxb)%sf(k - 2, l, q) &
+                             - 8d0*q_prim_vf(momxb)%sf(k - 1, l, q) &
+                             + 8d0*q_prim_vf(momxb)%sf(k + 1, l, q) &
+                             - q_prim_vf(momxb)%sf(k + 2, l, q)) &
+                            /(12d0*dx(k))
+                    end do
+                end do
+            end do
+
+            if (ndirs > 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            du_dy(k, l, q) = &
+                                (q_prim_vf(momxb)%sf(k, l - 2, q) &
+                                 - 8d0*q_prim_vf(momxb)%sf(k, l - 1, q) &
+                                 + 8d0*q_prim_vf(momxb)%sf(k, l + 1, q) &
+                                 - q_prim_vf(momxb)%sf(k, l + 2, q)) &
+                                /(12d0*dy(l))
+                            dv_dx(k, l, q) = &
+                                (q_prim_vf(momxb + 1)%sf(k - 2, l, q) &
+                                 - 8d0*q_prim_vf(momxb + 1)%sf(k - 1, l, q) &
+                                 + 8d0*q_prim_vf(momxb + 1)%sf(k + 1, l, q) &
+                                 - q_prim_vf(momxb + 1)%sf(k + 2, l, q)) &
+                                /(12d0*dx(k))
+                            dv_dy(k, l, q) = &
+                                (q_prim_vf(momxb + 1)%sf(k, l - 2, q) &
+                                 - 8d0*q_prim_vf(momxb + 1)%sf(k, l - 1, q) &
+                                 + 8d0*q_prim_vf(momxb + 1)%sf(k, l + 1, q) &
+                                 - q_prim_vf(momxb + 1)%sf(k, l + 2, q)) &
+                                /(12d0*dy(l))
+                        end do
+                    end do
+                end do
+
+                ! 3D
+                if (ndirs == 3) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                du_dz(k, l, q) = &
+                                    (q_prim_vf(momxb)%sf(k, l, q - 2) &
+                                     - 8d0*q_prim_vf(momxb)%sf(k, l, q - 1) &
+                                     + 8d0*q_prim_vf(momxb)%sf(k, l, q + 1) &
+                                     - q_prim_vf(momxb)%sf(k, l, q + 2)) &
+                                    /(12d0*dz(q))
+                                dv_dz(k, l, q) = &
+                                    (q_prim_vf(momxb + 1)%sf(k, l, q - 2) &
+                                     - 8d0*q_prim_vf(momxb + 1)%sf(k, l, q - 1) &
+                                     + 8d0*q_prim_vf(momxb + 1)%sf(k, l, q + 1) &
+                                     - q_prim_vf(momxb + 1)%sf(k, l, q + 2)) &
+                                    /(12d0*dz(q))
+                                dw_dx(k, l, q) = &
+                                    (q_prim_vf(momxe)%sf(k - 2, l, q) &
+                                     - 8d0*q_prim_vf(momxe)%sf(k - 1, l, q) &
+                                     + 8d0*q_prim_vf(momxe)%sf(k + 1, l, q) &
+                                     - q_prim_vf(momxe)%sf(k + 2, l, q)) &
+                                    /(12d0*dx(k))
+                                dw_dy(k, l, q) = &
+                                    (q_prim_vf(momxe)%sf(k, l - 2, q) &
+                                     - 8d0*q_prim_vf(momxe)%sf(k, l - 1, q) &
+                                     + 8d0*q_prim_vf(momxe)%sf(k, l + 1, q) &
+                                     - q_prim_vf(momxe)%sf(k, l + 2, q)) &
+                                    /(12d0*dy(l))
+                                dw_dz(k, l, q) = &
+                                    (q_prim_vf(momxe)%sf(k, l, q - 2) &
+                                     - 8d0*q_prim_vf(momxe)%sf(k, l, q - 1) &
+                                     + 8d0*q_prim_vf(momxe)%sf(k, l, q + 1) &
+                                     - q_prim_vf(momxe)%sf(k, l, q + 2)) &
+                                    /(12d0*dz(q))
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+        end if
+
+    end subroutine s_compute_grad_xi
+
 end module m_rmt_tensor_calc
+

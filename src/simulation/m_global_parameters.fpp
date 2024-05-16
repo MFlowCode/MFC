@@ -186,18 +186,19 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the
     !! size and the configuration of the system of equations to which they belong
     !> @{
-    integer :: sys_size                  !< Number of unknowns in system of eqns.
+    integer :: sys_size                                !< Number of unknowns in system of eqns.
     type(int_bounds_info) :: cont_idx                  !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx                   !< Indexes of first & last momentum eqns.
-    integer :: E_idx                     !< Index of energy equation
-    integer :: n_idx                     !< Index of number density
+    integer :: E_idx                                   !< Index of energy equation
+    integer :: n_idx                                   !< Index of number density
     type(int_bounds_info) :: adv_idx                   !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx      !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer :: alf_idx               !< Index of void fraction
-    integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
-    integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
+    type(bub_bounds_info) :: bub_idx                   !< Indexes of first & last bubble variable eqns.
+    integer :: alf_idx                                 !< Index of void fraction
+    integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
+    integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    integer :: b_size                                  !< Number of elements in the symmetric b tensor
     !> @}
 
     !$acc declare create(bub_idx)
@@ -250,7 +251,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -788,6 +789,7 @@ contains
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + num_dims
                     sys_size = stress_idx%end
+                    b_size = (num_dims*(num_dims + 1))/2
                 end if
 
             else if (model_eqns == 3) then
@@ -987,7 +989,7 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, b_size)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
