@@ -33,31 +33,26 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (${profiler} "${target.get_install_binpath(case)}")
+        ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}"
     % else:
         if [ "$binary" == "jsrun" ]; then
-            (${profiler}   \
+            ${' '.join([f"'{x}'" for x in profiler ])}            \
                 jsrun --nrs          ${tasks_per_node*nodes}      \
                       --cpu_per_rs   1                            \
                       --gpu_per_rs   ${1 if gpu else 0}           \
                       --tasks_per_rs 1                            \
                       ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                      "${target.get_install_binpath(case)}")
+                      "${target.get_install_binpath()}"
         elif [ "$binary" == "srun" ]; then
-            (${profiler}  \
+            ${' '.join([f"'{x}'" for x in profiler ])}           \
                 srun --ntasks-per-node ${tasks_per_node}         \
                      ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                     "${target.get_install_binpath(case)}")
-        elif [ "$binary" == "mpirun" ]; then
-            (${profiler}     \
+                     "${target.get_install_binpath()}"
+        elif [ "$binary" == "mpirun" ] || [ "$binary" == "mpiexec" ]; then
+            ${' '.join([f"'{x}'" for x in profiler ])}              \
                 $binary -np ${nodes*tasks_per_node}                 \
                         ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                        "${target.get_install_binpath(case)}")
-        elif [ "$binary" == "mpiexec" ]; then
-            (${profiler}     \
-                $binary --ntasks ${nodes*tasks_per_node}            \
-                        ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                        "${target.get_install_binpath(case)}")
+                        "${target.get_install_binpath()}"
         fi
     % endif
 
