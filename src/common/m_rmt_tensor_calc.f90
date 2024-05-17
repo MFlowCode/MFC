@@ -235,7 +235,8 @@ contains
                     - 8d0*q_prim_vf(xibeg + 1)%sf(j, k - 1, l) &
                     + 8d0*q_prim_vf(xibeg + 1)%sf(j, k + 1, l) &
                     - q_prim_vf(xibeg + 1)%sf(j, k + 2, l)) &
-                    /(12d0*dy(k))
+                    /(12d0*(y_cb(k) - y_cb(k-1)))
+                    !/(12d0*dy(k))
         end if 
         ! 3D
         if (num_dims > 2) then
@@ -248,35 +249,40 @@ contains
                   - 8d0*q_prim_vf(xibeg)%sf(j, k, l - 1) &
                   + 8d0*q_prim_vf(xibeg)%sf(j, k, l + 1) &
                   - q_prim_vf(xibeg)%sf(j, k, l + 2)) &
-                  /(12d0*dz(l))
+                  /(12d0*(z_cb(l) - z_cb(l-1)))
+                  !/(12d0*dz(l))
                ! dxiy / dz
                grad_xi(6) = &
                   (q_prim_vf(xibeg + 1)%sf(j, k, l - 2) &
                   - 8d0*q_prim_vf(xibeg + 1)%sf(j, k, l - 1) &
                   + 8d0*q_prim_vf(xibeg + 1)%sf(j, k, l + 1) &
                   - q_prim_vf(xibeg + 1)%sf(j, k, l + 2)) &
-                  /(12d0*dz(l))
+                  /(12d0*(z_cb(l) - z_cb(l-1)))
+                  !/(12d0*dz(l))
                ! dxiz / dx
                grad_xi(7) = &
                   (q_prim_vf(xiend)%sf(j - 2, k, l) &
                   - 8d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                   + 8d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                   - q_prim_vf(xiend)%sf(j + 2, k, l)) &
-                  /(12d0*dx(j))
+                  /(12d0*(x_cb(j) - x_cb(j-1)))
+                  !/(12d0*dx(j))
                ! dxiz / dy
                grad_xi(8) = &
                   (q_prim_vf(xiend)%sf(j, k - 2, l) &
                   - 8d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                   + 8d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                   - q_prim_vf(xiend)%sf(j, k + 2, l)) &
-                  /(12d0*dy(k))
+                  /(12d0*(y_cb(k) - y_cb(k-1)))
+                  !/(12d0*dy(k))
                ! dxiz / dz
                grad_xi(9) = &
                   (q_prim_vf(xiend)%sf(j, k, l - 2) &
                   - 8d0*q_prim_vf(xiend)%sf(j, k, l - 1) &
                   + 8d0*q_prim_vf(xiend)%sf(j, k, l + 1) &
                   - q_prim_vf(xiend)%sf(j, k, l + 2)) &
-                  /(12d0*dz(l))
+                  /(12d0*(z_cb(l) - z_cb(l-1)))
+                  !/(12d0*dz(l))
        end if
     end subroutine s_compute_grad_xi
 
