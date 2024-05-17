@@ -1049,10 +1049,10 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
                         end do
-                        !call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
+                        call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
 
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 
-                             !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
 
                     else
                         ! Mostly in the non-solid material

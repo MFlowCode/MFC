@@ -42,12 +42,36 @@ contains
             tensorb(i) = btensor(i)%sf(j, k, l)
         end do
         jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
-        !call s_calculate_deviatoric(tensorb, devbtensor)
-        ! calculate deviatoric using symmetric tensor
-
+        call s_calculate_deviatoric(tensorb, devbtensor)
         sigma(:) = devbtensor(:)/jacobian
 
     end subroutine s_calculate_cauchy_stress
 
-end module m_hyperelastic
+    function f_trace(symtensor)
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: symtensor
+        real(kind(0d0)) ::  f_trace
 
+        f_trace  = symtensor(1)
+        if (num_dims == 2) then
+            f_trace = symtensor(1)+symtensor(3)
+        else
+            f_trace = symtensor(1)+symtensor(4)+symtensor(6)
+        endif
+    end function f_trace
+
+     subroutine s_calculate_deviatoric(symtensor, devtensor)
+        real(kind(0d0)), dimension(num_dims*2 + 1), intent(IN) :: symtensor
+        real(kind(0d0)), dimension(num_dims*2), intent(OUT) :: devtensor
+        real(kind(0d0)) :: trace
+        devtensor = symtensor
+        trace = f_trace(symtensor)
+        devtensor(1) = symtensor(1) - (1d0/3d0)*trace      
+        if (num_dims == 2) then
+             devtensor(3) = symtensor(3) - (1d0/3d0)*trace
+        else
+             devtensor(4) = symtensor(4) - (1d0/3d0)*trace
+             devtensor(6) = symtensor(6) - (1d0/3d0)*trace
+        end if     
+     end subroutine s_calculate_deviatoric
+
+end module m_hyperelastic

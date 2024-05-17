@@ -248,7 +248,6 @@ contains
                   !/(12d0*dz(l))
        end if
 
-
     end subroutine s_compute_grad_xi
 
 end module m_rmt_tensor_calc
