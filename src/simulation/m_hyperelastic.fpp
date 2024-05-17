@@ -28,7 +28,13 @@ contains
 
     end subroutine s_initialize_hyperelastic_module
 
-    subroutine s_calculate_cauchy_stress(btensor, j, k, l, sigma)
+        !type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+
+        !do l = izb, ize
+        !    do k = iyb, iye
+        !        do j = ixb, ixe
+
+    subroutine s_calculate_cauchy_from_btensor(q_btensor_vf, ix, iy, iz, q_prim_vf)
         type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: sigma
         integer, intent(IN) :: j, k, l
