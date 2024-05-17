@@ -117,10 +117,10 @@ def diff():
             if target.name not in lhs_summary or target.name not in rhs_summary:
                 continue
 
-            if (float(f"{lhs_summary[target.name]}") <= 0):
+            if float(f"{lhs_summary[target.name]}") <= 0:
                 raise MFCException(f"Non-positive runtime in LHS - Case: {slug} - Target: {target.name}")
 
-            if (float(f"{rhs_summary[target.name]}") <= 0):
+            if float(f"{rhs_summary[target.name]}") <= 0:
                 raise MFCException(f"Non-positive runtime in RHS - Case: {slug} - Target: {target.name}")
 
             speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
