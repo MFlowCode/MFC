@@ -83,8 +83,8 @@ def count_diff():
         PLUS  = "++ "
         MINUS = "-- "
 
-        for filepath_root, _ in dirfiles_root:
-            for filepath, n in dirfiles_pr:
+        for filepath, n in dirfiles_pr:
+            for filepath_root, _ in dirfiles_root:
                 if os.path.basename(dirfiles_pr[ii][0]) == os.path.basename(filepath_root):
                     diff_count = n - dirfiles_root[ii][1]
                     mycolor = "red" if diff_count > 0 else "green"
