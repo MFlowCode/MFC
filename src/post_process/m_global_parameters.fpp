@@ -247,6 +247,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
+    integer :: xibeg, xiend
     !> @}
 
 contains
@@ -581,6 +582,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        xibeg = stress_idx%beg
+        xiend = stress_idx%end
         ! ==================================================================
 
 #ifdef MFC_MPI
