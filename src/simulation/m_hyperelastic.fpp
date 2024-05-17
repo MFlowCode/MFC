@@ -15,14 +15,11 @@ module m_hyperelastic
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    use m_rmt_tensor_calc !< State variables type conversion procedures
-
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_hyperelastic_module, &
- s_compute_hyperelastic_rhs, &
  s_calculate_cauchy_stress
 
 contains
@@ -30,10 +27,6 @@ contains
     subroutine s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_hyperelastic_module
-
-    subroutine s_compute_hyperelastic_rhs()
-
-    end subroutine s_compute_hyperelastic_rhs
 
     subroutine s_calculate_cauchy_stress(btensor, j, k, l, sigma)
         type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
@@ -49,13 +42,12 @@ contains
             tensorb(i) = btensor(i)%sf(j, k, l)
         end do
         jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
-        call s_calculate_deviatoric(tensorb, devbtensor)
+        !call s_calculate_deviatoric(tensorb, devbtensor)
+        ! calculate deviatoric using symmetric tensor
+
         sigma(:) = devbtensor(:)/jacobian
 
     end subroutine s_calculate_cauchy_stress
 
-
-
 end module m_hyperelastic
-
 
