@@ -28,29 +28,32 @@ contains
 
     end subroutine s_initialize_hyperelastic_module
 
-        !type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+    subroutine s_calculate_cauchy_from_btensor(btensor, ix, iy, iz, q_prim_vf)
+    type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+    real(kind(0d0)), dimension(b_size), intent(IN) :: btensor
+    integer, intent(IN) :: j, k, l
+        
+    type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+ 
+    real(kind(0d0)), dimension(b_size) :: sigma, tensorb, devbtensor
+    real(kind(0d0)) :: jacobian
+    integer :: i !< Generic loop iterators
 
-        !do l = izb, ize
-        !    do k = iyb, iye
-        !        do j = ixb, ixe
-
-    subroutine s_calculate_cauchy_from_btensor(q_btensor_vf, ix, iy, iz, q_prim_vf)
-        type(scalar_field), dimension(num_dims**2 + 1), intent(IN) :: btensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: sigma
-        integer, intent(IN) :: j, k, l
-
-        real(kind(0d0)), dimension(num_dims**2) :: tensorb, devbtensor
-        real(kind(0d0)) :: jacobian
-        integer :: i !< Generic loop iterators
-
-        ! extracting the nxn tensor for the calculation
-        do i = 1, num_dims**2
-            tensorb(i) = btensor(i)%sf(j, k, l)
+    ! extracting the nxn tensor for the calculation
+    do l = izb, ize
+       do k = iyb, iye
+           do j = ixb, ixe
+               do i = 1, b_size-1
+                  tensorb(i) = btensor(i)%sf(j, k, l)                
+               end do
+               jacobian = btensor(b_size+1)%sf(j, k, l)
+               call s_calculate_deviatoric(tensorb, devbtensor)
+               sigma(:) = devbtensor(:)/jacobian
+               do i = 1, b_size-1
+                  q_prim_vf(i)%sf(ix,iy,iz) = sigma(i)   
+           end do
         end do
-        jacobian = btensor(num_dims**2 + 1)%sf(j, k, l)
-        call s_calculate_deviatoric(tensorb, devbtensor)
-        sigma(:) = devbtensor(:)/jacobian
-
+     end do   
     end subroutine s_calculate_cauchy_stress
 
     function f_trace(symtensor)
@@ -65,7 +68,7 @@ contains
         endif
     end function f_trace
 
-     subroutine s_calculate_deviatoric(symtensor, devtensor)
+    subroutine s_calculate_deviatoric(symtensor, devtensor)
         real(kind(0d0)), dimension(num_dims*2 + 1), intent(IN) :: symtensor
         real(kind(0d0)), dimension(num_dims*2), intent(OUT) :: devtensor
         real(kind(0d0)) :: trace
@@ -78,6 +81,6 @@ contains
              devtensor(4) = symtensor(4) - (1d0/3d0)*trace
              devtensor(6) = symtensor(6) - (1d0/3d0)*trace
         end if     
-     end subroutine s_calculate_deviatoric
+    end subroutine s_calculate_deviatoric
 
 end module m_hyperelastic
