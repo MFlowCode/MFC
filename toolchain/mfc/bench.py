@@ -7,6 +7,7 @@ from .state   import ARG, CFG
 from .build   import get_targets, DEFAULT_TARGETS
 from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
 from .common  import file_load_yaml, file_dump_yaml, create_directory
+from .common  import MFCException
 
 
 @dataclasses.dataclass
@@ -115,6 +116,12 @@ def diff():
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
             if target.name not in lhs_summary or target.name not in rhs_summary:
                 continue
+
+            if (float(f"{lhs_summary[target.name]}") <= 0):
+                raise MFCException(f"Non-positive runtime in LHS - Case: {slug} - Target: {target.name}")
+
+            if (float(f"{rhs_summary[target.name]}") <= 0):
+                raise MFCException(f"Non-positive runtime in RHS - Case: {slug} - Target: {target.name}")
 
             speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
 
