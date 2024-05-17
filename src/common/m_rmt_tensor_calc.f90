@@ -21,21 +21,17 @@ module m_rmt_tensor_calc
     implicit none
 
     private; public :: s_calculate_btensor, &
- f_elastic_energy, &
- s_calculate_deviatoric
+ f_elastic_energy
 
 #ifdef CRAY_ACC_WAR
-
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), grad_xi)
     !$acc declare link(grad_xi)
 #else
-
     real(kind(0d0)), allocatable, dimension(:) :: grad_xi
     ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
     ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
     ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
     !$acc declare create(grad_xi)
-
 #endif
 
 contains
@@ -66,7 +62,7 @@ contains
            btensor(6)%sf(j,k,l) = tensorb(9)
         end if
         ! store the determinant at the last entry of the btensor sf
-        btensor(7)%sf(j,k,l) = f_determinant(ftensor)
+        btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
 
     end subroutine s_calculate_btensor
 
@@ -89,33 +85,6 @@ contains
             call s_mpi_abort()
         end if
     end function f_determinant
-
-    subroutine s_calculate_deviatoric(tensor, deviatoric)
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: deviatoric
-        real(kind(0d0)) :: trace13
-        deviatoric = tensor
-        trace13 = f_trace(tensor)
-        trace13 = (1.0/3.0)*trace13
-        deviatoric(1) = tensor(1) - trace13
-        if (num_dims == 2) then
-            deviatoric(4) = tensor(4) - trace13
-        elseif (num_dims == 3) then
-            deviatoric(5) = tensor(5) - trace13
-            deviatoric(9) = tensor(9) - trace13
-        end if
-    end subroutine s_calculate_deviatoric
-
-    function f_trace(tensor)
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)) :: f_trace
-        f_trace = tensor(1)
-        if (num_dims == 2) then
-            f_trace = f_trace + tensor(4)
-        elseif (num_dims == 3) then
-            f_trace = f_trace + tensor(5) + tensor(9)
-        end if
-    end function f_trace
 
     subroutine s_calculate_atransposea(tensor, ata)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
@@ -177,25 +146,19 @@ contains
 
     ! neo-Hookean only at this time, will need to be changed later
     function f_elastic_energy(btensor, j, k, l)
-        type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(IN) :: btensor
-
+        type(scalar_field), dimension(b_size), intent(IN) :: btensor
         integer, intent(IN) :: j, k, l
+        real(kind(0d0)) :: invariant1, f_elastic_energy
 
-        real(kind(0d0)), dimension(num_dims**2) :: ftransposef, tensorb
-        real(kind(0d0)) :: invariant1, jacobian, f_elastic_energy
-        integer :: i !< Generic loop iterators
+        invariant1 = btensor(1)%sf(j,k,l)
 
-        ! extracting the nxn tensor for the calculation
-        !TODO COPY SPRATT CODE FOR SYMMETRIC TENSOR
-        do i = 1, num_dims*(num_dims+1)/2
-            tensorb(i) = btensor(i)%sf(j, k, l)
-        end do
-        tensorb(1) = btensor(1)%sf(j, k, l)
-        
-        jacobian = btensor(num_dims*(num_dims+1)/2 + 1)%sf(j, k, l)
-        invariant1 = f_trace(tensorb)
+        if (num_dims == 2) then
+           invariant1 = invariant1 + btensor(3)%sf(j,k,l)
+        elseif (num_dims == 3) then 
+           invariant1 = invariant1 + btensor(4)%sf(j,k,l) + btensor(6)%sf(j,k,l)
+        end if 
         ! compute the invariant without the elastic modulus
-        f_elastic_energy = 0.5d0*(invariant1 - 3)/jacobian
+        f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
     end function f_elastic_energy
 
     subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
@@ -284,6 +247,8 @@ contains
                   /(12d0*(z_cb(l) - z_cb(l-1)))
                   !/(12d0*dz(l))
        end if
+
+
     end subroutine s_compute_grad_xi
 
 end module m_rmt_tensor_calc

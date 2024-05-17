@@ -94,6 +94,7 @@ module m_global_parameters
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
+    integer :: b_size          !< Number of components in the b tensor
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -491,6 +492,8 @@ contains
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + num_dims
                 sys_size = stress_idx%end
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
             end if
 
             ! ==================================================================

@@ -790,7 +790,8 @@ contains
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + num_dims
                     sys_size = stress_idx%end
-                    b_size = (num_dims*(num_dims + 1))/2
+                    ! number of entries in the symmetric btensor plus the jacobian
+                    b_size = (num_dims*(num_dims + 1))/2 + 1
                 end if
 
             else if (model_eqns == 3) then
