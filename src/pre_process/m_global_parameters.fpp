@@ -85,6 +85,7 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity  !< activate hypoelasticity
     logical :: hyperelasticity !< activate hyperelasticity
+    integer :: b_size          !< Number of components in the b tensor
     logical :: pre_stress      !< activate pre_stressed domain
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
