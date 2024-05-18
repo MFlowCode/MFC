@@ -19,30 +19,23 @@ module m_hyperelastic
 
     implicit none
 
-    private; public :: s_initialize_hyperelastic_module, &
- s_calculate_cauchy_stress
+    private; public :: s_calculate_cauchy_stress
 
 contains
 
-    subroutine s_initialize_hyperelastic_module()
-
-    end subroutine s_initialize_hyperelastic_module
-
-    subroutine s_calculate_cauchy_from_btensor(btensor, ix, iy, iz, q_prim_vf)
+    subroutine s_calculate_cauchy_from_btensor(btensor, q_prim_vf)
     type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
     real(kind(0d0)), dimension(b_size), intent(IN) :: btensor
-    integer, intent(IN) :: j, k, l
-        
-    type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
- 
+
     real(kind(0d0)), dimension(b_size) :: sigma, tensorb, devbtensor
     real(kind(0d0)) :: jacobian
-    integer :: i !< Generic loop iterators
+    integer :: i, j, k, l !< Generic loop iterators
 
     ! extracting the nxn tensor for the calculation
-    do l = izb, ize
-       do k = iyb, iye
-           do j = ixb, ixe
+    !$acc parallel loop collapse(3) gang vector default(present)
+    do l = 0, p
+        do k = 0, n
+           do j = 0, m
                do i = 1, b_size-1
                   tensorb(i) = btensor(i)%sf(j, k, l)                
                end do
@@ -52,9 +45,9 @@ contains
                do i = 1, b_size-1
                   q_prim_vf(i)%sf(ix,iy,iz) = sigma(i)   
            end do
-        end do
-     end do   
-    end subroutine s_calculate_cauchy_stress
+       end do
+    end do   
+    end subroutine s_calculate_cauchy_from_btensor
 
     function f_trace(symtensor)
         real(kind(0d0)), dimension(num_dims**2), intent(IN) :: symtensor
