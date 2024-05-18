@@ -64,13 +64,13 @@ fi
 
 cd "${os.path.dirname(input)}"
 
-t_${target.name}_start=$(date +%s.%N)
+t_${target.name}_start=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
 </%def>
 
 <%def name="run_epilogue(target)">
 code=$?
 
-t_${target.name}_stop=$(date +%s.%N)
+t_${target.name}_stop=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
 
 if [ $code -ne 0 ]; then
     echo

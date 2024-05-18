@@ -107,6 +107,8 @@ def diff():
     table.add_column("[bold]Simulation[/bold]", justify="right")
     table.add_column("[bold]Post Process[/bold]", justify="right")
 
+    err = 0
+
     for slug in slugs:
         lhs_summary = lhs["cases"][slug]["output_summary"]
         rhs_summary = rhs["cases"][slug]["output_summary"]
@@ -114,17 +116,24 @@ def diff():
         speedups = ['N/A', 'N/A', 'N/A']
 
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
-            if target.name not in lhs_summary or target.name not in rhs_summary:
+            if target.name not in lhs_summary:
+                cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+                err = 1
                 continue
 
-            if float(f"{lhs_summary[target.name]}") <= 0:
-                raise MFCException(f"Non-positive runtime in LHS - Case: {slug} - Target: {target.name}")
-
-            if float(f"{rhs_summary[target.name]}") <= 0:
-                raise MFCException(f"Non-positive runtime in RHS - Case: {slug} - Target: {target.name}")
+            if target.name not in rhs_summary:
+                cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+                err = 1
+                continue
 
             speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
+
+            if speedups[i] == 'N/A':
+                err = 1
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
     cons.raw.print(table)
+
+    if err != 0:
+        raise MFCException("Benchmarking failed")
