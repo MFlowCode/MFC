@@ -295,12 +295,19 @@ contains
         do i = 1, num_dims
             @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
             @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
-            do l = mom_idx%beg, mom_idx%end
-                @:ALLOCATE(qL_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-                @:ALLOCATE(qR_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-            end do
-            @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
         end do
+
+        if (weno_Re_flux) then
+            do i = 1, num_dims
+                @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
+                @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
+                do l = mom_idx%beg, mom_idx%end
+                    @:ALLOCATE(qL_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+                    @:ALLOCATE(qR_prim(i)%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+                end do
+                @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
+            end do
+        end if
 
         if (mpp_lim .and. bubbles) then
             @:ALLOCATE(alf_sum%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -960,8 +967,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; 
-            if (p > 0) iz%beg = -buff_size; 
+            if (n > 0) iy%beg = -buff_size;
+            if (p > 0) iz%beg = -buff_size;
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 
