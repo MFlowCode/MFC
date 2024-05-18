@@ -737,7 +737,7 @@ contains
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
           if (hyperelasticity) then
-             call s_compute_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf,ix,iy,iz)
+             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf)
           end if
         call nvtxEndRange
 

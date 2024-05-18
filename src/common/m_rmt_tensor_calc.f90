@@ -41,6 +41,7 @@ contains
         type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(OUT) :: btensor
         integer, intent(IN) :: j, k, l
         real(kind(0d0)), dimension(num_dims**2) :: grad_xi, ftensor, tensorb
+        integer :: i
 
         ! calculate the grad_xi, grad_xi is a nxn tensor
         call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
@@ -64,6 +65,10 @@ contains
         ! store the determinant at the last entry of the btensor sf
         btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
 
+    do i = 1, size(btensor)
+      print*, 'btensor(', i, ')%sf(', j, ',', k, ',', l, ') = ', btensor(i)%sf(j,k,l)
+    end do   
+     
     end subroutine s_calculate_btensor
 
     function f_determinant(tensor)

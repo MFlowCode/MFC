@@ -19,34 +19,38 @@ module m_hyperelastic
 
     implicit none
 
-    private; public :: s_calculate_cauchy_stress
+    private; public :: s_calculate_cauchy_from_btensor
 
 contains
 
     subroutine s_calculate_cauchy_from_btensor(btensor, q_prim_vf)
     type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-    real(kind(0d0)), dimension(b_size), intent(IN) :: btensor
+    type(scalar_field), dimension(b_size), intent(IN) :: btensor
 
     real(kind(0d0)), dimension(b_size) :: sigma, tensorb, devbtensor
     real(kind(0d0)) :: jacobian
     integer :: i, j, k, l !< Generic loop iterators
 
+
+    !if (proc_rank ==0) print*, 'this is btensor ::', btensor
     ! extracting the nxn tensor for the calculation
     !$acc parallel loop collapse(3) gang vector default(present)
     do l = 0, p
-        do k = 0, n
-           do j = 0, m
-               do i = 1, b_size-1
-                  tensorb(i) = btensor(i)%sf(j, k, l)                
-               end do
-               jacobian = btensor(b_size+1)%sf(j, k, l)
-               call s_calculate_deviatoric(tensorb, devbtensor)
-               sigma(:) = devbtensor(:)/jacobian
-               do i = 1, b_size-1
-                  q_prim_vf(i)%sf(ix,iy,iz) = sigma(i)   
-           end do
+       do k = 0, n
+          do j = 0, m
+             do i = 1, b_size-1
+                tensorb(i) = btensor(i)%sf(j, k, l)                
+             end do
+             jacobian = btensor(b_size+1)%sf(j, k, l)
+             call s_calculate_deviatoric(tensorb, devbtensor)
+             sigma(:) = devbtensor(:)/jacobian
+             do i = 1, b_size-1
+                q_prim_vf(i)%sf(j, k, l) = sigma(i)   
+            end do
+          end do
        end do
     end do   
+    if (proc_rank ==0) print*, 'J is ::', jacobian, 'this is sigma ::', sigma
     end subroutine s_calculate_cauchy_from_btensor
 
     function f_trace(symtensor)
