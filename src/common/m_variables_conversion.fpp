@@ -1043,7 +1043,7 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity .and. .not. bubbles ) then ! .and. G_K > 100 ) then
+                    if (hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1051,8 +1051,8 @@ contains
                         end do
                         call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
 
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                        !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                        !     G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
 
                     else
                         ! Mostly in the non-solid material
@@ -1224,6 +1224,7 @@ contains
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
+                        ! TODO 
                         !call s_calculate_btensor(qK_prim_vf, j, k, l, q_btensor_vf)
                         q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ & 
                              !G*f_elastic_energy(q_btensor_vf, j, k, l)

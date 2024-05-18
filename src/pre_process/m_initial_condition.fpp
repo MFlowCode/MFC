@@ -123,10 +123,10 @@ contains
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
-        if (old_ic) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-                                                               q_prim_vf)
-        end if
+        !if (old_ic) then
+        !    call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+        !                                                       q_prim_vf)
+        !end if
 
         !  3D Patch Geometries =============================================
         if (p > 0) then
@@ -317,6 +317,10 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
+
+        !TODO REMOVE AFTER DEBUGGING
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+                                                               q_prim_vf)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
