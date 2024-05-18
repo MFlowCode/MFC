@@ -458,9 +458,10 @@ contains
            end if
            do i = 1, (stress_idx%end - stress_idx%beg) + 1
                       q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = xi_cart(i) 
+                        
                        !(eta*xi_cart(i) + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
                        
-               !if (proc_rank ==0) print *, 'q(',i') ::', q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l)
+               !if (proc_rank ==0) print *, 'q(',i,') ::', q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l)
                 !if (proc_rank == 0) then
                  !       write(*,*) 'q(',i,') :: ',q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l)&
                   !      ,', xi_cart :: ',xi_cart(i)

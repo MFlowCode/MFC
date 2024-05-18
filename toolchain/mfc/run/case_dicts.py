@@ -2,7 +2,7 @@ from ..state import ARG
 
 
 COMMON = [
-    "hypoelasticity",'hyperelasticity', "cyl_coord", "pref", "p", "parallel_io",
+    "hypoelasticity", "hyperelasticity", "cyl_coord", "pref", "p", "parallel_io",
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
@@ -16,7 +16,7 @@ PRE_PROCESS = COMMON + [
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-    'pi_fac', 'ib', 'num_ibs', 'pre_stress'
+    'pi_fac', 'ib', 'num_ibs','pre_stress'
 ]
 
 for ib_id in range(1, 10+1):

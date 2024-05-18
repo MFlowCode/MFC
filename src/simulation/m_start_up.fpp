@@ -131,6 +131,7 @@ contains
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
+            x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, hyperelasticity, patch_ib, &
@@ -138,8 +139,8 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles, bubble_model, &
-            R0ref, &
+            rhoref, pref, bubbles, bubble_model, & 
+ 
 #:if not MFC_CASE_OPTIMIZATION
             nb, weno_order, num_fluids, &
 #:endif
@@ -151,7 +152,7 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, &
-            pi_fac, adv_n, adap_dt
+            pi_fac, adv_n, adap_dt, R0ref,
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.

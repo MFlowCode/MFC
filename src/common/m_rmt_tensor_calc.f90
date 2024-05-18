@@ -38,7 +38,7 @@ contains
 
     subroutine s_calculate_btensor(q_prim_vf, j, k, l, btensor)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(OUT) :: btensor
+        type(scalar_field), dimension(num_dims*(num_dims+1)/2 + 1), intent(INOUT) :: btensor
         integer, intent(IN) :: j, k, l
         real(kind(0d0)), dimension(num_dims**2) :: grad_xi, ftensor, tensorb
         integer :: i
@@ -46,29 +46,26 @@ contains
         ! calculate the grad_xi, grad_xi is a nxn tensor
         call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
         ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-        call s_calculate_ainverse(grad_xi,ftensor)
+        !call s_calculate_ainverse(grad_xi,ftensor)
         ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-        call s_calculate_atransposea(ftensor,tensorb)
+        !call s_calculate_atransposea(ftensor,tensorb)
         ! btensor is symmetric, save the data space
+        print *, "I got here!"
         ! 1: 1D, 3: 2D, 6: 3D
         btensor(1)%sf(j,k,l) = tensorb(1)
-        if (num_dims > 1) then ! 2D
-           btensor(2)%sf(j,k,l) = tensorb(2)
-           btensor(3)%sf(j,k,l) = tensorb(4)
-        end if
-        if (num_dims > 2) then ! 3D
-           btensor(3)%sf(j,k,l) = tensorb(3)
-           btensor(4)%sf(j,k,l) = tensorb(5)
-           btensor(5)%sf(j,k,l) = tensorb(6)
-           btensor(6)%sf(j,k,l) = tensorb(9)
-        end if
+        !if (num_dims > 1) then ! 2D
+        !   btensor(2)%sf(j,k,l) = tensorb(2)
+        !   btensor(3)%sf(j,k,l) = tensorb(4)
+        !end if
+        !if (num_dims > 2) then ! 3D
+        !   btensor(3)%sf(j,k,l) = tensorb(3)
+        !   btensor(4)%sf(j,k,l) = tensorb(5)
+        !   btensor(5)%sf(j,k,l) = tensorb(6)
+        !   btensor(6)%sf(j,k,l) = tensorb(9)
+        !end if
         ! store the determinant at the last entry of the btensor sf
-        btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
-
-    do i = 1, size(btensor)
-      print*, 'btensor(', i, ')%sf(', j, ',', k, ',', l, ') = ', btensor(i)%sf(j,k,l)
-    end do   
-     
+        !btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
+  
     end subroutine s_calculate_btensor
 
     function f_determinant(tensor)
@@ -86,6 +83,7 @@ contains
         end if
         ! error checking
         if (f_determinant == 0) then
+            print *, 'f_determinant :: ',f_determinant
             print *, 'ERROR: Determinant was zero'
             call s_mpi_abort()
         end if
@@ -143,7 +141,7 @@ contains
         real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ainv
         real(kind(0d0)), dimension(num_dims**2) :: dja
         real(kind(0d0)) :: det
-
+        integer :: i
         call s_calculate_adjointa(tensor, dja)
         det = f_determinant(tensor)
         ainv(:) = dja(:)/det
@@ -171,7 +169,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), dimension(num_dims**2), intent(INOUT) :: grad_xi
         integer, intent(IN) :: j, k, l
-
+        integer :: i
+        print *, "num_dims :: ",num_dims
         ! dxix/dx
         grad_xi(1) = (q_prim_vf(xibeg)%sf(j - 2, k, l) &
                        - 8d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
@@ -253,6 +252,12 @@ contains
                   !/(12d0*dz(l))
        end if
 
-    end subroutine s_compute_grad_xi
+     
+     !if (proc_rank ==0) then
+     !   do i = 1, num_dims**2
+     !           print *, 'grad_xi(',i,') ::', grad_xi(i)
+     !   end do
+     !end if
+     end subroutine s_compute_grad_xi
 
 end module m_rmt_tensor_calc
