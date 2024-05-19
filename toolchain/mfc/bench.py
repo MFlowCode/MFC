@@ -116,14 +116,16 @@ def diff():
         speedups = ['N/A', 'N/A', 'N/A']
 
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
-            if target.name not in lhs_summary:
-                cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
-                err = 1
-                continue
+            if (target.name not in lhs_summary) or (target.name not in rhs_summary):
 
-            if target.name not in rhs_summary:
-                cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
                 err = 1
+
+                if target.name not in lhs_summary:
+                    cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+
+                if target.name not in rhs_summary:
+                    cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+
                 continue
 
             speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
