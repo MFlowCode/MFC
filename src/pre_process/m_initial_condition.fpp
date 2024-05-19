@@ -48,6 +48,8 @@ module m_initial_condition
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
+    !type(scalar_field), allocatable, dimension(:) :: q_btensor !< btensor vector field
+
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
@@ -69,11 +71,16 @@ contains
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
+        !allocate (q_btensor(1:b_size))
 
         do i = 1, sys_size
             allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
+
+        !do i = 1, b_size
+        !    allocate (q_btensor(i)%sf(0:m, 0:n, 0:p))
+        !end do
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
@@ -100,6 +107,12 @@ contains
             q_prim_vf(i)%sf = dflt_real
         end do
 
+        ! Similarly for the btensor field
+        !do i = 1, b_size
+        !    q_btensor(i)%sf = dflt_real
+        !end do
+
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch
@@ -123,10 +136,10 @@ contains
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
-        !if (old_ic) then
-        !    call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-        !                                                       q_prim_vf)
-        !end if
+        if (old_ic) then
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+                                                               q_prim_vf)
+        end if
 
         !  3D Patch Geometries =============================================
         if (p > 0) then
@@ -319,8 +332,8 @@ contains
                                                            q_cons_vf)
 
         !TODO REMOVE AFTER DEBUGGING
-        call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-                                                               q_prim_vf)
+        !call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+        !                                                   q_prim_vf)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv

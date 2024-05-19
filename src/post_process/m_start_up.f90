@@ -155,12 +155,12 @@ contains
 
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
-                call s_populate_conservative_variables_buffer_regions()
+            call s_populate_conservative_variables_buffer_regions()
         end if
-       !if (proc_rank == 0) print *, "I got here 1"
+        !if (proc_rank == 0) print *, "I got here 1"
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
-       !if (proc_rank == 0) print *, "I got here 2"
+        !if (proc_rank == 0) print *, "I got here 2"
 
     end subroutine s_perform_time_step
 
@@ -328,12 +328,12 @@ contains
                         write (varname, '(A,I0)') 'xi', i
                     end if
                     call s_write_variable_to_formatted_database_file(varname, t_step)
-                 end if
+                end if
                 varname(:) = ' '
             end do
         end if
         !if (proc_rank == 0) print *, "I got here 4"
-       ! ----------------------------------------------------------------------
+        ! ----------------------------------------------------------------------
 
         ! Adding the pressure to the formatted database file -------------------
         if (pres_wrt .or. prim_vars_wrt) then

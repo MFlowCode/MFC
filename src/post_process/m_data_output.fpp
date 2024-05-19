@@ -993,11 +993,11 @@ contains
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-         maxalph_loc = 0d0
+        maxalph_loc = 0d0
         do k = 0, p
             do j = 0, n
-                do i = 0, m 
-                if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
+                do i = 0, m
+                    if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
                         maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
                     end if
                 end do
@@ -1024,7 +1024,7 @@ contains
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
                         y_d1(counter) = y_cc(k)
-                        euc_d  = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                         tgp = sqrt(dx(j)**2 + dy(k)**2)
                     else
                         do i = 1, counter
@@ -1032,7 +1032,7 @@ contains
                                 cycle OLoop
                             elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
                                 !artificial bounding on the interface for bubble at a centroid.
-                                !need to remove eventually. 
+                                !need to remove eventually.
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)
@@ -1070,7 +1070,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
         real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb, Vl, pres_av
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf,  MaxMa, MaxMa_glb, maxvel, c, Ma, H
+        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs, adv
         integer :: i, j, k, l, s !looping indicies
@@ -1094,18 +1094,18 @@ contains
                         gamma = 0d0
                         pi_inf = 0d0
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Egint = Egint + q_prim_vf(E_idx+2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                        Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                         do s = 1, num_dims
                             vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                             Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
                             Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            if (dabs(vel(s)) .gt. maxvel) then
+                            if (dabs(vel(s)) > maxvel) then
                                 maxvel = dabs(vel(s))
-                            endif
+                            end if
                         end do
                         do l = 1, adv_idx%end - E_idx
                             adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
-                            gamma = gamma+ adv(l)*fluid_pp(l)%gamma
+                            gamma = gamma + adv(l)*fluid_pp(l)%gamma
                             pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
                             rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
                         end do
@@ -1117,9 +1117,9 @@ contains
                                                       H, adv, 0d0, c)
 
                         Ma = maxvel/c
-                        if (Ma > MaxMa .and. adv(1) > 1.0d0-1.0d-6) then
-                                MaxMa = Ma
-                        endif
+                        if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-6) then
+                            MaxMa = Ma
+                        end if
                         Vl = Vl + adv(1)*dV
                         Vb = Vb + adv(2)*dV
                         pres_av = pres_av + adv(1)*pres*dV

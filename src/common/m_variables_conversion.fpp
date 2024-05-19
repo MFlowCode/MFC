@@ -873,9 +873,7 @@ contains
 
         type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
 
-        type(scalar_field), & 
-            optional, dimension(num_dims*(num_dims+1)/2 + 1), & 
-            intent(OUT) :: qK_btensor_vf
+        type(scalar_field), optional, dimension(b_size), intent(OUT) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -896,10 +894,6 @@ contains
         real(kind(0d0)) :: G_K
 
         real(kind(0d0)) :: pres
-
-        real(kind(0d0)) :: detG, e_e
-
-        real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -1091,7 +1085,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
 
-        type(scalar_field), dimension(num_dims**2) :: q_btensor_vf
+        type(scalar_field), dimension(b_size) :: q_btensor
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1105,10 +1099,11 @@ contains
         real(kind(0d0)), dimension(nb) :: Rtmp
         real(kind(0d0)) :: G = 0d0
         real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: detG, e_e
-        real(kind(0d0)), dimension(num_dims**2) :: gtensor, getge, ghat
 
         integer :: i, j, k, l, q !< Generic loop iterators
+        do l = 1, b_size
+            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+        end do
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
@@ -1224,10 +1219,9 @@ contains
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        ! TODO 
-                        !call s_calculate_btensor(qK_prim_vf, j, k, l, q_btensor_vf)
-                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ & 
-                             !G*f_elastic_energy(q_btensor_vf, j, k, l)
+                        call s_calculate_btensor(q_prim_vf, j, k, l, q_btensor)
+                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                             G*f_elastic_energy(q_btensor, j, k, l)
                     end if
   
                 end do
