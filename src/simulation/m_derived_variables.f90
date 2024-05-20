@@ -198,7 +198,6 @@ contains
 
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
-                                print *, q_sf(j, k, l), q_prim_vf0(mom_idx%beg)%sf(j, k, l), fd_coeff_x(r, j), q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
                                 q_sf(j, k, l) = q_sf(j, k, l) &
                                                 + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
                                                 q_prim_vf0(mom_idx%beg)%sf(r + j, k, l)
