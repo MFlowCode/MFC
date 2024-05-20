@@ -135,7 +135,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
-                        do j = 0, m
+                        do j = 0, m + 100
                             divu%sf(j, k, l) = 0d0
                             divu%sf(j, k, l) = &
                                 5d-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &

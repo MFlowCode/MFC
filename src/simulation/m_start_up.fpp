@@ -180,9 +180,6 @@ contains
             n_glb = n
             p_glb = p
 
-            if (bubbles) then
-                call s_mpi_abort("THIS CAUSES AN ERROR")
-            end if
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
