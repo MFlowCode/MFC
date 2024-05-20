@@ -172,7 +172,7 @@ Nt = AS * SF
 
 # total simulation time - s. Note that tend >= tendA
 tend = Nt * dt
-
+print*, "THIS CAUSES AN ERROR"
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================

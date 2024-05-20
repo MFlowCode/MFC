@@ -162,6 +162,10 @@ contains
             p_glb = p
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+
+            if (hypoelasticity) then
+                call sleep(60)
+            end if
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if
