@@ -102,7 +102,7 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         case=case,
         MFC_ROOTDIR=MFC_ROOTDIR,
         qsystem=queues.get_system(),
-        profiler=' '.join([ shlex.quote(_) for _ in __profiler_prepend()])
+        profiler=shlex.join(__profiler_prepend())
     )
 
     file_write(__job_script_filepath(), content)
