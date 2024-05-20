@@ -48,8 +48,6 @@ module m_initial_condition
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
-    !type(scalar_field), allocatable, dimension(:) :: q_btensor !< btensor vector field
-
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
@@ -71,16 +69,11 @@ contains
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
-        !allocate (q_btensor(1:b_size))
 
         do i = 1, sys_size
             allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
-
-        !do i = 1, b_size
-        !    allocate (q_btensor(i)%sf(0:m, 0:n, 0:p))
-        !end do
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
@@ -106,12 +99,6 @@ contains
             q_cons_vf(i)%sf = dflt_real
             q_prim_vf(i)%sf = dflt_real
         end do
-
-        ! Similarly for the btensor field
-        !do i = 1, b_size
-        !    q_btensor(i)%sf = dflt_real
-        !end do
-
 
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
@@ -330,10 +317,6 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                            q_cons_vf)
-
-        !TODO REMOVE AFTER DEBUGGING
-        !call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-        !                                                   q_prim_vf)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv

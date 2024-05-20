@@ -725,6 +725,8 @@ contains
             end do
         end if
 
+        print *, 'I got here 1 !'
+
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -732,14 +734,15 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz, &
             q_btensor%vf)
-
         call nvtxEndRange
+        print *, 'I got here 2 !'
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-          if (hyperelasticity) then
-             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf)
-          end if
+          !if (hyperelasticity) then
+          !   call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf)
+          !end if
         call nvtxEndRange
+        print *, 'I got here 3 !'
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)

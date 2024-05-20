@@ -171,11 +171,7 @@ contains
                 end if
             end do
 
-            pres = ( &
-                   energy - &
-                   0.5d0*(mom**2.d0)/rho - &
-                   pi_inf - qv - E_e &
-                   )/gamma
+            pres = (energy - 0.5d0*(mom**2.d0)/rho - pi_inf - qv - E_e )/gamma
 
         end if
 
@@ -873,7 +869,7 @@ contains
 
         type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
 
-        type(scalar_field), optional, dimension(b_size), intent(OUT) :: qK_btensor_vf
+        type(scalar_field), optional, dimension(b_size), intent(INOUT) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -915,7 +911,7 @@ contains
             end if
         #:endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -1025,33 +1021,23 @@ contains
                             ! subtracting elastic contribution for pressure calculation
                             if (G_K > 1000) then !TODO: check if stable for >0
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
                                 if ((i == strxb + 1) .or. &
                                     (i == strxb + 3) .or. &
                                     (i == strxb + 4)) then
                                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                    ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 end if
                             end if
                         end do
                     end if
 
                     if (hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
-                        !$acc loop seq
-                        do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /rho_K
-                        end do
-                        call s_calculate_btensor(qK_prim_vf, j, k, l, qK_btensor_vf)
-
-                        !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                        !     G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-
-                    else
-                        ! Mostly in the non-solid material
-                        !qK_btensor_vf(:)%sf(j,k,l) = 0d0
-
+                      !$acc loop seq
+                      do i = strxb, strxe
+                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
+                      end do
                     end if
 
                     !$acc loop seq
@@ -1063,6 +1049,22 @@ contains
             end do
         end do
         !$acc end parallel loop
+
+        ! going through hyperelasticity again due to the btensor calculation
+        if (hyperelasticity .and. .not. bubbles) then 
+           ! s_calculate_btensor has its own triple nested for loop with openacc
+           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+           !$acc parallel loop collapse(3) gang vector default(present) private(gamma_K,G_K)
+           do l = izb, ize
+               do k = iyb, iye
+                   do j = ixb, ixe
+                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                     G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                   end do
+               end do
+           end do
+          !$acc end parallel loop
+        end if
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1213,20 +1215,32 @@ contains
                             end if
                         end do
                     end if
-
-                    if (hyperelasticity) then
+                    ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
+                    if ( hyperelasticity .and. .not. bubbles ) then
                         ! adding the elastic contribution
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        call s_calculate_btensor(q_prim_vf, j, k, l, q_btensor)
-                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
-                             G*f_elastic_energy(q_btensor, j, k, l)
                     end if
   
                 end do
             end do
         end do
+        ! going through hyperelasticity again due to the btensor calculation
+        if (hyperelasticity .and. .not. bubbles) then
+            ! s_calculate_btensor has its own triple nested for loop, with openacc
+            call s_calculate_btensor(q_prim_vf, q_btensor)
+            ! triple nested for loop to update the total energy using the btensor information
+            ! openacc is not needed here as this function is used only in pre_process/post_process
+            do l = 0, p
+               do k = 0, n
+                  do j = 0, m
+                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                          G*f_elastic_energy(q_btensor, j, k, l)
+                  end do
+               end do
+            end do
+        end if 
 
 #else
         if (proc_rank == 0) then

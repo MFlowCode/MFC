@@ -48,6 +48,8 @@ module m_start_up
                                 !! from the conservative and primitive variables
     use m_hypoelastic
 
+    use m_rmt_tensor_calc       !< State variables type conversion procedures
+
     use m_phase_change          !< Phase-change module
 
     use m_viscous
@@ -1248,6 +1250,7 @@ contains
 #endif
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()      
+        if (hyperelasticity) call s_initialize_rmt_module() 
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1389,6 +1392,8 @@ contains
         s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
+        if (hypoelasticity) call s_finalize_hypoelastic_module() 
+        if (hyperelasticity) call s_finalize_rmt_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()

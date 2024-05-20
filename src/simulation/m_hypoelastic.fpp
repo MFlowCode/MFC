@@ -20,6 +20,7 @@ module m_hypoelastic
     implicit none
 
     private; public :: s_initialize_hypoelastic_module, &
+ s_finalize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
 #ifdef CRAY_ACC_WAR
@@ -313,5 +314,19 @@ contains
         end if
 
     end subroutine s_compute_hypoelastic_rhs
+
+    subroutine s_finalize_hypoelastic_module() ! --------------------
+
+        @:DEALLOCATE_GLOBAL(Gs)
+        @:DEALLOCATE_GLOBAL(rho_K_field, G_K_field)
+        @:DEALLOCATE_GLOBAL(du_dx)
+        if (n > 0) then
+            @:DEALLOCATE_GLOBAL(du_dy,dv_dx,dv_dy)
+            if (p > 0) then
+                @:DEALLOCATE_GLOBAL(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
+            end if
+        end if
+
+    end subroutine s_finalize_hypoelastic_module
 
 end module m_hypoelastic
