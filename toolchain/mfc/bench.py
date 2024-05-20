@@ -1,4 +1,4 @@
-import os, sys, uuid, subprocess, dataclasses, typing
+import os, sys, uuid, subprocess, dataclasses, typing, math
 
 import rich.table
 
@@ -124,14 +124,19 @@ def diff():
                     cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
 
                 if target.name not in rhs_summary:
-                    cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+                    cons.print(f"{target.name} not present in rhs_summary - Case: {slug}")
 
                 continue
 
-            speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
-
-            if speedups[i] == 'N/A':
+            if (float(f"{lhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{lhs_summary[target.name]}")):
                 err = 1
+                cons.print(f"lhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
+
+            if (float(f"{rhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{rhs_summary[target.name]}")):
+                err = 1
+                cons.print(f"rhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
+
+            speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
