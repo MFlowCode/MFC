@@ -176,6 +176,7 @@ class Case:
 #:set nb                    = {int(self.params.get("nb", 1))}
 #:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
 #:set nterms                = {nterms}
+#:set num_fluids            = {int(self.params["num_fluids"])}
 """
 
         return """\
@@ -183,19 +184,13 @@ class Case:
 ! of --case-optimization.
 """
 
-    def __get_post_fpp(self, _) -> str:
-        return """\
-! This file is purposefully empty for all post-process builds.
-"""
-
     def get_fpp(self, target, print = True) -> str:
         def _default(_) -> str:
-            return ""
+            return "! This file is purposefully empty."
 
         result = {
-            "pre_process"  : self.__get_pre_fpp,
-            "simulation"   : self.__get_sim_fpp,
-            "post_process" : self.__get_post_fpp,
+            "pre_process" : self.__get_pre_fpp,
+            "simulation"  : self.__get_sim_fpp,
         }.get(build.get_target(target).name, _default)(print)
 
         return result
