@@ -331,6 +331,12 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    
+                    if ( c .lt. 10d-12 ) then
+                        print*, 'code has crashed at processor: ',proc_rank,' at j :: ',j,', k :: ',k,' l :: ',l,'with alph1a ::',alpha(1),'and alpha2 ::', alpha(2)
+                        print*, 'ICFL ERROR, I TOLD YOU AGAIN!'                     
+                       ! call s_mpi_abort()
+                    endif
 
                     if (grid_geometry == 3) then
                         if (k == 0) then
