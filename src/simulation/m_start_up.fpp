@@ -193,8 +193,8 @@ contains
         if (CRAY_ACC_MODULE == "") then
             call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
         end if
-#endif        
-#endif        
+#endif
+#endif
 
     end subroutine s_read_input_file ! -------------------------------------
 
@@ -483,7 +483,7 @@ contains
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
-        
+
         ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         ! Computing the cell width distribution
@@ -1253,7 +1253,7 @@ contains
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()      
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1362,7 +1362,9 @@ contains
         ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
+
         call s_initialize_parallel_io()
+
         call s_mpi_decompose_computational_domain()
 
     end subroutine s_initialize_mpi_domain
@@ -1378,10 +1380,12 @@ contains
         end if
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
         !$acc update device(monopole, num_mono)
         !$acc update device(sigma)
     
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)    
+
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
@@ -1410,7 +1414,7 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
-        if (relax) call s_finalize_relaxation_solver_module()      
+        if (relax) call s_finalize_relaxation_solver_module()
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
