@@ -1,97 +1,27 @@
-#:include 'macros.fpp'
-
 !>
-!! @file m_variables_conversion.f90
-!! @brief Contains module m_variables_conversion
+!! @file m_xi_tensor_calc.f90
+!! @brief Contains module m_xi_tensor_calc
 
 !> @brief This module consists of subroutines used in the calculation of matrix
 !!              operations for the reference map tensor
 
-module m_rmt_tensor_calc
+module m_xi_tensor_calc
 
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
-
     ! ==========================================================================
 
     implicit none
 
-    private; public :: s_initialize_rmt_module, &
- s_finalize_rmt_module, &
- s_calculate_btensor, &
- f_elastic_energy
-
-
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), grad_xi)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ftensor)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), tensorb)
-    !$acc declare link(grad_xi,ftensor,tensorb)
-#else
-    real(kind(0d0)), allocatable, dimension(:) :: grad_xi, ftensor, tensorb
-    !$acc declare create(grad_xi,ftensor,tensorb)
-#endif
-    ! grad_xi definition / organization
-    ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
-    ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
-    ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
+    private; public :: s_calculate_ainverse, &
+ s_calculate_atransposea, &
+ f_determinant, &
+ f_elastic_energy, &
+ s_compute_grad_xi
 
 contains
-
-    subroutine s_initialize_rmt_module() ! --------------------
-
-     integer :: i
-     #ifdef MFC_SIMULATION
-        @:ALLOCATE(grad_xi(1:num_dims**2))
-        @:ALLOCATE(ftensor(1:num_dims**2))
-        @:ALLOCATE(tensorb(1:num_dims**2))
-     #endif
-     grad_xi(:) = 0d0 
-     ftensor(:) = 0d0
-     tensorb(:) = 0d0
-!$acc update device(grad_xi,ftensor,tensorb)
-
-    end subroutine s_initialize_rmt_module
-
-    subroutine s_calculate_btensor(q_prim_vf, btensor)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        integer :: j, k, l
-        !real(kind(0d0)), dimension(num_dims**2) :: grad_xi, ftensor, tensorb
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(grad_xi,ftensor,tensorb)
-        do l = izb, ize
-           do k = iyb, iye
-              do j = ixb, ixe
-                ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
-                ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-                call s_calculate_ainverse(grad_xi,ftensor)
-                ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-                call s_calculate_atransposea(ftensor,tensorb)
-                ! btensor is symmetric, save the data space
-                ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)
-                if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
-                end if
-                if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensorb(3)
-                   btensor(4)%sf(j,k,l) = tensorb(5)
-                   btensor(5)%sf(j,k,l) = tensorb(6)
-                   btensor(6)%sf(j,k,l) = tensorb(9)
-                end if
-                ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
-                end do
-           end do
-        end do
-        !$acc end parallel loop
-
-    end subroutine s_calculate_btensor
 
     function f_determinant(tensor)
         !$acc routine seq
@@ -111,7 +41,7 @@ contains
         if (f_determinant == 0) then
             print *, 'f_determinant :: ', f_determinant
             print *, 'ERROR: Determinant was zero'
-            !STOP
+            stop
         end if
     end function f_determinant
 
@@ -184,7 +114,7 @@ contains
         real(kind(0d0)) :: invariant1, f_elastic_energy
 
         invariant1 = btensor(1)%sf(j, k, l)
-
+        f_elastic_energy = 0d0
         if (num_dims == 2) then
             invariant1 = invariant1 + btensor(3)%sf(j, k, l)
         elseif (num_dims == 3) then
@@ -197,7 +127,7 @@ contains
     subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2), intent(INOUT) :: grad_xi
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: grad_xi
         integer, intent(IN) :: j, k, l
         integer :: i
 
@@ -577,16 +507,14 @@ contains
                       -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           end if  
-
         end if
+
+    !if(proc_rank == 0) then
+    !    do i = 1, num_dims**2
+    !        print *, "i :: ",i,", grad_xi :: ",grad_xi(i)
+    !    end do
+    !end if
+
     end subroutine s_compute_grad_xi
 
-    subroutine s_finalize_rmt_module() ! --------------------
-
-     #ifdef MFC_SIMULATION
-        @:DEALLOCATE(grad_xi,ftensor,tensorb)
-     #endif
-
-    end subroutine s_finalize_rmt_module
-
-end module m_rmt_tensor_calc
+end module m_xi_tensor_calc

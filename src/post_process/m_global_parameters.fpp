@@ -490,8 +490,8 @@ contains
             if (hyperelasticity) then
                 ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                 stress_idx%beg = sys_size + 1
-                stress_idx%end = sys_size + num_dims
-                sys_size = stress_idx%end
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2 
+                sys_size = stress_idx%end + num_dims
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
             end if
@@ -585,8 +585,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
-        xibeg = stress_idx%beg
-        xiend = stress_idx%end
+        xibeg = stress_idx%end+1
+        xiend = stress_idx%end+num_dims
         ! ==================================================================
 
 #ifdef MFC_MPI
