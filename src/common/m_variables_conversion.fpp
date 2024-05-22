@@ -110,20 +110,6 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), grad_xi)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ftensor)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), tensorb)
-    !$acc declare link(grad_xi,ftensor,tensorb)
-#else
-    real(kind(0d0)), allocatable, dimension(:) :: grad_xi, ftensor, tensorb
-    !$acc declare create(grad_xi,ftensor,tensorb)
-#endif
-    ! grad_xi definition / organization
-    ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
-    ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
-    ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
-
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
@@ -783,14 +769,6 @@ contains
 
         end if
 #endif
-
-        @:ALLOCATE(grad_xi(1:num_dims**2))
-        @:ALLOCATE(ftensor(1:num_dims**2))
-        @:ALLOCATE(tensorb(1:num_dims**2))
-          grad_xi(:) = 0d0 
-          ftensor(:) = 0d0
-          tensorb(:) = 0d0
-!$acc update device(grad_xi,ftensor,tensorb)
 
         if (model_eqns == 1) then        ! Gamma/pi_inf model
             s_convert_to_mixture_variables => &
@@ -1455,10 +1433,6 @@ contains
         if (bubbles) then
             @:DEALLOCATE(bubrs)
         end if
-#endif
-
-#ifdef MFC_SIMULATION
-        @:DEALLOCATE(grad_xi,ftensor,tensorb)
 #endif
 
         ! Nullifying the procedure pointer to the subroutine transferring/

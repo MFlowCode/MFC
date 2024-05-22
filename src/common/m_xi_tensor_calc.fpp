@@ -16,113 +16,8 @@ module m_xi_tensor_calc
     implicit none
 
     private; public :: s_compute_gradient_xi, f_elastic_energy
- !s_calculate_ainverse, &
- !s_calculate_atransposea, &
- !f_determinant, &
- !s_compute_tensora
 
-contains
-
-    function f_determinant(tensor)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)) :: f_determinant
-
-        if (num_dims == 1) then
-            f_determinant = tensor(1)
-        elseif (num_dims == 2) then
-            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
-        else
-            f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8)) &
-                            - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7)) &
-                            + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
-        end if
-        ! error checking
-        if (f_determinant == 0) then
-            print *, 'f_determinant :: ', f_determinant
-            print *, 'ERROR: Determinant was zero'
-            stop
-        end if
-    end function f_determinant
-
-    subroutine s_calculate_atransposea(tensor, ata)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
-
-        ata(1) = tensor(1)**2
-        if (num_dims == 2) then
-            ata(1) = ata(1) + tensor(3)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
-            ata(3) = ata(2)
-            ata(4) = tensor(2)**2 + tensor(4)**2
-        elseif (num_dims == 3) then
-            ata(1) = ata(1) + tensor(4)**2 + tensor(7)**2
-            ata(5) = tensor(2) + tensor(5)**2 + tensor(8)**2
-            ata(9) = tensor(3) + tensor(6)**2 + tensor(9)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(4)*tensor(5) + tensor(7)*tensor(8)
-            ata(3) = tensor(1)*tensor(3) + tensor(4)*tensor(6) + tensor(7)*tensor(9)
-            ata(6) = tensor(2)*tensor(3) + tensor(5)*tensor(6) + tensor(8)*tensor(9)
-            ata(4) = ata(2)
-            ata(7) = ata(3)
-            ata(8) = ata(4)
-        end if
-    end subroutine s_calculate_atransposea
-
-    subroutine s_calculate_adjointa(tensor, dja)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: dja
-
-        if (num_dims == 1) then
-            dja(1) = 1
-        elseif (num_dims == 2) then
-            dja(1) = tensor(4)
-            dja(2) = -tensor(3)
-            dja(3) = -tensor(2)
-            dja(4) = tensor(1)
-        elseif (num_dims == 3) then
-            dja(1) = tensor(5)*tensor(9) - tensor(6)*tensor(8)
-            dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
-            dja(3) = tensor(2)*tensor(6) - tensor(3)*tensor(5)
-            dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
-            dja(5) = tensor(1)*tensor(9) - tensor(3)*tensor(7)
-            dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
-            dja(7) = tensor(4)*tensor(8) - tensor(5)*tensor(7)
-            dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
-            dja(9) = tensor(1)*tensor(5) - tensor(2)*tensor(4)
-        end if
-    end subroutine s_calculate_adjointa
-
-    subroutine s_calculate_ainverse(tensor, ainv)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ainv
-        real(kind(0d0)), dimension(num_dims**2) :: dja
-        real(kind(0d0)) :: det
-
-        call s_calculate_adjointa(tensor, dja)
-        ainv(:) = dja(:)/f_determinant(tensor)
-
-    end subroutine s_calculate_ainverse
-
-    ! neo-Hookean only at this time, will need to be changed later
-    function f_elastic_energy(btensor, j, k, l)
-        !$acc routine seq
-        type(scalar_field), dimension(b_size), intent(IN) :: btensor
-        integer, intent(IN) :: j, k, l
-        real(kind(0d0)) :: invariant1, f_elastic_energy
-
-        invariant1 = btensor(1)%sf(j, k, l)
-        f_elastic_energy = 0d0
-        if (num_dims == 2) then
-            invariant1 = invariant1 + btensor(3)%sf(j, k, l)
-        elseif (num_dims == 3) then
-            invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-        end if
-        ! compute the invariant without the elastic modulus
-        f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
-    end function f_elastic_energy
+    contains
 
     subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb, tensorc)
         !$acc routine seq
@@ -131,7 +26,10 @@ contains
         integer, intent(IN) :: j, k, l
 
         integer :: i
-
+        ! grad_xi definition / organization
+        ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
+        ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
+        ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
         if(j == 0) then
            ! dxix/dx
            tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
@@ -516,6 +414,108 @@ contains
     !    end do
     !end if
 
+    subroutine s_calculate_adjointa(tensor, dja)
+        !$acc routine seq
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: dja
+
+        if (num_dims == 1) then
+            dja(1) = 1
+        elseif (num_dims == 2) then
+            dja(1) = tensor(4)
+            dja(2) = -tensor(3)
+            dja(3) = -tensor(2)
+            dja(4) = tensor(1)
+        elseif (num_dims == 3) then
+            dja(1) = tensor(5)*tensor(9) - tensor(6)*tensor(8)
+            dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
+            dja(3) = tensor(2)*tensor(6) - tensor(3)*tensor(5)
+            dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
+            dja(5) = tensor(1)*tensor(9) - tensor(3)*tensor(7)
+            dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
+            dja(7) = tensor(4)*tensor(8) - tensor(5)*tensor(7)
+            dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
+            dja(9) = tensor(1)*tensor(5) - tensor(2)*tensor(4)
+        end if
+    end subroutine s_calculate_adjointa
+
+    function f_determinant(tensor)
+        !$acc routine seq
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)) :: f_determinant
+
+        if (num_dims == 1) then
+            f_determinant = tensor(1)
+        elseif (num_dims == 2) then
+            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
+        else
+            f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8)) &
+                            - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7)) &
+                            + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
+        end if
+        ! error checking
+        if (f_determinant == 0) then
+            print *, 'f_determinant :: ', f_determinant
+            print *, 'ERROR: Determinant was zero'
+            stop
+        end if
+    end function f_determinant
+
+    subroutine s_calculate_ainverse(tensor, ainv)
+        !$acc routine seq
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ainv
+        real(kind(0d0)), dimension(num_dims**2) :: dja
+        real(kind(0d0)) :: det
+
+        call s_calculate_adjointa(tensor, dja)
+        ainv(:) = dja(:)/f_determinant(tensor)
+
+    end subroutine s_calculate_ainverse
+
+
+    subroutine s_calculate_atransposea(tensor, ata)
+        !$acc routine seq
+        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
+        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
+
+        ata(1) = tensor(1)**2
+        if (num_dims == 2) then
+            ata(1) = ata(1) + tensor(3)**2
+            ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
+            ata(3) = ata(2)
+            ata(4) = tensor(2)**2 + tensor(4)**2
+        elseif (num_dims == 3) then
+            ata(1) = ata(1) + tensor(4)**2 + tensor(7)**2
+            ata(5) = tensor(2) + tensor(5)**2 + tensor(8)**2
+            ata(9) = tensor(3) + tensor(6)**2 + tensor(9)**2
+            ata(2) = tensor(1)*tensor(2) + tensor(4)*tensor(5) + tensor(7)*tensor(8)
+            ata(3) = tensor(1)*tensor(3) + tensor(4)*tensor(6) + tensor(7)*tensor(9)
+            ata(6) = tensor(2)*tensor(3) + tensor(5)*tensor(6) + tensor(8)*tensor(9)
+            ata(4) = ata(2)
+            ata(7) = ata(3)
+            ata(8) = ata(4)
+        end if
+    end subroutine s_calculate_atransposea
+
     end subroutine s_compute_gradient_xi
+
+    ! neo-Hookean only at this time, will need to be changed later
+    function f_elastic_energy(btensor, j, k, l)
+        !$acc routine seq
+        type(scalar_field), dimension(b_size), intent(IN) :: btensor
+        integer, intent(IN) :: j, k, l
+        real(kind(0d0)) :: invariant1, f_elastic_energy
+
+        invariant1 = btensor(1)%sf(j, k, l)
+        f_elastic_energy = 0d0
+        if (num_dims == 2) then
+            invariant1 = invariant1 + btensor(3)%sf(j, k, l)
+        elseif (num_dims == 3) then
+            invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        end if
+        ! compute the invariant without the elastic modulus
+        f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
+    end function f_elastic_energy
 
 end module m_xi_tensor_calc
