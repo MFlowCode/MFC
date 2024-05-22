@@ -24,9 +24,9 @@ echo
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (${rofiler} "${target.get_install_binpath(case)}")
+        (set -x; ${rofiler} "${target.get_install_binpath(case)}")
     % else:
-        (${profiler} \
+        (set -x; ${profiler} \
             jsrun                                           \
                 ${'--smpiargs="-gpu"' if gpu else ''}       \
                 --nrs          ${tasks_per_node*nodes}      \
