@@ -1401,7 +1401,7 @@ contains
     subroutine s_calculate_btensor(q_prim_vf, btensor)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb, tensora, tensorc
        
         integer :: j, k, l
 
@@ -1410,7 +1410,7 @@ contains
            do k = iyb, iye
               do j = ixb, ixe
                 ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb)
+                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb, tensora, tensorc)
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor

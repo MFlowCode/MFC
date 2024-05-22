@@ -15,11 +15,11 @@ module m_xi_tensor_calc
 
     implicit none
 
-    private; public :: s_calculate_ainverse, &
- s_calculate_atransposea, &
- f_determinant, &
- f_elastic_energy, &
- s_compute_grad_xi
+    private; public :: s_compute_grad_xi, f_elastic_energy
+ !s_calculate_ainverse, &
+ !s_calculate_atransposea, &
+ !f_determinant, &
+ !s_compute_grad_xi
 
 contains
 
@@ -124,10 +124,13 @@ contains
         f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
     end function f_elastic_energy
 
-    subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
+    subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi, tensora, tensorc)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: grad_xi
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: grad_xi 
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensorc
+
         integer, intent(IN) :: j, k, l
         integer :: i
 
