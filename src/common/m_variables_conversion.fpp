@@ -1405,7 +1405,7 @@ contains
 
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(tensorb)
+        !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb,tensorc)
         do l = izb, ize
            do k = iyb, iye
               do j = ixb, ixe
