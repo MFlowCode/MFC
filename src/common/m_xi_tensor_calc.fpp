@@ -15,96 +15,10 @@ module m_xi_tensor_calc
 
     implicit none
 
-    private; public :: s_calculate_ainverse, &
- s_calculate_atransposea, &
- f_determinant, &
- f_elastic_energy, &
+    private; public ::  f_elastic_energy, &
  s_compute_grad_xi
 
 contains
-
-    function f_determinant(tensor)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)) :: f_determinant
-
-        if (num_dims == 1) then
-            f_determinant = tensor(1)
-        elseif (num_dims == 2) then
-            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
-        else
-            f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8)) &
-                            - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7)) &
-                            + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
-        end if
-        ! error checking
-        if (f_determinant == 0) then
-            print *, 'f_determinant :: ', f_determinant
-            print *, 'ERROR: Determinant was zero'
-            stop
-        end if
-    end function f_determinant
-
-    subroutine s_calculate_atransposea(tensor, ata)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
-
-        ata(1) = tensor(1)**2
-        if (num_dims == 2) then
-            ata(1) = ata(1) + tensor(3)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
-            ata(3) = ata(2)
-            ata(4) = tensor(2)**2 + tensor(4)**2
-        elseif (num_dims == 3) then
-            ata(1) = ata(1) + tensor(4)**2 + tensor(7)**2
-            ata(5) = tensor(2) + tensor(5)**2 + tensor(8)**2
-            ata(9) = tensor(3) + tensor(6)**2 + tensor(9)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(4)*tensor(5) + tensor(7)*tensor(8)
-            ata(3) = tensor(1)*tensor(3) + tensor(4)*tensor(6) + tensor(7)*tensor(9)
-            ata(6) = tensor(2)*tensor(3) + tensor(5)*tensor(6) + tensor(8)*tensor(9)
-            ata(4) = ata(2)
-            ata(7) = ata(3)
-            ata(8) = ata(4)
-        end if
-    end subroutine s_calculate_atransposea
-
-    subroutine s_calculate_adjointa(tensor, dja)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: dja
-
-        if (num_dims == 1) then
-            dja(1) = 1
-        elseif (num_dims == 2) then
-            dja(1) = tensor(4)
-            dja(2) = -tensor(3)
-            dja(3) = -tensor(2)
-            dja(4) = tensor(1)
-        elseif (num_dims == 3) then
-            dja(1) = tensor(5)*tensor(9) - tensor(6)*tensor(8)
-            dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
-            dja(3) = tensor(2)*tensor(6) - tensor(3)*tensor(5)
-            dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
-            dja(5) = tensor(1)*tensor(9) - tensor(3)*tensor(7)
-            dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
-            dja(7) = tensor(4)*tensor(8) - tensor(5)*tensor(7)
-            dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
-            dja(9) = tensor(1)*tensor(5) - tensor(2)*tensor(4)
-        end if
-    end subroutine s_calculate_adjointa
-
-    subroutine s_calculate_ainverse(tensor, ainv)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ainv
-        real(kind(0d0)), dimension(num_dims**2) :: dja
-        real(kind(0d0)) :: det
-
-        call s_calculate_adjointa(tensor, dja)
-        ainv(:) = dja(:)/f_determinant(tensor)
-
-    end subroutine s_calculate_ainverse
 
     ! neo-Hookean only at this time, will need to be changed later
     function f_elastic_energy(btensor, j, k, l)
@@ -121,16 +35,25 @@ contains
             invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
         end if
         ! compute the invariant without the elastic modulus
-        f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
+        f_elastic_energy = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)
     end function f_elastic_energy
 
-    subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
+    subroutine s_compute_grad_xi(q_prim_vf, j, k, l, ftensor, grad_xi, tensorb)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: grad_xi
+        real(kind(0d0)), dimension(num_dims**2+1), intent(INOUT) :: ftensor
+        real(kind(0d0)), dimension(num_dims**2+1), intent(INOUT) :: grad_xi, tensorb
         integer, intent(IN) :: j, k, l
+
+        real(kind(0d0)) :: determinant
         integer :: i
 
+        !print *, 'xibeg :: ',xibeg,', qprim :: ',q_prim_vf(xibeg)%sf(j,k,l)
+
+        ! grad_xi definition / organization
+        ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
+        ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
+        ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
         if(j == 0) then
            ! dxix/dx
            grad_xi(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
@@ -509,11 +432,82 @@ contains
           end if  
         end if
 
-    !if(proc_rank == 0) then
-    !    do i = 1, num_dims**2
-    !        print *, "i :: ",i,", grad_xi :: ",grad_xi(i)
-    !    end do
-    !end if
+        !do i = 1, num_dims**2
+        !   print *, 'i :: ',i,', grad_xi :: ',grad_xi(i)
+        !end do 
+
+        ! calculating the adjoint of grad_xi tensor in preparation for 
+        ! calculating the inverse of the tensor
+        if (num_dims == 1) then
+            ftensor(1) = 1
+        elseif (num_dims == 2) then
+            ftensor(1) = grad_xi(4)
+            ftensor(2) = -grad_xi(3)
+            ftensor(3) = -grad_xi(2)
+            ftensor(4) = grad_xi(1)
+        elseif (num_dims == 3) then
+            ftensor(1) = grad_xi(5)*grad_xi(9) - grad_xi(6)*grad_xi(8)
+            ftensor(2) = -(grad_xi(2)*grad_xi(9) - grad_xi(3)*grad_xi(8))
+            ftensor(3) = grad_xi(2)*grad_xi(6) - grad_xi(3)*grad_xi(5)
+            ftensor(4) = -(grad_xi(4)*grad_xi(9) - grad_xi(6)*grad_xi(7))
+            ftensor(5) = grad_xi(1)*grad_xi(9) - grad_xi(3)*grad_xi(7)
+            ftensor(6) = -(grad_xi(1)*grad_xi(6) - grad_xi(4)*grad_xi(3))
+            ftensor(7) = grad_xi(4)*grad_xi(8) - grad_xi(5)*grad_xi(7)
+            ftensor(8) = -(grad_xi(1)*grad_xi(8) - grad_xi(2)*grad_xi(7))
+            ftensor(9) = grad_xi(1)*grad_xi(5) - grad_xi(2)*grad_xi(4)
+        end if
+
+        ! calculating the determinant of the grad_xi tensor 
+        if (num_dims == 1) then
+            determinant = grad_xi(1)
+        elseif (num_dims == 2) then
+            determinant = grad_xi(1)*grad_xi(4) - grad_xi(2)*grad_xi(3)
+        else
+            determinant = grad_xi(1)*(grad_xi(5)*grad_xi(9) - grad_xi(6)*grad_xi(8)) &
+                            - grad_xi(2)*(grad_xi(4)*grad_xi(9) - grad_xi(6)*grad_xi(7)) &
+                            + grad_xi(3)*(grad_xi(4)*grad_xi(8) - grad_xi(5)*grad_xi(7))
+        end if
+
+        ! error checking
+        if (determinant == 0) then
+            if(proc_rank == 0) then
+            print *, 'determinant :: ', determinant
+            !print *, 'ERROR: Determinant was zero'
+            !stop
+            end if
+        end if
+        ! calculating the inverse and saving it in tensorb, which is F tensor
+        tensorb(:) = ftensor(:)/determinant
+
+        ! calculating F transpose F 
+        ftensor(1) = tensorb(1)**2
+        if (num_dims == 2) then
+            ftensor(1) = ftensor(1) + tensorb(3)**2
+            ftensor(2) = tensorb(1)*tensorb(2) + tensorb(3)*tensorb(4)
+            ftensor(3) = ftensor(2)
+            ftensor(4) = tensorb(2)**2 + tensorb(4)**2
+        elseif (num_dims == 3) then
+            ftensor(1) = ftensor(1) + tensorb(4)**2 + tensorb(7)**2
+            ftensor(5) = tensorb(2) + tensorb(5)**2 + tensorb(8)**2
+            ftensor(9) = tensorb(3) + tensorb(6)**2 + tensorb(9)**2
+            ftensor(2) = tensorb(1)*tensorb(2) + tensorb(4)*tensorb(5) + tensorb(7)*tensorb(8)
+            ftensor(3) = tensorb(1)*tensorb(3) + tensorb(4)*tensorb(6) + tensorb(7)*tensorb(9)
+            ftensor(6) = tensorb(2)*tensorb(3) + tensorb(5)*tensorb(6) + tensorb(8)*tensorb(9)
+            ftensor(4) = ftensor(2)
+            ftensor(7) = ftensor(3)
+            ftensor(8) = ftensor(4)
+        end if
+
+        ! calculating the determinant of the F tensor and storing in last entry of ftensor
+        if (num_dims == 1) then ! 1D
+            ftensor(num_dims**2+1) = tensorb(1)
+        elseif (num_dims == 2) then ! 2D
+            ftensor(num_dims**2+1) = tensorb(1)*tensorb(4) - tensorb(2)*tensorb(3)
+        else ! 3D
+            ftensor(num_dims**2+1) = tensorb(1)*(tensorb(5)*tensorb(9) - tensorb(6)*tensorb(8)) &
+                            - tensorb(2)*(tensorb(4)*tensorb(9) - tensorb(6)*tensorb(7)) &
+                            + tensorb(3)*(tensorb(4)*tensorb(8) - tensorb(5)*tensorb(7))
+        end if
 
     end subroutine s_compute_grad_xi
 

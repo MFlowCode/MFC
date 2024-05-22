@@ -780,17 +780,18 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if ( hypoelasticity ) then
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
                 end if
 
-                if (hyperelasticity) then
+                if ( hyperelasticity ) then
                     ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                     stress_idx%beg = sys_size + 1
-                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2 
+                    stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                    ! adding three more equations for the \xi field 
                     sys_size = stress_idx%end + num_dims
                     ! number of entries in the symmetric btensor plus the jacobian
                     b_size = (num_dims*(num_dims + 1))/2 + 1

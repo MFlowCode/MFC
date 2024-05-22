@@ -152,7 +152,7 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, &
-            pi_fac, adv_n, adap_dt, R0ref,
+            pi_fac, adv_n, adap_dt, R0ref
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -575,8 +575,8 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles .or. hypoelasticity) then
-
+                if ( bubbles .or. hypoelasticity .or. hyperelasticity ) then
+                    print *, 'I was here AA'
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -600,6 +600,8 @@ contains
                                            MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
+                
+                print *, 'i :: ',xibeg,', data :: ',MPI_IO_DATA%var(xibeg)%sf(1,1,1)
 
                 call s_mpi_barrier()
 
@@ -661,7 +663,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles .or. hypoelasticity) then
+                if ( bubbles .or. hypoelasticity .or. hyperelasticity ) then
 
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -1374,7 +1376,6 @@ contains
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
-
 
         !$acc update device(relax, relax_model)
         if (relax) then

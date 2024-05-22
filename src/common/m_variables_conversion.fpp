@@ -110,19 +110,6 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), grad_xi)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ftensor)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), tensorb)
-    !$acc declare link(grad_xi,ftensor,tensorb)
-#else
-    real(kind(0d0)), allocatable, dimension(:) :: grad_xi, ftensor, tensorb
-    !$acc declare create(grad_xi,ftensor,tensorb)
-#endif
-    ! grad_xi definition / organization
-    ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
-    ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
-    ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
@@ -784,14 +771,6 @@ contains
         end if
 #endif
 
-        @:ALLOCATE(grad_xi(1:num_dims**2))
-        @:ALLOCATE(ftensor(1:num_dims**2))
-        @:ALLOCATE(tensorb(1:num_dims**2))
-          grad_xi(:) = 0d0 
-          ftensor(:) = 0d0
-          tensorb(:) = 0d0
-!$acc update device(grad_xi,ftensor,tensorb)
-
         if (model_eqns == 1) then        ! Gamma/pi_inf model
             s_convert_to_mixture_variables => &
                 s_convert_mixture_to_mixture_variables
@@ -933,6 +912,14 @@ contains
             end if
         #:endif
 
+        ! going through hyperelasticity again due to the btensor calculation
+        ! s_calculate_btensor has its own triple nested for loop with openacc
+        print *, 'I got here A1'
+        if (hyperelasticity .and. .not. bubbles) then 
+           !call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+        end if
+        print *, 'I got here A2'
+
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
             do k = iyb, iye
@@ -1055,11 +1042,13 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
+                    if ( hyperelasticity .and. .not. bubbles ) then 
                       !$acc loop seq
                       do i = xibeg, xiend
                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
                       end do
+                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                         G_K * f_elastic_energy( qK_btensor_vf, j, k, l) / gamma_K
                     end if
 
                     !$acc loop seq
@@ -1071,22 +1060,6 @@ contains
             end do
         end do
         !$acc end parallel loop
-
-        ! going through hyperelasticity again due to the btensor calculation
-        if (hyperelasticity .and. .not. bubbles) then 
-           ! s_calculate_btensor has its own triple nested for loop with openacc
-           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
-           !$acc parallel loop collapse(3) gang vector default(present) private(gamma_K,G_K)
-           do l = izb, ize
-               do k = iyb, iye
-                   do j = ixb, ixe
-                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                     G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-                   end do
-               end do
-           end do
-          !$acc end parallel loop
-        end if
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1126,10 +1099,17 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         do l = 1, b_size
-            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+            @:ALLOCATE_GLOBAL(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
         end do
 
 #ifndef MFC_SIMULATION
+
+        ! going through hyperelasticity again due to the btensor calculation
+        if ( hyperelasticity .and. .not. bubbles) then
+            ! s_calculate_btensor has its own triple nested for loop, no openacc
+            !call s_calculate_btensor(q_prim_vf, q_btensor)
+        end if 
+
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
             do k = 0, n
@@ -1237,33 +1217,21 @@ contains
                             end if
                         end do
                     end if
+
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if ( hyperelasticity .and. .not. bubbles ) then
                         ! adding the elastic contribution
                         do i = xibeg, xiend
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
+                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                            G*f_elastic_energy(q_btensor, j, k, l)
                     end if
-  
+
                 end do
             end do
         end do 
 
-        ! going through hyperelasticity again due to the btensor calculation
-        if (hyperelasticity .and. .not. bubbles) then
-            ! s_calculate_btensor has its own triple nested for loop, with openacc
-            call s_calculate_btensor(q_prim_vf, q_btensor)
-            ! triple nested for loop to update the total energy using the btensor information
-            ! openacc is not needed here as this function is used only in pre_process/post_process
-            do l = 0, p
-               do k = 0, n
-                  do j = 0, m
-                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
-                          G*f_elastic_energy(q_btensor, j, k, l)
-                  end do
-               end do
-            end do
-        end if 
 #else
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
@@ -1413,20 +1381,24 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param btensor is the output
     subroutine s_calculate_btensor(q_prim_vf, btensor)
+
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorc
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(grad_xi,ftensor,tensorb)
+        !$acc parallel loop collapse(3) gang vector default(present) private(tensorb, tensora, tensorc)
         do l = izb, ize
            do k = iyb, iye
               do j = ixb, ixe
                 ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
+                !call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
+                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb, tensora, tensorc)
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-                call s_calculate_ainverse(grad_xi,ftensor)
+                !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-                call s_calculate_atransposea(ftensor,tensorb)
+                !call s_calculate_atransposea(ftensor,tensorb)
                 ! btensor is symmetric, save the data space
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
@@ -1441,7 +1413,7 @@ contains
                    btensor(6)%sf(j,k,l) = tensorb(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
+                btensor(b_size)%sf(j,k,l) = tensorb(10)
                 end do
            end do
         end do
@@ -1467,10 +1439,6 @@ contains
         if (bubbles) then
             @:DEALLOCATE(bubrs)
         end if
-#endif
-
-#ifdef MFC_SIMULATION
-        @:DEALLOCATE(grad_xi,ftensor,tensorb)
 #endif
 
         ! Nullifying the procedure pointer to the subroutine transferring/
