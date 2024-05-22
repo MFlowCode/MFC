@@ -19,13 +19,16 @@ module m_xi_tensor_calc
 
     contains
 
-    subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb, tensorc)
+    subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora, tensorb, tensorc 
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora, tensorb 
         integer, intent(IN) :: j, k, l
 
+        real(kind(0d0)) :: determinant
         integer :: i
+        
+        ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
@@ -414,89 +417,67 @@ module m_xi_tensor_calc
     !    end do
     !end if
 
-    subroutine s_calculate_adjointa(tensor, dja)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: dja
-
+    ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
         if (num_dims == 1) then
-            dja(1) = 1
+            tensorb(1) = 1
         elseif (num_dims == 2) then
-            dja(1) = tensor(4)
-            dja(2) = -tensor(3)
-            dja(3) = -tensor(2)
-            dja(4) = tensor(1)
+            tensorb(1) = tensora(4)
+            tensorb(2) = -tensora(3)
+            tensorb(3) = -tensora(2)
+            tensorb(4) = tensora(1)
         elseif (num_dims == 3) then
-            dja(1) = tensor(5)*tensor(9) - tensor(6)*tensor(8)
-            dja(2) = -(tensor(2)*tensor(9) - tensor(3)*tensor(8))
-            dja(3) = tensor(2)*tensor(6) - tensor(3)*tensor(5)
-            dja(4) = -(tensor(4)*tensor(9) - tensor(6)*tensor(7))
-            dja(5) = tensor(1)*tensor(9) - tensor(3)*tensor(7)
-            dja(6) = -(tensor(1)*tensor(6) - tensor(4)*tensor(3))
-            dja(7) = tensor(4)*tensor(8) - tensor(5)*tensor(7)
-            dja(8) = -(tensor(1)*tensor(8) - tensor(2)*tensor(7))
-            dja(9) = tensor(1)*tensor(5) - tensor(2)*tensor(4)
+            tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
+            tensorb(2) = -(tensora(2)*tensora(9) - tensora(3)*tensora(8))
+            tensorb(3) = tensora(2)*tensora(6) - tensora(3)*tensora(5)
+            tensorb(4) = -(tensora(4)*tensora(9) - tensora(6)*tensora(7))
+            tensorb(5) = tensora(1)*tensora(9) - tensora(3)*tensora(7)
+            tensorb(6) = -(tensora(1)*tensora(6) - tensora(4)*tensora(3))
+            tensorb(7) = tensora(4)*tensora(8) - tensora(5)*tensora(7)
+            tensorb(8) = -(tensora(1)*tensora(8) - tensora(2)*tensora(7))
+            tensorb(9) = tensora(1)*tensora(5) - tensora(2)*tensora(4)
         end if
-    end subroutine s_calculate_adjointa
 
-    function f_determinant(tensor)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)) :: f_determinant
-
+    ! STEP 2b: computing the determinant of the grad_xi tensor 
         if (num_dims == 1) then
-            f_determinant = tensor(1)
+            determinant = tensora(1)
         elseif (num_dims == 2) then
-            f_determinant = tensor(1)*tensor(4) - tensor(2)*tensor(3)
+            determinant = tensora(1)*tensora(4) - tensora(2)*tensora(3)
         else
-            f_determinant = tensor(1)*(tensor(5)*tensor(9) - tensor(6)*tensor(8)) &
-                            - tensor(2)*(tensor(4)*tensor(9) - tensor(6)*tensor(7)) &
-                            + tensor(3)*(tensor(4)*tensor(8) - tensor(5)*tensor(7))
+            determinant = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
+                            - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
+                            + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
         ! error checking
-        if (f_determinant == 0) then
-            print *, 'f_determinant :: ', f_determinant
+        if (determinant == 0) then
+            print *, 'determinant :: ', determinant
             print *, 'ERROR: Determinant was zero'
             stop
         end if
-    end function f_determinant
 
-    subroutine s_calculate_ainverse(tensor, ainv)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ainv
-        real(kind(0d0)), dimension(num_dims**2) :: dja
-        real(kind(0d0)) :: det
+    ! STEP 2c: computing the inverse of grad_xi tensor = F
+    ! tensorb is the adjoint, tensora becomes the inverse
+        tensora(:) = tensorb(:)/determinant
 
-        call s_calculate_adjointa(tensor, dja)
-        ainv(:) = dja(:)/f_determinant(tensor)
-
-    end subroutine s_calculate_ainverse
-
-
-    subroutine s_calculate_atransposea(tensor, ata)
-        !$acc routine seq
-        real(kind(0d0)), dimension(num_dims**2), intent(IN) :: tensor
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: ata
-
-        ata(1) = tensor(1)**2
+    ! STEP 3: computing F tranpose F
+        tensorb(1) = tensora(1)**2
         if (num_dims == 2) then
-            ata(1) = ata(1) + tensor(3)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(3)*tensor(4)
-            ata(3) = ata(2)
-            ata(4) = tensor(2)**2 + tensor(4)**2
+            tensorb(1) = tensorb(1) + tensora(3)**2
+            tensorb(2) = tensora(1)*tensora(2) + tensora(3)*tensora(4)
+            tensorb(3) = tensorb(2)
+            tensorb(4) = tensora(2)**2 + tensora(4)**2
         elseif (num_dims == 3) then
-            ata(1) = ata(1) + tensor(4)**2 + tensor(7)**2
-            ata(5) = tensor(2) + tensor(5)**2 + tensor(8)**2
-            ata(9) = tensor(3) + tensor(6)**2 + tensor(9)**2
-            ata(2) = tensor(1)*tensor(2) + tensor(4)*tensor(5) + tensor(7)*tensor(8)
-            ata(3) = tensor(1)*tensor(3) + tensor(4)*tensor(6) + tensor(7)*tensor(9)
-            ata(6) = tensor(2)*tensor(3) + tensor(5)*tensor(6) + tensor(8)*tensor(9)
-            ata(4) = ata(2)
-            ata(7) = ata(3)
-            ata(8) = ata(4)
+            tensorb(1) = tensorb(1) + tensora(4)**2 + tensora(7)**2
+            tensorb(5) = tensora(2) + tensora(5)**2 + tensora(8)**2
+            tensorb(9) = tensora(3) + tensora(6)**2 + tensora(9)**2
+            tensorb(2) = tensora(1)*tensora(2) + tensora(4)*tensora(5) + tensora(7)*tensora(8)
+            tensorb(3) = tensora(1)*tensora(3) + tensora(4)*tensora(6) + tensora(7)*tensora(9)
+            tensorb(6) = tensora(2)*tensora(3) + tensora(5)*tensora(6) + tensora(8)*tensora(9)
+            tensorb(4) = tensorb(2)
+            tensorb(7) = tensorb(3)
+            tensorb(8) = tensorb(4)
         end if
-    end subroutine s_calculate_atransposea
+    ! STEP 4: store the determinant of F in the last entry of the tensor
+        tensorb(num_dims**2+1) = determinant
 
     end subroutine s_compute_gradient_xi
 
