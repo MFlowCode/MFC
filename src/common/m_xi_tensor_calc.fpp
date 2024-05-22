@@ -127,7 +127,7 @@ contains
     subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2), intent(OUT) :: grad_xi
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: grad_xi
         integer, intent(IN) :: j, k, l
         integer :: i
 

@@ -1401,18 +1401,20 @@ contains
     subroutine s_calculate_btensor(q_prim_vf, btensor)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb
+       
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(grad_xi,ftensor,tensorb)
+        !$acc parallel loop collapse(3) gang vector default(present) private(tensorb)
         do l = izb, ize
            do k = iyb, iye
               do j = ixb, ixe
                 ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
+                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb)
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-                call s_calculate_ainverse(grad_xi,ftensor)
+                !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-                call s_calculate_atransposea(ftensor,tensorb)
+                !call s_calculate_atransposea(ftensor,tensorb)
                 ! btensor is symmetric, save the data space
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
@@ -1427,7 +1429,7 @@ contains
                    btensor(6)%sf(j,k,l) = tensorb(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = f_determinant(ftensor)
+                btensor(b_size)%sf(j,k,l) = tensorb(num_dims**2+1)
                 end do
            end do
         end do
