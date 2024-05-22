@@ -1401,8 +1401,8 @@ contains
     subroutine s_calculate_btensor(q_prim_vf, btensor)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb, tensora, tensorc
-       
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorb, tensorc
+
         integer :: j, k, l
 
         !$acc parallel loop collapse(3) gang vector default(present) private(tensorb)
@@ -1410,26 +1410,26 @@ contains
            do k = iyb, iye
               do j = ixb, ixe
                 ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb, tensora, tensorc)
+                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb, tensorc)
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
                 !call s_calculate_atransposea(ftensor,tensorb)
                 ! btensor is symmetric, save the data space
                 ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)
+                btensor(1)%sf(j, k, l) = tensora(1)
                 if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
+                   btensor(2)%sf(j,k,l) = tensora(2)
+                   btensor(3)%sf(j,k,l) = tensora(4)
                 end if
                 if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensorb(3)
-                   btensor(4)%sf(j,k,l) = tensorb(5)
-                   btensor(5)%sf(j,k,l) = tensorb(6)
-                   btensor(6)%sf(j,k,l) = tensorb(9)
+                   btensor(3)%sf(j,k,l) = tensora(3)
+                   btensor(4)%sf(j,k,l) = tensora(5)
+                   btensor(5)%sf(j,k,l) = tensora(6)
+                   btensor(6)%sf(j,k,l) = tensora(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(num_dims**2+1)
+                btensor(b_size)%sf(j,k,l) = tensora(num_dims**2+1)
                 end do
            end do
         end do

@@ -15,11 +15,11 @@ module m_xi_tensor_calc
 
     implicit none
 
-    private; public :: s_compute_grad_xi, f_elastic_energy
+    private; public :: s_compute_gradient_xi, f_elastic_energy
  !s_calculate_ainverse, &
  !s_calculate_atransposea, &
  !f_determinant, &
- !s_compute_grad_xi
+ !s_compute_tensora
 
 contains
 
@@ -124,19 +124,17 @@ contains
         f_elastic_energy = 0.5d0*(invariant1 - 3)/btensor(b_size)%sf(j, k, l)
     end function f_elastic_energy
 
-    subroutine s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi, tensora, tensorc)
+    subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb, tensorc)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: grad_xi 
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensorc
-
+        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora, tensorb, tensorc 
         integer, intent(IN) :: j, k, l
+
         integer :: i
 
         if(j == 0) then
            ! dxix/dx
-           grad_xi(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+           tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xibeg)%sf(j + 3, k, l) &
@@ -144,7 +142,7 @@ contains
                      /(12d0*(x_cb(j+1) - x_cb(j)))
         else if (j == 1) then
            ! dxix/dx
-           grad_xi(1) = (-3d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
+           tensora(1) = (-3d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       -  6d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &
@@ -152,7 +150,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
         else if (j == m - 1) then
            ! dxix/dx
-           grad_xi(1) = (3d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
+           tensora(1) = (3d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
                       +  6d0*q_prim_vf(xibeg)%sf(j - 2, k, l) &
@@ -160,7 +158,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
         else if (j == m) then
            ! dxix/dx
-           grad_xi(1) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+           tensora(1) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
                       + 36d0*q_prim_vf(xibeg)%sf(j - 2, k, l) &
                       - 16d0*q_prim_vf(xibeg)%sf(j - 3, k, l) &
@@ -168,7 +166,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j-1)))
         else
            ! dxix/dx
-           grad_xi(1) = (   q_prim_vf(xibeg)%sf(j - 2, k, l) &
+           tensora(1) = (   q_prim_vf(xibeg)%sf(j - 2, k, l) &
                       - 8d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
                       + 8d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       -     q_prim_vf(xibeg)%sf(j + 2, k, l)) &
@@ -178,7 +176,7 @@ contains
         if (num_dims > 1) then
           if(j == 0) then
              ! dxiy / dx
-             grad_xi(2) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(2) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xibeg+1)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j + 3, k, l) &
@@ -186,7 +184,7 @@ contains
                      /(12d0*(x_cb(j + 1) - x_cb(j)))
           else if (j == 1) then
              ! dxiy / dx
-             grad_xi(2) = (-3d0*q_prim_vf(xibeg+1)%sf(j - 1, k, l) &
+             tensora(2) = (-3d0*q_prim_vf(xibeg+1)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j + 2, k, l) &
@@ -194,7 +192,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == m - 1) then
              ! dxiy / dx
-             grad_xi(2) = (3d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
+             tensora(2) = (3d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg+1)%sf(j - 1, k, l) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j - 2, k, l) &
@@ -202,7 +200,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == m) then
              ! dxiy / dx
-             grad_xi(2) = (25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(2) = (25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg+1)%sf(j - 1, k, l) &
                       + 36d0*q_prim_vf(xibeg+1)%sf(j - 2, k, l) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j - 3, k, l) &
@@ -210,7 +208,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else
              ! dxiy / dx
-             grad_xi(2) = ( q_prim_vf(xibeg+1)%sf(j - 2, k, l) &
+             tensora(2) = ( q_prim_vf(xibeg+1)%sf(j - 2, k, l) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j - 1, k, l) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
                       -     q_prim_vf(xibeg+1)%sf(j + 2, k, l)) &
@@ -219,7 +217,7 @@ contains
 
           if(k == 0) then
              ! dxix / dy
-             grad_xi(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       - 36d0*q_prim_vf(xibeg)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xibeg)%sf(j, k + 3, l) &
@@ -227,7 +225,7 @@ contains
                      /(12d0*(y_cb(k+1) - y_cb(k)))
           else if (k == 1) then
              ! dxix / dy
-             grad_xi(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
+             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xibeg)%sf(j, k + 2, l) &
@@ -235,7 +233,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n - 1) then
              ! dxix / dy
-             grad_xi(3) = (3d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
+             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k - 2, l) &
@@ -243,7 +241,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n) then
              ! dxix / dy
-             grad_xi(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       + 36d0*q_prim_vf(xibeg)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k - 3, l) &
@@ -251,7 +249,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j-1)))
           else
              ! dxix / dy
-             grad_xi(3) = ( q_prim_vf(xibeg)%sf(j, k - 2, l) &
+             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       -     q_prim_vf(xibeg)%sf(j, k + 2, l)) &
@@ -260,7 +258,7 @@ contains
 
           if(k == 0) then
              ! dxiy / dy
-             grad_xi(4) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(4) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       - 36d0*q_prim_vf(xibeg+1)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j, k + 3, l) &
@@ -268,7 +266,7 @@ contains
                      /(12d0*(y_cb(k+1) - y_cb(k)))
           else if (k == 1) then
              ! dxiy / dy
-             grad_xi(4) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
+             tensora(4) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j, k + 2, l) &
@@ -276,7 +274,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n - 1) then
              ! dxiy / dy
-             grad_xi(4) = (3d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
+             tensora(4) = (3d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
@@ -284,7 +282,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n) then
              ! dxiy / dy
-             grad_xi(4) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(4) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k - 3, l) &
@@ -292,7 +290,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j-1)))
           else
              ! dxiy / dy
-             grad_xi(4) = ( q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
+             tensora(4) = ( q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       -     q_prim_vf(xibeg+1)%sf(j, k + 2, l)) &
@@ -303,12 +301,12 @@ contains
         ! 3D
         if (num_dims > 2) then
             ! using results from upper if statement to map form 2x2 to 3x3 tensor
-            grad_xi(5) = grad_xi(4)
-            grad_xi(4) = grad_xi(3)
+            tensora(5) = tensora(4)
+            tensora(4) = tensora(3)
 
           if(l == 0) then
              ! dxix / dz
-             grad_xi(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       - 36d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg)%sf(j, k , l + 3) &
@@ -316,7 +314,7 @@ contains
                      /(12d0*(z_cb(k+1) - z_cb(k)))
           else if (l == 1) then
              ! dxix / dz
-             grad_xi(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
+             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
@@ -324,7 +322,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p - 1) then
              ! dxix / dz
-             grad_xi(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
+             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
@@ -332,7 +330,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p) then
              ! dxix / dz
-             grad_xi(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
@@ -340,7 +338,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j-1)))
           else
              ! dxix / dz
-             grad_xi(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
+             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
@@ -349,7 +347,7 @@ contains
 
           if(l == 0) then
              ! dxiy / dz
-             grad_xi(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       - 36d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j, k , l + 3) &
@@ -357,7 +355,7 @@ contains
                      /(12d0*(z_cb(k+1) - z_cb(k)))
           else if (l == 1) then
              ! dxiy / dz
-             grad_xi(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
+             tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
@@ -365,7 +363,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p - 1) then
              ! dxiy / dz
-             grad_xi(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
+             tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
@@ -373,7 +371,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p) then
              ! dxiy / dz
-             grad_xi(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
@@ -381,7 +379,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j-1)))
           else
              ! dxiy / dz
-             grad_xi(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+             tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
@@ -390,7 +388,7 @@ contains
 
           if(j == 0) then
              ! dxiz / dx
-             grad_xi(7) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(7) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j + 3, k, l) &
@@ -398,7 +396,7 @@ contains
                      /(12d0*(x_cb(j + 1) - x_cb(j)))
           else if (j == 1) then
              ! dxiz / dx
-             grad_xi(7) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
+             tensora(7) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
@@ -406,7 +404,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == m - 1) then
              ! dxiz / dx
-             grad_xi(7) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
+             tensora(7) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
@@ -414,7 +412,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == m) then
              ! dxiz / dx
-             grad_xi(7) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(7) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j - 3, k, l) &
@@ -422,7 +420,7 @@ contains
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else
              ! dxiz / dx
-             grad_xi(7) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
+             tensora(7) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -     q_prim_vf(xiend)%sf(j + 2, k, l)) &
@@ -431,7 +429,7 @@ contains
 
           if(k == 0) then
              ! dxiz / dy
-             grad_xi(8) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(8) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k + 3, l) &
@@ -439,7 +437,7 @@ contains
                      /(12d0*(y_cb(k+1) - y_cb(k)))
           else if (k == 1) then
              ! dxiz / dy
-             grad_xi(8) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
+             tensora(8) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
@@ -447,7 +445,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n - 1) then
              ! dxiz / dy
-             grad_xi(8) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
+             tensora(8) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
@@ -455,7 +453,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j - 1)))
           else if (k == n) then
              ! dxiz / dy
-             grad_xi(8) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(8) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k - 3, l) &
@@ -463,7 +461,7 @@ contains
                      /(12d0*(y_cb(j) - y_cb(j-1)))
           else
              ! dxiz / dy
-             grad_xi(8) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
+             tensora(8) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -     q_prim_vf(xiend)%sf(j, k + 2, l)) &
@@ -472,7 +470,7 @@ contains
 
           if(l == 0) then
              ! dxiz / dz
-             grad_xi(9) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(9) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       - 36d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k , l + 3) &
@@ -480,7 +478,7 @@ contains
                      /(12d0*(z_cb(k+1) - z_cb(k)))
           else if (l == 1) then
              ! dxiz / dz
-             grad_xi(9) = (-3d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
+             tensora(9) = (-3d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
@@ -488,7 +486,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p - 1) then
              ! dxiz / dz
-             grad_xi(9) = (3d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
+             tensora(9) = (3d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
@@ -496,7 +494,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j - 1)))
           else if (l == p) then
              ! dxiz / dz
-             grad_xi(9) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(9) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k , l - 3) &
@@ -504,7 +502,7 @@ contains
                      /(12d0*(z_cb(j) - z_cb(j-1)))
           else
              ! dxiz / dz
-             grad_xi(9) = ( q_prim_vf(xiend)%sf(j, k , l - 2) &
+             tensora(9) = ( q_prim_vf(xiend)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
@@ -514,10 +512,10 @@ contains
 
     !if(proc_rank == 0) then
     !    do i = 1, num_dims**2
-    !        print *, "i :: ",i,", grad_xi :: ",grad_xi(i)
+    !        print *, "i :: ",i,", tensora :: ",tensora(i)
     !    end do
     !end if
 
-    end subroutine s_compute_grad_xi
+    end subroutine s_compute_gradient_xi
 
 end module m_xi_tensor_calc
