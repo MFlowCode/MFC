@@ -933,6 +933,12 @@ contains
             end if
         #:endif
 
+        ! going through hyperelasticity again due to the btensor calculation
+        if (hyperelasticity) then 
+           ! s_calculate_btensor has its own triple nested for loop with openacc
+           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+        end if
+
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
             do k = iyb, iye
@@ -1055,38 +1061,24 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity .and. .not. bubbles) then ! .and. G_K > 100 ) then
+                    if ( hyperelasticity ) then
                       !$acc loop seq
                       do i = xibeg, xiend
                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
                       end do
+                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
                     end if
 
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
-
                 end do
             end do
         end do
         !$acc end parallel loop
 
-        ! going through hyperelasticity again due to the btensor calculation
-        if (hyperelasticity .and. .not. bubbles) then 
-           ! s_calculate_btensor has its own triple nested for loop with openacc
-           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
-           !$acc parallel loop collapse(3) gang vector default(present) private(gamma_K,G_K)
-           do l = izb, ize
-               do k = iyb, iye
-                   do j = ixb, ixe
-                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                     G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-                   end do
-               end do
-           end do
-          !$acc end parallel loop
-        end if
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1125,11 +1117,18 @@ contains
         real(kind(0d0)), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
-        do l = 1, b_size
-            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
-        end do
 
 #ifndef MFC_SIMULATION
+        do l = 1, b_size
+            @:ALLOCATE_GLOBAL(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+        end do
+
+        ! going through hyperelasticity again due to the btensor calculation
+        if (hyperelasticity ) then
+            ! s_calculate_btensor has its own triple nested for loop, with openacc
+            call s_calculate_btensor(q_prim_vf, q_btensor)
+        end if 
+
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
             do k = 0, n
@@ -1243,27 +1242,14 @@ contains
                         do i = xibeg, xiend
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
+                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                              G*f_elastic_energy(q_btensor, j, k, l)
                     end if
   
                 end do
             end do
         end do 
 
-        ! going through hyperelasticity again due to the btensor calculation
-        if (hyperelasticity .and. .not. bubbles) then
-            ! s_calculate_btensor has its own triple nested for loop, with openacc
-            call s_calculate_btensor(q_prim_vf, q_btensor)
-            ! triple nested for loop to update the total energy using the btensor information
-            ! openacc is not needed here as this function is used only in pre_process/post_process
-            do l = 0, p
-               do k = 0, n
-                  do j = 0, m
-                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
-                          G*f_elastic_energy(q_btensor, j, k, l)
-                  end do
-               end do
-            end do
-        end if 
 #else
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
