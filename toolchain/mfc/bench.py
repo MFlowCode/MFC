@@ -97,7 +97,7 @@ def diff():
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
-       cons.print(f"""\
+        cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.
     * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.
     * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.
