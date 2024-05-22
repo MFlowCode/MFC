@@ -110,7 +110,6 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
@@ -913,10 +912,10 @@ contains
         #:endif
 
         ! going through hyperelasticity again due to the btensor calculation
-        ! s_calculate_btensor has its own triple nested for loop with openacc
         print *, 'I got here A1'
-        if (hyperelasticity .and. .not. bubbles) then 
-           !call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+        if (hyperelasticity) then 
+           ! s_calculate_btensor has its own triple nested for loop with openacc
+           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
         end if
         print *, 'I got here A2'
 
@@ -1042,20 +1041,19 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity .and. .not. bubbles ) then 
+                    if ( hyperelasticity ) then
                       !$acc loop seq
                       do i = xibeg, xiend
                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
                       end do
                       qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                         G_K * f_elastic_energy( qK_btensor_vf, j, k, l) / gamma_K
+                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
                     end if
 
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
-
                 end do
             end do
         end do
@@ -1098,16 +1096,16 @@ contains
         real(kind(0d0)), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
+
+#ifndef MFC_SIMULATION
         do l = 1, b_size
             @:ALLOCATE_GLOBAL(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
         end do
 
-#ifndef MFC_SIMULATION
-
         ! going through hyperelasticity again due to the btensor calculation
-        if ( hyperelasticity .and. .not. bubbles) then
-            ! s_calculate_btensor has its own triple nested for loop, no openacc
-            !call s_calculate_btensor(q_prim_vf, q_btensor)
+        if (hyperelasticity ) then
+            ! s_calculate_btensor has its own triple nested for loop, with openacc
+            call s_calculate_btensor(q_prim_vf, q_btensor)
         end if 
 
         ! Converting the primitive variables to the conservative variables
@@ -1225,7 +1223,7 @@ contains
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
                         q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
-                            G*f_elastic_energy(q_btensor, j, k, l)
+                              G*f_elastic_energy(q_btensor, j, k, l)
                     end if
 
                 end do
@@ -1384,36 +1382,35 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        real(kind(0d0)), dimension(num_dims**2+1) :: tensorb
-        real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorc
+        real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorb
+
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(tensorb, tensora, tensorc)
+        !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = izb, ize
            do k = iyb, iye
               do j = ixb, ixe
                 ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                !call s_compute_grad_xi(q_prim_vf, j, k, l, grad_xi)
-                call s_compute_grad_xi(q_prim_vf, j, k, l, tensorb, tensora, tensorc)
+                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
                 !call s_calculate_atransposea(ftensor,tensorb)
                 ! btensor is symmetric, save the data space
                 ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)
+                btensor(1)%sf(j, k, l) = tensora(1)
                 if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
+                   btensor(2)%sf(j,k,l) = tensora(2)
+                   btensor(3)%sf(j,k,l) = tensora(4)
                 end if
                 if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensorb(3)
-                   btensor(4)%sf(j,k,l) = tensorb(5)
-                   btensor(5)%sf(j,k,l) = tensorb(6)
-                   btensor(6)%sf(j,k,l) = tensorb(9)
+                   btensor(3)%sf(j,k,l) = tensora(3)
+                   btensor(4)%sf(j,k,l) = tensora(5)
+                   btensor(5)%sf(j,k,l) = tensora(6)
+                   btensor(6)%sf(j,k,l) = tensora(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(10)
+                btensor(b_size)%sf(j,k,l) = tensora(num_dims**2+1)
                 end do
            end do
         end do

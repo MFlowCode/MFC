@@ -54,7 +54,9 @@ contains
             end do
         end do
         !$acc end parallel loop
-        if (proc_rank == 0) print *, 'J is ::', jacobian, 'this is sigma ::', sigma
+
+        !if (proc_rank == 0) print *, 'J is ::', jacobian, 'this is sigma ::', sigma
+
     end subroutine s_calculate_cauchy_from_btensor
 
     function f_trace(symtensor)
