@@ -95,6 +95,7 @@ module m_global_parameters
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
     integer :: b_size          !< Number of components in the b tensor
+    integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -494,6 +495,7 @@ contains
                 sys_size = stress_idx%end + num_dims
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
             end if
 
             ! ==================================================================

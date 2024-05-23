@@ -1408,11 +1408,14 @@ contains
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
 
         integer :: j, k, l
+        !do l = izb, ize
+        !   do k = iyb, iye
+        !      do j = ixb, ixe
 
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-        do l = izb, ize
-           do k = iyb, iye
-              do j = ixb, ixe
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
                 ! calculate the grad_xi, grad_xi is a nxn tensor
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
