@@ -33,7 +33,7 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (${profiler} "${target.get_install_binpath(case)}")
+        (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         if [ "$binary" == "jsrun" ]; then
             (set -x; ${profiler}   \
