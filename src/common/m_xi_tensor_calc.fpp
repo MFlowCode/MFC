@@ -488,15 +488,19 @@ module m_xi_tensor_calc
         integer, intent(IN) :: j, k, l
         real(kind(0d0)) :: invariant1, f_elastic_energy
 
-        invariant1 = btensor(1)%sf(j, k, l)
         f_elastic_energy = 0d0
+
+        invariant1 = btensor(1)%sf(j, k, l)
+
         if (num_dims == 2) then
             invariant1 = invariant1 + btensor(3)%sf(j, k, l)
         elseif (num_dims == 3) then
             invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
         end if
+
         ! compute the invariant without the elastic modulus
         f_elastic_energy = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)
+
     end function f_elastic_energy
 
 end module m_xi_tensor_calc

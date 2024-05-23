@@ -912,11 +912,13 @@ contains
         #:endif
 
         ! going through hyperelasticity again due to the btensor calculation
+        ! s_calculate_btensor has its own triple nested for loop with openacc
         print *, 'I got here A1'
+
         if (hyperelasticity) then 
-           ! s_calculate_btensor has its own triple nested for loop with openacc
            call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
         end if
+
         print *, 'I got here A2'
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
@@ -1054,6 +1056,7 @@ contains
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
+
                 end do
             end do
         end do
@@ -1103,8 +1106,8 @@ contains
         end do
 
         ! going through hyperelasticity again due to the btensor calculation
+        ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity ) then
-            ! s_calculate_btensor has its own triple nested for loop, with openacc
             call s_calculate_btensor(q_prim_vf, q_btensor)
         end if 
 
@@ -1231,11 +1234,13 @@ contains
         end do 
 
 #else
+
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
                              'conservative variables not '// &
                              'implemented. Exiting ...')
         end if
+
 #endif
 
     end subroutine s_convert_primitive_to_conservative_variables ! ---------
@@ -1390,27 +1395,25 @@ contains
         do l = izb, ize
            do k = iyb, iye
               do j = ixb, ixe
-                ! STEP 1: calculate the grad_xi, grad_xi is a nxn tensor
-                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
+                ! calculate the grad_xi, grad_xi is a nxn tensor
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-                !call s_calculate_ainverse(grad_xi,ftensor)
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-                !call s_calculate_atransposea(ftensor,tensorb)
                 ! btensor is symmetric, save the data space
+                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
                 ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensora(1)
+                btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensora(2)
-                   btensor(3)%sf(j,k,l) = tensora(4)
+                   btensor(2)%sf(j,k,l) = tensorb(2)
+                   btensor(3)%sf(j,k,l) = tensorb(4)
                 end if
                 if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensora(3)
-                   btensor(4)%sf(j,k,l) = tensora(5)
-                   btensor(5)%sf(j,k,l) = tensora(6)
-                   btensor(6)%sf(j,k,l) = tensora(9)
+                   btensor(3)%sf(j,k,l) = tensorb(3)
+                   btensor(4)%sf(j,k,l) = tensorb(5)
+                   btensor(5)%sf(j,k,l) = tensorb(6)
+                   btensor(6)%sf(j,k,l) = tensorb(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensora(num_dims**2+1)
+                btensor(b_size)%sf(j,k,l) = tensorb(num_dims**2+1)
                 end do
            end do
         end do
