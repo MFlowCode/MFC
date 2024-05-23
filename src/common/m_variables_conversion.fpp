@@ -1057,10 +1057,15 @@ contains
         if (hyperelasticity) then 
 #ifdef MFC_SIMULATION
         call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
-        !$acc parallel loop collapse(3) gang vector default(present) private(gamma_K, G_K)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
         do l = izb, ize
            do k = iyb, iye
                do j = ixb, ixe
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    end do
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
@@ -1070,12 +1075,15 @@ contains
            end do
         end do
         !$acc end parallel loop
-        print *, 'I got here A2'
 #else
-         call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+        call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
         do l = izb, ize
            do k = iyb, iye
                do j = ixb, ixe
+                    do i = 1, num_fluids
+                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    end do
                     ! If pre-processing, use non acc mixture subroutines
                     call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                              rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
@@ -1133,11 +1141,9 @@ contains
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
-        print *, 'I got here B1'
         if (hyperelasticity ) then
             call s_calculate_btensor(q_prim_vf, q_btensor)
         end if 
-        print *, 'I got here B2'
 
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
@@ -1459,6 +1465,7 @@ contains
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
         integer :: j, k, l
+        !TODO FIX THE TRIPLE LOOPING INDEX HERE!
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = 0, p
             do k = 0, n
@@ -1480,13 +1487,9 @@ contains
                 btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
            end do
-           !if(l == ize) print *, 'I got to the end of triple do loop of tensorb calc'
         end do
         !$acc end parallel loop
-
         print *, 'I got to finish the parallel loop'
-        !print *, 'STOPPING THE CODE'
-        !stop
     end subroutine s_calculate_btensor_acc
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
