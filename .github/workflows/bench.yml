@@ -52,8 +52,8 @@ jobs:
 
       - name: Generate & Post Comment
         run: |
-          . ./mfc.sh load -c p -m g
-          ./mfc.sh bench_diff master/bench-${{ matrix.device }}.yaml pr/bench-${{ matrix.device }}.yaml
+          (cd pr && . ./mfc.sh load -c p -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
       - name: Archive Logs
         uses: actions/upload-artifact@v3
