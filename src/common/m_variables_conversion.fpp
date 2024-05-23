@@ -1422,9 +1422,44 @@ contains
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
 
         integer :: j, k, l
-        !do l = izb, ize
-        !   do k = iyb, iye
-        !      do j = ixb, ixe
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
+                ! 1: 1D, 3: 2D, 6: 3D
+                btensor(1)%sf(j, k, l) = tensorb(1)
+                if (num_dims > 1) then ! 2D
+                   btensor(2)%sf(j,k,l) = tensorb(2)
+                   btensor(3)%sf(j,k,l) = tensorb(4)
+                end if
+                if (num_dims > 2) then ! 3D
+                   btensor(3)%sf(j,k,l) = tensorb(3)
+                   btensor(4)%sf(j,k,l) = tensorb(5)
+                   btensor(5)%sf(j,k,l) = tensorb(6)
+                   btensor(6)%sf(j,k,l) = tensorb(9)
+                end if
+                ! store the determinant at the last entry of the btensor sf
+                btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+                end do
+           end do
+        end do
+    end subroutine s_calculate_btensor
+
+    !>  The following subroutine handles the calculation of the btensor.
+        !!      The calculation of the btensor takes qprimvf.
+        !!  @param q_prim_vf Primitive variables
+        !!  @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
+    subroutine s_calculate_btensor_acc(q_prim_vf, btensor)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
+        integer :: j, k, l
+        !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -1447,58 +1482,11 @@ contains
            end do
            !if(l == ize) print *, 'I got to the end of triple do loop of tensorb calc'
         end do
-
-        print *, 'I got to finish the parallel loop'
-        print *, 'STOPPING THE CODE'
-        !stop
-    end subroutine s_calculate_btensor
-
-    !>  The following subroutine handles the calculation of the btensor.
-        !!      The calculation of the btensor takes qprimvf.
-        !!  @param q_prim_vf Primitive variables
-        !!  @param btensor is the output
-        !! calculate the grad_xi, grad_xi is a nxn tensor
-        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-        !! btensor is symmetric, save the data space
-    subroutine s_calculate_btensor_acc(q_prim_vf, btensor)
-
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-        integer :: j, k, l
-        !do l = izb, ize
-        !   do k = iyb, iye
-        !      do j = ixb, ixe
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
-                ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)
-                if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
-                end if
-                if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensorb(3)
-                   btensor(4)%sf(j,k,l) = tensorb(5)
-                   btensor(5)%sf(j,k,l) = tensorb(6)
-                   btensor(6)%sf(j,k,l) = tensorb(9)
-                end if
-                ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
-                end do
-           end do
-           if(l == ize) print *, 'I got to the end of triple do loop of tensorb calc'
-        end do
         !$acc end parallel loop
 
         print *, 'I got to finish the parallel loop'
-        print *, 'STOPPING THE CODE'
-        stop
+        !print *, 'STOPPING THE CODE'
+        !stop
     end subroutine s_calculate_btensor_acc
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
