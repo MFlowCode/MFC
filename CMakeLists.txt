@@ -196,7 +196,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
     if (SUPPORTS_IPO)
         message(STATUS "Enabled IPO / LTO")
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        if ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 23.11))
+            # Is this message super clear or necessary?
+            message(STATUS "Performing IPO using -Mextract followed by -Minline")
+            set(NVHPC_USE_TWO_PASS_IPO TRUE)
+        else()
+            # Passes -Mipa flag on NVIDIA compiler, which is now deprecated.
+            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        endif()
     else()
         message(STATUS "IPO / LTO is NOT available")
     endif()
@@ -349,7 +356,19 @@ HANDLE_SOURCES(syscheck OFF)
 function(MFC_SETUP_TARGET)
     cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
 
-    add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+    # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
+    # A little hacky, but it *is* an edge-case for *one* compiler.
+    if (DEFINED NVHPC_USE_TWO_STAGE_IPO)
+        add_library(${ARGS_TARGET}_lib ${ARGS_SOURCES})
+        target_compile_options(${ARGS_TARGET}_lib PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
+        set_target_properties(${ARGS_TARGET}_lib PROPERTIES Fortran_PREPROCESS ON)
+        # Can we assume files have been pre-processed at this point? Only if the above does what I think it does.
+        add_executable(${ARGS_TARGET} p_main.f90)
+        # I tested on a small example -- this *will* inline modules that call each other too.
+        target_compile_options(${ARGS_TARGET} $<$<COMPILE_LANGUAGE:Fortran>:-Minline=lib:${ARGS_TARGET}_lib>)
+    else()
+        add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+    endif()
 
     set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
 
