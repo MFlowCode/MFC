@@ -2030,7 +2030,7 @@ contains
 
     subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: c_divs_vf
+        type(scalar_field), dimension(num_dims + 1), intent(INOUT) :: c_divs_vf
 
         integer, intent(IN) :: mpi_dir, pbc_loc
 
@@ -2050,6 +2050,7 @@ contains
 #ifdef MFC_MPI
 
         nVars = num_dims + 1
+        !$acc update device(nVars)
 
         buffer_counts = (/ &
                         buff_size*nVars*(n + 1)*(p + 1), &

@@ -634,6 +634,7 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         else
+
             ! Open the file to read conservative variables
             write (file_loc, '(I0,A)') t_step_start, '.dat'
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
@@ -647,8 +648,11 @@ contains
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
+
                     call s_initialize_mpi_data(q_cons_vf)
+
                 end if
+
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -699,6 +703,7 @@ contains
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
+
                     end do
                 end if
 
@@ -1274,7 +1279,7 @@ contains
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
-        
+
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
 
@@ -1383,8 +1388,8 @@ contains
 
         !$acc update device(monopole, num_mono)
         !$acc update device(sigma)
-    
-        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)    
+
+        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
 
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)

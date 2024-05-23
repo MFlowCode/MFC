@@ -49,10 +49,10 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
                      ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                      "${target.get_install_binpath(case)}"
         elif [ "$binary" == "mpirun" ] || [ "$binary" == "mpiexec" ]; then
-            ${' '.join([f"'{x}'" for x in profiler ])}              \
+            (set -x ;${' '.join([f"'{x}'" for x in profiler ])}              \
                 $binary -np ${nodes*tasks_per_node}                 \
                         ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                        "${target.get_install_binpath(case)}"
+                        "${target.get_install_binpath(case)}")
         fi
     % endif
 

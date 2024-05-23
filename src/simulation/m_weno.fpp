@@ -500,7 +500,7 @@ contains
 
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
                       norm_dir, weno_dir, &
-                      is1_weno_d, is2_weno_d, is3_weno_d, recon_order)
+                      is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(IN) :: v_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
@@ -534,7 +534,7 @@ contains
                                    norm_dir, weno_dir)
         end if
 
-        if (recon_order == 1) then
+        if (weno_order == 1) then
             if (weno_dir == 1) then
                 !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
@@ -575,7 +575,7 @@ contains
                 end do
                 !$acc end parallel loop
             end if
-        elseif (recon_order == 3) then
+        elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
                     !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)

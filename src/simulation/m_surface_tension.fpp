@@ -26,6 +26,7 @@ module m_surface_tension
     private; public :: s_initialize_surface_tension_module, &
  s_compute_capilary_source_flux, &
  s_get_capilary, &
+ s_reconstruct_cell_boundary_values_first_order, &
  s_finalize_surface_tension_module
 
 #ifdef CRAY_ACC_WAR
@@ -313,17 +314,17 @@ contains
 
         ! reconstruct gradient components at cell boundaries
         do i = 1, num_dims
-            call s_reconstruct_cell_boundary_values_capilary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
+            call s_reconstruct_cell_boundary_values_first_order(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
 
     end subroutine s_get_capilary
 
-    subroutine s_reconstruct_cell_boundary_values_capilary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
                                                            norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
+        type(scalar_field), dimension(1:), intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
@@ -349,28 +350,48 @@ contains
 
         end if
 
-        if (n > 0) then
-            if (p > 0) then
-
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            norm_dir, weno_dir, &
-                            is1, is2, is3, 1)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1, is2, is3, 1)
-            end if
-        else
-
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        norm_dir, weno_dir, &
-                        is1, is2, is3, 1)
+        if (weno_dir == 1) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, ubound(v_vf, 1)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vl_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vr_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        else if (weno_dir == 2) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, ubound(v_vf, 1)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vl_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vr_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        else if (weno_dir == 3) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, ubound(v_vf, 1)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vl_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vr_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
         end if
 
-    end subroutine s_reconstruct_cell_boundary_values_capilary
+    end subroutine s_reconstruct_cell_boundary_values_first_order
 
     subroutine s_finalize_surface_tension_module()
 

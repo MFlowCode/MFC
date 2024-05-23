@@ -819,66 +819,41 @@ contains
 
             call nvtxStartRange("RHS-WENO")
 
-            ! Reconstruct densitiess
-            iv%beg = 1; iv%end = contxe
-            call s_reconstruct_cell_boundary_values( &
-                q_prim_qp%vf(1:sys_size), &
-                qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                id)
-            call nvtxEndRange
-
-            ! Reconstruction pressure
-            iv%beg = E_idx; iv%end = E_idx
-            if (sigma /= dflt_real) then
+            if (sigma == dflt_real) then
+                ! Reconstruct densitiess
+                iv%beg = 1; iv%end =sys_size
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(1:sys_size), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
+                call nvtxEndRange
+            else
+                iv%beg = 1; iv%end = E_idx - 1
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id, 1)
-            else
+                    id)
+                call nvtxEndRange
+
+                iv%beg = E_idx; iv%end = E_idx
+                call s_reconstruct_cell_boundary_values_first_order( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
+                call nvtxEndRange
+
+                iv%beg = E_idx + 1; iv%end =sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
-                    ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                    qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
+                call nvtxEndRange
             end if
 
-            ! Reconstruction volume fractions
-            iv%beg = advxb; iv%end = advxe
-            call s_reconstruct_cell_boundary_values( &
-                q_prim_qp%vf(iv%beg:iv%end), &
-                ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
-                id)
-
-            ! Reconstruct velocities
-            iv%beg = momxb; iv%end = momxe
-            call s_reconstruct_cell_boundary_values( &
-                q_prim_qp%vf(iv%beg:iv%end), &
-                ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
-                id)
-
-            ! Reconstruction bubble variables
-            if (bubbles) then
-                iv%beg = bubxb; iv%end = bubxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                    qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
-                    id)
-            end if
-
-            ! reconstruct the hypoelasticity variables
-            if (hypoelasticity) then
-                iv%beg = stress_idx%beg; iv%end = stress_idx%end
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                    qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
-                    id)
-            end if
 
             ! Reconstruct viscous derivatives for viscosity
             if (weno_Re_flux) then
@@ -905,36 +880,6 @@ contains
                             ix, iy, iz)
                     end if
                 end if
-            end if
-
-            ! Reconstruct color function
-            if (sigma /= dflt_real) then
-                iv%beg = c_idx; iv%end = c_idx
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    ql_rsx_vf, ql_rsy_vf, ql_rsz_vf, &
-                    qr_rsx_vf, qr_rsy_vf, qr_rsz_vf, &
-                    id)
-            end if
-
-            ! Reconstruct bubbles variables
-            if (bubbles) then
-                iv%beg = bubxb; iv%end = bubxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-            end if
-
-            ! Advect variables for directly solving number density
-            if (adv_n) then
-                iv%beg = n_idx; iv%end = n_idx
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
             end if
 
             call nvtxEndRange
@@ -1062,8 +1007,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; 
-            if (p > 0) iz%beg = -buff_size; 
+            if (n > 0) iy%beg = -buff_size;
+            if (p > 0) iz%beg = -buff_size;
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 
@@ -2137,7 +2082,7 @@ contains
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                  norm_dir, local_order)
+                                                  norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
@@ -2145,19 +2090,12 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        integer, optional :: local_order
         integer :: recon_order
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
-
-        if (present(local_order)) then
-            recon_order = local_order
-        else
-            recon_order = weno_order
-        end if
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
@@ -2182,19 +2120,19 @@ contains
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3, recon_order)
+                            is1, is2, is3)
             else
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
                             norm_dir, weno_dir, &
-                            is1, is2, is3, recon_order)
+                            is1, is2, is3)
             end if
         else
 
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         norm_dir, weno_dir, &
-                        is1, is2, is3, recon_order)
+                        is1, is2, is3)
         end if
 
         ! ==================================================================
