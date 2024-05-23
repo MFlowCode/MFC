@@ -106,11 +106,16 @@ contains
         end if
 
         if (hyperelasticity .and. (model_eqns /= 2)) then
-            call s_mpi_abort('hyperelasticity requires model_eqns =2'// &
+            call s_mpi_abort('hyperelasticity requires model_eqns = 2'// &
                              'exiting ...')
         end if
 
-        if (pre_stress .and. .not. hyperelasticity) then
+         if (hyperelasticity .and. (riemann_solver /= 1)) then
+            call s_mpi_abort('hyperelasticity requires riemann_solver = 1 (HLL only)'// &
+                             'exiting ...')
+        end if
+
+       if (pre_stress .and. .not. hyperelasticity) then
             call s_mpi_abort('pre_stress requires hyperelasticity'// &
                              'exiting ...')
         end if
