@@ -911,15 +911,6 @@ contains
             end if
         #:endif
 
-        ! going through hyperelasticity again due to the btensor calculation
-        ! s_calculate_btensor has its own triple nested for loop with openacc
-        print *, 'I got here A1'
-
-        if (hyperelasticity) then 
-           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
-        end if
-
-        print *, 'I got here A2'
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
@@ -1048,8 +1039,6 @@ contains
                       do i = xibeg, xiend
                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
                       end do
-                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
                     end if
 
                     !$acc loop seq
@@ -1061,6 +1050,33 @@ contains
             end do
         end do
         !$acc end parallel loop
+
+        ! going through hyperelasticity again due to the btensor calculation
+        ! s_calculate_btensor has its own triple nested for loop with openacc
+        print *, 'I got here A1'
+        if (hyperelasticity) then 
+           call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+           !$acc parallel loop collapse(3) gang vector default(present) private(gamma_K, G_K)
+           do l = izb, ize
+              do k = iyb, iye
+                  do j = ixb, ixe
+#ifdef MFC_SIMULATION
+                        ! If in simulation, use acc mixture subroutines
+                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                     alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+#else
+                        ! If pre-processing, use non acc mixture subroutines
+                        call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                     rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
+#endif
+                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                  end do
+              end do
+           end do
+           !$acc end parallel loop
+        end if
+        print *, 'I got here A2'
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1389,10 +1405,9 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorb
+        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
 
         integer :: j, k, l
-        print *, 'I got here in btensor calc'
 
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = izb, ize
@@ -1402,9 +1417,9 @@ contains
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
                 ! btensor is symmetric, save the data space
-                print *, 'I got here in triple do loop '
+                !print *, 'I got here in triple do loop '
                 call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
-                print *, 'I got out of gradient_xi'
+                !print *, 'I got out of gradient_xi'
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D
@@ -1418,13 +1433,16 @@ contains
                    btensor(6)%sf(j,k,l) = tensorb(9)
                 end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(num_dims**2+1)
+                btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
            end do
+           if(l == ize) print *, 'I got to the end of triple do loop of tensorb calc'
         end do
         !$acc end parallel loop
-        print *, 'I got to the end of triple do loop of tensorb calc'
 
+        print *, 'I got to finish the parallel loop'
+        print *, 'STOPPING THE CODE'
+        stop
     end subroutine s_calculate_btensor
 
     subroutine s_finalize_variables_conversion_module() ! ------------------

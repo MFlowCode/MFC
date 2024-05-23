@@ -202,7 +202,8 @@ module m_global_parameters
     integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
-    integer :: b_size                                  !< Number of elements in the symmetric b tensor
+    integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
+    integer :: tensor_size                             !< Number of elements in the full tensor plus one
     !> @}
 
     !$acc declare create(bub_idx)
@@ -255,7 +256,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -795,6 +796,7 @@ contains
                     sys_size = stress_idx%end + num_dims
                     ! number of entries in the symmetric btensor plus the jacobian
                     b_size = (num_dims*(num_dims + 1))/2 + 1
+                    tensor_size = num_dims**2 + 1
                 end if
 
             else if (model_eqns == 3) then
@@ -996,7 +998,7 @@ contains
         xibeg = stress_idx%end+1
         xiend = stress_idx%end+num_dims
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, b_size, xibeg, xiend)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, b_size, xibeg, xiend, tensor_size)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
