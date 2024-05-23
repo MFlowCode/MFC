@@ -576,7 +576,7 @@ contains
 
                 ! Read the data for each variable
                 if ( bubbles .or. hypoelasticity .or. hyperelasticity ) then
-                    print *, 'I was here AA'
+
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -601,7 +601,6 @@ contains
                     end do
                 end if
                 
-                print *, 'i :: ',xibeg,', data :: ',MPI_IO_DATA%var(xibeg)%sf(1,1,1)
 
                 call s_mpi_barrier()
 

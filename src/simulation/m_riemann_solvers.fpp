@@ -473,7 +473,7 @@ contains
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
 
-                            if (hypoelasticity) then
+                            if (hypoelasticity .or. hyperelasticity) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
                                     tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
@@ -526,7 +526,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if (hypoelasticity) then
+                                if (hypoelasticity .or. hyperelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -607,7 +607,7 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if (hypoelasticity) then
+                            else if (hypoelasticity .or. hyperelasticity) then
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -646,7 +646,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if (hypoelasticity) then
+                            else if (hypoelasticity .or. hyperelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -2485,7 +2485,7 @@ contains
 
         !$acc update device(is1, is2, is3)
 
-        if (hypoelasticity) then
+        if (hypoelasticity .or. hyperelasticity) then
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
             else if (norm_dir == 2) then

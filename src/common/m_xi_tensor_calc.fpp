@@ -22,7 +22,7 @@ module m_xi_tensor_calc
     subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)), dimension(num_dims**2+1), intent(OUT) :: tensora, tensorb 
+        real(kind(0d0)), dimension(num_dims**2+1), intent(INOUT) :: tensora, tensorb 
         integer, intent(IN) :: j, k, l
 
         real(kind(0d0)) :: determinant
@@ -200,6 +200,9 @@ module m_xi_tensor_calc
 
         end if
         ! 3D
+
+        print *, 'I got half way !'
+
         if (num_dims > 2) then
             ! using results from upper if statement to map form 2x2 to 3x3 tensor
             tensora(5) = tensora(4)
@@ -416,7 +419,7 @@ module m_xi_tensor_calc
     !        print *, "i :: ",i,", tensora :: ",tensora(i)
     !    end do
     !end if
-
+        print *, 'I got to before the inverse'
     ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
         if (num_dims == 1) then
             tensorb(1) = 1
@@ -448,15 +451,16 @@ module m_xi_tensor_calc
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
         ! error checking
-        if (determinant == 0) then
-            print *, 'determinant :: ', determinant
-            print *, 'ERROR: Determinant was zero'
-            stop
-        end if
+        !if (determinant == 0) then
+        !    print *, 'determinant :: ', determinant
+        !    print *, 'ERROR: Determinant was zero'
+        !    stop
+        !end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
     ! tensorb is the adjoint, tensora becomes the inverse
         tensora(:) = tensorb(:)/determinant
+        print *, 'I got to F tranpose F'
 
     ! STEP 3: computing F tranpose F
         tensorb(1) = tensora(1)**2

@@ -1102,14 +1102,16 @@ contains
 
 #ifndef MFC_SIMULATION
         do l = 1, b_size
-            @:ALLOCATE_GLOBAL(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
         end do
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
+        print *, 'I got here B1'
         if (hyperelasticity ) then
             call s_calculate_btensor(q_prim_vf, q_btensor)
         end if 
+        print *, 'I got here B2'
 
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
@@ -1390,6 +1392,7 @@ contains
         real(kind(0d0)), dimension(num_dims**2+1) :: tensora, tensorb
 
         integer :: j, k, l
+        print *, 'I got here in btensor calc'
 
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = izb, ize
@@ -1399,7 +1402,9 @@ contains
                 ! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
                 ! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
                 ! btensor is symmetric, save the data space
+                print *, 'I got here in triple do loop '
                 call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
+                print *, 'I got out of gradient_xi'
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D
@@ -1418,6 +1423,7 @@ contains
            end do
         end do
         !$acc end parallel loop
+        print *, 'I got to the end of triple do loop of tensorb calc'
 
     end subroutine s_calculate_btensor
 

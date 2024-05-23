@@ -146,7 +146,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps,hypoelasticity,hyperelasticity)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model

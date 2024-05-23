@@ -699,6 +699,11 @@ contains
             end do
         end do
 
+        print *, 'A qconsvf :: ',q_cons_vf(xibeg)%sf(1,1,1)
+        print *, 'B qconsvf :: ',q_cons_vf(xibeg)%sf(10,10,10)
+        print *, 'C qconsvf :: ',q_cons_vf(xibeg)%sf(20,20,20)
+        print *, 'D qconsvf :: ',q_cons_vf(xibeg)%sf(30,30,30)
+
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
