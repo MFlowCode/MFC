@@ -449,11 +449,11 @@ module m_xi_tensor_calc
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
         ! error checking
-        !if (determinant == 0) then
-        !    print *, 'determinant :: ', determinant
-        !    print *, 'ERROR: Determinant was zero'
-        !    stop
-        !end if
+        if (determinant == 0) then
+            print *, 'determinant :: ', determinant
+            print *, 'ERROR: Determinant was zero'
+            stop
+        end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
     ! tensorb is the adjoint, tensora becomes the inverse
@@ -481,8 +481,6 @@ module m_xi_tensor_calc
         end if
     ! STEP 4: store the determinant of F in the last entry of the tensor
         tensorb(tensor_size) = determinant
-
-        !print *, 'succeeded, j :: ',j,', k :: ',k,', l :: ',l
 
     end subroutine s_compute_gradient_xi
 
