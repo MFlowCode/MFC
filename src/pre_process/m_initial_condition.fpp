@@ -173,7 +173,7 @@ contains
 
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
 
@@ -252,7 +252,7 @@ contains
 
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
                 !> @}
@@ -273,6 +273,9 @@ contains
 
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 5) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, .true.)
                 end if
             end do
             !> @}

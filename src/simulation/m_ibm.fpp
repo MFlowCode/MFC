@@ -30,6 +30,7 @@ module m_ibm
                s_interpolate_image_point, &
                s_compute_levelset, &
                s_find_ghost_points, &
+               s_determine_IB_boundary, &
                s_find_num_ghost_points
     ; public :: s_initialize_ibm_module, &
  s_ibm_setup, &
@@ -109,7 +110,9 @@ contains
         call s_find_ghost_points(ghost_points, inner_points)
         !$acc update device(ghost_points, inner_points)
 
-        call s_compute_levelset(levelset, levelset_norm)
+        call s_determine_IB_boundary(ghost_points)
+
+        call s_compute_levelset(levelset, levelset_norm, ghost_points)
         !$acc update device(levelset, levelset_norm)
 
         call s_compute_image_points(ghost_points, levelset, levelset_norm)
@@ -333,6 +336,48 @@ contains
 
     end subroutine s_ibm_correct_state
 
+    subroutine s_determine_IB_boundary(ghost_points)
+        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
+        integer, dimension(2 + 1, 2 + 1) &
+            :: subsection_2D
+        integer, dimension(2 + 1, 2 + 1, 2 + 1) &
+            :: subsection_3D
+        integer :: i, j, k, l, q !< Iterator variables
+        type(ghost_point) :: gp
+
+        do q = 1, num_gps
+            gp = ghost_points(q)
+            i = gp%loc(1)
+            j = gp%loc(2)
+            k = gp%loc(3)
+
+            if (p == 0) then
+                subsection_2D = ib_markers%sf( &
+                                i - 1:i + 1, &
+                                j - 1:j + 1, 0)
+                if (any(subsection_2D == 0)) then
+                    ghost_points(q)%IBB = 1
+                else
+                    ghost_points(q)%IBB = 0
+                end if
+            else
+                subsection_3D = ib_markers%sf( &
+                                i - 1:i + 1, &
+                                j - 1:j + 1, &
+                                k - 1:k + 1)
+                if (any(subsection_3D == 0)) then
+                    ghost_points(q)%IBB = 1
+                else
+                    ghost_points(q)%IBB = 0
+                end if
+            end if
+
+            ! print*, i, j, ghost_points(q)%IBB
+
+        end do
+
+    end subroutine s_determine_IB_boundary
+
     !>  Function that computes that bubble wall pressure for Gilmore bubbles
         !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
@@ -531,13 +576,13 @@ contains
                             end if
 
                             count = count + 1
-
                         else
                             inner_points(count_i)%loc = [i, j, 0]
                             patch_id = ib_markers%sf(i, j, 0)
                             inner_points(count_i)%ib_patch_id = &
                                 patch_id
                             inner_points(count_i)%slip = patch_ib(patch_id)%slip
+
                             if ((x_cc(i) - dx(i)) < x_domain%beg .or. &
                                 (x_cc(i) + dx(i)) > x_domain%end) then
                                 ghost_points(count)%DB(1) = 1
@@ -553,7 +598,6 @@ contains
                             end if
 
                             count_i = count_i + 1
-
                         end if
                     end if
                 else
@@ -625,7 +669,7 @@ contains
                                 else
                                     ghost_points(count)%DB(3) = 0
                                 end if
-
+                                
                                 count_i = count_i + 1
                             end if
                         end if
@@ -679,7 +723,6 @@ contains
                                 (y_cc(j2) - gp%ip_loc(2))**2)
 
                 interp_coeffs = 0d0
-
                 if (dist(1, 1, 1) <= 1d-16) then
                     interp_coeffs(1, 1, 1) = 1d0
                 else if (dist(2, 1, 1) <= 1d-16) then
@@ -910,8 +953,8 @@ contains
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
         !!  @param fpb Internal bubble pressure
-    subroutine s_compute_levelset(levelset, levelset_norm)
-
+    subroutine s_compute_levelset(levelset, levelset_norm, ghost_points)
+        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
         real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
         integer :: i !< Iterator variables
@@ -925,6 +968,8 @@ contains
                 call s_compute_rectangle_levelset(levelset, levelset_norm, i)
             else if (geometry == 4) then
                 call s_compute_airfoil_levelset(levelset, levelset_norm, i)
+            else if (geometry == 5) then
+                call s_compute_2D_STL_levelset(levelset, levelset_norm, i, ghost_points, num_gps, ib_markers)
             else if (geometry == 8) then
                 call s_compute_sphere_levelset(levelset, levelset_norm, i)
             else if (geometry == 10) then
