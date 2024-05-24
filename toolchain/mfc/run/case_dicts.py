@@ -162,7 +162,7 @@ for p_id in range(1, 10+1):
             PRE_PROCESS.append(f'patch_icpp({p_id})%alter_patch({alter_id})')
             set_type(f'patch_icpp({p_id})%alter_patch({alter_id})', ParamType.LOG)
 
-# NOTE: Current sole result.
+# NOTE: Currently unused.
 # for f_id in range(1, 10+1):
 #     PRE_PROCESS.append(f"spec_pp({f_id})")
 
