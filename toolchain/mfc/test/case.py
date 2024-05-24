@@ -2,6 +2,7 @@ import os, glob, typing, hashlib, binascii, subprocess, itertools, dataclasses
 
 from ..      import case, common
 from ..state import ARG
+from ..run   import input
 from ..build import MFCTarget, get_target
 
 Tend = 0.25
@@ -92,16 +93,19 @@ BASE_CFG = {
     'cu_mpi'                        :'F',
 }
 
+def trace_to_uuid(trace: str) -> str:
+    return hex(binascii.crc32(hashlib.sha1(str(trace).encode()).digest())).upper()[2:].zfill(8)
+
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
-    ppn:   int
-    trace: str
-    opt:   bool
+    ppn:     int
+    trace:   str
+    rebuild: bool
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None, opt: bool = None) -> None:
-        self.trace = trace
-        self.ppn   = ppn or 1
-        self.opt   = opt or False
+    def __init__(self, trace: str, mods: dict, ppn: int = None, rebuild: bool = None) -> None:
+        self.trace   = trace
+        self.ppn     = ppn or 1
+        self.rebuild = rebuild or False
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: typing.List[typing.Union[str, MFCTarget]], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
@@ -113,24 +117,28 @@ class TestCase(case.Case):
         filepath          = f'{self.get_dirpath()}/case.py'
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
-        case_optimization = ["--case-optimization"] if ARG("case_optimization") or self.opt else ["--no-build"]
+        case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
+        rebuild           = [] if self.rebuild or ARG("case_optimization") else ["--no-build"]
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
         target_names = [ get_target(t).name for t in targets ]
 
         command = [
-            mfc_script, "run", filepath, *tasks, *case_optimization,
+            mfc_script, "run", filepath, *rebuild, *tasks, *case_optimization,
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
         return common.system(command, print_cmd=False, text=True, capture_output=True)
 
     def get_uuid(self) -> str:
-        return hex(binascii.crc32(hashlib.sha1(str(self.trace).encode()).digest())).upper()[2:].zfill(8)
+        return trace_to_uuid(self.trace)
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
+
+    def get_filepath(self):
+        return os.path.join(self.get_dirpath(), "case.py")
 
     def delete_output(self):
         dirpath = self.get_dirpath()
@@ -155,20 +163,20 @@ class TestCase(case.Case):
 
         common.create_directory(dirpath)
 
-        common.file_write(f"{dirpath}/case.py", f"""\
+        common.file_write(self.get_filepath(), f"""\
 #!/usr/bin/env python3
 #
-# tests/{self.get_uuid()}/case.py:
+# {self.get_filepath()}:
 # {self.trace}
 
 import json
 import argparse
 
 parser = argparse.ArgumentParser(
-    prog="tests/{self.get_uuid()}/case.py",
-    description="tests/{self.get_uuid()}/case.py: {self.trace}",
+    prog="{self.get_filepath()}",
+    description="{self.get_filepath()}: {self.trace}",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
- 
+
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
 
 ARGS = vars(parser.parse_args())
@@ -220,6 +228,35 @@ print(json.dumps({{**case, **mods}}))
 
         return 1e-12
 
+@dataclasses.dataclass
+class TestCaseBuilder:
+    trace:   str
+    mods:    dict
+    path:    str
+    args:    typing.List[str]
+    ppn:     int
+    rebuild: bool
+
+    def get_uuid(self) -> str:
+        return trace_to_uuid(self.trace)
+
+    def to_case(self) -> TestCase:
+        dictionary = self.mods.copy()
+        if self.path:
+            dictionary.update(input.load(self.path, self.args).params)
+
+            for key, value in dictionary.items():
+                if not isinstance(value, str):
+                    continue
+
+                for path in [value, os.path.join(os.path.dirname(self.path), value)]:
+                    path = os.path.abspath(path)
+                    if os.path.exists(path):
+                        dictionary[key] = path
+                        break
+
+        return TestCase(self.trace, dictionary, self.ppn, self.rebuild)
+
 
 @dataclasses.dataclass
 class CaseGeneratorStack:
@@ -240,7 +277,11 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None) -> TestCase:
+def define_case_f(trace: str, path: str, args: typing.List[str] = None, ppn: int = None, rebuild: bool = None) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, {}, path, args or [], ppn, rebuild)
+
+
+def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, rebuild: bool = None) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -256,4 +297,4 @@ def create_case(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: in
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCase(' -> '.join(traces), mods, ppn)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn, rebuild)
