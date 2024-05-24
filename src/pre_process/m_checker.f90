@@ -110,11 +110,6 @@ contains
                              'exiting ...')
         end if
 
-         if (hyperelasticity .and. (riemann_solver /= 1)) then
-            call s_mpi_abort('hyperelasticity requires riemann_solver = 1 (HLL only)'// &
-                             'exiting ...')
-        end if
-
        if (pre_stress .and. .not. hyperelasticity) then
             call s_mpi_abort('pre_stress requires hyperelasticity'// &
                              'exiting ...')

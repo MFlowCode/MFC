@@ -1051,11 +1051,12 @@ contains
         end do
         !$acc end parallel loop
 
-        ! going through hyperelasticity again due to the btensor calculation
+        ! going through hyperelasticity to calculate btensor
         ! s_calculate_btensor has its own triple nested for loop with openacc
-        print *, 'I got here A1'
         if (hyperelasticity) then 
 #ifdef MFC_SIMULATION
+        print *, 'I got here A1'
+
         call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
         do l = izb, ize

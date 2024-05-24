@@ -290,8 +290,8 @@ contains
         elseif (riemann_solver /= 2 .and. alt_soundspeed) then
             call s_mpi_abort('Unsupported combination of riemann_solver '// &
                              'and alt_soundspeed. Exiting ...')
-        elseif (hypoelasticity .and. (riemann_solver /= 1)) then
-            call s_mpi_abort('hypoelasticity requires riemann_solver = 1'// &
+        elseif ((hypoelasticity .or. hyperelasticity) .and. (riemann_solver /= 1)) then
+            call s_mpi_abort('hypoelasticity and hyperelasticity requires riemann_solver = 1'// &
                              'Exiting ...')
         end if
 
