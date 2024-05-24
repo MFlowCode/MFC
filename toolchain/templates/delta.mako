@@ -16,6 +16,8 @@
 % endif
 % if gpu:
 #SBATCH --gpus-per-node=${tasks_per_node}
+#SBATCH --mem=208G
+#SBATCH --gpu-bind=closest
 % endif
 #SBATCH --output="${name}.out"
 #SBATCH --error="${name}.err"
@@ -34,6 +36,9 @@ cd "${MFC_ROOTDIR}"
 cd - > /dev/null
 echo
 
+# Fixes Delta not being able to find core library file
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-22.11/openmpi-4.1.5-nzb4n4r/lib/
+
 % for target in targets:
     ${helpers.run_prologue(target)}
 
@@ -43,7 +48,7 @@ echo
         (set -x; ${profiler}    \
             mpirun -np ${nodes*tasks_per_node}                 \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                   "${target.get_install_binpath(case)}"
+                   "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}

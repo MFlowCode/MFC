@@ -42,7 +42,7 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
                       --gpu_per_rs   ${1 if gpu else 0}           \
                       --tasks_per_rs 1                            \
                       ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                      "${target.get_install_binpath(case)}"
+                      "${target.get_install_binpath(case)}")
         elif [ "$binary" == "srun" ]; then
             (set -x; {profiler}  \
                 srun --ntasks-per-node ${tasks_per_node}         \
