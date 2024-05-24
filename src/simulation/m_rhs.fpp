@@ -745,8 +745,8 @@ contains
              call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf)
           end if
         call nvtxEndRange
-
         print *, 'I got here 3 !'
+        STOP
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)

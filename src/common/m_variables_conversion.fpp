@@ -1468,10 +1468,11 @@ contains
         integer :: j, k, l
         !TODO FIX THE TRIPLE LOOPING INDEX HERE!
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
+        do l = izb, ize
+           do k = iyb, iye
+               do j = ixb, ixe
+                call s_compute_gradient_xi_acc(q_prim_vf, ixb, ixe, iyb, &
+                iye, izb, ize, j, k, l, tensora, tensorb)
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D
