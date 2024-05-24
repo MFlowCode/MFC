@@ -319,9 +319,9 @@ contains
     end subroutine s_get_capilary
 
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                             norm_dir)
+                                                            norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end),intent(IN) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
@@ -353,8 +353,8 @@ contains
         !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
-           do i = iv%beg, iv%end
+            !$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -366,7 +366,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -379,7 +379,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end

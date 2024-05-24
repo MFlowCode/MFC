@@ -821,7 +821,7 @@ contains
 
             if (sigma == dflt_real) then
                 ! Reconstruct densitiess
-                iv%beg = 1; iv%end =sys_size
+                iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -852,7 +852,7 @@ contains
                 !print*, "qR_rsx_vf(:,:,0,E_idx)"
                 !print*, qR_rsx_vf(:,:,0,E_idx)
 
-                iv%beg = E_idx + 1; iv%end =sys_size
+                iv%beg = E_idx + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -860,7 +860,6 @@ contains
                     id)
                 call nvtxEndRange
             end if
-
 
             ! Reconstruct viscous derivatives for viscosity
             if (weno_Re_flux) then
@@ -1014,8 +1013,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size;
-            if (p > 0) iz%beg = -buff_size;
+            if (n > 0) iy%beg = -buff_size; 
+            if (p > 0) iz%beg = -buff_size; 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 
@@ -2144,7 +2143,7 @@ contains
     end subroutine s_reconstruct_cell_boundary_values ! --------------------
 
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                             norm_dir)
+                                                              norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
@@ -2177,20 +2176,20 @@ contains
         !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            end do
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-                !$acc end parallel loop
+            end do
+            !$acc end parallel loop
         else if (recon_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -2203,7 +2202,7 @@ contains
             end do
             !$acc end parallel loop
         else if (recon_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
+            !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
