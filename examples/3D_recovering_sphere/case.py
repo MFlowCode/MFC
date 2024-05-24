@@ -45,9 +45,9 @@ data = {
         'p'                 : Nz,
         'cyl_coord'        : 'F',
         'dt'                : mydt,
-        't_step_start'      : 0,
-        't_step_stop'       : 10,
-        't_step_save'       : 10,
+        't_step_start'      : 400000,
+        't_step_stop'       : 1000000,
+        't_step_save'       : 2000,
         #'t_step_stop'       : 100,
         #'t_step_save'       : 100,
     # =======================================
@@ -82,7 +82,8 @@ data = {
     # Database Structure Parameters =========
         'format'            : 1,
         'precision'         : 2,
-        'prim_vars_wrt'     : 'T',
+        'alpha_wrt(1)'      : 'T',
+        # 'prim_vars_wrt'     : 'T',
         'cf_wrt'            : 'T',
         'parallel_io'       : 'T',
     # =======================================

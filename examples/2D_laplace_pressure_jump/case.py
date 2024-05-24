@@ -27,7 +27,7 @@ mydt = 5e-6
 #Configuration case dictionary
 data = {
     # Logistics =============================
-        #'case_dir'          : '\'.\'', 
+        #'case_dir'          : '\'.\'',
         'run_time_info'     : 'T',
     # =======================================
 
@@ -58,9 +58,9 @@ data = {
         #'recon_type'        : 1,
         #'muscl_order'       : 2,
         #'muscl_lim'         : 2,
-        'weno_order'        : 5,  
+        'weno_order'        : 5,
         'avg_state'         : 2,
-        'weno_eps'          : 1e-16, 
+        'weno_eps'          : 1e-16,
         'mapped_weno'       : 'T',
         'null_weights'      : 'F',
         'mp_weno'           : 'T',

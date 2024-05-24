@@ -26,7 +26,6 @@ module m_surface_tension
     private; public :: s_initialize_surface_tension_module, &
  s_compute_capilary_source_flux, &
  s_get_capilary, &
- s_reconstruct_cell_boundary_values_first_order, &
  s_finalize_surface_tension_module
 
 #ifdef CRAY_ACC_WAR
@@ -314,76 +313,79 @@ contains
 
         ! reconstruct gradient components at cell boundaries
         do i = 1, num_dims
-            call s_reconstruct_cell_boundary_values_first_order(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
+            call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
 
     end subroutine s_get_capilary
 
-    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                           norm_dir)
+    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+                                                             norm_dir)
 
-        type(scalar_field), dimension(1:), intent(IN) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end),intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
+
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
+            recon_dir = 1; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
+            recon_dir = 2; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         else
             is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
+            recon_dir = 3; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         end if
 
-        if (weno_dir == 1) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = 1, ubound(v_vf, 1)
+        !$acc update device(is1, is2, is3, iv)
+
+        if (recon_dir == 1) then
+!$acc parallel loop collapse(4) default(present)
+           do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            vl_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            vr_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
             end do
             !$acc end parallel loop
-        else if (weno_dir == 2) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = 1, ubound(v_vf, 1)
+        else if (recon_dir == 2) then
+!$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            vl_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                            vr_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
                         end do
                     end do
                 end do
             end do
             !$acc end parallel loop
-        else if (weno_dir == 3) then
-            !$acc parallel loop collapse(4) default(present)
-            do i = 1, ubound(v_vf, 1)
+        else if (recon_dir == 3) then
+!$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            vl_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                            vr_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
                         end do
                     end do
                 end do
@@ -391,7 +393,7 @@ contains
             !$acc end parallel loop
         end if
 
-    end subroutine s_reconstruct_cell_boundary_values_first_order
+    end subroutine s_reconstruct_cell_boundary_values_capillary
 
     subroutine s_finalize_surface_tension_module()
 
