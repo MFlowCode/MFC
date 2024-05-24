@@ -354,7 +354,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
-| `adap_dt`              | Loginal | Strang splitting scheme with adaptive time stepping |
+| `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
 | `weno_eps`	           | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO with mapping of nonlinear weights |

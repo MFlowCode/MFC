@@ -1,4 +1,4 @@
-import re, json, math, copy, dataclasses
+import re, json, math, copy, dataclasses, jsonschema
 
 from . import common
 from . import build
@@ -42,6 +42,8 @@ class Case:
         ignored = []
 
         # Create Fortran-style input file content string
+        # (also typecheck)
+        param_schema = case_dicts.get_or_construct_schema()
         dict_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS:
