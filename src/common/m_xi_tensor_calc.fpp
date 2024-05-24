@@ -19,6 +19,14 @@ module m_xi_tensor_calc
 
     contains
 
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
     subroutine s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), dimension(tensor_size), intent(INOUT) :: tensora, tensorb 
@@ -26,7 +34,6 @@ module m_xi_tensor_calc
 
         real(kind(0d0)) :: determinant
         integer :: i
-        
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
@@ -477,6 +484,14 @@ module m_xi_tensor_calc
 
     end subroutine s_compute_gradient_xi
 
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
     subroutine s_compute_gradient_xi_acc(q_prim_vf, ixb, ixe, iyb, iye, & !---------
         izb, ize, j, k, l, tensora, tensorb)
         !$acc routine seq
@@ -902,12 +917,6 @@ module m_xi_tensor_calc
                             - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
-        ! error checking
-        !if (determinant == 0) then
-        !    print *, 'determinant :: ', determinant
-        !    print *, 'ERROR: Determinant was zero'
-            !stop
-        !end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
     ! tensorb is the adjoint, tensora becomes the inverse
@@ -940,17 +949,25 @@ module m_xi_tensor_calc
 
     end subroutine s_compute_gradient_xi_acc
 
-    ! neo-Hookean only at this time, will need to be changed later
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
+        !! neo-Hookean only at this time, will need to be changed later
     function f_elastic_energy(btensor, j, k, l)
+#ifdef MFC_SIMULATION
         !$acc routine seq
+#endif
         type(scalar_field), dimension(b_size), intent(IN) :: btensor
         integer, intent(IN) :: j, k, l
         real(kind(0d0)) :: invariant1, f_elastic_energy
 
         f_elastic_energy = 0d0
-
         invariant1 = btensor(1)%sf(j, k, l)
-
         if (num_dims == 2) then
             invariant1 = invariant1 + btensor(3)%sf(j, k, l)
         elseif (num_dims == 3) then

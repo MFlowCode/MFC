@@ -311,6 +311,7 @@ contains
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
         real(kind(0d0)) :: G_L, G_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
+        real(kind(0d0)), dimension(3) :: xi_field_L, xi_field_R
 
         real(kind(0d0)) :: rho_avg
         real(kind(0d0)), dimension(num_dims) :: vel_avg
@@ -473,7 +474,7 @@ contains
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
 
-                            if (hypoelasticity .or. hyperelasticity) then
+                            if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
                                     tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
@@ -502,6 +503,39 @@ contains
                                         end if
                                     end if
                                 end do
+                            end if
+
+                            if (hyperelasticity) then
+                                G_L = 0d0 
+                                G_R = 0d0
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    G_L = G_L + alpha_L(i)*Gs(i)
+                                    G_R = G_R + alpha_R(i)*Gs(i)
+                                end do
+
+                                !$acc loop seq
+                                do i = 1, strxe - strxb + 1
+                                    tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                end do
+
+                                !$acc loop seq
+                                do i = 1, xiend - xibeg + 1
+                                    xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
+                                    xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                end do
+
+                                !$acc loop seq
+                                do i = 1, strxe - strxb + 1
+                                    ! Elastic contribution to energy if G large enough
+                                    ! TODO MRJ ADD THE ELASTIC ENERGY
+                                    if ((G_L > 1d0) .and. (G_R > 1d0)) then
+                                        E_L = E_L !+ 
+                                        E_R = E_R !+ 
+                                    end if
+                                end do
+
                             end if
 
                             @:compute_average_state()
@@ -713,6 +747,19 @@ contains
                                      - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
                                     /(s_M - s_P)
                             end do
+
+                            ! Xi field
+                            if (hyperelasticity) then 
+                                !$acc loop seq
+                                do i = 1, xiend - xibeg + 1
+                                  flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                                    (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
+                                     - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
+                                     + s_M*s_P*(rho_L*xi_field_L(i) &
+                                                - rho_R*xi_field_R(i))) &
+                                    /(s_M - s_P)
+                                end do
+                            end if 
 
                             ! Div(U)?
                             !$acc loop seq

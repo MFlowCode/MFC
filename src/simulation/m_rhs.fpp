@@ -699,11 +699,6 @@ contains
             end do
         end do
 
-        print *, 'A qconsvf :: ',q_cons_vf(xibeg)%sf(1,1,1)
-        print *, 'B qconsvf :: ',q_cons_vf(xibeg)%sf(10,10,10)
-        print *, 'C qconsvf :: ',q_cons_vf(xibeg)%sf(20,20,20)
-        print *, 'D qconsvf :: ',q_cons_vf(xibeg)%sf(30,30,30)
-
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -742,11 +737,11 @@ contains
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
           if ( hyperelasticity ) then
-             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf)
+             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
           end if
         call nvtxEndRange
+
         print *, 'I got here 3 !'
-        STOP
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)

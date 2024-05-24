@@ -1466,7 +1466,7 @@ contains
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
         integer :: j, k, l
-        !TODO FIX THE TRIPLE LOOPING INDEX HERE!
+
         !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
         do l = izb, ize
            do k = iyb, iye
@@ -1491,7 +1491,7 @@ contains
            end do
         end do
         !$acc end parallel loop
-        print *, 'I got to finish the parallel loop'
+
     end subroutine s_calculate_btensor_acc
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
