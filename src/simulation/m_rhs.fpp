@@ -723,7 +723,8 @@ contains
             end do
         end if
 
-        print *, 'I got here 1 !'
+        !if(proc_rank == 0) print *, 'I got here 1 !'
+
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -733,19 +734,21 @@ contains
             q_btensor%vf)
         call nvtxEndRange
 
-        print *, 'I got here 2 !'
+        if(proc_rank == 0) print *, 'I got here 2 !'
 
-        call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-          if ( hyperelasticity ) then
-             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-          end if
-        call nvtxEndRange
+        !call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
+        !  if ( hyperelasticity ) then
+        !     !call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
+        !  end if
+        !call nvtxEndRange
 
-        print *, 'I got here 3 !'
+        if(proc_rank == 0) print *, 'I got here 3.1 !'
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
+
+        if(proc_rank == 0) print *, 'I got here 3.2 !'
 
         if (t_step == t_step_stop) return
         ! ==================================================================
@@ -866,9 +869,10 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
+            if(proc_rank == 0) print *, 'I got here A4.0 !'
 
             ! Computing Riemann Solver Flux and Source Flux =================
-
+            call nvtxStartRange("RHS_riemann_solver")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -886,10 +890,9 @@ contains
                                   id, ix, iy, iz)
             call nvtxEndRange
 
-            ! ===============================================================
+            if(proc_rank == 0) print *, 'I got here A4.1 !'
 
-            ! call nvtxStartRange("RHS_Flux_Add")
-            ! call nvtxEndRange
+            ! ===============================================================
 
             ! Additional physics and source terms ==============================
 
@@ -909,14 +912,7 @@ contains
                                                                rhs_vf)
             call nvtxEndRange
 
-            ! RHS additions for hyperelasticity
-            call nvtxStartRange("RHS_Hyperelasticity")
-            ! use the calculated Btensor and compute the Cauchy stress tensor in common
-            !if (hyperelasticity) call s_compute_hyperelastic_rhs(id, &
-            !                                                   q_prim_qp%vf, &
-            !                                                   
-            !                                                   rhs_vf)
-            call nvtxEndRange
+            if(proc_rank == 0) print *, 'I got here A4.3 !'
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_viscous")
@@ -951,6 +947,8 @@ contains
             ! END: Additional physics and source terms =========================
 
         end do
+
+        if(proc_rank == 0) print *, 'I got here A4.4 !'
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -1011,6 +1009,7 @@ contains
         end if
 
         ! ==================================================================
+        if(proc_rank == 0) print *, 'I got here A4.5 !'
 
     end subroutine s_compute_rhs ! -----------------------------------------
 

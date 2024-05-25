@@ -932,7 +932,7 @@ contains
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (hypoelasticity .or. hyperelasticity) then
+                        if (hypoelasticity) then ! .or. hyperelasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                                                             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                         else if (bubbles) then
@@ -944,7 +944,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity .or. hyperelasticity) then
+                        if (hypoelasticity) then !.or. hyperelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1034,12 +1034,12 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity ) then
-                      !$acc loop seq
-                      do i = xibeg, xiend
-                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
-                      end do
-                    end if
+                    !if ( hyperelasticity ) then
+                    !  !$acc loop seq
+                    !  do i = xibeg, xiend
+                    !     qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
+                    !  end do
+                    !end if
 
                     !$acc loop seq
                     do i = advxb, advxe
@@ -1053,34 +1053,37 @@ contains
 
         ! going through hyperelasticity to calculate btensor
         ! s_calculate_btensor has its own triple nested for loop with openacc
-        if (hyperelasticity) then 
 #ifdef MFC_SIMULATION
-        print *, 'I got here A1'
+        if (hyperelasticity) then 
+           print *, 'I got here A1'
 
         call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-        do l = izb, ize
-           do k = iyb, iye
-               do j = ixb, ixe
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    end do
+
+        !!!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
+        !do l = izb, ize
+        !    do k = iyb, iye
+        !        do j = ixb, ixe
+        !            !$acc loop seq
+        !            do i = 1, num_fluids
+        !                alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+        !                alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+        !            end do
                     ! If in simulation, use acc mixture subroutines
-                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                 alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                                 G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-               end do
-           end do
-        end do
-        !$acc end parallel loop
+                    !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                    !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                    !             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+        !       end do
+        !   end do
+        !end do
+        !!!$acc end parallel loop
+        end if
 #else
-        call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
-        do l = izb, ize
-           do k = iyb, iye
-               do j = ixb, ixe
+        if (hyperelasticity) then 
+          call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+          do l = izb, ize
+             do k = iyb, iye
+                 do j = ixb, ixe
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
@@ -1090,11 +1093,11 @@ contains
                              rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
                            G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-               end do
-           end do
-        end do
+                 end do
+             end do
+          end do
+        end if 
 #endif
-        end if
         print *, 'I got here A2'
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
@@ -1425,7 +1428,7 @@ contains
     subroutine s_calculate_btensor(q_prim_vf, btensor)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        type(scalar_field), dimension(b_size), intent(INOUT) :: btensor
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
 
         integer :: j, k, l
@@ -1473,6 +1476,17 @@ contains
                do j = ixb, ixe
                 call s_compute_gradient_xi_acc(q_prim_vf, ixb, ixe, iyb, &
                 iye, izb, ize, j, k, l, tensora, tensorb)
+
+!        if(j == ixb) then
+!           ! dxix/dx
+!           tensorb(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+!                      + 48d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
+!                      - 36d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &
+!                      + 16d0*q_prim_vf(xibeg)%sf(j + 3, k, l) &
+!                      -  3d0*q_prim_vf(xibeg)%sf(j + 4, k, l) ) &
+!                     /(12d0*(x_cb(j+1) - x_cb(j)))
+!        end if
+
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D

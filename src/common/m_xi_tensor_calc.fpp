@@ -500,9 +500,9 @@ module m_xi_tensor_calc
         integer, intent(IN) :: ixb, ixe, iyb, iye, izb, ize
         integer, intent(IN) :: j, k, l
 
-        real(kind(0d0)) :: determinant
+        !real(kind(0d0)) :: determinant
         integer :: i
-        
+   
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
@@ -598,7 +598,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xibeg)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xibeg)%sf(j, k + 3, l) &
                       -  3d0*q_prim_vf(xibeg)%sf(j, k + 4, l) ) &
-                     /(12d0*(y_cb(k+1) - y_cb(k)))
+                     /(12d0*(y_cb(k + 1) - y_cb(k)))
           else if (k == iyb + 1) then
              ! dxix / dy
              tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
@@ -606,7 +606,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xibeg)%sf(j, k + 2, l) &
                       +      q_prim_vf(xibeg)%sf(j, k + 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye - 1) then
              ! dxix / dy
              tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
@@ -614,7 +614,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k - 2, l) &
                       -      q_prim_vf(xibeg)%sf(j, k - 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye) then
              ! dxix / dy
              tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
@@ -622,14 +622,14 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xibeg)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k - 3, l) &
                       +  3d0*q_prim_vf(xibeg)%sf(j, k - 4, l) ) &
-                     /(12d0*(y_cb(j) - y_cb(j-1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else
              ! dxix / dy
              tensora(3) = ( q_prim_vf(xibeg)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       -     q_prim_vf(xibeg)%sf(j, k + 2, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           end if  
 
           if(k == iyb) then
@@ -639,7 +639,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xibeg+1)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j, k + 3, l) &
                       -  3d0*q_prim_vf(xibeg+1)%sf(j, k + 4, l) ) &
-                     /(12d0*(y_cb(k+1) - y_cb(k)))
+                     /(12d0*(y_cb(k + 1) - y_cb(k)))
           else if (k == iyb + 1) then
              ! dxiy / dy
              tensora(4) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
@@ -647,7 +647,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j, k + 2, l) &
                       +      q_prim_vf(xibeg+1)%sf(j, k + 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye - 1) then
              ! dxiy / dy
              tensora(4) = (3d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
@@ -655,7 +655,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
                       -      q_prim_vf(xibeg+1)%sf(j, k - 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye) then
              ! dxiy / dy
              tensora(4) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
@@ -663,23 +663,25 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k - 3, l) &
                       +  3d0*q_prim_vf(xibeg+1)%sf(j, k - 4, l) ) &
-                     /(12d0*(y_cb(j) - y_cb(j-1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else
              ! dxiy / dy
              tensora(4) = ( q_prim_vf(xibeg+1)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k + 1, l) &
                       -     q_prim_vf(xibeg+1)%sf(j, k + 2, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           end if  
 
         end if
 
+        tensorb(4) = tensora(4)
+        tensorb(3) = tensora(3)
         ! 3D
         if (num_dims > 2) then
             ! using results from upper if statement to map form 2x2 to 3x3 tensor
-            tensora(5) = tensora(4)
-            tensora(4) = tensora(3)
+            tensora(5) = tensorb(4)
+            tensora(4) = tensorb(3)
 
           if(l == izb) then
              ! dxix / dz
@@ -688,7 +690,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg)%sf(j, k , l + 3) &
                       -  3d0*q_prim_vf(xibeg)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(k+1) - z_cb(k)))
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
           else if (l == izb + 1) then
              ! dxix / dz
              tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
@@ -696,7 +698,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
                       +      q_prim_vf(xibeg)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize - 1) then
              ! dxix / dz
              tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
@@ -704,7 +706,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       -      q_prim_vf(xibeg)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize) then
              ! dxix / dz
              tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
@@ -712,14 +714,14 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
                       +  3d0*q_prim_vf(xibeg)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(j) - z_cb(j-1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else
              ! dxix / dz
              tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
 
           if(l == izb) then
@@ -729,7 +731,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j, k , l + 3) &
                       -  3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(k+1) - z_cb(k)))
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
           else if (l == izb + 1) then
              ! dxiy / dz
              tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
@@ -737,7 +739,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
                       +      q_prim_vf(xibeg+1)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize - 1) then
              ! dxiy / dz
              tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
@@ -745,7 +747,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       -      q_prim_vf(xibeg+1)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize) then
              ! dxiy / dz
              tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
@@ -753,14 +755,14 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
                       +  3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(j) - z_cb(j-1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else
              ! dxiy / dz
              tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
 
           if(j == ixb) then
@@ -811,7 +813,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k + 3, l) &
                       -  3d0*q_prim_vf(xiend)%sf(j, k + 4, l) ) &
-                     /(12d0*(y_cb(k+1) - y_cb(k)))
+                     /(12d0*(y_cb(k + 1) - y_cb(k)))
           else if (k == iyb + 1) then
              ! dxiz / dy
              tensora(8) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
@@ -819,7 +821,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       +      q_prim_vf(xiend)%sf(j, k + 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye - 1) then
              ! dxiz / dy
              tensora(8) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
@@ -827,7 +829,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       -      q_prim_vf(xiend)%sf(j, k - 3, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == iye) then
              ! dxiz / dy
              tensora(8) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
@@ -835,14 +837,14 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k - 3, l) &
                       +  3d0*q_prim_vf(xiend)%sf(j, k - 4, l) ) &
-                     /(12d0*(y_cb(j) - y_cb(j-1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           else
              ! dxiz / dy
              tensora(8) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -     q_prim_vf(xiend)%sf(j, k + 2, l)) &
-                     /(12d0*(y_cb(j) - y_cb(j - 1)))
+                     /(12d0*(y_cb(k) - y_cb(k - 1)))
           end if  
 
           if(l == izb) then
@@ -852,7 +854,7 @@ module m_xi_tensor_calc
                       - 36d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k , l + 3) &
                       -  3d0*q_prim_vf(xiend)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(k+1) - z_cb(k)))
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
           else if (l == izb + 1) then
              ! dxiz / dz
              tensora(9) = (-3d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
@@ -860,7 +862,7 @@ module m_xi_tensor_calc
                       + 18d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
                       +      q_prim_vf(xiend)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize - 1) then
              ! dxiz / dz
              tensora(9) = (3d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
@@ -868,7 +870,7 @@ module m_xi_tensor_calc
                       - 18d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
                       -      q_prim_vf(xiend)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ize) then
              ! dxiz / dz
              tensora(9) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
@@ -876,14 +878,14 @@ module m_xi_tensor_calc
                       + 36d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k , l - 3) &
                       +  3d0*q_prim_vf(xiend)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(j) - z_cb(j-1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           else
              ! dxiz / dz
              tensora(9) = ( q_prim_vf(xiend)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
                       -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(j) - z_cb(j - 1)))
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
         end if
 
@@ -909,11 +911,11 @@ module m_xi_tensor_calc
 
     ! STEP 2b: computing the determinant of the grad_xi tensor 
         if (num_dims == 1) then
-            determinant = tensora(1)
+            tensorb(tensor_size) = tensora(1)
         elseif (num_dims == 2) then
-            determinant = tensora(1)*tensora(4) - tensora(2)*tensora(3)
+            tensorb(tensor_size) = tensora(1)*tensora(4) - tensora(2)*tensora(3)
         else
-            determinant = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
+            tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
                             - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
@@ -923,7 +925,7 @@ module m_xi_tensor_calc
 
         !$acc loop seq
         do i = 1, tensor_size - 1
-           tensora(i) = tensorb(i)/determinant
+           tensora(i) = tensorb(i)/tensorb(tensor_size)
         end do 
 
     ! STEP 3: computing F tranpose F
@@ -945,7 +947,7 @@ module m_xi_tensor_calc
             tensorb(8) = tensorb(4)
         end if
     ! STEP 4: store the determinant of F in the last entry of the tensor
-        tensorb(tensor_size) = determinant
+        !tensorb(tensor_size) = determinant
 
     end subroutine s_compute_gradient_xi_acc
 
