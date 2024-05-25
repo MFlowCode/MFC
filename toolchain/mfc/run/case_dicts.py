@@ -124,7 +124,7 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%ve1')
     SIMULATION.append(f'bc_{cmp}%ve2')
     SIMULATION.append(f'bc_{cmp}%ve3')
-    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+    for prepend in ["domain%beg", "domain%end"]:
         SIMULATION.append(f"{cmp}_{prepend}")
 
 for wrt_id in range(1,10+1):

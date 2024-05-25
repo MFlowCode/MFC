@@ -861,10 +861,10 @@ contains
             time_final = 0d0
             if (num_procs == 1) then
                 time_final = time_avg
-                print *, "Final Time", time_final
+                print *, "Elapsed Time", time_final
             else
                 time_final = maxval(proc_time)
-                print *, "Final Time", time_final
+                print *, "Elapsed Time", time_final
             end if
             inquire (FILE='pre_time_data.dat', EXIST=file_exists)
             if (file_exists) then

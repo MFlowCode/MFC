@@ -694,12 +694,15 @@ contains
 
     end subroutine s_initialize_rhs_module ! -------------------------------
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg) ! -------
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
+        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(kind(0d0)) :: t_start, t_finish
+        real(kind(0d0)) :: gp_sum
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
         integer, intent(IN) :: t_step
 
@@ -734,7 +737,7 @@ contains
         ! ==================================================================
 
         !$acc update device(ix, iy, iz)
-
+        call cpu_time(t_start)
         ! Association/Population of Working Variables ======================
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -1028,9 +1031,13 @@ contains
                     end do
                 end do
             end do
-
         end if
-
+        call cpu_time(t_finish)
+        if (t_step >= 4) then
+            time_avg = (abs(t_finish - t_start)/((ix%end - ix%beg)*(iy%end - iy%beg)*(iz%end - iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
         ! ==================================================================
 
     end subroutine s_compute_rhs ! -----------------------------------------
