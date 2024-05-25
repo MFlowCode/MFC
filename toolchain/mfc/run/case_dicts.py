@@ -221,7 +221,7 @@ for cmp in ["x", "y", "z"]:
     set_type(f'bc_{cmp}%ve2', ParamType.REAL)
     set_type(f'bc_{cmp}%ve3', ParamType.REAL)
 
-    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+    for prepend in ["domain%beg", "domain%end"]:
         SIMULATION.append(f"{cmp}_{prepend}")
         set_type(f"{cmp}_{prepend}", ParamType.REAL)
 
