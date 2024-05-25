@@ -41,9 +41,10 @@ class Case:
 
         ignored = []
 
+        # Typecheck parameters -- may need to filter for "not ic_analytical"
+        jsonschema.validate(self.params, case_dicts.SCHEMA)
+
         # Create Fortran-style input file content string
-        # (also typecheck)
-        param_schema = case_dicts.get_or_construct_schema()
         dict_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS:

@@ -9,30 +9,34 @@ class ParamType(Enum):
     STR = 3
 
 # Currently doing this manually -- the first automated solution I came up with involved grep and awk, but it seemed quite brittle.
-INTEGERS = {"m", "n", "p", 'thermal', 't_step_old', 't_step_start', 't_step_stop',
-            't_step_save', 'num_patches', 'model_eqns', 'num_fluids', "weno_order",
-            "precision", "relax_model", 'perturb_flow_fluid', 'perturb_sph_fluid',
-            'dist_type', 'R0_type', 'num_ibs', 't_step_print', 'time_stepper',
-            'riemann_solver', 'wave_speeds', 'avg_state', 'fd_order', 'num_probes',
-            'bubble_model', 'num_mono', 'R0_type', 'num_integrals', 'format', 
-            'flux_lim',
-            }
-REALS = {"pref", "Web", "poly_sigma", 'x_domain%beg', 'x_domain%end', 'y_domain%beg',
-         'y_domain%end', 'dt', "nb", "rhoref", "R0ref", "Re_inv", "Ca",
-         'perturb_flow_mag', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-         'pi_fac', 'weno_eps', 'schlieren_alpha', 
-         }
-LOGICALS = {"hypoelasticity", "cyl_coord", "parallel_io", "run_time_info", "bubbles",
-            "polytropic", "polydisperse", "file_per_process", "relax", "mpp_lim", 
-            "adv_alphan",  "adv_n", 'old_grid', 'old_ic', 'instability_wave',
-            'perturb_flow', 'perturb_sph', 'qbmm', 'ib', 'mapped_weno', 'mp_weno',
-            'weno_avg', 'weno_Re_flux', 'prim_vars_wrt', 'alt_soundspeed', 
-            'null_weights', 'probe_wrt', 'Monopole', 'integral_wrt', 'cu_mpi', 
-            'adap_dt', 'schlieren_wrt', 'alpha_rho_wrt', 'rho_wrt', 'mom_wrt', 
-            'vel_wrt', 'flux_wrt', 'E_wrt', 'pres_wrt', 'alpha_wrt', 'kappa_wrt',
-            'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 
-            'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt', 'qm_wrt', 'chem_wrt'
-            }
+INTEGERS = {
+    "m", "n", "p", 'thermal', 't_step_old', 't_step_start', 't_step_stop',
+    't_step_save', 'num_patches', 'model_eqns', 'num_fluids', "weno_order",
+    "precision", "relax_model", 'perturb_flow_fluid', 'perturb_sph_fluid',
+    'dist_type', 'R0_type', 'num_ibs', 't_step_print', 'time_stepper',
+    'riemann_solver', 'wave_speeds', 'avg_state', 'fd_order', 'num_probes',
+    'bubble_model', 'num_mono', 'R0_type', 'num_integrals', 'format', 
+    'flux_lim',
+}
+REALS = {
+    "pref", "Web", "poly_sigma", 'x_domain%beg', 'x_domain%end', 'y_domain%beg',
+    'y_domain%end', 'dt', "nb", "rhoref", "R0ref", "Re_inv", "Ca",
+    'perturb_flow_mag', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
+    'pi_fac', 'weno_eps', 'schlieren_alpha', 'fluid_rho',
+}
+LOGICALS = {
+    "hypoelasticity", "cyl_coord", "parallel_io", "run_time_info", "bubbles",
+    "polytropic", "polydisperse", "file_per_process", "relax", "mpp_lim", 
+    "adv_alphan",  "adv_n", 'old_grid', 'old_ic', 'instability_wave',
+    'perturb_flow', 'perturb_sph', 'qbmm', 'ib', 'mapped_weno', 'mp_weno',
+    'weno_avg', 'weno_Re_flux', 'prim_vars_wrt', 'alt_soundspeed', 
+    'null_weights', 'probe_wrt', 'Monopole', 'integral_wrt', 'cu_mpi', 
+    'adap_dt', 'schlieren_wrt', 'alpha_rho_wrt', 'rho_wrt', 'mom_wrt', 
+    'vel_wrt', 'flux_wrt', 'E_wrt', 'pres_wrt', 'alpha_wrt', 'kappa_wrt',
+    'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 
+    'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt', 'qm_wrt',
+    'vel_profile', 'mixture_err',
+}
 STRINGS = {"case_dir"}
 
 
@@ -67,12 +71,12 @@ PRE_PROCESS = COMMON + [
 ]
 
 for ib_id in range(1, 10+1):
-    for attribute, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
+    for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL), 
                           ("t", ParamType.REAL), ("m", ParamType.REAL)]:
-        PRE_PROCESS.append(f"patch_ib({ib_id})%{attribute}")
-        set_type(f"patch_ib({ib_id})%{attribute}", ty)
+        PRE_PROCESS.append(f"patch_ib({ib_id})%{real_attr}")
+        set_type(f"patch_ib({ib_id})%{real_attr}", ty)
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -99,16 +103,16 @@ for f_id in range(1, 10+1):
     PRE_PROCESS.append(f'fluid_rho({f_id})')
     set_type(f'fluid_rho({f_id})', ParamType.REAL)
 
-    for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
+    for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
                       "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
-        PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
-        set_type(f"fluid_pp({f_id})%{attribute}", ParamType.REAL)
+        PRE_PROCESS.append(f"fluid_pp({f_id})%{real_attr}")
+        set_type(f"fluid_pp({f_id})%{real_attr}", ParamType.REAL)
 
 for p_id in range(1, 10+1):
-    for attribute, ty in [("geometry", ParamType.INT), ("smoothen", ParamType.LOG),
+    for real_attr, ty in [("geometry", ParamType.INT), ("smoothen", ParamType.LOG),
                       ("smooth_patch_id", ParamType.INT), ("hcid", ParamType.INT)]:
-        PRE_PROCESS.append(f"patch_icpp({p_id})%{attribute}")
-        set_type(f"patch_icpp({p_id})%{attribute}", ty)
+        PRE_PROCESS.append(f"patch_icpp({p_id})%{real_attr}")
+        set_type(f"patch_icpp({p_id})%{real_attr}", ty)
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho", 
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
@@ -123,15 +127,15 @@ for p_id in range(1, 10+1):
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%filepath")
     set_type(f"patch_icpp({p_id})%model%filepath", ParamType.STR)
 
-    for attribute in ["translate", "scale", "rotate"]:
+    for real_attr in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
-            PRE_PROCESS.append(f"patch_icpp({p_id})%model%{attribute}({j})")
-            set_type(f"patch_icpp({p_id})%model%{attribute}({j})", ParamType.REAL)
+            PRE_PROCESS.append(f"patch_icpp({p_id})%model%{real_attr}({j})")
+            set_type(f"patch_icpp({p_id})%model%{real_attr}({j})", ParamType.REAL)
 
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%spc")
     set_type(f"patch_icpp({p_id})%model%spc", ParamType.INT)
     PRE_PROCESS.append(f"patch_icpp({p_id})%model%threshold")
-    set_type(f"patch_icpp({p_id})%model%threhold", ParamType.REAL)
+    set_type(f"patch_icpp({p_id})%model%threshold", ParamType.REAL)
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -187,57 +191,84 @@ SIMULATION = COMMON + [
 #     SIMULATION.append(f'chem_params%{var}')
 
 for ib_id in range(1, 10+1):
-    for attribute in ["geometry", "radius", "theta","slip", "c", "m", "t", "p"]:
-        SIMULATION.append(f"patch_ib({ib_id})%{attribute}")
+    for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
+                          ("theta", ParamType.REAL), ("slip", ParamType.LOG),
+                          ("c", ParamType.REAL), ("p", ParamType.REAL), 
+                          ("t", ParamType.REAL), ("m", ParamType.REAL)]:
+        SIMULATION.append(f"patch_ib({ib_id})%{real_attr}")
+        set_type(f"patch_ib({ib_id})%{real_attr}", ty)
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
         SIMULATION.append(f'patch_ib({ib_id})%{cmp}_centroid')
+        set_type(f'patch_ib({ib_id})%{cmp}_centroid', ParamType.REAL)
         SIMULATION.append(f'patch_ib({ib_id})%length_{cmp}')
+        set_type(f'patch_ib({ib_id})%length_{cmp}', ParamType.REAL)
 
 for cmp in ["x", "y", "z"]:
-    SIMULATION.append(f'bc_{cmp}%beg')
-    SIMULATION.append(f'bc_{cmp}%end')
+    SIMULATION.append(f'bc_{cmp}%beg') # Type already set to int
+    SIMULATION.append(f'bc_{cmp}%end') # Type already set to int
     SIMULATION.append(f'bc_{cmp}%vb1')
     SIMULATION.append(f'bc_{cmp}%vb2')
     SIMULATION.append(f'bc_{cmp}%vb3')
     SIMULATION.append(f'bc_{cmp}%ve1')
     SIMULATION.append(f'bc_{cmp}%ve2')
     SIMULATION.append(f'bc_{cmp}%ve3')
+    set_type(f'bc_{cmp}%vb1', ParamType.REAL)
+    set_type(f'bc_{cmp}%vb2', ParamType.REAL)
+    set_type(f'bc_{cmp}%vb3', ParamType.REAL)
+    set_type(f'bc_{cmp}%ve1', ParamType.REAL)
+    set_type(f'bc_{cmp}%ve2', ParamType.REAL)
+    set_type(f'bc_{cmp}%ve3', ParamType.REAL)
+
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
         SIMULATION.append(f"{cmp}_{prepend}")
+        set_type(f"{cmp}_{prepend}", ParamType.REAL)
 
-for wrt_id in range(1,10+1):
-    for cmp in ["x", "y", "z"]:
-        SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
+# NOTE: This is now just "probe_wrt"
+# for wrt_id in range(1,10+1):
+#    for cmp in ["x", "y", "z"]:
+#        SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
+#        set_type(f'probe_wrt({wrt_id})%{cmp}', ParamType.LOG)
 
 for probe_id in range(1,3+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION.append(f'probe({probe_id})%{cmp}')
+        set_type(f'probe({probe_id})%{cmp}', ParamType.REAL)
 
 for f_id in range(1,10+1):
-    for attribute in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
+    for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
                       "mu_v", "k_v", "G", "cv", "qv", "qvp" ]:
-        SIMULATION.append(f"fluid_pp({f_id})%{attribute}")
+        SIMULATION.append(f"fluid_pp({f_id})%{real_attr}")
+        set_type(f"fluid_pp({f_id})%{real_attr}", ParamType.REAL)
 
     for re_id in [1, 2]:
         SIMULATION.append(f"fluid_pp({f_id})%Re({re_id})")
+        set_type(f"fluid_pp({f_id})%Re({re_id})", ParamType.REAL)
 
     for mono_id in range(1,4+1):
-        for attribute in ["mag", "length", "dir", "npulse", "pulse", "support",
-                          "delay", "foc_length", "aperture", "support_width"]:
-            SIMULATION.append(f"Mono({mono_id})%{attribute}")
+        for int_attr in ["pulse", "support"]:
+            SIMULATION.append(f"Mono({mono_id})%{int_attr}")
+            set_type(f"Mono({mono_id})%{int_attr}", ParamType.INT)
+
+        for real_attr in ["mag", "length", "dir", "npulse", "delay", 
+                          "foc_length", "aperture", "support_width"]:
+            SIMULATION.append(f"Mono({mono_id})%{real_attr}")
+            set_type(f"Mono({mono_id})%{real_attr}", ParamType.REAL)
 
         for cmp_id in range(1,3+1):
             SIMULATION.append(f"Mono({mono_id})%loc({cmp_id})")
+            set_type(f"Mono({mono_id})%loc({cmp_id})", ParamType.REAL)
 
     for int_id in range(1,5+1):
         for cmp in ["x", "y", "z"]:
             SIMULATION.append(f"integral({int_id})%{cmp}min")
             SIMULATION.append(f"integral({int_id})%{cmp}max")
+            set_type(f"integral({int_id})%{cmp}min", ParamType.REAL)
+            set_type(f"integral({int_id})%{cmp}max", ParamType.REAL)
 
 
-# Removed: 'fourier_modes%beg', 'fourier_modes%end', 
+# Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt'
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON + [
     't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
@@ -246,34 +277,41 @@ POST_PROCESS = COMMON + [
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt', 'chem_wrt'
+    'qm_wrt'
 ]
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]
 
-    POST_PROCESS.append(f'bc_{cmp}%beg')
-    POST_PROCESS.append(f'bc_{cmp}%end')
+    POST_PROCESS.append(f'bc_{cmp}%beg') # Type already set to int
+    POST_PROCESS.append(f'bc_{cmp}%end') # Type already set to int
 
-    for attribute in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
-        POST_PROCESS.append(f'{attribute}({cmp_id})')
+    for real_attr in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
+        POST_PROCESS.append(f'{real_attr}({cmp_id})')
+        set_type(f'{real_attr}({cmp_id})', ParamType.LOG)
 
-for cmp_id in range(100):
-    POST_PROCESS.append(f'chem_wrt({cmp_id})')
+# NOTE: `chem_wrt` is missing
+# for cmp_id in range(100):
+#     POST_PROCESS.append(f'chem_wrt({cmp_id})')
 
 for fl_id in range(1,10+1):
-    for append in ["schlieren_alpha", "alpha_rho_wrt", "alpha_wrt", "kappa_wrt"]:
+    for append, ty in [("schlieren_alpha", ParamType.REAL), ("alpha_rho_wrt", ParamType.LOG),
+                       ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG)]:
         POST_PROCESS.append(f'{append}({fl_id})')
+        set_type(f'{append}({fl_id})', ty)
 
-    for attribute in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0",
+    for real_attr in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "G", "mul0",
                       "cv", "qv", "qvp" ]:
-        POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
+        POST_PROCESS.append(f"fluid_pp({fl_id})%{real_attr}")
+        set_type(f"fluid_pp({fl_id})%{real_attr}", ParamType.REAL)
 
 ALL = list(set(PRE_PROCESS + SIMULATION + POST_PROCESS))
 
 CASE_OPTIMIZATION = [ "nb", "weno_order", "num_fluids" ]
 
-assert list(INTEGERS | REALS | LOGICALS | STRINGS) == ALL, "Untyped parameter found (or ALL is missing one!)"
+TYPED_SET = INTEGERS | REALS | LOGICALS | STRINGS
+assert TYPED_SET - set(ALL) == set(), "Found parameter without stage (COMMON, PREPROCESS, SIMULATION, POSTPROCESS)"
+assert set(ALL) - TYPED_SET  == set(), "Found untyped parameter!"
 
 _properties = {}
 for param in ALL:
@@ -286,11 +324,12 @@ for param in ALL:
     elif param in STRINGS:
         _properties[param] = {"type": "string"}
     else:
-        print('WARNING: Found parameter without type!')
+        print(f'WARNING: Found parameter {param} without type!')
 
-SCHEMA = {"type": "object",
-           "properties": _properties
-           }
+SCHEMA = {
+    "type": "object",
+    "properties": _properties
+    }
 
 
 def get_input_dict_keys(target_name: str) -> list:
