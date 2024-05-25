@@ -2173,8 +2173,6 @@ contains
 
         end if
 
-        !$acc update device(is1, is2, is3, iv)
-
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)
             do i = iv%beg, iv%end
@@ -2369,7 +2367,7 @@ contains
                 @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
             end do
             @:DEALLOCATE(tau_re_vf(e_idx)%sf)
-            @:DEALLOCATE(tau_re_vf)
+            @:DEALLOCATE_GLOBAL(tau_re_vf)
         end if
 
         s_riemann_solver => null()
