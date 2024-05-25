@@ -15,8 +15,7 @@ INTEGERS = {
     "precision", "relax_model", 'perturb_flow_fluid', 'perturb_sph_fluid',
     'dist_type', 'R0_type', 'num_ibs', 't_step_print', 'time_stepper',
     'riemann_solver', 'wave_speeds', 'avg_state', 'fd_order', 'num_probes',
-    'bubble_model', 'num_mono', 'R0_type', 'num_integrals', 'format', 
-    'flux_lim',
+    'bubble_model', 'num_mono', 'num_integrals', 'format', 'flux_lim',
 }
 REALS = {
     "pref", "Web", "poly_sigma", 'x_domain%beg', 'x_domain%end', 'y_domain%beg',
@@ -33,16 +32,16 @@ LOGICALS = {
     'null_weights', 'probe_wrt', 'Monopole', 'integral_wrt', 'cu_mpi', 
     'adap_dt', 'schlieren_wrt', 'alpha_rho_wrt', 'rho_wrt', 'mom_wrt', 
     'vel_wrt', 'flux_wrt', 'E_wrt', 'pres_wrt', 'alpha_wrt', 'kappa_wrt',
-    'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 
-    'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt', 'qm_wrt',
-    'vel_profile', 'mixture_err',
+    'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt',
+    'cons_vars_wrt', 'c_wrt', 'omega_wrt', 'qm_wrt', 'vel_profile',
+    'mixture_err',
 }
 STRINGS = {"case_dir"}
 
 
-def set_type(param_name: str, ty: ParamType):
-    match ty:
-        case ParamType.INT: 
+def set_type(param_name: str, ty_: ParamType):
+    match ty_:
+        case ParamType.INT:
             INTEGERS.add(param_name)
         case ParamType.REAL:
             REALS.add(param_name)
@@ -73,7 +72,7 @@ PRE_PROCESS = COMMON + [
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
-                          ("c", ParamType.REAL), ("p", ParamType.REAL), 
+                          ("c", ParamType.REAL), ("p", ParamType.REAL),
                           ("t", ParamType.REAL), ("m", ParamType.REAL)]:
         PRE_PROCESS.append(f"patch_ib({ib_id})%{real_attr}")
         set_type(f"patch_ib({ib_id})%{real_attr}", ty)
@@ -114,7 +113,7 @@ for p_id in range(1, 10+1):
         PRE_PROCESS.append(f"patch_icpp({p_id})%{real_attr}")
         set_type(f"patch_icpp({p_id})%{real_attr}", ty)
 
-    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho", 
+    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]: 
         PRE_PROCESS.append(f"patch_icpp({p_id})%{real_attr}")
@@ -193,7 +192,7 @@ SIMULATION = COMMON + [
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
-                          ("c", ParamType.REAL), ("p", ParamType.REAL), 
+                          ("c", ParamType.REAL), ("p", ParamType.REAL),
                           ("t", ParamType.REAL), ("m", ParamType.REAL)]:
         SIMULATION.append(f"patch_ib({ib_id})%{real_attr}")
         set_type(f"patch_ib({ib_id})%{real_attr}", ty)
@@ -251,7 +250,7 @@ for f_id in range(1,10+1):
             SIMULATION.append(f"Mono({mono_id})%{int_attr}")
             set_type(f"Mono({mono_id})%{int_attr}", ParamType.INT)
 
-        for real_attr in ["mag", "length", "dir", "npulse", "delay", 
+        for real_attr in ["mag", "length", "dir", "npulse", "delay",
                           "foc_length", "aperture", "support_width"]:
             SIMULATION.append(f"Mono({mono_id})%{real_attr}")
             set_type(f"Mono({mono_id})%{real_attr}", ParamType.REAL)
@@ -343,4 +342,3 @@ def get_input_dict_keys(target_name: str) -> list:
         return result
 
     return [ x for x in result if x not in CASE_OPTIMIZATION ]
-
