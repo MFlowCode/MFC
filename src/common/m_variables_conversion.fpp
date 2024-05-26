@@ -1515,6 +1515,8 @@ contains
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
 
+        integer :: i !< Generic loop iterators
+
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
 #ifdef MFC_POST_PROCESS
