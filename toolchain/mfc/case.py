@@ -1,4 +1,4 @@
-import re, json, math, copy, dataclasses, jsonschema
+import re, json, math, copy, dataclasses
 
 from . import common
 from . import build
@@ -18,8 +18,6 @@ class Case:
 
     def __init__(self, params: dict) -> None:
         self.params = copy.deepcopy(params)
-        # Typecheck parameters
-        jsonschema.validate(self.params, case_dicts.SCHEMA)
 
     def get_parameters(self) -> dict:
         return self.params
@@ -42,9 +40,6 @@ class Case:
         MASTER_KEYS: list = case_dicts.get_input_dict_keys(target.name)
 
         ignored = []
-
-        # Typecheck parameters -- may need to filter for "not ic_analytical"
-        jsonschema.validate(self.params, case_dicts.SCHEMA)
 
         # Create Fortran-style input file content string
         dict_str = ""

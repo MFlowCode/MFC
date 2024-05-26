@@ -1,9 +1,10 @@
-import os, json, typing, dataclasses
+import os, json, typing, dataclasses, jsonschema, traceback
 
 from ..printer import cons
 from ..        import common, build
 from ..state   import ARGS
 from ..case    import Case
+from ..run     import case_dicts
 
 @dataclasses.dataclass(init=False)
 class MFCInputFile(Case):
@@ -12,6 +13,8 @@ class MFCInputFile(Case):
 
     def __init__(self, filename: str, dirpath: str, params: dict) -> None:
         super().__init__(params)
+        # Typecheck parameters
+        jsonschema.validate(self.params, case_dicts.SCHEMA)
 
         self.filename = filename
         self.dirpath  = dirpath
