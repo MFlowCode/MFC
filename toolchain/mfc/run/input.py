@@ -1,4 +1,4 @@
-import os, json, typing, dataclasses, jsonschema, traceback
+import os, json, typing, dataclasses, jsonschema
 
 from ..printer import cons
 from ..        import common, build
