@@ -18,6 +18,8 @@ class Case:
 
     def __init__(self, params: dict) -> None:
         self.params = copy.deepcopy(params)
+        # Typecheck parameters
+        jsonschema.validate(self.params, case_dicts.SCHEMA)
 
     def get_parameters(self) -> dict:
         return self.params

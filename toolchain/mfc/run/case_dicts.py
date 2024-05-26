@@ -40,15 +40,14 @@ STRINGS = {"case_dir"}
 
 
 def set_type(param_name: str, ty_: ParamType):
-    match ty_:
-        case ParamType.INT:
-            INTEGERS.add(param_name)
-        case ParamType.REAL:
-            REALS.add(param_name)
-        case ParamType.LOG:
-            LOGICALS.add(param_name)
-        case ParamType.STR:
-            STRINGS.add(param_name)
+    if ty_ == ParamType.INT:
+        INTEGERS.add(param_name)
+    elif ty_ == ParamType.REAL:
+        REALS.add(param_name)
+    elif ty_ == ParamType.LOG:
+        LOGICALS.add(param_name)
+    elif ty_ == ParamType.STR:
+        STRINGS.add(param_name)
 
 
 COMMON = [
@@ -328,7 +327,7 @@ for param in ALL:
 SCHEMA = {
     "type": "object",
     "properties": _properties
-    }
+}
 
 
 def get_input_dict_keys(target_name: str) -> list:
