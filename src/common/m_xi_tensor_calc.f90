@@ -926,6 +926,116 @@ f_elastic_energy
 
         end if  
 
+        ! 3D
+          if(l == izb) then
+             ! dxix / dz
+             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j,k,l) &
+                      + 48d0*q_prim_vf(xibeg)%sf(j,k,l+1) &
+                      - 36d0*q_prim_vf(xibeg)%sf(j,k,l+2) &
+                      + 16d0*q_prim_vf(xibeg)%sf(j,k,l+3) &
+                      -  3d0*q_prim_vf(xibeg)%sf(j,k,l+4) ) &
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
+             ! dxiy / dz
+             tensora(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
+                      + 48d0*q_prim_vf(xibeg+1)%sf(j,k,l+1) &
+                      - 36d0*q_prim_vf(xibeg+1)%sf(j,k,l+2) &
+                      + 16d0*q_prim_vf(xibeg+1)%sf(j,k,l+3) &
+                      -  3d0*q_prim_vf(xibeg+1)%sf(j,k,l+4) ) &
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
+             ! dxiz / dz
+             tensora(9) = (-25d0*q_prim_vf(xiend)%sf(j,k, l) &
+                      + 48d0*q_prim_vf(xiend)%sf(j,k,l + 1) &
+                      - 36d0*q_prim_vf(xiend)%sf(j,k,l + 2) &
+                      + 16d0*q_prim_vf(xiend)%sf(j,k,l + 3) &
+                      -  3d0*q_prim_vf(xiend)%sf(j,k,l + 4) ) &
+                     /(12d0*(z_cb(l + 1) - z_cb(l)))
+          else if (l == izb + 1) then
+             ! dxix / dz
+             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j,k,l - 1) &
+                      - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
+                      + 18d0*q_prim_vf(xibeg)%sf(j,k,l + 1) &
+                      -  6d0*q_prim_vf(xibeg)%sf(j,k,l + 2) &
+                      +      q_prim_vf(xibeg)%sf(j,k,l + 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiy / dz
+             tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j,k,l - 1) &
+                      - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
+                      + 18d0*q_prim_vf(xibeg+1)%sf(j,k,l + 1) &
+                      -  6d0*q_prim_vf(xibeg+1)%sf(j,k,l + 2) &
+                      +      q_prim_vf(xibeg+1)%sf(j,k,l + 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiz / dz
+             tensora(9) = (-3d0*q_prim_vf(xiend)%sf(j,k,l - 1) &
+                      - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
+                      + 18d0*q_prim_vf(xiend)%sf(j,k,l + 1) &
+                      -  6d0*q_prim_vf(xiend)%sf(j,k,l + 2) &
+                      +      q_prim_vf(xiend)%sf(j,k,l + 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+          else if (l == ize - 1) then
+             ! dxix / dz
+             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
+                      + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
+                      - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
+                      +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
+                      -      q_prim_vf(xibeg)%sf(j, k , l - 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiy / dz
+             tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
+                      + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
+                      - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
+                      +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+                      -      q_prim_vf(xibeg+1)%sf(j, k , l - 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiz / dz
+             tensora(9) = (3d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
+                      + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
+                      - 18d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
+                      +  6d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
+                      -      q_prim_vf(xiend)%sf(j, k , l - 3)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+          else if (l == ize) then
+             ! dxix / dz
+             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+                      - 48d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
+                      + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
+                      - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
+                      +  3d0*q_prim_vf(xibeg)%sf(j, k , l - 4) ) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiy / dz
+             tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+                      - 48d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
+                      + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+                      - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
+                      +  3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 4) ) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiz / dz
+             tensora(9) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
+                      - 48d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
+                      + 36d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
+                      - 16d0*q_prim_vf(xiend)%sf(j, k , l - 3) &
+                      +  3d0*q_prim_vf(xiend)%sf(j, k , l - 4) ) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+          else
+             ! dxix / dz
+             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
+                      - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
+                      + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
+                      -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiy / dz
+             tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+                      - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
+                      + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
+                      -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+             ! dxiz / dz
+             tensora(9) = ( q_prim_vf(xiend)%sf(j, k , l - 2) &
+                      - 8d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
+                      + 8d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
+                      -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
+                     /(12d0*(z_cb(l) - z_cb(l - 1)))
+          end if  
+
         ! 2D
           if(k == iyb) then
              ! dxix / dy
@@ -1037,115 +1147,6 @@ f_elastic_energy
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
           end if  
 
-        ! 3D
-          if(l == izb) then
-             ! dxix / dz
-             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
-                      + 48d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
-                      - 36d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
-                      + 16d0*q_prim_vf(xibeg)%sf(j, k , l + 3) &
-                      -  3d0*q_prim_vf(xibeg)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(l + 1) - z_cb(l)))
-             ! dxiy / dz
-             tensora(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
-                      + 48d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
-                      - 36d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
-                      + 16d0*q_prim_vf(xibeg+1)%sf(j, k , l + 3) &
-                      -  3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(l + 1) - z_cb(l)))
-             ! dxiz / dz
-             tensora(9) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
-                      + 48d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
-                      - 36d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
-                      + 16d0*q_prim_vf(xiend)%sf(j, k , l + 3) &
-                      -  3d0*q_prim_vf(xiend)%sf(j, k , l + 4) ) &
-                     /(12d0*(z_cb(l + 1) - z_cb(l)))
-          else if (l == izb + 1) then
-             ! dxix / dz
-             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
-                      - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
-                      + 18d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
-                      -  6d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
-                      +      q_prim_vf(xibeg)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiy / dz
-             tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
-                      - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
-                      + 18d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
-                      -  6d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
-                      +      q_prim_vf(xibeg+1)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiz / dz
-             tensora(9) = (-3d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
-                      - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
-                      + 18d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
-                      -  6d0*q_prim_vf(xiend)%sf(j, k , l + 2) &
-                      +      q_prim_vf(xiend)%sf(j, k , l + 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-          else if (l == ize - 1) then
-             ! dxix / dz
-             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
-                      + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
-                      - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
-                      +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
-                      -      q_prim_vf(xibeg)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiy / dz
-             tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
-                      + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
-                      - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
-                      +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
-                      -      q_prim_vf(xibeg+1)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiz / dz
-             tensora(9) = (3d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
-                      + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
-                      - 18d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
-                      +  6d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
-                      -      q_prim_vf(xiend)%sf(j, k , l - 3)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-          else if (l == ize) then
-             ! dxix / dz
-             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
-                      - 48d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
-                      + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
-                      - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
-                      +  3d0*q_prim_vf(xibeg)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiy / dz
-             tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
-                      - 48d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
-                      + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
-                      - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
-                      +  3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiz / dz
-             tensora(9) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
-                      - 48d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
-                      + 36d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
-                      - 16d0*q_prim_vf(xiend)%sf(j, k , l - 3) &
-                      +  3d0*q_prim_vf(xiend)%sf(j, k , l - 4) ) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-          else
-             ! dxix / dz
-             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
-                      - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
-                      + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
-                      -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiy / dz
-             tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
-                      - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
-                      + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
-                      -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-             ! dxiz / dz
-             tensora(9) = ( q_prim_vf(xiend)%sf(j, k , l - 2) &
-                      - 8d0*q_prim_vf(xiend)%sf(j, k , l - 1) &
-                      + 8d0*q_prim_vf(xiend)%sf(j, k , l + 1) &
-                      -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
-                     /(12d0*(z_cb(l) - z_cb(l - 1)))
-          end if  
 
     ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
             tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
