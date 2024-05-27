@@ -1,10 +1,9 @@
-import os, json, typing, dataclasses, jsonschema
+import os, json, typing, dataclasses
 
 from ..printer import cons
 from ..        import common, build
 from ..state   import ARGS
 from ..case    import Case
-from ..run     import case_dicts
 
 @dataclasses.dataclass(init=False)
 class MFCInputFile(Case):
@@ -13,9 +12,14 @@ class MFCInputFile(Case):
 
     def __init__(self, filename: str, dirpath: str, params: dict) -> None:
         super().__init__(params)
-        # Typecheck parameters
-        jsonschema.validate(self.params, case_dicts.SCHEMA)
-
+        # We only validate params when reading a case from a file
+        # because the test runner will spend ~45s validating every
+        # parameter of every case sequentially before spawning any tests.
+        #
+        # Each test calls this same validation code on the same set of parameters
+        # when it runs anyway, and these checks for each test are done in parallel.
+        # Of course, normal runs of MFC also call this function.
+        self.validate_params()
         self.filename = filename
         self.dirpath  = dirpath
 

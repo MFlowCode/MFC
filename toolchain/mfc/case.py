@@ -1,4 +1,4 @@
-import re, json, math, copy, dataclasses
+import re, json, math, copy, dataclasses, jsonschema
 
 from . import common
 from . import build
@@ -64,6 +64,12 @@ class Case:
         cons.unindent()
 
         return f"&user_inputs\n{dict_str}&end/\n"
+
+    def validate_params(self):
+        '''Typechecks parameters read from case file. If a parameter
+        is assigned a vlaie of the wrong type, this method throws an exception
+        highlighting the violating parameter and specifying what it expects.'''
+        jsonschema.validate(self.params, case_dicts.SCHEMA)
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
