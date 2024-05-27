@@ -802,7 +802,9 @@ f_elastic_energy
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         real(kind(0d0)), dimension(tensor_size), intent(INOUT) :: tensora
         real(kind(0d0)), dimension(tensor_size), intent(INOUT) :: tensorb 
-        integer, intent(IN) :: ixb, ixe, iyb, iye, izb, ize
+        integer, intent(IN) :: ixb, ixe
+        integer, intent(IN) :: iyb, iye
+        integer, intent(IN) :: izb, ize
         integer, intent(IN) :: j, k, l
 
         integer :: i
