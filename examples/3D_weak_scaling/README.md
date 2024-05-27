@@ -16,7 +16,7 @@ Weak scaling benchmarks can be produced by keeping _gbpp_ constant and varying _
 For example, to run a weak scaling test that uses ~4GB of GPU memory per rank
 on 8 2-rank nodes with case optimization, one could:
 
-```console
+```shell
 ./mfc.sh run examples/3D_weak_scaling/case.py 4 -t pre_process simulation          \
              -e batch -p mypartition -N 8 -n 2 -w "01:00:00" -# "MFC Weak Scaling" \
              --case-optimization -j 32
