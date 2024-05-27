@@ -1,7 +1,7 @@
 ## Testing
  
 To run MFC's test suite, run
-```console
+```shell
 ./mfc.sh test -j <thread count>
 ```
 
@@ -21,7 +21,7 @@ To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instea
 ### Creating Tests
 
 To (re)generate *golden files*, append the `--generate` option:
-```console
+```shell
 ./mfc.sh test --generate -j 8
 ```
 
@@ -87,7 +87,7 @@ Finally, the case is appended to the `cases` list, which will be returned by the
 ### Testing Post Process
 
 To test updated post process code, append the `-a` or `--test-all` option: 
-```console
+```shell
 ./mfc.sh test -a -j 8
 ```
 

@@ -22,7 +22,7 @@ print(json.dumps({
 
 Thus, you can run your case file with Python to view the computed case dictionary that will be processed by MFC when you run:
 
-```console
+```shell
 python3 my_case_file.py
 ```
 
@@ -56,13 +56,13 @@ You can add as many additional positional arguments as you may need.
 
 To run such a case, use the following format:
 
-```console
+```shell
 ./mfc.sh run <path/to/case.py> <positional arguments> <regular mfc.sh run arguments>
 ```
 
 For example, to run the 3D_weak_scaling case with `gbpp=2`:
 
-```console
+```shell
 ./mfc.sh run examples/3D_weak_scaling/case.py 2 -t pre_process -j 8
 ```
 
@@ -192,7 +192,7 @@ The code outputs error messages when an empty region is left in the domain.
 
 Some parameters, as described above, can be defined by analytical functions in the input file. For example, one can define the following patch:
 
-```console
+```shell
 'patch_icpp(2)%geometry'    : 15,
 'patch_icpp(2)%x_centroid'  : 0.25,
 'patch_icpp(2)%length_x'    : 9.5,

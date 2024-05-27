@@ -91,7 +91,7 @@ This is optional and defaults to whatever is set on line 52 of `pace-paraview-se
 Once you run `./pace-paraview-server <options>`, it'll take a bit to start up. 
 In the meantime, you'll see the below message:
 
-```console
+```shell
 Submitted batch job <job #>
 Waiting for ParaView server to start. This may take several minutes  ...
 ```

@@ -52,23 +52,23 @@ You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_
 It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
-```console
+```shell
 brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
-```console
+```shell
 git clone https://github.com/mflowcode/MFC.git
 cd MFC
 ```
 and make sure MFC knows what compilers to use by putting the following in your `~/.profile`
-```console
+```shell
 export CC=gcc-13
 export CXX=g++-13
 export FC=gfortran-13
 ```
 and source that file, build, and test!
-```console
+```shell
 source ~/.profile
 ./mfc.sh build -j 8
 ./mfc.sh test -j 8
@@ -78,7 +78,7 @@ And... you're done!
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
 
 The shock-droplet interaction case above was run via
-```console
+```shell
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
