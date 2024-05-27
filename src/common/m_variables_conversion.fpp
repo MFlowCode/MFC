@@ -110,9 +110,6 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-    type(scalar_field), allocatable, dimension(:) :: tensora, tensorb !<
-    !$acc declare create(tensora,tensorb)
-
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
@@ -713,20 +710,6 @@ contains
 
             !$acc update device(bubrs)
         end if
-
-#ifdef MFC_SIMULATION
-        if (hyperelasticity) then
-           @:ALLOCATE_GLOBAL(tensora(1:tensor_size))
-           @:ALLOCATE_GLOBAL(tensorb(1:tensor_size))
-
-           do i = 1, tensor_size
-              @:ALLOCATE(tensora(i)%sf(ixb:ixe, iyb:iye, izb:ize))
-              @:ALLOCATE(tensorb(i)%sf(ixb:ixe, iyb:iye, izb:ize))
-              @:ACC_SETUP_SFs(tensora(i))
-              @:ACC_SETUP_SFs(tensorb(i))
-           end do
-        end if
-#endif
 
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
@@ -1484,32 +1467,62 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb 
         integer :: j, k, l
 
-        !$acc parallel loop collapse(3) gang vector default(present) 
-        do l = izb, ize
-           do k = iyb, iye
-               do j = ixb, ixe
-                call s_compute_gradient_xi_acc(q_prim_vf, ixb, ixe, iyb, &
-                iye, izb, ize, j, k, l, tensora, tensorb)
-                !! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)%sf(j,k,l)
-                if (num_dims > 1) then ! 2D
-                   btensor(2)%sf(j,k,l) = tensorb(2)%sf(j,k,l)
-                   btensor(3)%sf(j,k,l) = tensorb(4)%sf(j,k,l)
-                end if
-                if (num_dims > 2) then ! 3D
-                   btensor(3)%sf(j,k,l) = tensorb(3)%sf(j,k,l)
-                   btensor(4)%sf(j,k,l) = tensorb(5)%sf(j,k,l)
-                   btensor(5)%sf(j,k,l) = tensorb(6)%sf(j,k,l)
-                   btensor(6)%sf(j,k,l) = tensorb(9)%sf(j,k,l)
-                end if
-                !! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)%sf(j,k,l)
+        if (num_dims == 1) then
+          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+          do l = izb, ize
+             do k = iyb, iye
+                do j = ixb, ixe
+                   call s_compute_gradient_xi1d_acc(q_prim_vf, ixb, ixe, iyb, &
+                   iye, izb, ize, j, k, l, tensora, tensorb)
+                   !! 1: 1D, 3: 2D, 6: 3D
+                   btensor(1)%sf(j, k, l) = tensorb(1)
+                   !! store the determinant at the last entry of the btensor sf
+                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
-           end do
-        end do
-        !$acc end parallel loop
+             end do
+          end do
+          !$acc end parallel loop
+        else if (num_dims == 2) then ! 2D
+          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+          do l = izb, ize
+             do k = iyb, iye
+                do j = ixb, ixe
+                   call s_compute_gradient_xi2d_acc(q_prim_vf, ixb, ixe, iyb, &
+                   iye, izb, ize, j, k, l, tensora, tensorb)
+                   !! 1: 1D, 3: 2D, 6: 3D
+                   btensor(1)%sf(j, k, l) = tensorb(1)
+                   btensor(2)%sf(j,k,l) = tensorb(2)
+                   btensor(3)%sf(j,k,l) = tensorb(4)
+                   !! store the determinant at the last entry of the btensor sf
+                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+                end do
+             end do
+          end do
+          !$acc end parallel loop
+        else ! 3D 
+          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+          do l = izb, ize
+             do k = iyb, iye
+                do j = ixb, ixe
+                   call s_compute_gradient_xi3d_acc(q_prim_vf, ixb, ixe, iyb, &
+                   iye, izb, ize, j, k, l, tensora, tensorb)
+                   !! 1: 1D, 3: 2D, 6: 3D
+                   !btensor(1)%sf(j, k, l) = tensorb(1)
+                   !btensor(2)%sf(j,k,l) = tensorb(2)
+                   !btensor(3)%sf(j,k,l) = tensorb(3)
+                   !btensor(4)%sf(j,k,l) = tensorb(5)
+                   !btensor(5)%sf(j,k,l) = tensorb(6)
+                   !btensor(6)%sf(j,k,l) = tensorb(9)
+                   !! store the determinant at the last entry of the btensor sf
+                   !btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+                end do
+             end do
+          end do
+          !$acc end parallel loop
+        end if
 
     end subroutine s_calculate_btensor_acc
 
@@ -1528,12 +1541,6 @@ contains
         if (bubbles) then
             @:DEALLOCATE_GLOBAL(bubrs)
         end if
-
-        ! Deallocating the cell-average primitive variables
-        do i = 1, tensor_size
-            @:DEALLOCATE(tensora(i)%sf)
-            @:DEALLOCATE(tensorb(i)%sf)
-        end do
 #else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
         if (bubbles) then
