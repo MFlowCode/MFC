@@ -179,8 +179,8 @@ contains
         end if
 
         if (sim_data) then
-            call s_write_intf_data_file(q_prim_vf, t_step)
-            call s_write_energy_data_file(q_prim_vf, t_step)
+            call s_write_intf_data_file(q_prim_vf)
+            call s_write_energy_data_file(q_prim_vf, q_cons_vf)
         end if
 
         ! Adding the grid to the formatted database file
@@ -600,10 +600,17 @@ contains
             end if
         end if
 
-        if (proc_rank == 0 .and. sim_data) then
-            close (211)
-            close (251)
+!        if (proc_rank == 0 .and. sim_data) then
+!            close (211)
+!            close (251)
+!        end if
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_close_intf_data_file()
+            call s_close_energy_data_file()
         end if
+
+
         ! Closing the formatted database file
         call s_close_formatted_database_file()
 
@@ -662,10 +669,10 @@ contains
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 
-        if (sim_data .and. proc_rank == 0) then
-            call s_close_intf_data_file()
-            call s_close_energy_data_file()
-        end if
+!        if (sim_data .and. proc_rank == 0) then
+!            call s_close_intf_data_file()
+!            call s_close_energy_data_file()
+!        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()
