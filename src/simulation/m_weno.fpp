@@ -517,8 +517,6 @@ contains
 
         real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
 
-        integer :: recon_order
-
         integer :: i, j, k, l, r, s, w
 
         integer :: t1, t2, c_rate, c_max
@@ -529,7 +527,7 @@ contains
 
         !$acc update device(is1_weno, is2_weno, is3_weno)
 
-        if (recon_order /= 1) then
+        if (weno_order /= 1) then
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
