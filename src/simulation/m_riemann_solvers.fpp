@@ -641,8 +641,24 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if (hypoelasticity .or. hyperelasticity) then
+                            else if (hypoelasticity) then
                                 !$acc loop seq
+                                do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
+                                              *vel_R(dir_idx(i)) &
+                                              + dir_flg(dir_idx(i))*pres_R &
+                                              - tau_e_R(dir_idx_tau(i))) &
+                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
+                                                *vel_L(dir_idx(i)) &
+                                                + dir_flg(dir_idx(i))*pres_L &
+                                                - tau_e_L(dir_idx_tau(i))) &
+                                         + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
+                                                    - rho_R*vel_R(dir_idx(i)))) &
+                                        /(s_M - s_P)
+                                end do
+                            else if (hyperelasticity) then
+                                !!!$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -680,7 +696,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if (hypoelasticity .or. hyperelasticity) then
+                            else if (hypoelasticity) then! .or. hyperelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
