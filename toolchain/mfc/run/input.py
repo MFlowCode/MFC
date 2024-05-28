@@ -12,14 +12,6 @@ class MFCInputFile(Case):
 
     def __init__(self, filename: str, dirpath: str, params: dict) -> None:
         super().__init__(params)
-        # We only validate params when reading a case from a file
-        # because the test runner will spend ~45s validating every
-        # parameter of every case sequentially before spawning any tests.
-        #
-        # Each test calls this same validation code on the same set of parameters
-        # when it runs anyway, and these checks for each test are done in parallel.
-        # Of course, normal runs of MFC also call this function.
-        self.validate_params()
         self.filename = filename
         self.dirpath  = dirpath
 
@@ -74,7 +66,9 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
         if empty_data is None:
             raise common.MFCException("Please provide an input file.")
 
-        return MFCInputFile("empty.py", "empty.py", empty_data)
+        input_file = MFCInputFile("empty.py", "empty.py", empty_data)
+        input_file.validate_params()
+        return input_file
 
     filename: str = filepath.strip()
 
@@ -101,7 +95,9 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
     except Exception as exc:
         raise common.MFCException(f"Input file {filename} did not produce valid JSON. It should only print the case dictionary.\n\n{exc}\n")
 
-    return MFCInputFile(filename, dirpath, dictionary)
+    input_file = MFCInputFile(filename, dirpath, dictionary)
+    input_file.validate_params()
+    return input_file
 
 
 load.CACHED_MFCInputFile = None
