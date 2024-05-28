@@ -32,10 +32,10 @@ module m_hyperelastic
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(b_size-1) :: tensor
-        real(kind(0d0)) :: trace, invariant
+        real(kind(0d0)) :: trace, invariant1
         integer :: i, j, k, l !< Generic loop iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(trace, tensor,invariant)
+        !$acc parallel loop collapse(3) gang vector default(present) private(trace,invariant1)
         do l = iz%beg, iz%end
            do k = iy%beg, iy%end
               do j = ix%beg, ix%end
@@ -63,7 +63,6 @@ module m_hyperelastic
                     end do
 
                     ! invariant calculation, saving it in the q_prim_vf field
-                
                     invariant1 = btensor(1)%sf(j, k, l)
                     !if (num_dims == 2) then
                     !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)

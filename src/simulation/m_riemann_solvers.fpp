@@ -311,7 +311,7 @@ contains
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
         real(kind(0d0)) :: G_L, G_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
-        real(kind(0d0)), dimension(num_dims) :: xi_field_L, xi_field_R
+        real(kind(0d0)), dimension(3) :: xi_field_L, xi_field_R
 
         real(kind(0d0)) :: rho_avg
         real(kind(0d0)), dimension(num_dims) :: vel_avg
@@ -356,7 +356,7 @@ contains
 
             if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, xi_field_R, xi_field_L)
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, xi_field_L, xi_field_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -505,39 +505,38 @@ contains
                                 end do
                             end if
 
-                            !if (.not. hyperelasticity) then
-                            !    G_L = 0d0 
-                            !    G_R = 0d0
-                            !
-                            !    !$acc loop seq
-                            !    do i = 1, num_fluids
-                            !        G_L = G_L + alpha_L(i)*Gs(i)
-                            !        G_R = G_R + alpha_R(i)*Gs(i)
-                            !    end do
+                            if (hyperelasticity) then
+                                G_L = 0d0 
+                                G_R = 0d0
+                            
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    G_L = G_L + alpha_L(i)*Gs(i)
+                                    G_R = G_R + alpha_R(i)*Gs(i)
+                                end do
 
-                            !   !$acc loop seq
-                            !    do i = 1, strxe - strxb + 1
-                            !        tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                            !        tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
-                            !    end do
+                               !$acc loop seq
+                                do i = 1, strxe - strxb + 1
+                                    tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                    tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                end do
 
-                                !!!!$acc loop seq
-                                !do i = 1, num_dims
-                                !    xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
-                                !    xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
-                                !end do
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
+                                    xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                end do
 
-                            !    !$acc loop seq
-                            !    do i = 1, strxe - strxb + 1
-                                    ! Elastic contribution to energy if G large enough
-                                    ! TODO MRJ ADD THE ELASTIC ENERGY
-                            !        if ((G_L > 1d0) .and. (G_R > 1d0)) then
-                            !            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
-                            !            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
-                            !        end if
-                            !    end do
+                                do i = 1, strxe - strxb + 1
+                                   ! Elastic contribution to energy if G large enough
+                                   ! TODO MRJ ADD THE ELASTIC ENERGY
+                                    if ((G_L > 1d0) .and. (G_R > 1d0)) then
+                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
+                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
+                                    end if
+                                end do
 
-                            !end if
+                            end if
 
                             @:compute_average_state()
 
@@ -561,7 +560,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if (hypoelasticity ) then ! .or. .not. hyperelasticity) then
+                                if (hypoelasticity .or. hyperelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -642,7 +641,7 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if (hypoelasticity) then ! .or. .not. hyperelasticity) then
+                            else if (hypoelasticity .or. hyperelasticity) then
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -681,7 +680,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if (hypoelasticity) then ! .or. .not. hyperelasticity) then
+                            else if (hypoelasticity .or. hyperelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -750,17 +749,16 @@ contains
                             end do
 
                             ! Xi field
-                            !if (hyperelasticity) then 
-                                !!!!$acc loop seq
-                            !    do i = 1, num_dims
-                                  !flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
-                                  !  (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
-                                  !   - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
-                                  !   + s_M*s_P*(rho_L*xi_field_L(i) &
-                                  !              - rho_R*xi_field_R(i))) &
-                                  !  /(s_M - s_P)
-                            !    end do
-                            !end if 
+                            if (hyperelasticity) then 
+                                do i = 1, num_dims
+                                  flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                                    (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
+                                     - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
+                                     + s_M*s_P*(rho_L*xi_field_L(i) &
+                                                - rho_R*xi_field_R(i))) &
+                                    /(s_M - s_P)
+                                end do
+                            end if 
 
                             ! Div(U)?
                             !$acc loop seq
@@ -2533,7 +2531,7 @@ contains
 
         !$acc update device(is1, is2, is3)
 
-        if (hypoelasticity) then ! .or. .not. hyperelasticity) then
+        if (hypoelasticity .or. hyperelasticity) then
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
             else if (norm_dir == 2) then

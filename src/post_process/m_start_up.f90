@@ -323,7 +323,6 @@ contains
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
                         write (varname, '(A,I0)') 'tau', i
-                    end if
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
@@ -337,7 +336,6 @@ contains
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
                         write (varname, '(A,I0)') 'xi', i
-                    end if
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
