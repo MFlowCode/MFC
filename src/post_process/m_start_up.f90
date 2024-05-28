@@ -322,9 +322,20 @@ contains
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-                    if (hypoelasticity) then
                         write (varname, '(A,I0)') 'tau', i
-                    else
+                    end if
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                end if
+                varname(:) = ' '
+            end do
+        end if
+        if (hyperelasticity) then
+            do i = 1, xiend - xibeg + 1
+                if (prim_vars_wrt) then
+                    q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
                         write (varname, '(A,I0)') 'xi', i
                     end if
                     call s_write_variable_to_formatted_database_file(varname, t_step)

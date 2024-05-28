@@ -1055,28 +1055,27 @@ contains
         ! s_calculate_btensor has its own triple nested for loop with openacc
 #ifdef MFC_SIMULATION
         if (hyperelasticity) then 
-           print *, 'I got here A1'
-
         call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
 
-        !!!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-        !do l = izb, ize
-        !    do k = iyb, iye
-        !        do j = ixb, ixe
-        !            !$acc loop seq
-        !            do i = 1, num_fluids
-        !                alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-        !                alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-        !            end do
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
+        do l = izb, ize
+            do k = iyb, iye
+                do j = ixb, ixe
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    end do
                     ! If in simulation, use acc mixture subroutines
-                    !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                    !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                    !             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-        !       end do
-        !   end do
-        !end do
-        !!!$acc end parallel loop
+                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                 alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                                 G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+               end do
+           end do
+        end do
+        !$acc end parallel loop
+
         end if
 #else
         if (hyperelasticity) then 
@@ -1098,7 +1097,6 @@ contains
           end do
         end if 
 #endif
-        print *, 'I got here A2'
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 

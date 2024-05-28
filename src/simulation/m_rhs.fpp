@@ -723,8 +723,6 @@ contains
             end do
         end if
 
-        !if(proc_rank == 0) print *, 'I got here 1 !'
-
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -736,11 +734,11 @@ contains
 
         if(proc_rank == 0) print *, 'I got here 2 !'
 
-        !call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-        !  if ( hyperelasticity ) then
-        !     !call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-        !  end if
-        !call nvtxEndRange
+        call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
+          if ( hyperelasticity ) then
+             call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
+          end if
+        call nvtxEndRange
 
         if(proc_rank == 0) print *, 'I got here 3.1 !'
 
