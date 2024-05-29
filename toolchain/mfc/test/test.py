@@ -99,7 +99,6 @@ def test():
 
     for case in cases:
         if case.rebuild:
-            case.validate_params()
             build(codes, MFCInputFile(os.path.basename(case.get_dirpath()), case.get_dirpath(), case.params))
 
     cons.print()
@@ -193,7 +192,6 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if not os.path.exists(silo_filepath):
                 silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
 
-            case.validate_params()
             h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
             if ARG("sys_hdf5"):
