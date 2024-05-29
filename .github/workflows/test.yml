@@ -22,12 +22,24 @@ jobs:
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
-        mpi:   ['mpi', 'no-mpi']
+        mpi:   ['mpi']
         debug: ['debug', 'no-debug']
         intel: [true, false]
         exclude:
-          - intel: true
-            os:    macos
+          - os:    macos
+            intel: true
+
+          - os:    macos
+            debug: debug
+            intel: false
+
+        include: 
+
+          - os:    ubuntu
+            mpi:   no-mpi
+            debug: no-debug
+            intel: false
+
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest

@@ -1128,12 +1128,11 @@ contains
             if (num_procs == 1) then
                 time_final = time_avg
                 io_time_final = io_time_avg
-                print *, "Final Time", time_final
             else
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
-                print *, "Final Time", time_final
             end if
+            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
