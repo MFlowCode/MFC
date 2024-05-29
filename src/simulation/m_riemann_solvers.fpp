@@ -474,6 +474,7 @@ contains
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
 
+                            ! elastic energy update
                             if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
@@ -505,6 +506,7 @@ contains
                                 end do
                             end if
 
+                            ! elastic energy update
                             if (hyperelasticity) then
                                 G_L = 0d0 
                                 G_R = 0d0
@@ -527,14 +529,11 @@ contains
                                     xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                 end do
 
-                                do i = 1, strxe - strxb + 1
-                                   ! Elastic contribution to energy if G large enough
-                                   ! TODO MRJ ADD THE ELASTIC ENERGY
-                                    if ((G_L > 1d0) .and. (G_R > 1d0)) then
-                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
-                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
-                                    end if
-                                end do
+                                ! Elastic contribution to energy if G large enough
+                                if ((G_L > 1d0) .and. (G_R > 1d0)) then
+                                    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
+                                    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                end if
 
                             end if
 
@@ -680,7 +679,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if ( elasticity ) then ! .or. hyperelasticity) then
+                            else if ( elasticity ) then 
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
