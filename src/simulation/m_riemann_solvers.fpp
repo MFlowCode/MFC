@@ -560,7 +560,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if (hypoelasticity .or. hyperelasticity) then
+                                if ( elasticity ) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -641,24 +641,8 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if (hypoelasticity) then
+                            else if ( elasticity ) then
                                 !$acc loop seq
-                                do i = 1, num_dims
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        (s_M*(rho_R*vel_R(dir_idx(1)) &
-                                              *vel_R(dir_idx(i)) &
-                                              + dir_flg(dir_idx(i))*pres_R &
-                                              - tau_e_R(dir_idx_tau(i))) &
-                                         - s_P*(rho_L*vel_L(dir_idx(1)) &
-                                                *vel_L(dir_idx(i)) &
-                                                + dir_flg(dir_idx(i))*pres_L &
-                                                - tau_e_L(dir_idx_tau(i))) &
-                                         + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
-                                                    - rho_R*vel_R(dir_idx(i)))) &
-                                        /(s_M - s_P)
-                                end do
-                            else if (hyperelasticity) then
-                                !!!$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -696,7 +680,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if (hypoelasticity) then! .or. hyperelasticity) then
+                            else if ( elasticity ) then ! .or. hyperelasticity) then
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -738,7 +722,7 @@ contains
                             end if
 
                             ! Elastic Stresses
-                            if (hypoelasticity) then
+                            if ( hypoelasticity ) then
                                 do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
                                     flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                         (s_M*(rho_R*vel_R(dir_idx(1)) &
@@ -765,7 +749,7 @@ contains
                             end do
 
                             ! Xi field
-                            if (hyperelasticity) then 
+                            if ( hyperelasticity ) then 
                                 do i = 1, num_dims
                                   flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
                                     (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &

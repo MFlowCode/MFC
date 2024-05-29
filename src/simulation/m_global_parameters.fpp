@@ -138,6 +138,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture properties correction
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
+    logical :: elasticity      !< elasticity modeling
     logical :: cu_tensor
 
     integer :: cpu_start, cpu_end, cpu_rate
@@ -494,6 +495,7 @@ contains
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         hyperelasticity = .false.
+        elasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
         cu_mpi = .false.
@@ -782,6 +784,7 @@ contains
                 end if
 
                 if ( hypoelasticity ) then
+                    elasticity = .true.
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
@@ -789,6 +792,7 @@ contains
                 end if
 
                 if ( hyperelasticity ) then
+                    elasticity = .true.
                     ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
