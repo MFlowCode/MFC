@@ -100,8 +100,12 @@ contains
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
         call s_find_num_ghost_points()
-
         !$acc update device(num_gps, num_inner_gps)
+
+        ! if (proc_rank == 0) then
+        !     call s_mpi_sendrecv_num_gps(num_gps)
+        ! end if
+
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
         @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
 
@@ -527,7 +531,6 @@ contains
                 end if
             end do
         end do
-
     end subroutine s_find_num_ghost_points
 
     subroutine s_find_ghost_points(ghost_points, inner_points)
