@@ -157,10 +157,8 @@ contains
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
         end if
-        !if (proc_rank == 0) print *, "I got here 1"
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
-        !if (proc_rank == 0) print *, "I got here 2"
 
     end subroutine s_perform_time_step
 
@@ -313,7 +311,6 @@ contains
 
         end if
         ! ----------------------------------------------------------------------
-        !if (proc_rank == 0) print *, "I got here 3"
         ! Adding the elastic shear stresses to the formatted database file -----
         if (hypoelasticity .or. hyperelasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
@@ -341,7 +338,7 @@ contains
                 varname(:) = ' '
             end do
         end if
-        !if (proc_rank == 0) print *, "I got here 4"
+
         ! ----------------------------------------------------------------------
 
         ! Adding the pressure to the formatted database file -------------------
