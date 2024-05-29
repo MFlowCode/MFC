@@ -832,6 +832,7 @@ contains
                     id)
                 call nvtxEndRange
             else
+
                 iv%beg = 1; iv%end = E_idx - 1
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
@@ -848,13 +849,6 @@ contains
                     id)
                 call nvtxEndRange
 
-                !print*, "q_prim_qp%vf(E_idx)%sf(:,:,0))"
-                !print*, q_prim_qp%vf(E_idx)%sf(:,:,0)
-                !print*, "qL_rsx_vf(:,:,0,E_idx)"
-                !print*, qL_rsx_vf(:,:,0,E_idx)
-                !print*, "qR_rsx_vf(:,:,0,E_idx)"
-                !print*, qR_rsx_vf(:,:,0,E_idx)
-
                 iv%beg = E_idx + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
@@ -862,6 +856,7 @@ contains
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
                 call nvtxEndRange
+
             end if
 
             ! Reconstruct viscous derivatives for viscosity
@@ -1016,8 +1011,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; 
-            if (p > 0) iz%beg = -buff_size; 
+            if (n > 0) iy%beg = -buff_size;
+            if (p > 0) iz%beg = -buff_size;
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 
@@ -2179,6 +2174,8 @@ contains
             is1%end = is1%end - weno_polyn
 
         end if
+
+        !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)
