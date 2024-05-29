@@ -84,7 +84,7 @@ for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
         PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
 
-    for append, ty in [("stretch", ParamType.LOG), ("a", ParamType.REAL), 
+    for append, ty in [("stretch", ParamType.LOG), ("a", ParamType.REAL),
                        ("loops", ParamType.INT)]:
         PRE_PROCESS[f"{append}_{cmp}"] = ty
 
@@ -304,8 +304,8 @@ for cmp_id in range(1,3+1):
 #     POST_PROCESS.append(f'chem_wrt({cmp_id})')
 
 for fl_id in range(1,10+1):
-    for append, ty in [("schlieren_alpha", ParamType.REAL), 
-                       ("alpha_rho_wrt", ParamType.LOG), 
+    for append, ty in [("schlieren_alpha", ParamType.REAL),
+                       ("alpha_rho_wrt", ParamType.LOG),
                        ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG)]:
         POST_PROCESS[f'{append}({fl_id})'] = ty
 
