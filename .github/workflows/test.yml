@@ -21,15 +21,15 @@ jobs:
     name: Github
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
+        os:    ['ubuntu', 'macos-13']
         mpi:   ['mpi']
         debug: ['debug', 'no-debug']
         intel: [true, false]
         exclude:
-          - os:    macos
+          - os:    macos-13
             intel: true
 
-          - os:    macos
+          - os:    macos-13
             debug: debug
             intel: false
 
@@ -47,8 +47,8 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Setup MacOS
-        if:   matrix.os == 'macos'
+      - name: Setup macos-13
+        if:   matrix.os == 'macos-13'
         run: |
           echo "CC=gcc-13"      >> $GITHUB_ENV
           echo "CXX=g++-13"     >> $GITHUB_ENV
@@ -56,7 +56,7 @@ jobs:
           brew install wget make python make cmake coreutils gcc@13
           
       - name: (MacOS) Build OpenMPI
-        if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
+        if:   matrix.os == 'macos-13' && matrix.mpi == 'mpi'
         run: |
           brew install mpich
 
