@@ -208,6 +208,25 @@ module m_derived_types
         real(kind(0d0)) :: theta
 
         logical :: slip
+        ! character(LEN=pathlen_max) :: model_filepath !<
+        ! !! Path the STL file relative to case_dir.
+
+        ! t_vec3 :: model_translate !<
+        ! !! Translation of the STL object.
+
+        ! t_vec3 :: model_scale !<
+        ! !! Scale factor for the STL object.
+
+        ! t_vec3 :: model_rotate !<
+        ! !! Angle to rotate the STL object along each cartesian coordinate axis,
+        ! !! in radians.
+
+        ! integer :: model_spc !<
+        ! !! Number of samples per cell to use when discretizing the STL object.
+
+        ! real(kind(0d0)) :: model_threshold !<
+
+        type(ic_model_parameters) :: model !< Model parameters
 
     end type ib_patch_parameters
 
@@ -277,6 +296,7 @@ module m_derived_types
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
         integer, dimension(3) :: DB
+        integer :: IBB
 
     end type ghost_point
 

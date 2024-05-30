@@ -96,11 +96,20 @@ contains
             call MPI_BCAST(patch_icpp(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             ! Broadcast IB variables
+            call MPI_BCAST(patch_ib(i)%model%filepath, len(patch_ib(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+
+            #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate']
+                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            call MPI_BCAST(patch_ib(i)%model%threshold, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
         end do
 
         ! Fluids physical parameters

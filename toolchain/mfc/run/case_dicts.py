@@ -80,6 +80,27 @@ for ib_id in range(1, 10+1):
         PRE_PROCESS[f'patch_ib({ib_id})%{cmp}_centroid'] = ParamType.REAL
         PRE_PROCESS[f'patch_ib({ib_id})%length_{cmp}'] = ParamType.REAL
 
+    for attribute in ["translate", "scale", "rotate"]:
+        for j in range(1, 4):
+            PRE_PROCESS.append(f"patch_ib({ib_id})%model%{attribute}({j})")
+    
+    PRE_PROCESS.append(f"patch_ib({ib_id})%model%filepath")
+    PRE_PROCESS.append(f"patch_ib({ib_id})%model%spc")
+    PRE_PROCESS.append(f"patch_ib({ib_id})%model%threshold")
+
+
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_scale({1})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_scale({2})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_scale({3})")
+
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_translate({1})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_translate({2})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_translate({3})")
+
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_rotate({1})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_rotate({2})")
+    # PRE_PROCESS.append(f"patch_ib({ib_id})%model_rotate({3})")
+
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
         PRE_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
