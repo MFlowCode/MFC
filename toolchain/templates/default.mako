@@ -44,7 +44,7 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
                       ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                       "${target.get_install_binpath(case)}")
         elif [ "$binary" == "srun" ]; then
-            (set -x; {profiler}  \
+            (set -x; ${profiler}  \
                 srun --ntasks-per-node ${tasks_per_node}         \
                      ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                      "${target.get_install_binpath(case)}")
