@@ -1211,7 +1211,7 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    if (hypoelasticity) then
+                    if (hypoelasticity .or. hyperelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
@@ -1223,7 +1223,7 @@ contains
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
 
-                    if (hypoelasticity) then
+                    if (hypoelasticity .or. hyperelasticity) then
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
@@ -1243,7 +1243,7 @@ contains
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                    else if (hypoelasticity) then
+                    else if (hypoelasticity .or. hyperelasticity) then
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1336,7 +1336,7 @@ contains
 
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                        else if (hypoelasticity) then
+                        else if (hypoelasticity .or. hyperelasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1437,7 +1437,7 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if (hypoelasticity .or. hyperelasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1530,7 +1530,7 @@ contains
                             nRdot(1), &
                             R(1), &
                             Rdot(1)
-                    else if (hypoelasticity) then
+                    else if (hypoelasticity .or. hyperelasticity) then
                         write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &

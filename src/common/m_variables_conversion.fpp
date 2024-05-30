@@ -156,7 +156,7 @@ contains
                     )**(1/gamma + 1) - pi_inf
         end if
 
-        if (hypoelasticity .and. present(G)) then
+        if ( (hypoelasticity .or. hyperelasticity) .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
             do s = stress_idx%beg, stress_idx%end
@@ -189,7 +189,7 @@ contains
         !            end if
         !        end if
         !    end do
-
+        !
         !    pres = ( &
         !           energy - &
         !           0.5d0*(mom**2.d0)/rho - &
