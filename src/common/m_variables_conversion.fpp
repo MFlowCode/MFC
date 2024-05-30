@@ -895,6 +895,10 @@ contains
 
         real(kind(0.d0)) :: ntmp
 
+#ifdef MFC_POST_PROCESS
+            type(scalar_field), dimension(b_size) :: q_btensor
+#endif
+
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
             if (bubbles) then
@@ -1034,12 +1038,12 @@ contains
                         end do
                     end if
 
-                    !if ( hyperelasticity ) then
-                    !  !$acc loop seq
-                    !  do i = xibeg, xiend
-                    !     qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
-                    !  end do
-                    !end if
+                    if ( hyperelasticity ) then
+                      !$acc loop seq
+                      do i = xibeg, xiend
+                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
+                      end do
+                    end if
 
                     !$acc loop seq
                     do i = advxb, advxe
@@ -1077,9 +1081,15 @@ contains
         !$acc end parallel loop
 
         end if
-#else
+#endif
+
+#ifdef MFC_POST_PROCESS
+       do l = 1, b_size
+            allocate(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+        end do
+
         if (hyperelasticity) then 
-          call s_calculate_btensor(qK_prim_vf, qK_btensor_vf)
+          call s_calculate_btensor(qK_prim_vf, q_btensor,0,m,0,n,0,p)
           do l = izb, ize
              do k = iyb, iye
                  do j = ixb, ixe
@@ -1091,7 +1101,7 @@ contains
                     call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                              rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                           G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                           G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                  end do
              end do
           end do
@@ -1144,7 +1154,7 @@ contains
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity ) then
-            call s_calculate_btensor(q_prim_vf, q_btensor)
+            call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if 
 
         ! Converting the primitive variables to the conservative variables
@@ -1423,17 +1433,19 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_calculate_btensor(q_prim_vf, btensor)
+    subroutine s_calculate_btensor(q_prim_vf, btensor, xb, xe, yb, ye, zb, ze)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(INOUT) :: btensor
+        integer, intent(IN) :: xb, xe, yb, ye, zb, ze
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-
         integer :: j, k, l
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                call s_compute_gradient_xi(q_prim_vf, j, k, l, tensora, tensorb)
+
+        do l = zb, ze
+            do k = yb, ye
+                do j = xb, xe
+                call s_compute_gradient_xi(q_prim_vf, xb, xe, yb, &
+                   ye, zb, ze, j, k, l, tensora, tensorb)
                 ! 1: 1D, 3: 2D, 6: 3D
                 btensor(1)%sf(j, k, l) = tensorb(1)
                 if (num_dims > 1) then ! 2D

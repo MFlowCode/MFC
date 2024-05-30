@@ -145,9 +145,9 @@ contains
                 (t_step_stop - t_step_start)/t_step_save + 1, &
                 t_step
         end if
-
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
+
         ! Populating the buffer regions of the grid variables
         if (buff_size > 0) then
             call s_populate_grid_variables_buffer_regions()
@@ -157,6 +157,7 @@ contains
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
         end if
+
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
 
@@ -312,7 +313,7 @@ contains
         end if
         ! ----------------------------------------------------------------------
         ! Adding the elastic shear stresses to the formatted database file -----
-        if (hypoelasticity .or. hyperelasticity) then
+        if (hypoelasticity) then ! .or. hyperelasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then
                     q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
@@ -325,19 +326,19 @@ contains
                 varname(:) = ' '
             end do
         end if
-        if (hyperelasticity) then
-            do i = 1, xiend - xibeg + 1
-                if (prim_vars_wrt) then
-                    q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
-                        write (varname, '(A,I0)') 'xi', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
-                varname(:) = ' '
-            end do
-        end if
+        !if (hyperelasticity) then
+        !    do i = 1, xiend - xibeg + 1
+        !        if (prim_vars_wrt) then
+        !            q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
+        !                   -offset_x%beg:m + offset_x%end, &
+        !                   -offset_y%beg:n + offset_y%end, &
+        !                   -offset_z%beg:p + offset_z%end)
+        !                write (varname, '(A,I0)') 'xi', i
+        !            call s_write_variable_to_formatted_database_file(varname, t_step)
+        !        end if
+        !        varname(:) = ' '
+        !    end do
+        !end if
 
         ! ----------------------------------------------------------------------
 

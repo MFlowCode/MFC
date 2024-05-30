@@ -483,6 +483,7 @@ contains
             end if
 
             if (hypoelasticity) then
+                ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 sys_size = stress_idx%end
