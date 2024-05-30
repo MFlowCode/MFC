@@ -1038,7 +1038,7 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity ) then
+                    if (hyperelasticity) then
                       !$acc loop seq
                       do i = xibeg, xiend
                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
@@ -1059,12 +1059,11 @@ contains
         ! s_calculate_btensor has its own triple nested for loop with openacc
 #ifdef MFC_SIMULATION
         if (hyperelasticity) then 
-        call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-        do l = izb, ize
-            do k = iyb, iye
-                do j = ixb, ixe
+           call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
+           !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
+           do l = izb, ize
+              do k = iyb, iye
+                 do j = ixb, ixe
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
@@ -1075,11 +1074,10 @@ contains
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
                                  G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-               end do
+                 end do
+              end do
            end do
-        end do
-        !$acc end parallel loop
-
+           !$acc end parallel loop
         end if
 #endif
 
@@ -1089,7 +1087,7 @@ contains
         end do
 
         if (hyperelasticity) then 
-          call s_calculate_btensor(qK_prim_vf, q_btensor,0,m,0,n,0,p)
+          call s_calculate_btensor(qK_prim_vf, q_btensor, ixb, ixe, iyb, iye, izb, ize)
           do l = izb, ize
              do k = iyb, iye
                  do j = ixb, ixe
