@@ -50,10 +50,10 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run: |
-          echo "CC=gcc-13"      >> $GITHUB_ENV
-          echo "CXX=g++-13"     >> $GITHUB_ENV
-          echo "FC=gfortran-13" >> $GITHUB_ENV
-          brew install wget make python make cmake coreutils gcc@13
+          brew install wget make python make cmake coreutils gcc@14
+          echo "CC=gcc-14"      >> $GITHUB_ENV
+          echo "CXX=g++-14"     >> $GITHUB_ENV
+          echo "FC=gfortran-14" >> $GITHUB_ENV
           
       - name: (MacOS) Build OpenMPI
         if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
