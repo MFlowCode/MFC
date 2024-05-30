@@ -473,6 +473,18 @@ contains
             end if
         end if
 
+        ! Constraints on the surface tension model
+        if (sigma /= dflt_real .and. sigma < 0d0) then
+            call s_mpi_abort('The surface tension coefficient must be'// &
+                             'greater than or equal to zero. Exiting ...')
+        elseif (sigma /= dflt_real .and. model_eqns /= 3) then
+            call s_mpi_abort("The surface tension model requires"// &
+                             'model_eqns=3. Exiting ...')
+        elseif (sigma == dflt_real .and. cf_wrt) then
+            call s_mpi_abort('cf_wrt can only be anabled if the surface'// &
+                             'coefficient is set')
+        end if
+
     end subroutine s_check_inputs
 
 end module m_checker
