@@ -2176,7 +2176,7 @@ contains
         end if
 
 #ifndef _CRAYFTN
-        !$acc update device(is1, is2, is3, iv)
+!$acc update device(is1, is2, is3, iv)
 #endif
 
         if (recon_dir == 1) then
