@@ -287,6 +287,7 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
 
     targets = get_targets(list(REQUIRED_TARGETS) + targets)
     case    = case or input.load(ARG("input"), ARG("arguments"), {})
+    case.validate_params()
 
     if len(history) == 0:
         cons.print(__generate_header("Build", targets))
