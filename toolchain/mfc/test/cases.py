@@ -74,6 +74,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
+    def alter_capillary():
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
+        stack.pop()
+
     def alter_weno():
         for weno_order in [3, 5]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
@@ -504,8 +509,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
+                alter_capillary()
             if len(dimInfo[0]) == 3:
                 alter_3d()
+                alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_bubbles(dimInfo)
