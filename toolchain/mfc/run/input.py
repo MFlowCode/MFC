@@ -96,7 +96,7 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
         raise common.MFCException(f"Input file {filename} did not produce valid JSON. It should only print the case dictionary.\n\n{exc}\n")
 
     input_file = MFCInputFile(filename, dirpath, dictionary)
-    input_file.validate_params()
+    input_file.validate_params(f"Input file {filename}")
     return input_file
 
 
