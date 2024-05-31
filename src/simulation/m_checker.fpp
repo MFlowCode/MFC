@@ -524,6 +524,22 @@ contains
                              'num_ibs and ib. Exiting ...')
         end if
 
+        #:for DIR in ['x', 'y', 'z']
+            if (bf_${DIR}$ .and. k_${DIR}$ == dflt_real) then
+                call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
+                                'Exiting ...')
+            elseif (bf_${DIR}$ .and. w_${DIR}$ == dflt_real) then
+                call s_mpi_abort('w_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
+                                'Exiting ...')
+            elseif (bf_${DIR}$ .and. p_${DIR}$ == dflt_real) then
+                call s_mpi_abort('p_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
+                                'Exiting ...')
+            elseif (bf_${DIR}$ .and. g_${DIR}$ == dflt_real) then
+                call s_mpi_abort('g_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
+                                'Exiting ...')
+            endif
+        #:endfor
+
     end subroutine s_check_inputs
 
 end module m_checker
