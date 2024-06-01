@@ -3,7 +3,7 @@
     real(kind(0d0)) :: eps
     real(kind(0d0)) :: r, rmax, gam, umax, p0
 
-    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH
+    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     eps = 1e-9
 
@@ -80,17 +80,22 @@
 
             intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
 
+            alph = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+
+            if (alph < eps) alph = eps
+            if (alph > 1-eps) alph = 1-eps
+
             if (y_cc(j) > intH) then
-                q_prim_vf(advxb)%sf(i, j, 0) = 1d0 - eps
-                q_prim_vf(advxe)%sf(i, j, 0) = eps
-                q_prim_vf(contxb)%sf(i, j, 0) = (1d0 - eps)*rhoH
-                q_prim_vf(contxe)%sf(i, j, 0) = eps*rhoL
+                q_prim_vf(advxb)%sf(i, j, 0) = alph
+                q_prim_vf(advxe)%sf(i, j, 0) = 1-alph
+                q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
+                q_prim_vf(contxe)%sf(i, j, 0) = (1-alph)*rhoL
                 q_prim_vf(E_idx)%sf(i, j, 0) = pref + rhoH * 9.81 * (1.2 - y_cc(j))
             else
-                q_prim_vf(advxb)%sf(i, j, 0) = eps
-                q_prim_vf(advxe)%sf(i, j, 0) = 1d0 - eps
-                q_prim_vf(contxb)%sf(i, j, 0) = eps*rhoH
-                q_prim_vf(contxe)%sf(i, j, 0) = (1d0 - eps)*rhoL
+                q_prim_vf(advxb)%sf(i, j, 0) = alph
+                q_prim_vf(advxe)%sf(i, j, 0) = 1-alph
+                q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
+                q_prim_vf(contxe)%sf(i, j, 0) = (1-alph)*rhoL
                 pInt = pref + rhoH * 9.81 * (1.2 -  intH)
                 q_prim_vf(E_idx)%sf(i,j,0) = pInt + rhoL * 9.81 * (intH - y_cc(j))
             end if
