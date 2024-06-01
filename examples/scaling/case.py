@@ -1,28 +1,45 @@
 #!/usr/bin/env python3
 
-# Case file contributed by Anand Radhakrishnan and modified by Henry Le Berre
-# for integration as a weak scaling benchmark for MFC.
-
-import json, math, argparse
+import sys, json, math, typing, argparse
 
 parser = argparse.ArgumentParser(
-    prog="3D_weak_scaling",
-    description="This MFC case was created for the purposes of weak scaling.",
+    prog="scaling",
+    description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("dict", type=str, metavar="DICT")
+parser.add_argument("-s", "--scaling",       type=str, metavar="SCALING", choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
+parser.add_argument("-m", "--memory",        type=int, metavar="MEMORY",  help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.")
+parser.add_argument("-f", "--fidelity",      type=str, metavar="FIDELITY", choices=["ideal", "exact"], default="ideal")
+parser.add_argument("--cu_mpi",              type=str, metavar="FIDELITY", choices=["T", "F"], default="F")
+parser.add_argument("--n-steps",             type=int, metavar="N", default=None)
 
-ARGS = vars(parser.parse_args())
-DICT = json.loads(ARGS["dict"])
+args = parser.parse_args()
 
-ppg    = 8000000 / 16.0
-procs  = DICT["nodes"] * DICT["tasks_per_node"]
-ncells = math.floor(ppg * procs * ARGS["gbpp"])
-s      = math.floor((ncells / 2.0) ** (1/3))
-Nx, Ny, Nz = 2*s, s, s
+if args.scaling is None:
+    parser.print_help()
+    sys.exit(1)
 
-# athmospheric pressure - Pa (used as reference value)
+DICT = json.loads(args.dict)
+
+# \approx The number of cells per GB of memory. The exact value is not important.
+cpg    = 8000000 / 16.0
+# Number of ranks.
+nranks = DICT["nodes"] * DICT["tasks_per_node"]
+
+def nxyz_from_ncells(ncells: float) -> typing.Tuple[int, int, int]:
+    s = math.floor((ncells / 2.0) ** (1/3))
+    return 2*s, s, s
+
+if args.scaling == "weak":
+    if args.fidelity == "ideal":
+        raise RuntimeError("ask ben")
+    else:
+        Nx, Ny, Nz = nxyz_from_ncells(cpg * nranks * args.memory)
+else:
+    Nx, Ny, Nz = nxyz_from_ncells(cpg * args.memory)
+
+# Atmospheric pressure - Pa (used as reference value)
 patm = 101325
 
 # Initial Droplet Diameter / Reference length - m
@@ -162,7 +179,8 @@ NtA = int( tendA//dt + 1 )
 AS = int( NtA // SF + 1 )
 
 # Nt = total number of steps. Note that Nt >= NtA (so at least tendA is completely simulated)
-Nt = AS * SF
+Nt = args.n_steps or (AS * SF)
+SF = min( SF, Nt )
 
 # total simulation time - s. Note that tend >= tendA
 tend = Nt * dt
@@ -171,6 +189,7 @@ tend = Nt * dt
 print(json.dumps({
     # Logistics ================================================
     'run_time_info'                : 'T',
+    'cu_mpi'                       : args.cu_mpi,
     # ==========================================================
 
     # Computational Domain Parameters ==========================
@@ -186,8 +205,8 @@ print(json.dumps({
     'cyl_coord'                    : 'F',
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(5000*16.0/ARGS["gbpp"]),
-    't_step_save'                  : int(1000*16.0/ARGS["gbpp"]),
+    't_step_stop'                  : Nt,
+    't_step_save'                  : SF,
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -201,7 +220,7 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 3,
     'weno_eps'                     : 1.0E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'riemann_solver'               : 2,
@@ -283,6 +302,3 @@ print(json.dumps({
     'fluid_pp(2)%pi_inf'           : gama*pia/(gama-1),
     # ==========================================================
 }))
-
-# ==============================================================================
-

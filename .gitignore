@@ -53,6 +53,8 @@ examples/*/viz/
 examples/*.jpg
 examples/*.png
 examples/*/workloads/
+examples/*/run-*/
+examples/*/logs/
 workloads/
 
 benchmarks/*batch/*/
