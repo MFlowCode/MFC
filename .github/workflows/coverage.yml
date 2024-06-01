@@ -1,14 +1,33 @@
-- name: Coverage Check
+name: Coverage Check
 on:
   push:
-
   pull_request:
-
   workflow_dispatch:
 
+jobs:
+  run:
+    name: Coverage Test on CodeCov
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Setup Ubuntu
+        run: |
+            sudo apt update -y
+            sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+          
+      - name: Clone - PR
+        uses: actions/checkout@v3
+        with:
+          path: pr
 
-  jobs:
-    - name: Upload coverage reports to Codecov
+      - name: Clone - Master
+        uses: actions/checkout@v3
+        with:
+          repository: MFlowCode/MFC
+          ref: master
+          path: master
+
+
+      - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
