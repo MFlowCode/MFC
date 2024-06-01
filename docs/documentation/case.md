@@ -57,7 +57,7 @@ You can add as many additional positional arguments as you may need.
 To run such a case, use the following format:
 
 ```shell
-./mfc.sh run <path/to/case.py> <positional arguments> <regular mfc.sh run arguments>
+./mfc.sh run <path/to/case.py> <mfc.sh run arguments> -- <case arguments>
 ```
 
 For example, to run the 3D_weak_scaling case with `gbpp=2`:
