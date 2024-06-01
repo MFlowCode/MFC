@@ -44,7 +44,7 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
                       "${target.get_install_binpath(case)}")
         elif [ "$binary" == "srun" ]; then
             (set -x; ${profiler}                            \
-                srun --ntasks-per-node ${tasks_per_node}    \
+                srun --ntasks ${nodes*tasks_per_node}       \
                      "${target.get_install_binpath(case)}")
         elif [ "$binary" == "mpirun" ]; then
             (set -x; ${profiler}     \
