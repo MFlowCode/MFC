@@ -113,11 +113,6 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fimplicit-none
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
-            # Stops error on this warning
-            # Casued by invalid linenum macros 
-            if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 11)
-                -Wno-error=coverage-invalid-line-number
-            endif()
 	    )
         add_link_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
