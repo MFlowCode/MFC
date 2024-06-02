@@ -183,7 +183,7 @@ SIMULATION.update({
     'R0_type': ParamType.INT,
     'integral_wrt': ParamType.LOG,
     'num_integrals': ParamType.INT,
-    'cu_mpi': ParamType.LOG,
+    'rdma_mpi': ParamType.LOG,
     'palpha_eps': ParamType.REAL,
     'ptgalpha_eps': ParamType.REAL,
     'pi_fac': ParamType.REAL,

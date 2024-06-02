@@ -11,7 +11,7 @@ parser.add_argument("dict", type=str, metavar="DICT")
 parser.add_argument("-s", "--scaling",       type=str, metavar="SCALING", choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
 parser.add_argument("-m", "--memory",        type=int, metavar="MEMORY",  help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.")
 parser.add_argument("-f", "--fidelity",      type=str, metavar="FIDELITY", choices=["ideal", "exact"], default="ideal")
-parser.add_argument("--cu_mpi",              type=str, metavar="FIDELITY", choices=["T", "F"], default="F")
+parser.add_argument("--rdma_mpi",            type=str, metavar="FIDELITY", choices=["T", "F"], default="F")
 parser.add_argument("--n-steps",             type=int, metavar="N", default=None)
 
 args = parser.parse_args()
@@ -189,7 +189,7 @@ tend = Nt * dt
 print(json.dumps({
     # Logistics ================================================
     'run_time_info'                : 'T',
-    'cu_mpi'                       : args.cu_mpi,
+    'rdma_mpi'                     : args.rdma_mpi,
     # ==========================================================
 
     # Computational Domain Parameters ==========================

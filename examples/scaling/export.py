@@ -16,9 +16,9 @@ def get_nums(arr):
 
 @dataclass(frozen=True, order=True)
 class Configuration:
-    nodes:  int
-    mem:    int
-    cu_mpi: bool
+    nodes:    int
+    mem:      int
+    rdma_mpi: bool
 
 @dataclass
 class Result:
@@ -47,7 +47,7 @@ for logpath in glob.glob(os.path.join(LDIR, "run-*-sim*")):
     runs[Configuration(
         nodes=int(pathels[1]),
         mem=int(pathels[2]),
-        cu_mpi=pathels[3] == 'T'
+        rdma_mpi=pathels[3] == 'T'
     )] = Result(
         ts_avg=statistics.mean(tss),
         mpi_avg=statistics.mean(mpis),
@@ -67,24 +67,24 @@ with open(os.path.join(CDIR, "export.csv"), "w") as f:
             [ getattr(runs[cfg], _.name) for _ in fields(Result) ] 
         )
 
-for cu_mpi in (False, True):
+for rdma_mpi in (False, True):
     with open(
-        os.path.join(CDIR, f"strong_scaling{'-cu_mpi' if cu_mpi else ''}.csv"),
+        os.path.join(CDIR, f"strong_scaling{'-rdma_mpi' if rdma_mpi else ''}.csv"),
         "w"
     ) as f:
         writer = csv.writer(f, delimiter=',')
 
         for nodes in sorted({
-            _.nodes for _ in runs.keys() if _.cu_mpi == cu_mpi
+            _.nodes for _ in runs.keys() if _.rdma_mpi == rdma_mpi
         }):
             row = (nodes*8,)
             for mem in sorted({
-                _.mem for _ in runs.keys() if _.nodes == nodes and _.cu_mpi == cu_mpi
+                _.mem for _ in runs.keys() if _.nodes == nodes and _.rdma_mpi == rdma_mpi
             }, reverse=True):
                 ref = runs[Configuration(nodes=sorted({
-                    _.nodes for _ in runs.keys() if _.cu_mpi == cu_mpi
-                })[0], mem=mem, cu_mpi=cu_mpi)]
-                run = runs[Configuration(nodes=nodes, mem=mem, cu_mpi=cu_mpi)]
+                    _.nodes for _ in runs.keys() if _.rdma_mpi == rdma_mpi
+                })[0], mem=mem, rdma_mpi=rdma_mpi)]
+                run = runs[Configuration(nodes=nodes, mem=mem, rdma_mpi=rdma_mpi)]
                 row = (*row,run.sim_t,ref.sim_t/nodes)
 
             writer.writerow(row)

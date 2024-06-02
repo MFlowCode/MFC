@@ -86,11 +86,15 @@ Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
 
-| Parameter        | Type           | Description                      |
-| ---:             |    :----:      |          :---                    |
-| `run_time_info`  | Logical        | Output run-time information      |
+| Parameter        | Type           | Description                               |
+| ---:             |    :----:      |          :---                             |
+| `run_time_info`  | Logical        | Output run-time information               |
+| `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
+- `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
+The underlying MPI implementation and communication infrastructure must support this
+feature, detecting GPU pointers and performing RDMA accordingly.
 
 ### 2. Computational Domain
 
