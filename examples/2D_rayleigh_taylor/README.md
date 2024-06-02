@@ -1,4 +1,4 @@
-# 2D Rayleigh-Taylor Instability (2D)
+# Rayleigh-Taylor Instability (2D)
 
 ## Final Condition
 
