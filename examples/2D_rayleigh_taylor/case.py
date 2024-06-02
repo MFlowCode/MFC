@@ -21,7 +21,7 @@ eps = 1e-6
 
 dx = lam/(Nx + 1)
 c = math.sqrt(1.4*1e5/1)
-cfl = 0.8
+cfl = 0.5
 dt = cfl*dx/c
 
 Nt = math.ceil(2/dt)

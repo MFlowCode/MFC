@@ -18,13 +18,13 @@ z1 = lam/2
 
 Nx = 99
 Ny = 1199
-Nz = 1199
+Nz = 99
 
 eps = 1e-6
 
 dx = lam/2/(Nx + 1)
 c = math.sqrt(1.4*1e5/1)
-cfl = 0.8
+cfl = 0.4
 dt = cfl*dx/c
 
 Nt = math.ceil(0.2/dt)
@@ -55,7 +55,7 @@ data = {
     # =======================================
 
     # Simulation Algorithm ==================
-        'model_eqns'        : 3,
+        'model_eqns'        : 2,
         'alt_soundspeed'    : 'F',
         'adv_alphan'        : 'T',
         'mixture_err'       : 'T',
@@ -71,11 +71,11 @@ data = {
         'riemann_solver'    : 2,
         'wave_speeds'       : 1,
         'bc_x%beg'          : -2,
-        'bc_x%end'          : -2,
+        'bc_x%end'          : -3,
         'bc_y%beg'          : -16,
         'bc_y%end'          : -16,
         'bc_z%beg'          : -2,
-        'bc_z%end'          : -2,
+        'bc_z%end'          : -3,
         'num_patches'       : 1,
         'num_fluids'        : 2,
     # =======================================
