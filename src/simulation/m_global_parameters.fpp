@@ -148,7 +148,7 @@ module m_global_parameters
         #:endfor
     #:endfor
     real(kind(0d0)), dimension(3) :: accel_bf
-!$acc declare create(accel_bf)
+    !$acc declare create(accel_bf)
 
     integer :: cpu_start, cpu_end, cpu_rate
 

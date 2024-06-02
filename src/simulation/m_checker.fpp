@@ -526,18 +526,18 @@ contains
 
         #:for DIR in ['x', 'y', 'z']
             if (bf_${DIR}$ .and. k_${DIR}$ == dflt_real) then
-                call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
-                                'Exiting ...')
+                call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
             elseif (bf_${DIR}$ .and. w_${DIR}$ == dflt_real) then
-                call s_mpi_abort('w_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
-                                'Exiting ...')
+                call s_mpi_abort('w_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
             elseif (bf_${DIR}$ .and. p_${DIR}$ == dflt_real) then
-                call s_mpi_abort('p_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
-                                'Exiting ...')
+                call s_mpi_abort('p_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
             elseif (bf_${DIR}$ .and. g_${DIR}$ == dflt_real) then
-                call s_mpi_abort('g_${DIR}$ must be specified if bf_${DIR}$ is true ' // &
-                                'Exiting ...')
-            endif
+                call s_mpi_abort('g_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
+            end if
         #:endfor
 
     end subroutine s_check_inputs
