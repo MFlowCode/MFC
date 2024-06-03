@@ -139,6 +139,17 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
+    logical :: bodyForces
+    logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
+    !< amplitude, frequency, and phase shift sinusoid in each direction
+    #:for dir in {'x', 'y', 'z'}
+        #:for param in {'k','w','p','g'}
+            real :: ${param}$_${dir}$
+        #:endfor
+    #:endfor
+    real(kind(0d0)), dimension(3) :: accel_bf
+    !$acc declare create(accel_bf)
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -576,6 +587,15 @@ contains
 
         ! Cuda aware MPI
         cu_tensor = .false.
+
+        bodyForces = .false.
+        bf_x = .false.; bf_y = .false.; bf_z = .false.
+        !< amplitude, frequency, and phase shift sinusoid in each direction
+        #:for dir in {'x', 'y', 'z'}
+            #:for param in {'k','w','p','g'}
+                ${param}$_${dir}$ = dflt_real
+            #:endfor
+        #:endfor
 
         do j = 1, num_probes_max
             do i = 1, 3

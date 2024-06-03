@@ -52,6 +52,8 @@ module m_rhs
     use m_helper
 
     use m_surface_tension
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none

@@ -218,6 +218,11 @@ for cmp in ["x", "y", "z"]:
     SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
 
+    for var in ["k", "w", "p", "g"]:
+        SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
+    SIMULATION[f'bf_{cmp}'] = ParamType.LOG
+
+
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
