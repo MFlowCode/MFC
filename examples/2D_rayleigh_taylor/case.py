@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+
+import math
+import json
+
+lam = 0.2
+h = 1.2
+k = 2*math.pi/lam
+amp = 0.05/k
+
+# Numerical setup
+x0 = -lam/2
+x1 = lam/2
+y0 = 0.
+y1 = h
+
+Nx = 199
+Ny = 1199
+
+eps = 1e-6
+
+dx = lam/(Nx + 1)
+c = math.sqrt(1.4*1e5/1)
+cfl = 0.5
+dt = cfl*dx/c
+
+Nt = math.ceil(2/dt)
+Ns = math.ceil(Nt/100)
+
+#Configuration case dictionary
+data = {
+    # Logistics =============================
+        #'case_dir'          : '\'.\'',
+        'run_time_info'     : 'T',
+    # =======================================
+
+    # Computational Domain ==================
+        'x_domain%beg'      : x0,
+        'x_domain%end'      : x1,
+        'y_domain%beg'      : y0,
+        'y_domain%end'      : y1,
+        'm'                 : Nx,
+        'n'                 : Ny,
+        'p'                 : 0,
+        'cyl_coord'        : 'F',
+        'dt'                : dt,
+        't_step_start'      : 0,
+        't_step_stop'       : Nt,
+        't_step_save'       : Ns,
+    # =======================================
+
+    # Simulation Algorithm ==================
+        'model_eqns'        : 3,
+        'alt_soundspeed'    : 'F',
+        'adv_alphan'        : 'T',
+        'mixture_err'       : 'T',
+        'mpp_lim'           : 'T',
+        'time_stepper'      : 3,
+        'avg_state'         : 2,
+        'weno_order'        : 5,
+        'weno_eps'          : 1e-16,
+        'mapped_weno'       : 'T',
+        'null_weights'      : 'F',
+        'mp_weno'           : 'T',
+        'weno_Re_flux'      : 'T',
+        'riemann_solver'    : 2,
+        'wave_speeds'       : 1,
+        'bc_x%beg'          : -2,
+        'bc_x%end'          : -2,
+        'bc_y%beg'          : -16,
+        'bc_y%end'          : -16,
+        'num_patches'       : 1,
+        'num_fluids'        : 2,
+    # =======================================
+
+    # Database Structure Parameters =========
+        'format'            : 1,
+        'precision'         : 2,
+        'prim_vars_wrt'     : 'T',
+        'parallel_io'       : 'T',
+    # =======================================
+
+    # Fluid Parameters (Heavy Gas) ==========
+        'fluid_pp(1)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
+        'fluid_pp(1)%pi_inf'           : 0.E+00,
+        'fluid_pp(1)%Re(1)'            : 1/0.0219,
+    # =======================================
+
+    # Fluid Parameters (Light Gas) ==========
+        'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
+        'fluid_pp(2)%pi_inf'           : 0.E+00,
+        'fluid_pp(2)%Re(1)'            : 1/0.0073,
+    # =======================================
+
+    # Body Forces ===========================
+        'bf_y'                      : 'T',
+        'k_y'                       : 0.,
+        'w_y'                       : 0.,
+        'p_y'                       : 0.,
+        'g_y'                       : -9.81,
+    # ======================================
+
+    # Water Patch ==========================
+        'patch_icpp(1)%geometry'    : 7,
+        'patch_icpp(1)%hcid'        : 204,
+        'patch_icpp(1)%x_centroid'  : 0,
+        'patch_icpp(1)%y_centroid'  : h/2,
+        'patch_icpp(1)%length_x'    : lam,
+        'patch_icpp(1)%length_y'    : h,
+        'patch_icpp(1)%vel(1)'      : 0.0,
+        'patch_icpp(1)%vel(2)'      : 0.0,
+        'patch_icpp(1)%pres'        : 1e5,
+        'patch_icpp(1)%alpha_rho(1)': (1-eps),
+        'patch_icpp(1)%alpha_rho(2)': eps*1,
+        'patch_icpp(1)%alpha(1)'    : 1-eps,
+        'patch_icpp(1)%alpha(2)'    : eps,
+    # ======================================
+
+}
+
+print(json.dumps(data))

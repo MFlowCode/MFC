@@ -70,6 +70,8 @@ module m_start_up
     use m_checker
 
     use m_surface_tension
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -154,7 +156,9 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt
+            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
+            g_x, g_y, g_z
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -176,6 +180,10 @@ contains
             end if
 
             close (1)
+
+            if ((bf_x) .or. (bf_y) .or. (bf_z)) then
+                bodyForces = .true.
+            endif
 
             ! Store m,n,p into global m,n,p
             m_glb = m
@@ -1281,6 +1289,7 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
+        if (bodyForces) call s_initialize_body_forces_module()
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
@@ -1424,6 +1433,7 @@ contains
         end if
 
         if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
+        if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

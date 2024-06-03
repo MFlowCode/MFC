@@ -668,8 +668,24 @@ The parameters are optionally used to define initial velocity profiles and pertu
 | ---:                   | :----:  |          :---                                  |
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
 
-- `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`). This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
+- `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`). i
+This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
 
+### 13. Body Forces
+
+| Parameter         | Type  | Description                                  |
+| ---:              | :---: | :---                                         |
+| `bf_x[y,z]`       | Logical | Enable body forces in the x[y,z] direction |
+| `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
+| `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
+| `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
+| `g_x[y,z]`        | Real    | Magnitude of bacground acceleration        |
+
+`k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
+
+$$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
+
+Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]` direction by convention.
 
 ## Enumerations
 
