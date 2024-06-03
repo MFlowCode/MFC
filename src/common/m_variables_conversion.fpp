@@ -157,10 +157,11 @@ contains
         end if
 
         if ( (hypoelasticity .or. hyperelasticity) .and. present(G)) then
+        !if ( hypoelasticity .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
             do s = stress_idx%beg, stress_idx%end
-                if (G > 0) then
+                if (G > 1d-3) then
                     E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
                     ! Additional terms in 2D and 3D
                     if ((s == stress_idx%beg + 1) .or. &
@@ -1018,7 +1019,7 @@ contains
                         end if
                     end if
 
-                    if ( hypoelasticity .and. .not. bubbles ) then
+                    if ( hypoelasticity ) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1038,13 +1039,14 @@ contains
                         end do
                     end if
 
-                    if (hyperelasticity) then
-                      !$acc loop seq
-                      do i = xibeg, xiend
-                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) / rho_K
-                      end do
+                    if ( hyperelasticity ) then 
+                         !$acc loop seq
+                         do i = xibeg, xiend
+                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                         / rho_K
+                          !print *, 'i ::',i,',j,k,l ::',j,k,l,', qprim ::',qK_prim_vf(i)%sf(j,k,l)
+                         end do
                     end if
-
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -1059,11 +1061,13 @@ contains
         ! s_calculate_btensor has its own triple nested for loop with openacc
 #ifdef MFC_SIMULATION
         if (hyperelasticity) then 
-           call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf)
+           ! MAURO HERE
+           call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
+
            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-           do l = izb, ize
-              do k = iyb, iye
-                 do j = ixb, ixe
+           do l = 0, p
+              do k = 0, n
+                 do j = 0, m
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
@@ -1072,8 +1076,11 @@ contains
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                    if (G_K > 1d-3) then
+                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
                                  G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                        !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
+                    end if
                  end do
               end do
            end do
@@ -1087,10 +1094,10 @@ contains
         end do
 
         if (hyperelasticity) then 
-          call s_calculate_btensor(qK_prim_vf, q_btensor, ixb, ixe, iyb, iye, izb, ize)
-          do l = izb, ize
-             do k = iyb, iye
-                 do j = ixb, ixe
+          call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+          do l = 0, p
+             do k = 0, n
+                do j = 0, m
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
@@ -1098,8 +1105,10 @@ contains
                     ! If pre-processing, use non acc mixture subroutines
                     call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                              rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
+                    if ( G_K > 1d-3 ) then
+                       qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
                            G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
+                    end if
                  end do
              end do
           end do
@@ -1264,13 +1273,15 @@ contains
                     end if
 
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
-                    if ( hyperelasticity .and. .not. bubbles ) then
+                    if ( hyperelasticity ) then
                         ! adding the elastic contribution
                         do i = xibeg, xiend
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                        if (G > 1d-3) then
+                            q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
                               G*f_elastic_energy(q_btensor, j, k, l)
+                        end if
                     end if
 
                 end do
@@ -1442,22 +1453,22 @@ contains
         do l = zb, ze
             do k = yb, ye
                 do j = xb, xe
-                call s_compute_gradient_xi(q_prim_vf, xb, xe, yb, &
-                   ye, zb, ze, j, k, l, tensora, tensorb)
+                  call s_compute_gradient_xi(q_prim_vf, xb, xe, yb, &
+                     ye, zb, ze, j, k, l, tensora, tensorb)
                 ! 1: 1D, 3: 2D, 6: 3D
-                btensor(1)%sf(j, k, l) = tensorb(1)
-                if (num_dims > 1) then ! 2D
+                   btensor(1)%sf(j,k,l) = tensorb(1)
+                !if (num_dims > 1) then ! 2D
                    btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
-                end if
-                if (num_dims > 2) then ! 3D
+                !   btensor(3)%sf(j,k,l) = tensorb(4)
+                !end if
+                !if (num_dims > 2) then ! 3D
                    btensor(3)%sf(j,k,l) = tensorb(3)
                    btensor(4)%sf(j,k,l) = tensorb(5)
                    btensor(5)%sf(j,k,l) = tensorb(6)
                    btensor(6)%sf(j,k,l) = tensorb(9)
-                end if
+                !end if
                 ! store the determinant at the last entry of the btensor sf
-                btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+                  btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
            end do
         end do
@@ -1471,50 +1482,53 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_calculate_btensor_acc(q_prim_vf, btensor)
+    subroutine s_calculate_btensor_acc(q_prim_vf, btensor, xb, xe, yb, ye, zb, ze)
+
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(OUT) :: btensor
+        integer, intent(IN) :: xb, xe, yb, ye, zb, ze
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb 
         integer :: j, k, l, i
 
-        if (num_dims == 1) then
+!        if (num_dims == 1) then
+!!          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+!         do l = izb, ize
+!            do k = iyb, iye
+!               do j = ixb, ixe
+!                  call s_compute_gradient_xi1d_acc(q_prim_vf, ixb, ixe, iyb, &
+!                  iye, izb, ize, j, k, l, tensora, tensorb)
+!                  !! 1: 1D, 3: 2D, 6: 3D
+!                   btensor(1)%sf(j, k, l) = tensorb(1)
+!                   !! store the determinant at the last entry of the btensor sf
+!                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+!                end do
+!             end do
+!          end do
+!          !$acc end parallel loop
+!        else if (num_dims == 2) then ! 2D
+!          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+!          do l = izb, ize
+!             do k = iyb, iye
+!                do j = ixb, ixe
+!                   call s_compute_gradient_xi2d_acc(q_prim_vf, ixb, ixe, iyb, &
+!                   iye, izb, ize, j, k, l, tensora, tensorb)
+!                   !! 1: 1D, 3: 2D, 6: 3D
+!                   btensor(1)%sf(j, k, l) = tensorb(1)
+!                   btensor(2)%sf(j,k,l) = tensorb(2)
+!                   btensor(3)%sf(j,k,l) = tensorb(4)
+!                   !! store the determinant at the last entry of the btensor sf
+!                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
+!                end do
+!             end do
+!          end do
+!          !$acc end parallel loop
+!        else ! 3D 
+
           !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-          do l = izb, ize
-             do k = iyb, iye
-                do j = ixb, ixe
-                   call s_compute_gradient_xi1d_acc(q_prim_vf, ixb, ixe, iyb, &
-                   iye, izb, ize, j, k, l, tensora, tensorb)
-                   !! 1: 1D, 3: 2D, 6: 3D
-                   btensor(1)%sf(j, k, l) = tensorb(1)
-                   !! store the determinant at the last entry of the btensor sf
-                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
-                end do
-             end do
-          end do
-          !$acc end parallel loop
-        else if (num_dims == 2) then ! 2D
-          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-          do l = izb, ize
-             do k = iyb, iye
-                do j = ixb, ixe
-                   call s_compute_gradient_xi2d_acc(q_prim_vf, ixb, ixe, iyb, &
-                   iye, izb, ize, j, k, l, tensora, tensorb)
-                   !! 1: 1D, 3: 2D, 6: 3D
-                   btensor(1)%sf(j, k, l) = tensorb(1)
-                   btensor(2)%sf(j,k,l) = tensorb(2)
-                   btensor(3)%sf(j,k,l) = tensorb(4)
-                   !! store the determinant at the last entry of the btensor sf
-                   btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
-                end do
-             end do
-          end do
-          !$acc end parallel loop
-        else ! 3D 
-          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-          do l = izb, ize
-             do k = iyb, iye
-                do j = ixb, ixe
+          do l = zb, ze
+             do k = yb, ye
+                do j = xb, xe
 
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
@@ -1523,14 +1537,15 @@ contains
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
         ! 1D
-        if(j == ixb) then
+        if(j == xb) then
            ! dxix/dx
-           tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+           !print *, ' grid check xb :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+             tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xibeg)%sf(j + 3, k, l) &
                       -  3d0*q_prim_vf(xibeg)%sf(j + 4, k, l) ) &
-                     /(12d0*(x_cb(j+1) - x_cb(j)))
+                     /(12d0*(x_cb(j + 1) - x_cb(j)))
              ! dxiy / dx
              tensora(2) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j + 1, k, l) &
@@ -1539,14 +1554,17 @@ contains
                       -  3d0*q_prim_vf(xibeg+1)%sf(j + 4, k, l) ) &
                      /(12d0*(x_cb(j + 1) - x_cb(j)))
              ! dxiz / dx
-             tensora(7) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(3) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j + 3, k, l) &
                       -  3d0*q_prim_vf(xiend)%sf(j + 4, k, l) ) &
                      /(12d0*(x_cb(j + 1) - x_cb(j)))
+           !print *, ' grid check xb :: ',tensora(1),tensora(2),tensora(7)
 
-        else if (j == ixb + 1) then
+        else if (j == xb + 1) then
+           !print *, ' grid check xb1 :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
            ! dxix/dx
            tensora(1) = (-3d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
@@ -1562,14 +1580,17 @@ contains
                       +      q_prim_vf(xibeg+1)%sf(j + 3, k, l)) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
              ! dxiz / dx
-             tensora(7) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
+             tensora(3) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
                       +      q_prim_vf(xiend)%sf(j + 3, k, l)) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
+           !print *, ' grid check xb1 :: ',tensora(1),tensora(2),tensora(7)
 
-        else if (j == ixe - 1) then
+        else if (j == xe - 1) then
+           !print *, ' grid check xe1 :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
            ! dxix/dx
            tensora(1) = (3d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
@@ -1585,13 +1606,17 @@ contains
                       -      q_prim_vf(xibeg+1)%sf(j - 3, k, l)) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
              ! dxiz / dx
-             tensora(7) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
+             tensora(3) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
                       -      q_prim_vf(xiend)%sf(j - 3, k, l)) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
-        else if (j == ixe) then
+           !print *, ' grid check xe1 :: ',tensora(1),tensora(2),tensora(7)
+
+        else if (j == xe) then
+           !print *, ' grid check xe :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
            ! dxix/dx
            tensora(1) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j - 1, k, l) &
@@ -1607,12 +1632,14 @@ contains
                       +  3d0*q_prim_vf(xibeg+1)%sf(j - 4, k, l) ) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
              ! dxiz / dx
-             tensora(7) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(3) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j - 3, k, l) &
                       +  3d0*q_prim_vf(xiend)%sf(j - 4, k, l) ) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
+           !print *, ' grid check xe :: ',tensora(1),tensora(2),tensora(7)
+
         else
            ! dxix/dx
            tensora(1) = (   q_prim_vf(xibeg)%sf(j - 2, k, l) &
@@ -1627,7 +1654,7 @@ contains
                       -     q_prim_vf(xibeg+1)%sf(j + 2, k, l)) &
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
              ! dxiz / dx
-             tensora(7) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
+             tensora(3) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -     q_prim_vf(xiend)%sf(j + 2, k, l)) &
@@ -1636,7 +1663,9 @@ contains
         end if  
 
         ! 2D
-          if(k == iyb) then
+          if(k == yb) then
+           !print *, ' grid check yb :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
              ! dxix / dy
              tensora(4) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
@@ -1652,14 +1681,17 @@ contains
                       -  3d0*q_prim_vf(xibeg+1)%sf(j, k + 4, l) ) &
                      /(12d0*(y_cb(k + 1) - y_cb(k)))
              ! dxiz / dy
-             tensora(8) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(6) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k + 3, l) &
                       -  3d0*q_prim_vf(xiend)%sf(j, k + 4, l) ) &
                      /(12d0*(y_cb(k + 1) - y_cb(k)))
+           !print *, ' grid check yb :: ',tensora(4),tensora(5),tensora(8)
 
-          else if (k == iyb + 1) then
+          else if (k == yb + 1) then
+           !print *, ' grid check yb1 :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
              ! dxix / dy
              tensora(4) = (-3d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
@@ -1675,13 +1707,17 @@ contains
                       +      q_prim_vf(xibeg+1)%sf(j, k + 3, l)) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
              ! dxiz / dy
-             tensora(8) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
+             tensora(6) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       +      q_prim_vf(xiend)%sf(j, k + 3, l)) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
-          else if (k == iye - 1) then
+           !print *, ' grid check yb1 :: ',tensora(4),tensora(5),tensora(8)
+
+          else if (k == ye - 1) then
+           !print *, ' grid check ye1 :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
              ! dxix / dy
              tensora(4) = (3d0*q_prim_vf(xibeg)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
@@ -1697,13 +1733,17 @@ contains
                       -      q_prim_vf(xibeg+1)%sf(j, k - 3, l)) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
              ! dxiz / dy
-             tensora(8) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
+             tensora(6) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       -      q_prim_vf(xiend)%sf(j, k - 3, l)) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
-          else if (k == iye) then
+           !print *, ' grid check yb1 :: ',tensora(4),tensora(5),tensora(8)
+
+          else if (k == ye) then
+           !print *, ' grid check ye :: ',q_prim_vf(xibeg+1)%sf(j, k, l) 
+
              ! dxix / dy
              tensora(4) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j, k - 1, l) &
@@ -1719,7 +1759,7 @@ contains
                       +  3d0*q_prim_vf(xibeg+1)%sf(j, k - 4, l) ) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
              ! dxiz / dy
-             tensora(8) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(6) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k - 3, l) &
@@ -1739,7 +1779,7 @@ contains
                       -     q_prim_vf(xibeg+1)%sf(j, k + 2, l)) &
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
              ! dxiz / dy
-             tensora(8) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
+             tensora(6) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -     q_prim_vf(xiend)%sf(j, k + 2, l)) &
@@ -1747,16 +1787,18 @@ contains
           end if  
 
         ! 3D
-          if(l == izb) then
+          if(l == zb) then
+           !print *, ' grid check zb :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
              ! dxix / dz
-             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j,k,l) &
+             tensora(7) = (-25d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j,k,l+1) &
                       - 36d0*q_prim_vf(xibeg)%sf(j,k,l+2) &
                       + 16d0*q_prim_vf(xibeg)%sf(j,k,l+3) &
                       -  3d0*q_prim_vf(xibeg)%sf(j,k,l+4) ) &
                      /(12d0*(z_cb(l + 1) - z_cb(l)))
              ! dxiy / dz
-             tensora(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
+             tensora(8) = (-25d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j,k,l+1) &
                       - 36d0*q_prim_vf(xibeg+1)%sf(j,k,l+2) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j,k,l+3) &
@@ -1769,16 +1811,18 @@ contains
                       + 16d0*q_prim_vf(xiend)%sf(j,k,l + 3) &
                       -  3d0*q_prim_vf(xiend)%sf(j,k,l + 4) ) &
                      /(12d0*(z_cb(l + 1) - z_cb(l)))
-          else if (l == izb + 1) then
+          else if (l == zb + 1) then
+           !print *, ' grid check zb1 :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
              ! dxix / dz
-             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j,k,l - 1) &
+             tensora(7) = (-3d0*q_prim_vf(xibeg)%sf(j,k,l - 1) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg)%sf(j,k,l + 1) &
                       -  6d0*q_prim_vf(xibeg)%sf(j,k,l + 2) &
                       +      q_prim_vf(xibeg)%sf(j,k,l + 3)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
              ! dxiy / dz
-             tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j,k,l - 1) &
+             tensora(8) = (-3d0*q_prim_vf(xibeg+1)%sf(j,k,l - 1) &
                       - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg+1)%sf(j,k,l + 1) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j,k,l + 2) &
@@ -1791,16 +1835,18 @@ contains
                       -  6d0*q_prim_vf(xiend)%sf(j,k,l + 2) &
                       +      q_prim_vf(xiend)%sf(j,k,l + 3)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
-          else if (l == ize - 1) then
+          else if (l == ze - 1) then
+           !print *, ' grid check ze1 :: ',q_prim_vf(xiend)%sf(j, k, l) 
+
              ! dxix / dz
-             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
+             tensora(7) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       -      q_prim_vf(xibeg)%sf(j, k , l - 3)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
              ! dxiy / dz
-             tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
+             tensora(8) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
@@ -1813,16 +1859,18 @@ contains
                       +  6d0*q_prim_vf(xiend)%sf(j, k , l - 2) &
                       -      q_prim_vf(xiend)%sf(j, k , l - 3)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
-          else if (l == ize) then
+          else if (l == ze) then
+           !print *, ' grid check ze :: ',q_prim_vf(xiend)%sf(j, k, l) 
+
              ! dxix / dz
-             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(7) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
                       +  3d0*q_prim_vf(xibeg)%sf(j, k , l - 4) ) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
              ! dxiy / dz
-             tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(8) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
@@ -1837,13 +1885,13 @@ contains
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else
              ! dxix / dz
-             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
+             tensora(7) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
              ! dxiy / dz
-             tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+             tensora(8) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
@@ -1855,7 +1903,6 @@ contains
                       -     q_prim_vf(xiend)%sf(j, k , l + 2)) &
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
-
 
 
     ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
@@ -1873,6 +1920,13 @@ contains
             tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
                             - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
+        ! error checking
+        if (tensorb(tensor_size) .lt. 0d0 .or. tensorb(tensor_size) .gt. 3d0) then
+           tensorb(tensor_size) = 1d0
+        end if 
+        ! print *, 'i, j, k :: ', j,' ', k,' ',l,',det ::',tensorb(tensor_size)
+        !    stop
+        !end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
     ! tensorb is the adjoint, tensora becomes the inverse
@@ -1884,22 +1938,22 @@ contains
         end do 
 
     ! STEP 3: computing F tranpose F
-        tensorb(1) = tensora(1)**2
-            tensorb(1) = tensorb(1) + tensora(4)**2 + tensora(7)**2
-            tensorb(5) = tensora(2) + tensora(5)**2 + tensora(8)**2
-            tensorb(9) = tensora(3) + tensora(6)**2 + tensora(9)**2
-            tensorb(2) = tensora(1)*tensora(2) + tensora(4)*tensora(5) + tensora(7)*tensora(8)
-            tensorb(3) = tensora(1)*tensora(3) + tensora(4)*tensora(6) + tensora(7)*tensora(9)
-            tensorb(6) = tensora(2)*tensora(3) + tensora(5)*tensora(6) + tensora(8)*tensora(9)
+        !tensorb(1) = tensora(1)**2
+            tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
+            tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
+            tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
+            tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
+            tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
+            tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
             tensorb(4) = tensorb(2)
             tensorb(7) = tensorb(3)
-            tensorb(8) = tensorb(4)
+            tensorb(8) = tensorb(6)
 
 
                    !call s_compute_gradient_xi3d_acc(q_prim_vf, ixb, ixe, iyb, &
                    !iye, izb, ize, j, k, l, tensora, tensorb)
                    !! 1: 1D, 3: 2D, 6: 3D
-                   btensor(1)%sf(j, k, l) = tensorb(1)
+                   btensor(1)%sf(j,k,l) = tensorb(1)
                    btensor(2)%sf(j,k,l) = tensorb(2)
                    btensor(3)%sf(j,k,l) = tensorb(3)
                    btensor(4)%sf(j,k,l) = tensorb(5)
@@ -1911,7 +1965,10 @@ contains
              end do
           end do
           !$acc end parallel loop
-        end if
+
+!        end if
+
+    stop
 
     end subroutine s_calculate_btensor_acc
 

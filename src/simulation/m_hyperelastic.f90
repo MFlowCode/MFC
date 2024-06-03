@@ -32,20 +32,28 @@ module m_hyperelastic
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
         real(kind(0d0)), dimension(b_size-1) :: tensor
-        real(kind(0d0)) :: trace, invariant1
+        real(kind(0d0)) :: trace
         integer :: i, j, k, l !< Generic loop iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(trace,invariant1)
-        do l = iz%beg, iz%end
-           do k = iy%beg, iy%end
-              do j = ix%beg, ix%end
+        !$acc parallel loop collapse(3) gang vector default(present) private(trace)
+        do l = 0, p
+           do k = 0, n
+              do j = 0, m
                     ! tensor is the symmetric tensor & calculate the trace of the tensor
-                    trace = btensor(1)%sf(j,k,l)
+                    !trace = btensor(1)%sf(j,k,l)
                     !if (num_dims == 2) then
                     !    trace = trace + btensor(3)%sf(j,k,l)
                     !else
-                        trace = trace + btensor(4)%sf(j,k,l) + btensor(6)%sf(j,k,l)
+                        trace = btensor(1)%sf(j,k,l) + btensor(4)%sf(j,k,l) + btensor(6)%sf(j,k,l)
                     !end if
+                    ! invariant calculation, saving it in the q_prim_vf field
+                    !invariant1 = btensor(1)%sf(j, k, l)
+                    !if (num_dims == 2) then
+                    !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
+                    !elseif (num_dims == 3) then
+                    !    invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+                    !end if
+
                     ! calculate the deviatoric of the tensor
                     btensor(1)%sf(j,k,l) = btensor(1)%sf(j,k,l) - (1d0/3d0)*trace
                     !if (num_dims == 2) then
@@ -62,17 +70,13 @@ module m_hyperelastic
                         q_prim_vf(strxb+i)%sf(j, k, l) = btensor(i)%sf(j,k,l)/btensor(b_size)%sf(j, k, l)
                     end do
 
-                    ! invariant calculation, saving it in the q_prim_vf field
-                    invariant1 = btensor(1)%sf(j, k, l)
-                    !if (num_dims == 2) then
-                    !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
-                    !elseif (num_dims == 3) then
-                        invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-                    !end if
 
                     ! compute the invariant without the elastic modulus
-                    q_prim_vf(xiend+1)%sf(j,k,l) = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)
-
+                    !if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then 
+                        q_prim_vf(xiend+1)%sf(j,k,l) = 0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)                       
+                   ! else 
+                   !     q_prim_vf(xiend+1)%sf(j,k,l) = 1d-12
+                   ! end if                    
                 end do
             end do
         end do

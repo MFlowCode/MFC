@@ -48,6 +48,8 @@ f_elastic_energy
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
         if(j == xb) then
            ! dxix/dx
+           print *, ' grid check :: ',q_prim_vf(xibeg)%sf(j, k, l) 
+
            tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &
@@ -221,7 +223,7 @@ f_elastic_energy
 
           if(l == zb) then
              ! dxix / dz
-             tensora(3) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(7) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       - 36d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg)%sf(j, k , l + 3) &
@@ -229,7 +231,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l + 1) - z_cb(l)))
           else if (l == zb + 1) then
              ! dxix / dz
-             tensora(3) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
+             tensora(7) = (-3d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       - 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg)%sf(j, k , l + 2) &
@@ -237,7 +239,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ze - 1) then
              ! dxix / dz
-             tensora(3) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
+             tensora(7) = (3d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
@@ -245,7 +247,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ze) then
              ! dxix / dz
-             tensora(3) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
+             tensora(7) =(25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg)%sf(j, k , l - 3) &
@@ -253,7 +255,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else
              ! dxix / dz
-             tensora(3) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
+             tensora(7) = ( q_prim_vf(xibeg)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg)%sf(j, k , l + 2)) &
@@ -262,7 +264,7 @@ f_elastic_energy
 
           if(l == zb) then
              ! dxiy / dz
-             tensora(6) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(8) = (-25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       - 36d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
                       + 16d0*q_prim_vf(xibeg+1)%sf(j, k , l + 3) &
@@ -270,7 +272,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l+1) - z_cb(l)))
           else if (l == zb + 1) then
              ! dxiy / dz
-             tensora(6) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
+             tensora(8) = (-3d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       - 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -  6d0*q_prim_vf(xibeg+1)%sf(j, k , l + 2) &
@@ -278,7 +280,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ze - 1) then
              ! dxiy / dz
-             tensora(6) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
+             tensora(8) = (3d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       + 10d0*q_prim_vf(xibeg+1)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       +  6d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
@@ -286,7 +288,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           else if (l == ze) then
              ! dxiy / dz
-             tensora(6) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
+             tensora(8) =(25d0*q_prim_vf(xibeg+1)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 36d0*q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 16d0*q_prim_vf(xibeg+1)%sf(j, k , l - 3) &
@@ -294,7 +296,7 @@ f_elastic_energy
                      /(12d0*(z_cb(l) - z_cb(l-1)))
           else
              ! dxiy / dz
-             tensora(6) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
+             tensora(8) = ( q_prim_vf(xibeg+1)%sf(j, k , l - 2) &
                       - 8d0*q_prim_vf(xibeg+1)%sf(j, k , l - 1) &
                       + 8d0*q_prim_vf(xibeg+1)%sf(j, k , l + 1) &
                       -     q_prim_vf(xibeg+1)%sf(j, k , l + 2)) &
@@ -303,7 +305,7 @@ f_elastic_energy
 
           if(j == xb) then
              ! dxiz / dx
-             tensora(7) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(3) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j + 3, k, l) &
@@ -311,7 +313,7 @@ f_elastic_energy
                      /(12d0*(x_cb(j + 1) - x_cb(j)))
           else if (j == xb + 1) then
              ! dxiz / dx
-             tensora(7) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
+             tensora(3) = (-3d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j + 2, k, l) &
@@ -319,7 +321,7 @@ f_elastic_energy
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == xe - 1) then
              ! dxiz / dx
-             tensora(7) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
+             tensora(3) = (3d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
@@ -327,7 +329,7 @@ f_elastic_energy
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else if (j == xe) then
              ! dxiz / dx
-             tensora(7) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(3) = (25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j - 3, k, l) &
@@ -335,7 +337,7 @@ f_elastic_energy
                      /(12d0*(x_cb(j) - x_cb(j - 1)))
           else
              ! dxiz / dx
-             tensora(7) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
+             tensora(3) = ( q_prim_vf(xiend)%sf(j - 2, k, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j - 1, k, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j + 1, k, l) &
                       -     q_prim_vf(xiend)%sf(j + 2, k, l)) &
@@ -344,7 +346,7 @@ f_elastic_energy
 
           if(k == yb) then
              ! dxiz / dy
-             tensora(8) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(6) = (-25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       - 36d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
                       + 16d0*q_prim_vf(xiend)%sf(j, k + 3, l) &
@@ -352,7 +354,7 @@ f_elastic_energy
                      /(12d0*(y_cb(k+1) - y_cb(k)))
           else if (k == yb + 1) then
              ! dxiz / dy
-             tensora(8) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
+             tensora(6) = (-3d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       - 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       + 18d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -  6d0*q_prim_vf(xiend)%sf(j, k + 2, l) &
@@ -360,7 +362,7 @@ f_elastic_energy
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == ye - 1) then
              ! dxiz / dy
-             tensora(8) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
+             tensora(6) = (3d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       + 10d0*q_prim_vf(xiend)%sf(j,k,l) &
                       - 18d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       +  6d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
@@ -368,7 +370,7 @@ f_elastic_energy
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
           else if (k == ye) then
              ! dxiz / dy
-             tensora(8) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
+             tensora(6) =(25d0*q_prim_vf(xiend)%sf(j, k, l) &
                       - 48d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 36d0*q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 16d0*q_prim_vf(xiend)%sf(j, k - 3, l) &
@@ -376,7 +378,7 @@ f_elastic_energy
                      /(12d0*(y_cb(k) - y_cb(k - 1)))
           else
              ! dxiz / dy
-             tensora(8) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
+             tensora(6) = ( q_prim_vf(xiend)%sf(j, k - 2, l) &
                       - 8d0*q_prim_vf(xiend)%sf(j, k - 1, l) &
                       + 8d0*q_prim_vf(xiend)%sf(j, k + 1, l) &
                       -     q_prim_vf(xiend)%sf(j, k + 2, l)) &
@@ -456,10 +458,14 @@ f_elastic_energy
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
         end if
         ! error checking
-        if (determinant == 0) then
-            print *, 'determinant :: ', determinant
-            print *, 'ERROR: Determinant was zero'
-            stop
+        !if (determinant == 0) then
+        !    print *, 'determinant :: ', determinant
+        !    print *, 'ERROR: Determinant was zero'
+        !    stop
+        !end if
+        if (determinant .lt. 0d0 .or. determinant .gt. 2d0) then
+         print *, 'i, j, k :: ', j,' ', k,' ',l,',det ::',tensorb(tensor_size)
+        !    stop
         end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
@@ -476,15 +482,15 @@ f_elastic_energy
             tensorb(3) = tensorb(2)
             tensorb(4) = tensora(2)**2 + tensora(4)**2
         elseif (num_dims == 3) then
-            tensorb(1) = tensorb(1) + tensora(4)**2 + tensora(7)**2
-            tensorb(5) = tensora(2) + tensora(5)**2 + tensora(8)**2
-            tensorb(9) = tensora(3) + tensora(6)**2 + tensora(9)**2
-            tensorb(2) = tensora(1)*tensora(2) + tensora(4)*tensora(5) + tensora(7)*tensora(8)
-            tensorb(3) = tensora(1)*tensora(3) + tensora(4)*tensora(6) + tensora(7)*tensora(9)
-            tensorb(6) = tensora(2)*tensora(3) + tensora(5)*tensora(6) + tensora(8)*tensora(9)
+            tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
+            tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
+            tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
+            tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
+            tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
+            tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
             tensorb(4) = tensorb(2)
             tensorb(7) = tensorb(3)
-            tensorb(8) = tensorb(4)
+            tensorb(8) = tensorb(6)
         end if
     ! STEP 4: store the determinant of F in the last entry of the tensor
         tensorb(tensor_size) = determinant
@@ -1212,11 +1218,11 @@ f_elastic_energy
 
         f_elastic_energy = 0d0
         invariant1 = btensor(1)%sf(j, k, l)
-        if (num_dims == 2) then
-            invariant1 = invariant1 + btensor(3)%sf(j, k, l)
-        elseif (num_dims == 3) then
+        !if (num_dims == 2) then
+        !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
+        !elseif (num_dims == 3) then
             invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-        end if
+        !end if
 
         ! compute the invariant without the elastic modulus
         f_elastic_energy = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)

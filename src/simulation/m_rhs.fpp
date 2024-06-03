@@ -722,7 +722,7 @@ contains
                 end do
             end do
         end if
-
+        print *, "I got here A"
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -731,6 +731,7 @@ contains
             ix, iy, iz, &
             q_btensor%vf)
         call nvtxEndRange
+        print *, "I got here B"
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
           if ( hyperelasticity ) then
@@ -741,6 +742,7 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
+        print *, "I got here c"
 
         if (t_step == t_step_stop) return
         ! ==================================================================
@@ -861,6 +863,7 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
+        print *, "I got here d"
 
             ! Computing Riemann Solver Flux and Source Flux =================
             call nvtxStartRange("RHS_riemann_solver")
@@ -880,6 +883,7 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
+        print *, "I got here e"
 
             ! ===============================================================
 
