@@ -37,6 +37,7 @@ COMMON = {
     'file_per_process': ParamType.LOG,
     'relax': ParamType.LOG,
     'relax_model': ParamType.INT,
+    'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
 }
 
@@ -105,7 +106,7 @@ for p_id in range(1, 10+1):
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]: 
+                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
 
     # (cameron): This parameter has since been removed.
@@ -217,6 +218,11 @@ for cmp in ["x", "y", "z"]:
     SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
 
+    for var in ["k", "w", "p", "g"]:
+        SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
+    SIMULATION[f'bf_{cmp}'] = ParamType.LOG
+
+
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
@@ -288,6 +294,7 @@ POST_PROCESS.update({
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
+    'cf_wrt': ParamType.LOG
 })
 
 for cmp_id in range(1,3+1):

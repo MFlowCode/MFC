@@ -191,6 +191,8 @@ module m_derived_types
         integer :: hcid
         !! id for hard coded initial condition
 
+        real(kind(0d0)) :: cf_val !! color function value
+
     end type ic_patch_parameters
 
     type ib_patch_parameters
