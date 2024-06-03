@@ -18,6 +18,7 @@ project(MFC LANGUAGES C CXX Fortran)
 
 option(MFC_MPI           "Build with MPI"       ON)
 option(MFC_OpenACC       "Build with OpenACC"  OFF)
+option(MFC_GCov          "Build with GCov"     OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"   OFF)
 option(MFC_SIMULATION    "Build simulation"    OFF)
 option(MFC_POST_PROCESS  "Build post_process"  OFF)
@@ -106,17 +107,32 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
     )
 
+    if (MFC_GCov)
+
+        # Warning present in gcc versions > 11 that is treated as an error
+        # This flag doesn't exist in gcc versions <= 11
+        if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 11)
+            add_compile_options(
+                -Wno-error=coverage-invalid-line-number
+            )
+        endif()
+
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
+            $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
+	    )
+
+        add_link_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
+            $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
+        )
+    endif()
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
-            $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
-            $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
-	    )
-        add_link_options(
-            $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
-            $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
         )
     endif()
 
