@@ -4,7 +4,7 @@
 
 You can either download MFC's [latest release from GitHub](https://github.com/MFlowCode/MFC/releases/latest) or clone the repository:
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2PVNS40H"}
 git clone https://github.com/MFlowCode/MFC.git
 cd MFC
 ```
@@ -19,13 +19,13 @@ Please select your desired configuration from the list bellow:
 
 - **On supported clusters:** Load environment modules
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2QRHCH0W"}
 . ./mfc.sh load
 ```
 
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2RCHGDB3"}
 sudo apt update
 sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++ \
@@ -36,7 +36,7 @@ sudo apt install tar wget make cmake gcc g++ \
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2SYBY4ZR"}
 sudo pacman -Syu
 sudo pacman -S base-devel coreutils  \
                  git ninja gcc-fortran \
@@ -62,12 +62,14 @@ On Windows, you can either use Intel Compilers with the standard Microsoft toolc
    <summary><h3>Windows + Intel (Native)</h3></summary>
 
 Install the latest version of:
+
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
 - [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
 - [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
 
 Then, in order to initialize your development environment, open a terminal window and run:
-```shell
+
+```shell {"id":"01HZFPNJRJKJ897YPN2TFT7D3V"}
 "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 ```
 
@@ -90,20 +92,20 @@ You can now follow the appropriate instructions for your distribution.
 <details>
   <summary><h3>MacOS</h3></summary>
 
-  - **If you use [ZSH]** (Verify with `echo $SHELL`)
+- **If you use [ZSH]** (Verify with `echo $SHELL`)
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2V88SDBX"}
 touch ~/.zshrc
 open ~/.zshrc
 ```
 
-  - **If you use [BASH]** (Verify with `echo $SHELL`)
-  
-```shell
+- **If you use [BASH]** (Verify with `echo $SHELL`)
+
+```shell {"id":"01HZFPNJRJKJ897YPN2XN8DXFZ"}
 touch ~/.bash_profile
 open ~/.bash_profile
 ```
-  
+
 An editor should open.
 Please paste the following lines into it before saving the file.
 If you wish to use a version of GNU's GCC other than 13, modify the first assignment.
@@ -111,7 +113,7 @@ These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't
 Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9).
 We do *not* support `clang` due to conflicts with the Silo dependency.
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN2ZTZJWVH"}
 export MFC_GCC_VER=13
 export CC=gcc-$MFC_GCC_VER
 export CXX=g++-$MFC_GCC_VER
@@ -120,7 +122,7 @@ export FC=gfortran-$MFC_GCC_VER
 
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN31QHVWXQ"}
 brew install wget python cmake gcc@$MFC_GCC_VER mpich
 ```
 
@@ -133,19 +135,21 @@ They will download the dependencies MFC requires to build itself.
 
 Docker is a lightweight, cross-platform, and performant alternative to Virtual Machines (VMs).
 We build a Docker Image that contains the packages required to build and run MFC on your local machine.
-  
+
 First install Docker and Git:
+
 - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
 - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
 - Other systems:
-```shell
+
+```shell {"id":"01HZFPNJRJKJ897YPN34Y40YAF"}
 sudo apt install git docker # Debian / Ubuntu via Aptitude
 sudo pacman -S git docker   # Arch Linux via Pacman
 ```
 
 Once Docker and Git are installed on your system, clone MFC with
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN383W8K9Y"}
 git clone https://github.com/MFlowCode/MFC
 cd MFC 
 ```
@@ -153,7 +157,7 @@ cd MFC
 To fetch the prebuilt Docker image and enter an interactive bash session with the
 recommended settings applied, run
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN385851V3"}
   ./mfc.sh  docker # If on \*nix/macOS
   .\mfc.bat docker # If on Windows
 ```
@@ -177,6 +181,7 @@ MFC can be built with support for various (compile-time) features:
 | **MPI**   | `--mpi`   | `--no-mpi`   | On      | Lets MFC run on multiple processors (and nodes) simultaneously. |
 | **GPU**   | `--gpu`   | `--no-gpu`   | Off     | Enables GPU acceleration via OpenACC.                           |
 | **Debug** | `--debug` | `--no-debug` | Off     | Requests the compiler build MFC in debug mode.                  |
+| **GCov**  | `--gcov`  | `--no-gcov`  | Off     | Builds MFC with coverage flags on.                              |
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
@@ -190,7 +195,8 @@ To only select a subset, use the `-t` (i.e., `--targets`) argument.
 For a detailed list of options, arguments, and features, please refer to `./mfc.sh build --help`.
 
 Most first-time users will want to build MFC using 8 threads (or more!) with MPI support:
-```shell
+
+```shell {"id":"01HZFPNJRJKJ897YPN3A0RW6CX"}
 ./mfc.sh build -j 8
 ```
 
@@ -204,7 +210,7 @@ Examples:
 
 Run MFC's test suite with 8 threads:
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN3DZTCCQ7"}
 ./mfc.sh test -j 8
 ```
 
@@ -214,7 +220,7 @@ Please refer to the [Testing](testing.md) document for more information.
 
 MFC has example cases in the `examples` folder. You can run such a case interactively using 2 tasks by typing:
 
-```shell
+```shell {"id":"01HZFPNJRJKJ897YPN3FKXVQH9"}
 ./mfc.sh run examples/2D_shockbubble/case.py -n 2
 ```
 

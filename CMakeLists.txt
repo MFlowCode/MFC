@@ -109,9 +109,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (MFC_GCov)
 
-        # Warning present in gcc versions > 11 that is treated as an error
-        # This flag doesn't exist in gcc versions <= 11
-        if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 11)
+        # Warning present in gcc versions >= 12 that is treated as an error
+        # This flag doesn't exist in gcc versions < 12
+        if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 12)
             add_compile_options(
                 -Wno-error=coverage-invalid-line-number
             )
