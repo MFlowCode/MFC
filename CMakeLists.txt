@@ -359,7 +359,7 @@ function(MFC_SETUP_TARGET)
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (DEFINED NVHPC_USE_TWO_STAGE_IPO)
-        add_library(${ARGS_TARGET}_lib ${ARGS_SOURCES})
+        add_library(${ARGS_TARGET} ${ARGS_SOURCES})
         target_compile_options(${ARGS_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
         set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
         message(STATUS "Current target = ${ARGS_TARGET}")
