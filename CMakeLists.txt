@@ -196,7 +196,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
     if (SUPPORTS_IPO)
         message(STATUS "Enabled IPO / LTO")
-        if ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 23.11))
+        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
             # Is this message super clear or necessary?
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
@@ -360,12 +360,24 @@ function(MFC_SETUP_TARGET)
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (DEFINED NVHPC_USE_TWO_STAGE_IPO)
         add_library(${ARGS_TARGET}_lib ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET}_lib PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
-        set_target_properties(${ARGS_TARGET}_lib PROPERTIES Fortran_PREPROCESS ON)
-        # Can we assume files have been pre-processed at this point? Only if the above does what I think it does.
-        add_executable(${ARGS_TARGET} p_main.f90)
-        # I tested on a small example -- this *will* inline modules that call each other too.
-        target_compile_options(${ARGS_TARGET} $<$<COMPILE_LANGUAGE:Fortran>:-Minline=lib:${ARGS_TARGET}_lib>)
+        target_compile_options(${ARGS_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
+        set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
+        message(STATUS "Current target = ${ARGS_TARGET}")
+
+        add_executable(${ARGS_TARGET}_exe ${ARGS_SOURCES})
+        set_property(TARGET ${ARGS_TARGET}_exe PROPERTY OUTPUT_NAME ${ARGS_TARGET})
+        # Odd, I'm explicitly stating a target as dependent on the other yet it is not rebuilt...
+        # ...wait, let's try a clean build.
+        add_dependencies(${ARGS_TARGET}_exe ${ARGS_TARGET})
+        # Okay, so we need to somehow get some of these flags onto the second target... hmmm
+        # Do I seriously have to go in and add the properties to the exe target too?
+        target_compile_options(${ARGS_TARGET}_exe PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        set_target_properties(${ARGS_TARGET}_exe PROPERTIES Fortran_PREPROCESS ON)
+
+        target_include_directories(${ARGS_TARGET}_exe PRIVATE
+            "${CMAKE_SOURCE_DIR}/src/common"
+            "${CMAKE_SOURCE_DIR}/src/common/include"
+            "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
     else()
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     endif()
@@ -477,7 +489,11 @@ function(MFC_SETUP_TARGET)
         target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::nvToolsExt)
     endif()
 
-    install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
+    if ((DEFINED NVHPC_USE_TWO_PASS_IPO) AND (NOT ${ARGS_TARGET} STREQUAL "syscheck"))
+       install(TARGETS ${ARGS_TARGET}_exe RUNTIME DESTINATION bin)
+    else()
+       install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
+    endif()
 endfunction()
 
 
