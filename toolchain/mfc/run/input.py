@@ -1,4 +1,4 @@
-import os, json, typing, dataclasses
+import os, json, glob, typing, dataclasses
 
 from ..printer import cons
 from ..        import common, build
@@ -49,15 +49,44 @@ class MFCInputFile(Case):
         self.generate_fpp(target)
 
 
-    def clean(self, targets) -> None:
-        for relfile in [
-            "equations.dat", "run_time.inf", "time_data.dat",
-            "io_time_data.dat", "fort.1"
-        ] + [f"{build.get_target(target).name}.inp" for target in targets]:
-            common.delete_file(os.path.join(self.dirpath, relfile))
+    def clean(self, _targets) -> None:
+        targets = [build.get_target(target) for target in _targets]
 
-        for reldir in ["D", "p_all", "silo_hdf5", "viz"]:
-            common.delete_directory(os.path.join(self.dirpath, reldir))
+        files = set()
+        dirs  = set()
+
+        files = set([
+            "equations.dat", "run_time.inf", "time_data.dat",
+            "io_time_data.dat", "fort.1", "pre_time_data.dat"
+        ] + [f"{target.name}.inp" for target in targets])
+
+        if build.PRE_PROCESS in targets:
+            files = files | set(glob.glob(os.path.join(self.dirpath, "D", "*.000000.dat")))
+            dirs  = dirs  | set(glob.glob(os.path.join(self.dirpath, "p_all", "p*", "0")))
+
+        if build.SIMULATION in targets:
+            restarts = set(glob.glob(os.path.join(self.dirpath, "restart_data", "*.dat")))
+            restarts = restarts - set(glob.glob(os.path.join(self.dirpath, "restart_data", "lustre_0.dat")))
+            restarts = restarts - set(glob.glob(os.path.join(self.dirpath, "restart_data", "lustre_*_cb.dat")))
+
+            Ds = set(glob.glob(os.path.join(self.dirpath, "D", "*.dat")))
+            Ds = Ds - set(glob.glob(os.path.join(self.dirpath, "D", "*.000000.dat")))
+
+            files = files | restarts
+            files = files | Ds
+
+        if build.POST_PROCESS in targets:
+            dirs.add("silo_hdf5")
+
+        for relfile in files:
+            if not os.path.isfile(relfile):
+                relfile = os.path.join(self.dirpath, relfile)
+            common.delete_file(relfile)
+
+        for reldir in dirs:
+            if not os.path.isdir(reldir):
+                reldir = os.path.join(self.dirpath, reldir)
+            common.delete_directory(reldir)
 
 
 # Load the input file

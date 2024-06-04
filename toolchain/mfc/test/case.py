@@ -90,7 +90,7 @@ BASE_CFG = {
     'Mono(1)%dir'                   : 1.0,
     'Mono(1)%npulse'                : 1,
     'Mono(1)%pulse'                 : 1,
-    'cu_mpi'                        :'F',
+    'rdma_mpi'                      : 'F',
 }
 
 def trace_to_uuid(trace: str) -> str:
