@@ -358,77 +358,71 @@ function(MFC_SETUP_TARGET)
 
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
-    if (DEFINED NVHPC_USE_TWO_STAGE_IPO)
-        add_library(${ARGS_TARGET} ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
-        set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
-        message(STATUS "Current target = ${ARGS_TARGET}")
+    if (NVHPC_USE_TWO_PASS_IPO)
+        add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
+        target_compile_options(${ARGS_TARGET}_lib PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
+        message(STATUS "Current target = ${ARGS_TARGET}_lib")
 
-        add_executable(${ARGS_TARGET}_exe ${ARGS_SOURCES})
-        set_property(TARGET ${ARGS_TARGET}_exe PROPERTY OUTPUT_NAME ${ARGS_TARGET})
+        add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+        #set_property(TARGET ${ARGS_TARGET}_exe PROPERTY OUTPUT_NAME ${ARGS_TARGET})
         # Odd, I'm explicitly stating a target as dependent on the other yet it is not rebuilt...
         # ...wait, let's try a clean build.
-        add_dependencies(${ARGS_TARGET}_exe ${ARGS_TARGET})
+        add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
         # Okay, so we need to somehow get some of these flags onto the second target... hmmm
         # Do I seriously have to go in and add the properties to the exe target too?
-        target_compile_options(${ARGS_TARGET}_exe PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
-        set_target_properties(${ARGS_TARGET}_exe PROPERTIES Fortran_PREPROCESS ON)
-
-        target_include_directories(${ARGS_TARGET}_exe PRIVATE
-            "${CMAKE_SOURCE_DIR}/src/common"
-            "${CMAKE_SOURCE_DIR}/src/common/include"
-            "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
     else()
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     endif()
 
-    set_target_properties(${ARGS_TARGET} PROPERTIES Fortran_PREPROCESS ON)
+    foreach (a_target ${ARGS_TARGET}_lib ${ARGS_TARGET})
+    set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
 
-    target_include_directories(${ARGS_TARGET} PRIVATE
+    target_include_directories(${a_target} PRIVATE
         "${CMAKE_SOURCE_DIR}/src/common"
         "${CMAKE_SOURCE_DIR}/src/common/include"
         "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
 
     if (EXISTS "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
-        target_include_directories(${ARGS_TARGET} PRIVATE
+        target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}/include")
     endif()
 
     string(TOUPPER "${ARGS_TARGET}" ${ARGS_TARGET}_UPPER)
     target_compile_definitions(
-        ${ARGS_TARGET} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
+        ${a_target} PRIVATE MFC_${CMAKE_Fortran_COMPILER_ID}
                                MFC_${${ARGS_TARGET}_UPPER}
     )
 
     if (MFC_MPI AND ARGS_MPI)
         find_package(MPI COMPONENTS Fortran REQUIRED)
 
-        target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_MPI)
-        target_link_libraries     (${ARGS_TARGET} PRIVATE MPI::MPI_Fortran)
+        target_compile_definitions(${a_target} PRIVATE MFC_MPI)
+        target_link_libraries     (${a_target} PRIVATE MPI::MPI_Fortran)
     endif()
 
     if (ARGS_SILO)
         find_package(SILO REQUIRED)
-        target_link_libraries(${ARGS_TARGET} PRIVATE SILO::SILO)
+        target_link_libraries(${a_target} PRIVATE SILO::SILO)
     endif()
 
     if (ARGS_HDF5)
         find_package(HDF5 REQUIRED)
-        target_link_libraries(${ARGS_TARGET} PRIVATE HDF5::HDF5)
+        target_link_libraries(${a_target} PRIVATE HDF5::HDF5)
     endif()
 
     if (ARGS_FFTW)
         if (MFC_OpenACC AND ARGS_OpenACC)
             if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 find_package(CUDAToolkit REQUIRED)
-                target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::cudart CUDA::cufft)
+                target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
             else()
                 find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                target_link_libraries(${ARGS_TARGET} PRIVATE hipfort::hipfft)
+                target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
             endif()
         else()
             find_package(FFTW REQUIRED)
-            target_link_libraries(${ARGS_TARGET} PRIVATE FFTW::FFTW)
+            target_link_libraries(${a_target} PRIVATE FFTW::FFTW)
         endif()
     endif()
 
@@ -440,12 +434,12 @@ function(MFC_SETUP_TARGET)
             message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
         endif()
 
-        target_link_libraries(${ARGS_TARGET} PRIVATE OpenACC::OpenACC_Fortran)
-        target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_OpenACC)
+        target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
+        target_compile_definitions(${a_target} PRIVATE MFC_OpenACC)
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             # FIXME: This should work with other cards than gfx90a ones.
-            target_compile_options(${ARGS_TARGET} PRIVATE
+            target_compile_options(${a_target} PRIVATE
                 "-foffload=amdgcn-amdhsa='-march=gfx90a'"
                 "-foffload-options=-lgfortran\ -lm"
                 "-fno-exceptions")
@@ -457,43 +451,41 @@ function(MFC_SETUP_TARGET)
                     "built without support for it, disallowing the use of "
                     "cu_tensor=T. This can result in degraded performance.")
             else()
-                target_link_libraries     (${ARGS_TARGET} PRIVATE cuTENSOR::cuTENSOR)
-                target_compile_definitions(${ARGS_TARGET} PRIVATE MFC_cuTENSOR)
+                target_link_libraries     (${a_target} PRIVATE cuTENSOR::cuTENSOR)
+                target_compile_definitions(${a_target} PRIVATE MFC_cuTENSOR)
             endif()
 
             foreach (cc ${MFC_CUDA_CC})
-                target_compile_options(${ARGS_TARGET}
+                target_compile_options(${a_target}
                     PRIVATE -gpu=cc${cc}
                 )
             endforeach()
 
-            target_compile_options(${ARGS_TARGET}
+            target_compile_options(${a_target}
                 PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
 
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-                target_compile_options(${ARGS_TARGET}
+                target_compile_options(${a_target}
                     PRIVATE -gpu=autocompare,debug
                 )
             endif()
         elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
-            target_link_libraries(${ARGS_TARGET} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
+            target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
         endif()
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-        target_compile_options(${ARGS_TARGET} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
+        target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
     endif()
 
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
         find_package(CUDAToolkit REQUIRED)
-        target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::nvToolsExt)
+        target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
     endif()
 
-    if ((DEFINED NVHPC_USE_TWO_PASS_IPO) AND (NOT ${ARGS_TARGET} STREQUAL "syscheck"))
-       install(TARGETS ${ARGS_TARGET}_exe RUNTIME DESTINATION bin)
-    else()
-       install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
-    endif()
+    endforeach()
+
+    install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
 endfunction()
 
 
