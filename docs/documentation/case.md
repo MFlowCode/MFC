@@ -30,40 +30,39 @@ This is particularly useful when computations are done in Python to generate the
 
 ## (Optional) Accepting command line arguments
 
-Input files can accept **positional** command line arguments, forwarded by `mfc.sh run`.
-Consider this example from the 3D_weak_scaling case:
+Input files can accept command line arguments, forwarded by `mfc.sh run`.
+Consider this example from the `scaling` case:
 
 ```python
 import argparse
 
 parser = argparse.ArgumentParser(
-    prog="3D_weak_scaling",
-    description="This MFC case was created for the purposes of weak scaling.",
+    prog="scaling",
+    description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory")
+parser.add_argument("dict", type=str, metavar="DICT")
+parser.add_argument("-s", "--scaling",  type=str, metavar="SCALING",  choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
 
 # Your parsed arguments are here
-ARGS = vars(parser.parse_args())
+args = parser.parse_args()
 ```
 
 The first argument is always a JSON string representing `mfc.sh run`'s internal
 state.
 It contains all the runtime information you might want from the build/run system.
-We hide it from the help menu with `help=argparse.SUPPRESS` since it is not meant to be passed in by users.
-You can add as many additional positional arguments as you may need.
+You can add as many additional arguments as you may need.
 
 To run such a case, use the following format:
 
 ```shell
-./mfc.sh run <path/to/case.py> <positional arguments> <regular mfc.sh run arguments>
+./mfc.sh run <path/to/case.py> <mfc.sh run arguments> -- <case arguments>
 ```
 
-For example, to run the 3D_weak_scaling case with `gbpp=2`:
+For example, to run the `scaling` case in "weak-scaling" mode:
 
 ```shell
-./mfc.sh run examples/3D_weak_scaling/case.py 2 -t pre_process -j 8
+./mfc.sh run examples/scaling/case.py -t pre_process -j 8 -- --scaling weak
 ```
 
 ## Parameters
@@ -87,11 +86,15 @@ Definition of the parameters is described in the following subsections.
 
 ### 1. Runtime
 
-| Parameter        | Type           | Description                      |
-| ---:             |    :----:      |          :---                    |
-| `run_time_info`  | Logical        | Output run-time information      |
+| Parameter        | Type           | Description                               |
+| ---:             |    :----:      |          :---                             |
+| `run_time_info`  | Logical        | Output run-time information               |
+| `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
+- `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
+The underlying MPI implementation and communication infrastructure must support this
+feature, detecting GPU pointers and performing RDMA accordingly.
 
 ### 2. Computational Domain
 

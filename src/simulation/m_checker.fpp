@@ -29,9 +29,9 @@ contains
         bub_fac = 0
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
-#if !(defined(MFC_OpenACC) && defined(__PGI))
-        if (cu_mpi) then
-            call s_mpi_abort('Unsupported value of cu_mpi. Exiting ...')
+#if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
+        if (rdma_mpi) then
+            call s_mpi_abort('Unsupported value of rdma_mpi. Exiting ...')
         end if
 #endif
 
