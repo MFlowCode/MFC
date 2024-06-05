@@ -1,7 +1,7 @@
 #:def Hardcoded3DVariables()
     ! Place any declaration of intermediate variables here
 
-    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, vf 
 
     real(kind(0d0)) :: eps
 
@@ -23,22 +23,22 @@
 
         intH = amp*(sin(2*pi*x_cc(i)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + h
 
-        alph = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+        vf = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
 
-        if (alph < eps) alph = eps
-        if (alph > 1 - eps) alph = 1 - eps
+        if (vf < eps) vf = eps
+        if (vf > 1 - eps) vf = 1 - eps
 
         if (y_cc(j) > intH) then
-            q_prim_vf(advxb)%sf(i, j, k) = alph
-            q_prim_vf(advxe)%sf(i, j, k) = 1 - alph
-            q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
-            q_prim_vf(contxe)%sf(i, j, k) = (1 - alph)*rhoL
+            q_prim_vf(advxb)%sf(i, j, k) = vf
+            q_prim_vf(advxe)%sf(i, j, k) = 1 - vf
+            q_prim_vf(contxb)%sf(i, j, k) = vf*rhoH
+            q_prim_vf(contxe)%sf(i, j, k) = (1 - vf)*rhoL
             q_prim_vf(E_idx)%sf(i, j, k) = pref + rhoH*9.81*(1.2 - y_cc(j))
         else
-            q_prim_vf(advxb)%sf(i, j, k) = alph
-            q_prim_vf(advxe)%sf(i, j, k) = 1 - alph
-            q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
-            q_prim_vf(contxe)%sf(i, j, k) = (1 - alph)*rhoL
+            q_prim_vf(advxb)%sf(i, j, k) = vf
+            q_prim_vf(advxe)%sf(i, j, k) = 1 - vf
+            q_prim_vf(contxb)%sf(i, j, k) = vf*rhoH
+            q_prim_vf(contxe)%sf(i, j, k) = (1 - vf)*rhoL
             pInt = pref + rhoH*9.81*(1.2 - intH)
             q_prim_vf(E_idx)%sf(i, j, k) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
