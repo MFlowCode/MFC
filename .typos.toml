@@ -12,6 +12,7 @@ WRONLY = "WRONLY"
 nd = "nd"
 iy = "iy"
 HPE = "HPE"
+alph = "alph"
 
 [files]
 extend-exclude = ["docs/documentation/references*", "tests/", "toolchain/cce_simulation_workgroup_256.sh"]

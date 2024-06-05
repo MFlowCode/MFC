@@ -682,7 +682,7 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 | `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
 | `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
 | `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
-| `g_x[y,z]`        | Real    | Magnitude of bacground acceleration        |
+| `g_x[y,z]`        | Real    | Magnitude of background acceleration        |
 
 `k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
 
