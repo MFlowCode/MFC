@@ -1916,21 +1916,35 @@ contains
             tensorb(8) = -(tensora(1)*tensora(8) - tensora(2)*tensora(7))
             tensorb(9) = tensora(1)*tensora(5) - tensora(2)*tensora(4)
 
+
     ! STEP 2b: computing the determinant of the grad_xi tensor 
             tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
                             - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                             + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
-        ! error checking
-        if (tensorb(tensor_size) .lt. 0d0 .or. tensorb(tensor_size) .gt. 3d0) then
-           tensorb(tensor_size) = 1d0
-        end if 
-        ! print *, 'i, j, k :: ', j,' ', k,' ',l,',det ::',tensorb(tensor_size)
-        !    stop
-        !end if
+
+    !if (tensorb(tensor_size) < 0d0 .or. tensorb(tensor_size) > 3d0 ) then
+    !    print *, 'j, k, l :: ', j, k, l
+    !            do i = 1, 9
+    !                    print *,'i :: ',i,', ten :: ',tensorb(i)
+    !            end do
+    !    print *, 'det : ',tensorb(tensor_size)
+    !    tensorb(tensor_size) = 1d0
+    !end if
 
     ! STEP 2c: computing the inverse of grad_xi tensor = F
     ! tensorb is the adjoint, tensora becomes the inverse
     ! STEP 4: store the determinant of F in the last entry of the tensor
+
+    !if (tensorb(tensor_size) < 0d0 .or. tensorb(tensor_size) > 2d0 ) then
+        tensorb(tensor_size) = 1d0
+        !$acc loop seq
+        do i = 1, tensor_size - 1
+           tensora(i) = 0d0
+        end do 
+        tensorb(1) = 1d0
+        tensorb(5) = 1d0
+        tensorb(9) = 1d0       
+    !end if
 
         !$acc loop seq
         do i = 1, tensor_size - 1
@@ -1949,7 +1963,6 @@ contains
             tensorb(7) = tensorb(3)
             tensorb(8) = tensorb(6)
 
-
                    !call s_compute_gradient_xi3d_acc(q_prim_vf, ixb, ixe, iyb, &
                    !iye, izb, ize, j, k, l, tensora, tensorb)
                    !! 1: 1D, 3: 2D, 6: 3D
@@ -1965,11 +1978,8 @@ contains
              end do
           end do
           !$acc end parallel loop
-
+       
 !        end if
-
-    stop
-
     end subroutine s_calculate_btensor_acc
 
     subroutine s_finalize_variables_conversion_module() ! ------------------
