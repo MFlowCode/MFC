@@ -437,7 +437,7 @@ function(MFC_SETUP_TARGET)
             endforeach()
 
             target_compile_options(${ARGS_TARGET}
-                PRIVATE -gpu=keep,ptxinfo,lineinfo
+                PRIVATE -gpu=keep,ptxinfo,lineinfo,unified
             )
 
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
