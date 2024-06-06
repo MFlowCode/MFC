@@ -68,7 +68,7 @@ print(json.dumps({
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
-    'parallel_io'                  :'T',
+    'parallel_io'                  :'F',
     # ==========================================================================
 
     # Patch 1: High pressured water ============================================

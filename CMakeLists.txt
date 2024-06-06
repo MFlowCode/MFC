@@ -452,7 +452,7 @@ function(MFC_SETUP_TARGET)
             endforeach()
 
             target_compile_options(${ARGS_TARGET}
-                PRIVATE -gpu=keep,ptxinfo,lineinfo
+                PRIVATE -gpu=keep,ptxinfo,lineinfo,unified
             )
 
             # GH-200 Unified Memory Support
