@@ -1912,11 +1912,7 @@ contains
                                     (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
                                      q_cons_vf(i + advxb - 1)%sf(j, k, l) &
                                      - pi_infs(i))/gammas(i)
-
-                                if (pres_K_init(i) <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                    pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
-                            else
-                                pres_K_init(i) = 0d0
+                                if (pres_k_init(i) .le. 0d0) pres_k_init = 1e-2
                             end if
                             pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
                         end do
@@ -1931,7 +1927,7 @@ contains
                         end do
 
                         !$acc loop seq
-                        do iter = 0, 49
+                        do iter = 0, 25
 
                             if (DABS(f_pres) > 1d-10) then
                                 pres_relax = pres_relax - f_pres/df_pres
@@ -1949,10 +1945,16 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                                        !rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
+                                        !             max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                        !             *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
+                                        !                                           pres_inf(i)))**(1d0/gamma_min(i))
+
                                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
-                                                     max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                                   pres_inf(i)))**(1d0/gamma_min(i))
+                                                     (max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                                     *(gamma_min(i)*(pres_relax + pres_inf(i))  & 
+                                                     /(gamma_min(i)*(pres_relax + pres_inf(i)) + pres_K_init(i) - &
+                                                                                   pres_relax)))
 
                                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
                                                  /rho_K_s(i)
@@ -1968,7 +1970,7 @@ contains
                         ! Cell update of the volume fraction
                         !$acc loop seq
                         do i = 1, num_fluids
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
+                            !if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
                                 q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
                                                                        /rho_K_s(i)
                         end do
@@ -2057,6 +2059,9 @@ contains
                             end do
                         end if
                     end if
+
+
+
 
                     dyn_pres = 0d0
 
