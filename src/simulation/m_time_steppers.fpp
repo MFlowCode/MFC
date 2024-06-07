@@ -34,6 +34,8 @@ module m_time_steppers
     use m_fftw
 
     use m_nvtx
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -198,6 +200,13 @@ contains
             end do
         end if
 
+        if (sigma /= dflt_real) then
+            @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(c_idx))
+        end if
+
         @:ALLOCATE_GLOBAL(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
@@ -286,16 +295,13 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 1 =====================================================
 
-        call cpu_time(start)
-
         call nvtxStartRange("Time_Step")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -371,6 +377,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
@@ -386,14 +396,6 @@ contains
         end if
 
         call nvtxEndRange
-
-        call cpu_time(finish)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
 
         ! ==================================================================
 
@@ -416,7 +418,7 @@ contains
 
         call nvtxStartRange("Time_Step")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -484,6 +486,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -503,7 +509,7 @@ contains
 
         ! Stage 2 of 2 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -555,6 +561,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -574,13 +584,6 @@ contains
         call nvtxEndRange
 
         call cpu_time(finish)
-
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
-
         ! ==================================================================
 
     end subroutine s_2nd_order_tvd_rk ! ------------------------------------
@@ -605,7 +608,7 @@ contains
             call nvtxStartRange("Time_Step")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (ib .and. t_step == 1) then
             if (qbmm .and. .not. polytropic) then
@@ -673,6 +676,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -693,7 +700,7 @@ contains
 
         ! Stage 2 of 3 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -745,6 +752,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -764,7 +775,7 @@ contains
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -816,6 +827,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -837,12 +852,6 @@ contains
             call cpu_time(finish)
 
             time = time + (finish - start)
-
-            if (t_step >= 4) then
-                time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-            else
-                time_avg = 0d0
-            end if
         end if
         ! ==================================================================
 
@@ -879,12 +888,6 @@ contains
 
         time = time + (finish - start)
 
-        if (t_step >= 4) then
-            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
-        else
-            time_avg = 0d0
-        end if
-
         ! ==================================================================
 
     end subroutine s_strang_splitting ! ------------------------------------
@@ -911,6 +914,31 @@ contains
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+    !> This subroutine applies the body forces source term at each
+        !! Runge-Kutta stage
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
+
+        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
+        real(kind(0d0)) :: ldt !< local dt
+
+        integer :: i, j, k, l
+
+        call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = momxb, E_idx
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                                                   ldt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_apply_bodyforces
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

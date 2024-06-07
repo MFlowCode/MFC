@@ -1,4 +1,4 @@
-import re, os, sys, typing, dataclasses
+import re, os, sys, typing, dataclasses, shlex
 
 from glob import glob
 
@@ -102,7 +102,7 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         case=case,
         MFC_ROOTDIR=MFC_ROOTDIR,
         qsystem=queues.get_system(),
-        profiler=__profiler_prepend(),
+        profiler=shlex.join(__profiler_prepend())
     )
 
     file_write(__job_script_filepath(), content)
@@ -130,7 +130,7 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
 def run(targets = None, case = None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
-    case    = case or input.load(ARG("input"), ARG("arguments"))
+    case    = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
 

@@ -33,7 +33,7 @@ print(json.dumps({
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'mp_weno'                      : 'F',
-    'recon_type'                   : 1,
+    # 'recon_type'                   : 1,
     'weno_order'                   : 5,
     'weno_eps'                     : 1e-16,
     #'muscl_order'                  : 2,

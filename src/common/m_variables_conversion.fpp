@@ -1013,6 +1013,10 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
+                    if (sigma /= dflt_real) then
+                        qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
+                    end if
+
                 end do
             end do
         end do
@@ -1162,6 +1166,11 @@ contains
                             end if
                         end do
                     end if
+
+                    if (sigma /= dflt_real) then
+                        q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
+                    end if
+
                 end do
             end do
         end do
