@@ -48,8 +48,6 @@ f_elastic_energy
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
         if(j == xb) then
            ! dxix/dx
-           print *, ' grid check :: ',q_prim_vf(xibeg)%sf(j, k, l) 
-
            tensora(1) = (-25d0*q_prim_vf(xibeg)%sf(j, k, l) &
                       + 48d0*q_prim_vf(xibeg)%sf(j + 1, k, l) &
                       - 36d0*q_prim_vf(xibeg)%sf(j + 2, k, l) &

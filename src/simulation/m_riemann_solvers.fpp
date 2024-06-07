@@ -471,10 +471,6 @@ contains
                             E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
                             E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
-                            ! moving this down to account for the elasticity
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
-
                             ! elastic energy update
                             if (hypoelasticity) then
                                 !$acc loop seq
@@ -508,7 +504,7 @@ contains
                             end if
 
                             ! elastic energy update
-                            if ( hyperelasticity ) then
+                            if ( hypoelasticity ) then
                                 G_L = 0d0 
                                 G_R = 0d0
                             
@@ -534,6 +530,10 @@ contains
                                 end if
                             end if
       
+                            ! moving this down to account for the elasticity
+                            H_L = (E_L + pres_L)/rho_L
+                            H_R = (E_R + pres_R)/rho_R
+
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
@@ -556,7 +556,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if ( elasticity ) then
+                                if ( hypoelasticity ) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -569,6 +569,12 @@ contains
                                               , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
                                                                          (((4d0*G_L)/3d0) + &
                                                                           tau_e_L(dir_idx_tau(1)))/rho_L))
+                                elseif ( hyperelasticity ) then
+                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ) &
+                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ))
+                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ) &
+                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ))
+
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -2527,7 +2533,7 @@ contains
 
         !$acc update device(is1, is2, is3)
 
-        if (hypoelasticity .or. hyperelasticity) then
+        if ( elasticity ) then
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
             else if (norm_dir == 2) then

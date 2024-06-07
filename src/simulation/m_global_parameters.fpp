@@ -785,6 +785,7 @@ contains
 
                 if ( hypoelasticity ) then
                     elasticity = .true.
+                    hyperelasticity = .false.
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
@@ -793,6 +794,7 @@ contains
 
                 if ( hyperelasticity ) then
                     elasticity = .true.
+                    hypoelasticity = .false.
                     ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
