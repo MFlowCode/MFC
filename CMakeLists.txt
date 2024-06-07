@@ -439,6 +439,10 @@ function(MFC_SETUP_TARGET)
             target_compile_options(${ARGS_TARGET}
                 PRIVATE -gpu=keep,ptxinfo,lineinfo,unified
             )
+            # "This option must appear in both the compile and link lines" -- NVHPC Docs
+	    target_link_options(${ARGS_TARGET}
+                PRIVATE -gpu=unified
+            )
 
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
