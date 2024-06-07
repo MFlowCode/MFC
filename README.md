@@ -17,6 +17,9 @@
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
   </a>
+  <a href="https://codecov.io/github/MFlowCode/MFC">
+    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
+  </a>
 </p>
 
 Welcome to the home of MFC!
