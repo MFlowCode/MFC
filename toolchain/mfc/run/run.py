@@ -130,7 +130,7 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
 def run(targets = None, case = None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
-    case    = case or input.load(ARG("input"), ARG("arguments"))
+    case    = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
 

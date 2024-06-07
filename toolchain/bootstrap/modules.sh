@@ -101,6 +101,11 @@ for element in ${ELEMENTS[@]}; do
     fi
 done
 
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ]; then
+    ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
+    export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
+fi
+
 ok 'All modules and environment variables have been loaded.'
 
 return

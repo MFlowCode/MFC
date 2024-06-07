@@ -177,6 +177,7 @@ MFC can be built with support for various (compile-time) features:
 | **MPI**   | `--mpi`   | `--no-mpi`   | On      | Lets MFC run on multiple processors (and nodes) simultaneously. |
 | **GPU**   | `--gpu`   | `--no-gpu`   | Off     | Enables GPU acceleration via OpenACC.                           |
 | **Debug** | `--debug` | `--no-debug` | Off     | Requests the compiler build MFC in debug mode.                  |
+| **GCov**  | `--gcov`  | `--no-gcov`  | Off     | Builds MFC with coverage flags on.                              |
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 

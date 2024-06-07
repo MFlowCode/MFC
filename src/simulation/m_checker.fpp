@@ -29,9 +29,9 @@ contains
         bub_fac = 0
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
-#if !(defined(MFC_OpenACC) && defined(__PGI))
-        if (cu_mpi) then
-            call s_mpi_abort('Unsupported value of cu_mpi. Exiting ...')
+#if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
+        if (rdma_mpi) then
+            call s_mpi_abort('Unsupported value of rdma_mpi. Exiting ...')
         end if
 #endif
 
@@ -424,6 +424,15 @@ contains
         end do
         ! END: Fluids Physical Parameters ==================================
 
+        ! Constraints on the surface tension model
+        if (sigma /= dflt_real .and. sigma < 0d0) then
+            call s_mpi_abort('The surface tension coefficient must be'// &
+                             'greater than or equal to zero. Exiting ...')
+        elseif (sigma /= dflt_real .and. model_eqns /= 3) then
+            call s_mpi_abort("The surface tension model requires"// &
+                             'model_eqns=3. Exiting ...')
+        end if
+
         ! Moving Boundaries Checks: x boundaries
         if (any((/bc_x%vb1, bc_x%vb2, bc_x%vb3/) /= 0d0)) then
             if (bc_x%beg == -15) then
@@ -514,6 +523,22 @@ contains
             call s_mpi_abort('Unsupported choices of the combination of values for '// &
                              'num_ibs and ib. Exiting ...')
         end if
+
+        #:for DIR in ['x', 'y', 'z']
+            if (bf_${DIR}$ .and. k_${DIR}$ == dflt_real) then
+                call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
+            elseif (bf_${DIR}$ .and. w_${DIR}$ == dflt_real) then
+                call s_mpi_abort('w_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
+            elseif (bf_${DIR}$ .and. p_${DIR}$ == dflt_real) then
+                call s_mpi_abort('p_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
+            elseif (bf_${DIR}$ .and. g_${DIR}$ == dflt_real) then
+                call s_mpi_abort('g_${DIR}$ must be specified if bf_${DIR}$ is true '// &
+                                 'Exiting ...')
+            end if
+        #:endfor
 
     end subroutine s_check_inputs
 
