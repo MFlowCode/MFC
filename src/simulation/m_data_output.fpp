@@ -1051,7 +1051,6 @@ contains
         real(kind(0d0)) :: G
         real(kind(0d0)) :: dyn_p
 
-
         integer :: i, j, k, l, s, q !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
