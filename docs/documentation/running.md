@@ -24,8 +24,6 @@ several supercomputer clusters, both interactively and through batch submission.
 >
 > If `-c <computer name>` is left unspecified, it defaults to `-c default`.
 
-Additional flags can be appended to the MPI executable call using the `-f` (i.e `--flags`) option.
-
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
 ## Interactive Execution

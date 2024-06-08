@@ -71,8 +71,8 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma, file_per_process, relax, relax_model, &
-            adv_n
+            polydisperse, poly_sigma, file_per_process, relax, &
+            relax_model, cf_wrt, sigma, adv_n, sim_data
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -172,6 +172,16 @@ contains
 
         ! Opening a new formatted database file
         call s_open_formatted_database_file(t_step)
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_open_intf_data_file()
+            call s_open_energy_data_file()
+        end if
+
+        if (sim_data) then
+            call s_write_intf_data_file(q_prim_vf)
+            call s_write_energy_data_file(q_prim_vf, q_cons_vf)
+        end if
 
         ! Adding the grid to the formatted database file
         call s_write_grid_to_formatted_database_file(t_step)
@@ -517,6 +527,32 @@ contains
         end if
         ! ----------------------------------------------------------------------
 
+        ! Adding the color function to formatted database file
+        if (cf_wrt) then
+            q_sf = q_cons_vf(c_idx)%sf( &
+                   -offset_x%beg:m + offset_x%end, &
+                   -offset_y%beg:n + offset_y%end, &
+                   -offset_z%beg:p + offset_z%end)
+
+            !do k = -offset_z%beg, p + offset_z%end
+            !    do j = -offset_y%beg, n + offset_y%end
+            !        do i = -offset_x%beg, m + offset_x%end
+            !            if (q_sf(i,j,k) > 0.5) then
+            !                q_sf(i,j,k) = 100000 + 8/0.15
+            !            else
+            !                q_sf(i,j,k) = 100000
+            !            end if
+            !        end do
+            !    end do
+            !end do
+
+            write (varname, '(A,I0)') 'color_function'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+            varname(:) = ' '
+
+        end if
+        ! ----------------------------------------------------------------------
+
         ! Adding the volume fraction(s) to the formatted database file ---------
         if (bubbles) then
             do i = adv_idx%beg, adv_idx%end
@@ -590,8 +626,20 @@ contains
             end if
         end if
 
+!        if (proc_rank == 0 .and. sim_data) then
+!            close (211)
+!            close (251)
+!        end if
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_close_intf_data_file()
+            call s_close_energy_data_file()
+        end if
+
+
         ! Closing the formatted database file
         call s_close_formatted_database_file()
+
     end subroutine s_save_data
 
     subroutine s_initialize_modules()
@@ -646,6 +694,11 @@ contains
     subroutine s_finalize_modules()
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
+
+!        if (sim_data .and. proc_rank == 0) then
+!            call s_close_intf_data_file()
+!            call s_close_energy_data_file()
+!        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()

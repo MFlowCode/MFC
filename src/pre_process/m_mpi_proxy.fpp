@@ -66,7 +66,7 @@ contains
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
-            & 'ptgalpha_eps', 'pi_fac']
+            & 'ptgalpha_eps', 'sigma', 'pi_fac']
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -76,13 +76,18 @@ contains
             #:endfor
 
             call MPI_BCAST(patch_icpp(i)%smoothen, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%non_axis_sym, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%alter_patch(0), num_patches_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model%threshold']
+                & 'model%threshold', 'cf_val']
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

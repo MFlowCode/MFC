@@ -27,13 +27,12 @@ echo
         (set -x; ${rofiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; ${profiler} \
-            jsrun                                           \
-                ${'--smpiargs="-gpu"' if gpu else ''}       \
-                --nrs          ${tasks_per_node*nodes}      \
-                --cpu_per_rs   1                            \
-                --gpu_per_rs   ${1 if gpu else 0}           \
-                --tasks_per_rs 1                            \
-                ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+            jsrun                                      \
+                ${'--smpiargs="-gpu"' if gpu else ''}  \
+                --nrs          ${tasks_per_node*nodes} \
+                --cpu_per_rs   1                       \
+                --gpu_per_rs   ${1 if gpu else 0}      \
+                --tasks_per_rs 1                       \
                 "${target.get_install_binpath(case)}")
     % endif
 

@@ -112,12 +112,17 @@ contains
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
             if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
+                             patch_icpp(i)%geometry == 3 .or. &
                              patch_icpp(i)%geometry == 4 .or. &
                              patch_icpp(i)%geometry == 5 .or. &
                              patch_icpp(i)%geometry == 8 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 9 .or. &
                              patch_icpp(i)%geometry == 10 .or. &
                              patch_icpp(i)%geometry == 11 .or. &
-                             patch_icpp(i)%geometry == 12)) then
+                             patch_icpp(i)%geometry == 12 .or. &
+                             patch_icpp(i)%geometry == 14)) then
                 call s_check_supported_patch_smoothing(i)
             else
                 call s_check_unsupported_patch_smoothing(i)
@@ -419,26 +424,32 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the spherical harmonic patch
-        if (p == 0 &
-            .or. &
-            patch_icpp(patch_id)%radius <= 0d0 &
-            .or. &
-            patch_icpp(patch_id)%x_centroid == dflt_real &
-            .or. &
-            patch_icpp(patch_id)%y_centroid == dflt_real &
-            .or. &
-            patch_icpp(patch_id)%z_centroid == dflt_real &
-            .or. &
-            all(patch_icpp(patch_id)%epsilon /= (/1d0, 2d0, 3d0, 4d0, 5d0/)) &
-            .or. &
-            patch_icpp(patch_id)%beta < 0d0 &
-            .or. &
-            patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon) then
 
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of spherical '// &
-                             'harmonic patch '//trim(iStr)//'. Exiting ...')
+        if (p > 0) then
+            if (n == 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+                .or. &
+                patch_icpp(patch_id)%x_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%y_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%z_centroid == dflt_real) then
 
+                call s_mpi_abort('Inconsistency(ies) detected in '// &
+                                 'geometric parameters of spherical '// &
+                                 'harmonic patch '//trim(iStr)//'. Exiting ...')
+
+            end if
+        else if (p == 0) then
+            if (n == 0 .or. p > 0 .or. patch_icpp(patch_id)%radius <= 0d0 &
+                .or. &
+                patch_icpp(patch_id)%x_centroid == dflt_real &
+                .or. &
+                patch_icpp(patch_id)%y_centroid == dflt_real) then
+
+                call s_mpi_abort('Inconsistency(ies) detected in '// &
+                                 'geometric parameters of spherical '// &
+                                 'harmonic patch '//trim(iStr)//'. Exiting ...')
+            end if
         end if
 
     end subroutine s_check_spherical_harmonic_patch_geometry ! -------------
@@ -718,7 +729,7 @@ contains
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
-        call s_int_to_str(patch_id, iStr)
+        ! call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the smoothing parameters of an unsupported patch
         if (patch_icpp(patch_id)%smoothen &

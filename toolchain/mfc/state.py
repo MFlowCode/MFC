@@ -6,6 +6,7 @@ class MFCConfig:
     mpi:   bool = True
     gpu:   bool = False
     debug: bool = False
+    gcov:  bool = False
 
     @staticmethod
     def from_dict(d: dict):
@@ -23,12 +24,12 @@ class MFCConfig:
 
     def make_options(self) -> typing.List[str]:
         """ Returns a list of options that could be passed to mfc.sh again.
-            Example: --no-debug --mpi --no-gpu """
+            Example: --no-debug --mpi --no-gpu --no-gcov"""
         return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
 
     def make_slug(self) -> str:
         """ Sort the items by key, then join them with underscores. This uniquely 
-            identifies the configuration. Example: no-debug_no-gpu_mpi """
+            identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov """
         return '_'.join([ f"{'no-' if not v else ''}{k}" for k, v in sorted(self.items(), key=lambda x: x[0]) ])
 
     def __eq__(self, other) -> bool:
@@ -40,7 +41,7 @@ class MFCConfig:
         return True
 
     def __str__(self) -> str:
-        """ Returns a string like "mpi=No & gpu=No & debug=No" """
+        """ Returns a string like "mpi=No & gpu=No & debug=No & gcov=No" """
 
         return ' & '.join([ f"{k}={'Yes' if v else 'No'}" for k, v in self.items() ])
 

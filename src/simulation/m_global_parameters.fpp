@@ -139,6 +139,17 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
+    logical :: bodyForces
+    logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
+    !< amplitude, frequency, and phase shift sinusoid in each direction
+    #:for dir in {'x', 'y', 'z'}
+        #:for param in {'k','w','p','g'}
+            real :: ${param}$_${dir}$
+        #:endfor
+    #:endfor
+    real(kind(0d0)), dimension(3) :: accel_bf
+    !$acc declare create(accel_bf)
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -161,6 +172,8 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
+    real(kind(0d0)) :: x_a, y_a, z_a
+    real(kind(0d0)) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -199,6 +212,7 @@ module m_global_parameters
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    integer :: c_idx         ! Index of the color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -401,6 +415,12 @@ module m_global_parameters
     !> @}
     !$acc declare create(monopole, mono, num_mono)
 
+    !> @name Surface tension parameters
+    !> @{
+    real(kind(0d0)) :: sigma
+    !$acc declare create(sigma)
+    !> @}
+
     integer :: momxb, momxe
     integer :: advxb, advxe
     integer :: contxb, contxe
@@ -420,7 +440,8 @@ module m_global_parameters
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, cu_mpi
+    logical :: weno_flat, riemann_flat, rdma_mpi
+
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), pb_ts)
 
@@ -488,7 +509,7 @@ contains
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
-        cu_mpi = .false.
+        rdma_mpi = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -564,7 +585,20 @@ contains
         monopole = .false.
         num_mono = 1
 
+        ! Surface tension
+        sigma = dflt_real
+
+        ! Cuda aware MPI
         cu_tensor = .false.
+
+        bodyForces = .false.
+        bf_x = .false.; bf_y = .false.; bf_z = .false.
+        !< amplitude, frequency, and phase shift sinusoid in each direction
+        #:for dir in {'x', 'y', 'z'}
+            #:for param in {'k','w','p','g'}
+                ${param}$_${dir}$ = dflt_real
+            #:endfor
+        #:endfor
 
         do j = 1, num_probes_max
             do i = 1, 3
@@ -780,6 +814,11 @@ contains
                     sys_size = stress_idx%end
                 end if
 
+                if (sigma /= dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
@@ -792,6 +831,12 @@ contains
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
+
+                if (sigma /= dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
@@ -1049,15 +1094,6 @@ contains
             @:DEALLOCATE_GLOBAL(Re_idx)
         end if
 
-        ! Deallocating grid variables for the x-, y- and z-directions
-        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
-
-        if (n == 0) return; 
-        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
-
-        if (p == 0) return; 
-        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
-
         deallocate (proc_coords)
         if (parallel_io) then
             deallocate (start_idx)
@@ -1070,6 +1106,15 @@ contains
         end if
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+
+        ! Deallocating grid variables for the x-, y- and z-directions
+        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
+
+        if (n == 0) return; 
+        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
+
+        if (p == 0) return; 
+        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module ! -------------------
 
