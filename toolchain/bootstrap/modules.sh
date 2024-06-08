@@ -23,7 +23,8 @@ if [ -v $u_c ]; then
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
     log   "$Y""Gatech$W:  Phoenix    (p)"
     log   "$R""Caltech$W: Richardson (r)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
+    log   "$B""Brown$W: Oscar (o)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR/$B""o$CR): "
     read u_c
     log
 fi
