@@ -184,13 +184,13 @@ If you use MFC, consider citing it as:
 
 ```bibtex
 @article{Radhakrishnan_2024,
-  title = {Method for portable, scalable, and performant {GPU}-accelerated simulation of multiphase compressible flow},
-  author = {A. Radhakrishnan and H. {Le Berre} and B. Wilfong and J.-S. Spratt and M. {Rodriguez Jr.} and T. Colonius and S. H. Bryngelson},
+  title   = {Method for portable, scalable, and performant {GPU}-accelerated simulation of multiphase compressible flow},
+  author  = {A. Radhakrishnan and H. {Le Berre} and B. Wilfong and J.-S. Spratt and M. {Rodriguez Jr.} and T. Colonius and S. H. Bryngelson},
   journal = {Computer Physics Communications},
-  year = {2024},
-  volume = {302},
-  pages = {109238},
-  doi = {10.1016/j.cpc.2024.109238}
+  year    = {2024},
+  volume  = {302},
+  pages   = {109238},
+  doi     = {10.1016/j.cpc.2024.109238}
 }
 ```
 
