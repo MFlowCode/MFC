@@ -7,7 +7,7 @@ module m_constants
     character, parameter :: dflt_char = ' ' !< Default string value
 
     real(kind(0d0)), parameter :: dflt_real = -1d6                !< Default real value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16               !< Segmentation tolerance
+    real(kind(0d0)), parameter :: sgm_eps = 1d-12               !< Segmentation tolerance
     real(kind(0d0)), parameter :: small_alf = 1d-11                !< Small alf tolerance
     real(kind(0d0)), parameter :: pi = 3.141592653589793d0 !< Pi
     real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
@@ -22,5 +22,6 @@ module m_constants
     integer, parameter :: num_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
+    real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
 
 end module m_constants

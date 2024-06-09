@@ -112,9 +112,13 @@ contains
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
             if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
+                             patch_icpp(i)%geometry == 3 .or. &
                              patch_icpp(i)%geometry == 4 .or. &
                              patch_icpp(i)%geometry == 5 .or. &
                              patch_icpp(i)%geometry == 8 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 0 .or. &
+                             patch_icpp(i)%geometry == 9 .or. &
                              patch_icpp(i)%geometry == 10 .or. &
                              patch_icpp(i)%geometry == 11 .or. &
                              patch_icpp(i)%geometry == 12 .or. &
@@ -725,7 +729,7 @@ contains
 
         ! Patch identifier
         integer, intent(IN) :: patch_id
-        call s_int_to_str(patch_id, iStr)
+        ! call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the smoothing parameters of an unsupported patch
         if (patch_icpp(patch_id)%smoothen &

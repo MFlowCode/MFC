@@ -23,7 +23,8 @@ if [ -v $u_c ]; then
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
     log   "$Y""Gatech$W:  Phoenix    (p)"
     log   "$R""Caltech$W: Richardson (r)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR): "
+    log   "$B""Brown$W: Oscar (o)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR/$B""o$CR): "
     read u_c
     log
 fi
@@ -100,6 +101,11 @@ for element in ${ELEMENTS[@]}; do
         export $element
     fi
 done
+
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ]; then
+    ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
+    export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
+fi
 
 ok 'All modules and environment variables have been loaded.'
 

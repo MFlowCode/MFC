@@ -1654,8 +1654,6 @@ contains
             radius = patch_ib(patch_id)%radius
         end if
 
-        print *, x_centroid, y_centroid, z_centroid, radius
-
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
         ! case that smoothing of the spherical patch's boundary is enabled.
