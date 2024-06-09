@@ -63,15 +63,15 @@ Put it to a convenient directory via
 git clone https://github.com/MFlowCode/MFC.git
 cd MFC
 ```
-and be sure MFC knows what compilers to use by appending your `~/.profile` file via this command
+and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
 ```shell
 echo -e "export CC=gcc-13 \nexport CXX=g++-13 \nexport FC=gfortran-13" >> ~/.profile
-```
-and source that file, build, and test!
-```shell
 source ~/.profile
-./mfc.sh build -j 8
-./mfc.sh test -j 8
+```
+then you can build MFC and run the test suite!
+```shell
+./mfc.sh build -j $(nproc)
+./mfc.sh test -j $(nproc)
 ```
 And... you're done!
 
