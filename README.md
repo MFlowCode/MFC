@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396">
+  <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396" target="_blank">
     <img src="https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg" />
   </a>
   <a href="https://github.com/MFlowCode/MFC/actions">
@@ -17,7 +17,7 @@
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
   </a>
-  <a href="https://codecov.io/github/MFlowCode/MFC">
+  <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
     <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
   </a>
 </p>
