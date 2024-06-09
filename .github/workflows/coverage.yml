@@ -1,6 +1,18 @@
 name: Coverage Check
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  pull_request:
+    paths:
+      - '**.f90'
+      - '**.fpp'
+      - '**.py'
+      - '**.yml'
+      - 'mfc.sh'
+      - 'golden.txt'
+      - 'golden-metadata.txt'
+      - 'CMakeLists.txt'
+      - 'requirements.txt'
+
 
 jobs:
   run:
