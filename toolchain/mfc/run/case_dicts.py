@@ -261,18 +261,6 @@ for f_id in range(1,10+1):
             SIMULATION[f"integral({int_id})%{cmp}min"] = ParamType.REAL
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
 
-
-<<<<<<< HEAD
-POST_PROCESS = COMMON + [
-    't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
-    'mixture_err', 'format', 'schlieren_wrt', 'schlieren_alpha', 'fd_order',
-    'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
-    'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
-    'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
-    'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt','qbmm',
-    'qm_wrt', 'sim_data', 'chem_wrt'
-]
-=======
 # Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt'
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
@@ -306,9 +294,9 @@ POST_PROCESS.update({
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
-    'cf_wrt': ParamType.LOG
+    'cf_wrt': ParamType.LOG,
+    'sim_data': ParamType.LOG
 })
->>>>>>> source
 
 for cmp_id in range(1,3+1):
     cmp = ["x", "y", "z"][cmp_id-1]
