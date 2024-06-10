@@ -30,4 +30,4 @@ checkall: &checkall
   # - *cmakelist
   - *tests
   - *scripts
-  - *yml
+  # - *yml
