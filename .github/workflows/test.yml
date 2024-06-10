@@ -82,6 +82,13 @@ jobs:
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
           echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
 
+      - name: Filter
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: "../file-filter.yml"
+          list-files: shell
+
       - name: Build
         run:  |
           if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi

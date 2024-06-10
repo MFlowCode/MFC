@@ -1,0 +1,18 @@
+# This is used by the action https://github.com/dorny/paths-filter
+# Lists all files to be filtered for changes to run a CI
+
+checkall: &checkall
+  - 'mfc.sh'
+  - 'CMakeLists.txt'
+  - '**/*.f90'
+  - '**/*.fpp'
+  - '**/*.py'
+  - 'toolchain/requirements.txt'
+  - '**/*.yml'
+  - 'tests/**'
+
+coverage: &coverage
+  - *checkall
+
+test: &test
+  - *checkall

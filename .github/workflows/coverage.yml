@@ -15,25 +15,12 @@ jobs:
       - name: Checkouts
         uses: actions/checkout@v4
 
-      - name: Filters
+      - name: Filter
         uses: dorny/paths-filter@v3
-        id: filter
+        id: changes
         with: 
-          # tests/ should encompass the golden and golden-metadata.txt
-          filters: |
-            root:
-              - 'mfc.sh'
-              - 'CMakeLists.txt'
-            fortran:
-              - '**/*.f90'
-              - '**/*.fpp'
-            python:
-              - '**/*.py'
-              - 'toolchain/requirements.txt'
-            yml:
-              - '**/*.yml'
-            tests:
-              - 'tests/**'
+          filters: "../file-filter.yml"
+          list-files: shell
         
       - name: Build
         run: /bin/bash mfc.sh build -j $(nproc) --gcov
