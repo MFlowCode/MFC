@@ -4,7 +4,7 @@ mfc.sh:
 
     Invocation: test -j 12 -o 0F6C4340 --generate
     Lock:       mpi=Yes & gpu=No & debug=No
-
+  
 pre_process:
 
     CMake Configuration:

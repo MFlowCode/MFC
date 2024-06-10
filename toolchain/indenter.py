@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, argparse
-
+  
 def main():
     parser = argparse.ArgumentParser(
         prog='indenter.py',
