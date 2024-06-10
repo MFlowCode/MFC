@@ -17,8 +17,7 @@ jobs:
         id: changes
         with: 
           filters: ".github/file-filter.yml"
-          list-files: shell
-
+          
   run:
     name: Coverage Test on CodeCov
     if: needs.file-changes.outputs.checkall == 'true'

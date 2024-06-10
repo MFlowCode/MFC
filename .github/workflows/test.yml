@@ -31,7 +31,6 @@ jobs:
         id: changes
         with: 
           filters: ".github/file-filter.yml"
-          list-files: shell
 
   github:
     name: Github
