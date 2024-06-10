@@ -1,18 +1,34 @@
 # This is used by the action https://github.com/dorny/paths-filter
-# Lists all files to be filtered for changes to run a CI
+# Lists all files to be filtered for changes to run a CI for test.yml & coverage.yml
 
 checkall: &checkall
-  - 'mfc.sh'
-  - 'CMakeLists.txt'
+  - *fortran_src
+  - *python_src
+  - *cmakelist
+  - *tests
+  - *scripts
+  - *yml
+
+fortran_src: &fortran_src
   - '**/*.f90'
   - '**/*.fpp'
+
+python_src: &python_src
   - '**/*.py'
   - 'toolchain/requirements.txt'
-  - '**/*.yml'
+
+cmakelist: &cmakelist
+  - 'CMakeLists.txt'
+  - 'toolchain/cmake/**'
+
+tests: &tests
   - 'tests/**'
 
-coverage: &coverage
-  - *checkall
+scripts: &scripts
+  - 'mfc.sh'
+  - 'mfc.bat'
+  - 'toolchain/bootstrap/**'
 
-test: &test
-  - *checkall
+yml: &yml
+  - '**/*.yml'
+

@@ -15,7 +15,7 @@ module m_check_ib_patches
 #ifdef MFC_MPI
     use mpi                      !< Message passing interface (MPI) module
 #endif
-  
+
     use m_compile_specific
 
     use m_helper

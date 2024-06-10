@@ -38,9 +38,19 @@ jobs:
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+
     steps:
       - name: Clone
         uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+          list-files: shell
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -81,13 +91,6 @@ jobs:
           echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
           echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
           echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
-
-      - name: Filter
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-          list-files: shell
 
       - name: Build
         run:  |

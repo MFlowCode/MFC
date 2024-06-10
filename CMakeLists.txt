@@ -117,7 +117,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_link_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
             $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
-        )  
+        )
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")

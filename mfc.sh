@@ -5,7 +5,7 @@ if [ ! -f "$(pwd)/toolchain/util.sh" ]; then
     echo "mfc: ERROR > You must call this script from within MFC's root folder."
 
     exit 1
-fi  
+fi
 
 # Load utility script
 . "$(pwd)/toolchain/util.sh"
