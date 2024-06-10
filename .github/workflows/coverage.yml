@@ -3,14 +3,13 @@ name: Coverage Check
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  run:
-    name: Coverage Test on CodeCov
-    runs-on: "ubuntu-latest"
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
     outputs: 
       checkall: ${{ steps.changes.outputs.checkall }}
-      
     steps:
-      - name: Checkouts
+      - name: Clone
         uses: actions/checkout@v4
 
       - name: Detect Changes
@@ -19,7 +18,15 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
           list-files: shell
-        
+
+  run:
+    name: Coverage Test on CodeCov
+    if: needs.files-changed.outputs.checkall == 'true'
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkouts
+        uses: actions/checkout@v4
+
       - name: Setup Ubuntu
         run: |
             sudo apt update -y

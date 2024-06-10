@@ -17,8 +17,25 @@ on:
   workflow_dispatch:
     
 jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+          list-files: shell
+
   github:
     name: Github
+    if: needs.files-changed.outputs.checkall == 'true'
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -38,19 +55,10 @@ jobs:
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
 
     steps:
       - name: Clone
         uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-          list-files: shell
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -107,6 +115,7 @@ jobs:
 
   docker:
     name:    Github | Docker
+    if: needs.files-changed.outputs.checkall == 'true'
     runs-on: ubuntu-latest
     steps:
     - name: Clone
@@ -117,7 +126,7 @@ jobs:
 
   self:
     name: Self Hosted
-    if: github.repository == 'MFlowCode/MFC'
+    if: github.repository == 'MFlowCode/MFC' && needs.files-changed.outputs.checkall == 'true'
     continue-on-error: true
     strategy:
       matrix:
