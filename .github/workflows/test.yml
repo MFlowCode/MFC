@@ -35,6 +35,7 @@ jobs:
   github:
     name: Github
     if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -115,6 +116,7 @@ jobs:
   docker:
     name: Github | Docker
     if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     runs-on: ubuntu-latest
     steps:
     - name: Clone
@@ -126,6 +128,7 @@ jobs:
   self:
     name: Self Hosted
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     continue-on-error: true
     strategy:
       matrix:

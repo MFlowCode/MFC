@@ -17,10 +17,11 @@ jobs:
         id: changes
         with: 
           filters: ".github/file-filter.yml"
-          
+
   run:
     name: Coverage Test on CodeCov
     if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     runs-on: "ubuntu-latest"
     steps:
       - name: Checkouts
