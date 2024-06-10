@@ -1,14 +1,6 @@
 # This is used by the action https://github.com/dorny/paths-filter
 # Lists all files to be filtered for changes to run a CI for test.yml & coverage.yml
 
-checkall: &checkall
-  - *fortran_src
-  - *python_src
-  - *cmakelist
-  - *tests
-  - *scripts
-  - *yml
-
 fortran_src: &fortran_src
   - '**/*.f90'
   - '**/*.fpp'
@@ -32,3 +24,10 @@ scripts: &scripts
 yml: &yml
   - '**/*.yml'
 
+checkall: &checkall
+  - *fortran_src
+  - *python_src
+  - *cmakelist
+  - *tests
+  - *scripts
+  - *yml
