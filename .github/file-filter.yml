@@ -27,7 +27,7 @@ yml: &yml
 checkall: &checkall
   - *fortran_src
   - *python_src
-  # - *cmakelist
+  - *cmakelist
   - *tests
   - *scripts
-  # - *yml
+  - *yml
