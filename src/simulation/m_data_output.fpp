@@ -1465,7 +1465,7 @@ contains
                 if (n == 0) then
                     if (bubbles .and. (num_fluids <= 2)) then
                         if (qbmm) then
-                            write (i + 30, '(6x,f12.12,14f28.16)') &
+                            write (i + 30, '(6x,f12.6,14f28.16)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1482,7 +1482,7 @@ contains
                                 M20, &
                                 M02
                         else
-                            write (i + 30, '(6x,f12.12,8f24.8)') &
+                            write (i + 30, '(6x,f12.6,8f24.8)') &
                                 nondim_time, &
                                 rho, &
                                 vel(1), &
@@ -1496,7 +1496,7 @@ contains
                             ! ptot
                         end if
                     else if (bubbles .and. (num_fluids == 3)) then
-                        write (i + 30, '(6x,f12.12,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
+                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                             nondim_time, &
                             rho, &
@@ -1511,7 +1511,7 @@ contains
                             ptilde, &
                             ptot
                     else if (bubbles .and. num_fluids == 4) then
-                        write (i + 30, '(6x,f12.12,f24.8,f24.8,f24.8,f24.8,'// &
+                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                             nondim_time, &
                             q_cons_vf(1)%sf(j - 2, 0, 0), &
@@ -1528,7 +1528,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else
-                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1548,7 +1548,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (hypoelasticity) then
-                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1559,7 +1559,7 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1629,7 +1629,7 @@ contains
 
                     if (proc_rank == 0) then
                         if (bubbles .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.12,f24.8)') &
+                            write (i + 70, '(6x,f12.6,f24.8)') &
                                 nondim_time, int_pres
                         end if
                     end if
@@ -1712,7 +1712,7 @@ contains
 
                     if (proc_rank == 0) then
                         if (bubbles .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.12,f24.8,f24.8)') &
+                            write (i + 70, '(6x,f12.6,f24.8,f24.8)') &
                                 nondim_time, int_pres, max_pres
                         end if
                     end if
