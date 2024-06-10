@@ -20,19 +20,20 @@ jobs:
         id: filter
         with: 
           # tests/ should encompass the golden and golden-metadata.txt
-          # requirments.txt is under toolchain/
           filters: |
-            root: 
+            root:
               - 'mfc.sh'
               - 'CMakeLists.txt'
-            src:
-              - 'src/**'
-            toolchain 
-              - 'toolchain/**'
-            tests: 
-              - 'tests/**'
+            fortran:
+              - '**/*.f90'
+              - '**/*.fpp'
+            python:
+              - '**/*.py'
+              - 'toolchain/requirements.txt'
             yml:
-              - '.github/workflows/**'
+              - '**/*.yml'
+            tests:
+              - 'tests/**'
         
       - name: Build
         run: /bin/bash mfc.sh build -j $(nproc) --gcov
