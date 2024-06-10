@@ -35,7 +35,7 @@ jobs:
 
   github:
     name: Github
-    if: needs.files-changed.outputs.checkall == 'true'
+    if: needs.files-changes.outputs.checkall == 'true'
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -114,8 +114,8 @@ jobs:
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   docker:
-    name:    Github | Docker
-    if: needs.files-changed.outputs.checkall == 'true'
+    name: Github | Docker
+    if: needs.files-changes.outputs.checkall == 'true'
     runs-on: ubuntu-latest
     steps:
     - name: Clone
@@ -126,7 +126,7 @@ jobs:
 
   self:
     name: Self Hosted
-    if: github.repository == 'MFlowCode/MFC' && needs.files-changed.outputs.checkall == 'true'
+    if: github.repository == 'MFlowCode/MFC' && needs.files-changes.outputs.checkall == 'true'
     continue-on-error: true
     strategy:
       matrix:

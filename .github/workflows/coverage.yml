@@ -21,7 +21,7 @@ jobs:
 
   run:
     name: Coverage Test on CodeCov
-    if: needs.files-changed.outputs.checkall == 'true'
+    if: needs.files-changes.outputs.checkall == 'true'
     runs-on: "ubuntu-latest"
     steps:
       - name: Checkouts
