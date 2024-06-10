@@ -14,6 +14,25 @@ jobs:
           
       - name: Checkouts
         uses: actions/checkout@v4
+
+      - name: Filters
+        uses: dorny/paths-filter@v3
+        id: filter
+        with: 
+          # tests/ should encompass the golden and golden-metadata.txt
+          # requirments.txt is under toolchain/
+          filters: |
+            root: 
+              - 'mfc.sh'
+              - 'CMakeLists.txt'
+            src:
+              - 'src/**'
+            toolchain 
+              - 'toolchain/**'
+            tests: 
+              - 'tests/**'
+            yml:
+              - '.github/workflows/**'
         
       - name: Build
         run: /bin/bash mfc.sh build -j $(nproc) --gcov
