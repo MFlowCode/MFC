@@ -2,8 +2,8 @@
 
     real(kind(0d0)) :: eps
     real(kind(0d0)) :: r, rmax, gam, umax, p0
-
     real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(kind(0d0)) :: a_0, l_t
 
     eps = 1e-9
 
@@ -99,6 +99,8 @@
             pInt = pref + rhoH*9.81*(1.2 - intH)
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
+
+    case (205) ! 2D lung simulation
 
     case default
         if (proc_rank == 0) then
