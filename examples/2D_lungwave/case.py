@@ -176,19 +176,18 @@ print(json.dumps({
     'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
 
     
-    # Acoustic Wave source =====================================================
-    # The acoustic wave is placed at y = 10
-    #'Monopole'                      : 'T',                                      # update : creating an acoustic wave
-    #'num_mono'                      : 1,                                        # update : place in the middle and expand
-    #'Mono(1)%pulse'                 : 3,                                        # update : square wave
-    #'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
-    #'Mono(1)%mag'                   : P_amp_n,                                  # update : magnitude
-    #'Mono(1)%length'                : P_len,                                    # update : impulse length
-    #'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    #'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
-    #'Mono(1)%loc(2)'                : dlengy/2,                                       # update : upper boundary of the domain
-    #'Mono(1)%dir'                   : 0, #theta,                                    # update : direction: -pi/2
-    #'Mono(1)%support_width'         : 3,                                       # update : 49 cells in each direction
+    # Monopole setting =========================================================
+    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
+    'num_mono'                      : 1,                                        # update : place in the middle and expand
+    'Mono(1)%pulse'                 : 3,                                        # update : sin  wave
+    'Mono(1)%npulse'                : 10,                                        # update : 1 impulse
+    'Mono(1)%mag'                   : 5.0*patmos_n,                                  # update : magnitude
+    'Mono(1)%length'                : 100*dlengx,                                    # update : impulse length
+    'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'Mono(1)%support_width'         : 10,                                       # update : 49 cells in each direction
+    'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
+    'Mono(1)%loc(2)'                : 5.0*dlengx,                                       # update : upper boundary of the domain
+    'Mono(1)%dir'                   : 0,                                    # update : direction: -pi/2
  #==============================================================================
 }))
 
