@@ -3,7 +3,19 @@
 import math
 import json
 
+<<<<<<< HEAD
 #material parameter
+=======
+pi = 3.141592653589
+# material parameters
+# material 1 :: gas
+# Patterson 2018 et al.
+gammag = 1.4  # unitless
+Bg = 0.       # Pascals
+rhog = 1.18   # kg/m^3
+c_g = 347.2   # m/sec
+Gg = 0.      # Pascals
+>>>>>>> f47f2f4a2186205f772fe3e6a0e9eeb23fe34196
 
     #material1 :: gas
 #patterson 2018
@@ -125,6 +137,20 @@ print(json.dumps({
     'bc_x%end'                     : -1,
     'bc_y%beg'                     : -6,
     'bc_y%end'                     : -6,
+    # ==========================================================================
+
+    # Monopole settings ========================================================
+    'Monopole'                     :'T',
+    'num_mono'                     : 1,
+    'Mono(1)%pulse'                 : 3, # this is for a sine wave
+    'Mono(1)%npulse'                : 10, # one cycle for now
+    'Mono(1)%support'               : 2, # plane of monopole
+    'Mono(1)%support_width'         : 10,
+    'Mono(1)%loc(1)'                : dlengx/2.0,
+    'Mono(1)%loc(2)'                : 5.0*dlengx,
+    'Mono(1)%dir'                   : 0.0,
+    'Mono(1)%mag'                   : 5.0*patmos_n,
+    'Mono(1)%length'                : 100.*dlengx,
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
