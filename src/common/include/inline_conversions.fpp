@@ -1,5 +1,5 @@
 #:def s_compute_speed_of_sound()
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c, G)
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
@@ -11,17 +11,30 @@
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
         real(kind(0d0)), intent(IN) :: vel_sum
         real(kind(0d0)), intent(OUT) :: c
+        real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
 
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(kind(0d0)), dimension(num_fluids) :: blkmod
 
-        integer :: q
+        integer :: q, i
 
         if (alt_soundspeed) then
-            blkmod1 = ((gammas(1) + 1d0)*pres + &
-                       pi_infs(1))/gammas(1)
-            blkmod2 = ((gammas(2) + 1d0)*pres + &
-                       pi_infs(2))/gammas(2)
-            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+             c = 0d0
+             do i = 1, num_fluids
+                 if (hypoelasticity) then
+                     blkmod(i) = ((gammas(i) + 1d0)*pres + &
+                                  pi_infs(i))/gammas(i)+4/3*G(i)
+                 else
+                     blkmod(i) = ((gammas(i) + 1d0)*pres + &
+                                  pi_infs(i))/gammas(i)
+                 end if
+                 c = c + adv(i)/blkmod(i)
+             end do 
+             c = 1d0/(rho*c)
+!            blkmod1 = ((gammas(1) + 1d0)*pres + &
+!                       pi_infs(1))/gammas(1)
+!            blkmod2 = ((gammas(2) + 1d0)*pres + &
+!                       pi_infs(2))/gammas(2)
+!            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
         elseif (model_eqns == 3) then
             c = 0d0
             !$acc loop seq

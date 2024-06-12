@@ -277,6 +277,7 @@ contains
         real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
         real(kind(0d0)) :: pres       !< Cell-avg. pressure
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)), dimension(num_fluids) :: G_K
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
@@ -302,7 +303,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
+                    G_K(:) = fluid_pp(:)%G   !SGR Reinitialize a vector for shear moduli
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -330,7 +331,8 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c, G_K)
+                    !SGR added G here for speed of sound
                     
                     if ( c .lt. 10d-12 ) then
                         print*, 'code has crashed at processor: ',proc_rank,' at j :: ',j,', k :: ',k,' l :: ',l,'with alph1a ::',alpha(1),'and alpha2 ::', alpha(2)

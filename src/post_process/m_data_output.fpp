@@ -1009,7 +1009,7 @@ contains
                 cent = l
             end if
         end do
-        thres = 0.9d0
+        thres = 0.9d0*max_alph_glb
         do k = 0, n
             OLoop: do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
