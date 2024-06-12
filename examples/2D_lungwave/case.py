@@ -66,7 +66,9 @@ alphag_back = 0.0
 alphal_lung = 0.0
 alphag_lung = 1.0
 
-#timestepping
+interface_amp = 0.5
+
+# time stepping requirements
 time_end = 0.5
 cfl = 0.1
 
