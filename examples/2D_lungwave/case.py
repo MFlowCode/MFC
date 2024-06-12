@@ -65,12 +65,12 @@ alphag_lung = 1.0
 interface_amp = 0.5
 
 # time stepping requirements
-time_end = 5.0
+time_end = 0.5
 cfl = 0.1
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
-Nframes = 60
+Nframes = 50000
 tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)
