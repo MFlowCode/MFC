@@ -303,7 +303,6 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    G_K(:) = fluid_pp(:)%G   !SGR Reinitialize a vector for shear moduli
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -331,7 +330,7 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c, G_K)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c, fluid_pp(:)%G)
                     !SGR added G here for speed of sound
                     
                     if ( c .lt. 10d-12 ) then
@@ -1297,7 +1296,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1372,7 +1371,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     end if
                 end if
@@ -1424,7 +1423,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if

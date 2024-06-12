@@ -19,6 +19,7 @@
 
         if (alt_soundspeed) then
              c = 0d0
+             !$acc loop seq
              do i = 1, num_fluids
                  if (hypoelasticity) then
                      blkmod(i) = ((gammas(i) + 1d0)*pres + &
