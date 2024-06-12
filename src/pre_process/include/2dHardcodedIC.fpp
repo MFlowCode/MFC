@@ -3,7 +3,7 @@
     real(kind(0d0)) :: eps
     real(kind(0d0)) :: r, rmax, gam, umax, p0
     real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
-    real(kind(0d0)) :: a_0, l_t
+    real(kind(0d0)) :: gas, liq, gasn, liqn
 
     eps = 1e-9
 
@@ -12,6 +12,7 @@
 #:def Hardcoded2D()
 
     select case (patch_icpp(patch_id)%hcid) ! 2D_hardcoded_ic example case
+    
     case (200)
         if (y_cc(j) <= (-x_cc(i)**3 + 1)**(1d0/3d0)) then
             ! Volume Fractions
@@ -100,7 +101,51 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
 
-    case (205) ! 2D lung simulation
+    case (205) ! 2D lung wave interaction problem
+        h = 0.0           !non dim origin y
+        lam = 1.0         !non dim lambda
+        !wl = 1.0         !this is non dim wave length of 1
+        amp =  patch_icpp(patch_id)%a2         !to be changed later!       !non dim amplitude
+
+        !define liquids
+        gas = 1.18
+        liq = 996.0
+        gasn = gas/gas
+        liqn = liq/gas
+        
+
+        intH = amp*sin(2*pi*x_cc(i)/lam - pi/2)+h
+
+        !alph = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+              
+        !if (alph < eps) alph = eps
+        !if (alph > 1 - eps) alph = 1 - eps
+
+       ! if (y_cc(j) > intH) then        !this is the liquid
+       !     q_prim_vf(advxb)%sf(i, j, 0) = alph
+       !     q_prim_vf(advxe)%sf(i, j, 0) = 1 - alph
+       !     q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
+       !     q_prim_vf(contxe)%sf(i, j, 0) = (1 - alph)*rhoL
+       !     q_prim_vf(E_idx)%sf(i, j, 0) = pref + rhoH*9.81*(1.2 - y_cc(j))
+       
+       ! updatig with air, need to define wa
+       
+       
+       if (y_cc(j) > intH) then                             !this is the lung
+            q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+       end if
+       
+       !if (y_cc(j) < intH) then                             !this is the lung
+        !    q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(patch_id)%alpha_rho(1)
+        !    q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(patch_id)%alpha_rho(2)
+        !    q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(patch_id)%pres
+        !    q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)
+        !    q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(2)
+       !end if
 
     case default
         if (proc_rank == 0) then

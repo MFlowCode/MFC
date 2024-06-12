@@ -331,19 +331,7 @@ contains
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
-        
-        else if (pulse(nm) == 4) then
-            ! Ultrasound pulse wave
-            period = length(nm)/sos
-            f_g = mag(nm)*cos((the_time + offset)*2.d0*pi/period)*EXP(-x**2/100)
-
-        else if (pulse(nm) == 5) then
-            ! Trapesoidal wave
             
-            if 
-            else if
-        
-        
         else
         end if
 

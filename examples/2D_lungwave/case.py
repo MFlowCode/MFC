@@ -3,22 +3,82 @@
 import math
 import json
 
-ps  = 248758.567
-gam = 1.4
-rho = 1.
-c_l = math.sqrt( 1.4*ps/rho )
-vel = 230.
+#material parameter
 
-leng = 1.
-Ny = 100.
-Nx = Ny*3
-dx = leng/Nx
+    #material1 :: gas
+#patterson 2018
 
-time_end = 5*leng/vel
+gammag = 1.4    #unitless
+Bg =0           #pascals
+rhog = 1.18     #kg/m^3
+c_g = 347.2     #m/s
+G_g = 0         #pa
+
+    #material2 :: lung
+
+gammal = 5.5
+Bl = 492.E+06
+rhol = 996.0
+c_l = 1648.7
+G_l = 1E3
+
+#primitive vartiables
+patmos = 101325. #pa
+
+#problem specific variable
+lambda_wave = 1E-3
+
+#define pulse
+P_amp = 10.E+6
+P_len = 45                  #length of the impulse
+theta = -math.pi/2          #direction of propagation 
+
+#non-dim
+
+#define characteristic density, length, time, stress material
+rho_char = rhog
+length_char = lambda_wave
+c_char = c_g
+time_char = length_char/c_char
+stress_char = rho_char*c_char*c_char/gammag
+
+#non-dim the properties
+rhog_n  = rhog/rho_char    
+c_g_n = c_g/c_char    
+rhol_n = rhol/rho_char
+c_l_n = c_l/c_char
+Bg_n = Bg/stress_char
+Bl_n = Bl/stress_char
+G_g_n = G_g/stress_char
+G_l_n = G_l/stress_char
+patmos_n = patmos/stress_char
+P_amp_n = P_amp/stress_char
+
+#geometry
+dlengx = 1.
+dlengy = 20.
+Nx = 200
+Ny = dlengy*Nx
+dx = dlengx/Nx
+dy = dlengy/Ny
+alphal_back = 1.0
+alphag_back = 0.0
+alphal_lung = 0.0
+alphag_lung = 1.0
+
+#timestepping
+time_end = 5.
 cfl = 0.1
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
+Nframes = 60
+tstart = 0
+tstop = 100         #Nt
+tsave = 10            #int(Nt/Nframes)
+
+#interface profile
+interface_amp = 0.5       
 
 # Configuring case dictionary
 print(json.dumps({
@@ -27,21 +87,21 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    'x_domain%beg'                 :  -leng/2.,
-    'x_domain%end'                 :  leng/2+2*leng,
-    'y_domain%beg'                 :  -leng/2.,
-    'y_domain%end'                 :  leng/2.,
+    'x_domain%beg'                 :  0.,
+    'x_domain%end'                 :  dlengx,
+    'y_domain%beg'                 :  -dlengy/2.,
+    'y_domain%end'                 :  dlengy/2.,
     'm'                            : int(Nx),
     'n'                            : int(Ny),
     'p'                            : 0,
     'dt'                           : dt,
-    't_step_start'                 : 0,
-    't_step_stop'                  : Nt,
-    't_step_save'                  : int(Nt/20.),
+    't_step_start'                 : tstart,
+    't_step_stop'                  : tstop,
+    't_step_save'                  : tsave,
     # ==========================================================================
 
     # Simulation Algorithm Parameters ==========================================
-    'num_patches'                  : 3,
+    'num_patches'                  : 2,
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
@@ -55,12 +115,12 @@ print(json.dumps({
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
-    'mp_weno'                      : 'F',
+    'mp_weno'                      : 'T',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
-    'bc_x%beg'                     : -6,
-    'bc_x%end'                     : -6,
+    'bc_x%beg'                     : -1,
+    'bc_x%end'                     : -1,
     'bc_y%beg'                     : -6,
     'bc_y%end'                     : -6,
     # ==========================================================================
@@ -74,55 +134,56 @@ print(json.dumps({
                                                                 
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : 0.,
+    'patch_icpp(1)%x_centroid'     : dlengx/2,
     'patch_icpp(1)%y_centroid'     : 0.,
-    'patch_icpp(1)%length_x'       : 10*leng,
-    'patch_icpp(1)%length_y'       : leng,
-    'patch_icpp(1)%vel(1)'         : vel,
+    'patch_icpp(1)%length_x'       : dlengx,
+    'patch_icpp(1)%length_y'       : dlengy,
+    'patch_icpp(1)%vel(1)'         : 0.,
     'patch_icpp(1)%vel(2)'         : 0.E+00,
-    'patch_icpp(1)%pres'           : 101325.,
-    'patch_icpp(1)%alpha_rho(1)'   : 1.29,
-    'patch_icpp(1)%alpha_rho(2)'   : 0.E+00,
-    'patch_icpp(1)%alpha(1)'       : 1.E+00,
-    'patch_icpp(1)%alpha(2)'       : 0.E+00,
+    'patch_icpp(1)%pres'           : patmos_n,
+    'patch_icpp(1)%alpha_rho(1)'   : rhol_n*alphal_back,
+    'patch_icpp(1)%alpha_rho(2)'   : rhog_n*alphag_back,
+    'patch_icpp(1)%alpha(1)'       : alphal_back,
+    'patch_icpp(1)%alpha(2)'       : alphag_back,
     # ==========================================================================
 
-    # Patch 2: Shocked state ===================================================
-    'patch_icpp(2)%geometry'       : 3,
+    # Patch 2: Lung ============================================================
+    'patch_icpp(2)%geometry'       : 7,
+    'patch_icpp(2)%hcid'           : 205,
     'patch_icpp(2)%alter_patch(1)' : 'T',
-    'patch_icpp(2)%x_centroid'     : -3*leng/8.,
-    'patch_icpp(2)%y_centroid'     : 0.,
-    'patch_icpp(2)%length_x'       : leng/4.,
-    'patch_icpp(2)%length_y'       : leng,
-    'patch_icpp(2)%vel(1)'         : vel,
-    'patch_icpp(2)%vel(2)'         : 0.E+00,
-    'patch_icpp(2)%pres'           : ps,
-    'patch_icpp(2)%alpha_rho(1)'   : 2.4,
-    'patch_icpp(2)%alpha_rho(2)'   : 0.E+00,
-    'patch_icpp(2)%alpha(1)'       : 1.E+00,
-    'patch_icpp(2)%alpha(2)'       : 0.E+00,
-    # ==========================================================================
-
-    # Patch 3: Bubble ==========================================================
-    'patch_icpp(3)%geometry'       : 2,
-    'patch_icpp(3)%x_centroid'     : 0.E+00,
-    'patch_icpp(3)%y_centroid'     : 0.E+00,
-    'patch_icpp(3)%radius'         : leng/5.,
-    'patch_icpp(3)%alter_patch(1)' : 'T',
-    'patch_icpp(3)%vel(1)'         : 0.,
-    'patch_icpp(3)%vel(2)'         : 0.E+00,
-    'patch_icpp(3)%pres'           : 101325.,
-    'patch_icpp(3)%alpha_rho(1)'   : 0.E+00,
-    'patch_icpp(3)%alpha_rho(2)'   : 0.167,
-    'patch_icpp(3)%alpha(1)'       : 0.E+00,
-    'patch_icpp(3)%alpha(2)'       : 1.E+00,
+    'patch_icpp(2)%x_centroid'     : dlengx/2.,
+    'patch_icpp(2)%y_centroid'     : -dlengy/4.,                  #moved the center by amp/2 up and increased length of y to account for the bump
+    'patch_icpp(2)%length_x'       : dlengx,
+    'patch_icpp(2)%length_y'       : dlengy/2.+2,                 #add 2
+    'patch_icpp(2)%a2'             : interface_amp,
+    'patch_icpp(2)%vel(1)'         : 0.E+00,
+    'patch_icpp(2)%vel(2)'         : 0.0,
+    'patch_icpp(2)%pres'           : patmos_n,
+    'patch_icpp(2)%alpha_rho(1)'   : rhol_n*alphal_lung,
+    'patch_icpp(2)%alpha_rho(2)'   : rhog_n*alphag_lung,
+    'patch_icpp(2)%alpha(1)'       : alphal_lung,
+    'patch_icpp(2)%alpha(2)'       : alphag_lung,
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================
-    'fluid_pp(1)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
-    'fluid_pp(1)%pi_inf'           : 0.,
-    'fluid_pp(2)%gamma'            : 1.E+00/(1.6666E+00-1.E+00),
-    'fluid_pp(2)%pi_inf'           : 0.E+00,
+    'fluid_pp(1)%gamma'            : 1.E+00/(gammal-1.E+00),
+    'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
+    'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
+    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
+    
+    # Acoustic Wave source =====================================================
+    # The acoustic wave is placed at y = 10
+    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
+    'num_mono'                      : 1,                                        # update : place in the middle and expand
+    'Mono(1)%pulse'                 : 3,                                        # update : square wave
+    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
+    'Mono(1)%mag'                   : P_amp_n,                                  # update : magnitude
+    'Mono(1)%length'                : P_len,                                    # update : impulse length
+    'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
+    'Mono(1)%loc(2)'                : dlengy/2,                                       # update : upper boundary of the domain
+    'Mono(1)%dir'                   : 0, #theta,                                    # update : direction: -pi/2
+    'Mono(1)%support_width'         : 3,                                       # update : 49 cells in each direction
 # ==============================================================================
 }))
 

@@ -113,11 +113,11 @@ print(json.dumps({
         # to minimize computational costs. The grid is coarsened
         # away from the bubble / origin
     #might not need
-    'stretch_x'                    : 'T',
+    'stretch_x'                    : 'F',
     'a_x'                          : 4.E+00,
     'x_a'                          : -1.5E-03/1.E-03,
     'x_b'                          : 1.5E-03/1.E-03,
-    'stretch_y'                    : 'T',
+    'stretch_y'                    : 'F',
     'a_y'                          : 4.E+00,
     'y_a'                          : -1.5E-03/1.E-03,
     'y_b'                          : 1.5E-03/1.E-03,
