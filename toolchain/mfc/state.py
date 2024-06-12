@@ -3,9 +3,10 @@ import typing, dataclasses
 
 @dataclasses.dataclass
 class MFCConfig:
-    mpi:   bool = True
-    gpu:   bool = False
-    debug: bool = False
+    mpi:     bool = True
+    gpu:     bool = False
+    unified: bool = False
+    debug:   bool = False
 
     @staticmethod
     def from_dict(d: dict):

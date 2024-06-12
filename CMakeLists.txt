@@ -16,14 +16,15 @@ project(MFC LANGUAGES C CXX Fortran)
 
 # Build options exposed to users and their default values.
 
-option(MFC_MPI           "Build with MPI"       ON)
-option(MFC_OpenACC       "Build with OpenACC"  OFF)
-option(MFC_PRE_PROCESS   "Build pre_process"   OFF)
-option(MFC_SIMULATION    "Build simulation"    OFF)
-option(MFC_POST_PROCESS  "Build post_process"  OFF)
-option(MFC_SYSCHECK      "Build syscheck"      OFF)
-option(MFC_DOCUMENTATION "Build documentation" OFF)
-option(MFC_ALL           "Build everything"    OFF)
+option(MFC_MPI           "Build with MPI"                                     ON)
+option(MFC_OpenACC       "Build with OpenACC"                                OFF)
+option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
+option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
+option(MFC_SIMULATION    "Build simulation"                                  OFF)
+option(MFC_POST_PROCESS  "Build post_process"                                OFF)
+option(MFC_SYSCHECK      "Build syscheck"                                    OFF)
+option(MFC_DOCUMENTATION "Build documentation"                               OFF)
+option(MFC_ALL           "Build everything"                                  OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -436,13 +437,20 @@ function(MFC_SETUP_TARGET)
                 )
             endforeach()
 
-            target_compile_options(${ARGS_TARGET}
-                PRIVATE -gpu=keep,ptxinfo,lineinfo,unified
+	    target_compile_options(${ARGS_TARGET}
+                PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
-            # "This option must appear in both the compile and link lines" -- NVHPC Docs
-	    target_link_options(${ARGS_TARGET}
-                PRIVATE -gpu=unified
-            )
+
+	    # GH-200 Unified Memory Suppory
+	    if (MFC_Unified)
+                target_compile_options(${ARGS_TARGET}
+	            PRIVATE -gpu=unified
+                )
+                # "This option must appear in both the compile and link lines" -- NVHPC Docs
+	        target_link_options(${ARGS_TARGET}
+                    PRIVATE -gpu=unified
+                )
+            endif()
 
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
