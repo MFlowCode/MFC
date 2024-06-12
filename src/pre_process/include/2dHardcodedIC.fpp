@@ -68,7 +68,7 @@
 
         q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1d0/gam)
 
-    case (204) ! Rayleigh-Taylor instability
+ case (204) ! Rayleigh-taylor problem
         rhoH = 3
         rhoL = 1
         pRef = 1e5
@@ -100,7 +100,42 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
 
-    case default
+
+
+    case (205) ! Lung-wave interaction problem
+       ! rhoH = patch_icpp(patch_id)%pres
+       ! rhoL = patch_icpp(patch_id)%pres
+       ! pRef = 1e5
+        !pInt = patch_icpp(patch_id)%pres
+        h = 0.0                            ! non-dimensional y-origin
+        lam = 1.0                          ! non-dimensional wavelength of 1
+        wl = 1.0                           ! non-dimensional wavelength of 1 
+        amp = patch_icpp(patch_id)%a2      ! non-dimensional amplitude of the interface
+
+        ! this is the interface function
+        intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
+        ! this is the volume fraction of the air
+       ! alph = 1.0
+        !alph = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+
+       ! if (alph < eps) alph = eps
+       ! if (alph > 1 - eps) alph = 1 - eps
+
+       ! if (y_cc(j) > intH) then                ! this is the liquid
+        !    q_prim_vf(advxb)%sf(i, j, 0) = alph
+         !   q_prim_vf(advxe)%sf(i, j, 0) = 1 - alph
+          !  q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
+           ! q_prim_vf(contxe)%sf(i, j, 0) = (1 - alph)*rhoL
+            !q_prim_vf(E_idx)%sf(i, j, 0) = pref + rhoH*9.81*(1.2 - y_cc(j))
+         if (y_cc(j) >  intH) then                                      ! this is the lungh with air
+            q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+            q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+        end if
+!patch id counter
+       case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
             call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
