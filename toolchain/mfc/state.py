@@ -6,7 +6,7 @@ class MFCConfig:
     mpi:     bool = True
     gpu:     bool = False
     debug:   bool = False
-    gcov:  bool = False
+    gcov:    bool = False
     unified: bool = False
 
     @staticmethod
@@ -25,7 +25,7 @@ class MFCConfig:
 
     def make_options(self) -> typing.List[str]:
         """ Returns a list of options that could be passed to mfc.sh again.
-            Example: --no-debug --mpi --no-gpu --no-gcov"""
+            Example: --no-debug --mpi --no-gpu --no-gcov --no-unified"""
         return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
 
     def make_slug(self) -> str:
@@ -42,7 +42,7 @@ class MFCConfig:
         return True
 
     def __str__(self) -> str:
-        """ Returns a string like "mpi=No & gpu=No & debug=No & gcov=No" """
+        """ Returns a string like "mpi=No & gpu=No & debug=No & gcov=No & unified=No" """
 
         return ' & '.join([ f"{k}={'Yes' if v else 'No'}" for k, v in self.items() ])
 
