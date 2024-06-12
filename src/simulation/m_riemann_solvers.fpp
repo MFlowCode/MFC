@@ -2227,6 +2227,21 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
+                                    if (hypoelasticity) then
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(idx1)* &
+                                                     vel_L(idxi) + &
+                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                                                (1d0 - dir_flg(idxi))* &
+                                                                vel_L(idxi)) - vel_L(idxi))) + &
+                                              dir_flg(idxi)*(pres_L) - tau_e_L(dir_idx_tau(i))) &
+                                        + xi_P*(rho_R*(vel_R(idx1)* &
+                                                       vel_R(idxi) + &
+                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                                                  (1d0 - dir_flg(idxi))* &
+                                                                  vel_R(idxi)) - vel_R(idxi))) + &
+                                                dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
+                                    end if  !SGR added this if statement for hypo
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                         xi_M*(rho_L*(vel_L(idx1)* &
                                                      vel_L(idxi) + &
