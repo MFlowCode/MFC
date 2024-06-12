@@ -67,15 +67,15 @@ alphal_lung = 0.0
 alphag_lung = 1.0
 
 #timestepping
-time_end = 5.
+time_end = 0.5
 cfl = 0.1
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
-Nframes = 60
+Nframes = 50000
 tstart = 0
-tstop = 100         #Nt
-tsave = 10            #int(Nt/Nframes)
+tstop = Nt
+tsave = int(Nt/Nframes)
 
 #interface profile
 interface_amp = 0.5      
@@ -87,11 +87,10 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-<<<<<<< HEAD
     'x_domain%beg'                 :  0.,
     'x_domain%end'                 :  dlengx,
     'y_domain%beg'                 :  -dlengy/2.,
-   'y_domain%end'                 :  dlengy/2.,
+    'y_domain%end'                 :  dlengy/2.,
     'm'                            : int(Nx),
     'n'                            : int(Ny),
     'p'                            : 0,
@@ -177,17 +176,17 @@ print(json.dumps({
     
     # Acoustic Wave source =====================================================
     # The acoustic wave is placed at y = 10
-    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
-    'num_mono'                      : 1,                                        # update : place in the middle and expand
-    'Mono(1)%pulse'                 : 3,                                        # update : square wave
-    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
-    'Mono(1)%mag'                   : P_amp_n,                                  # update : magnitude
-    'Mono(1)%length'                : P_len,                                    # update : impulse length
-    'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
-    'Mono(1)%loc(2)'                : dlengy/2,                                       # update : upper boundary of the domain
-    'Mono(1)%dir'                   : 0, #theta,                                    # update : direction: -pi/2
-    'Mono(1)%support_width'         : 3,                                       # update : 49 cells in each direction
+    #'Monopole'                      : 'T',                                      # update : creating an acoustic wave
+    #'num_mono'                      : 1,                                        # update : place in the middle and expand
+    #'Mono(1)%pulse'                 : 3,                                        # update : square wave
+    #'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
+    #'Mono(1)%mag'                   : P_amp_n,                                  # update : magnitude
+    #'Mono(1)%length'                : P_len,                                    # update : impulse length
+    #'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    #'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
+    #'Mono(1)%loc(2)'                : dlengy/2,                                       # update : upper boundary of the domain
+    #'Mono(1)%dir'                   : 0, #theta,                                    # update : direction: -pi/2
+    #'Mono(1)%support_width'         : 3,                                       # update : 49 cells in each direction
  #==============================================================================
 }))
 

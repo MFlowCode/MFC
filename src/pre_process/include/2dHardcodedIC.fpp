@@ -3,7 +3,6 @@
     real(kind(0d0)) :: eps
     real(kind(0d0)) :: r, rmax, gam, umax, p0
     real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
-    real(kind(0d0)) :: gas, liq, gasn, liqn
 
     eps = 1e-9
 
@@ -101,19 +100,11 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
 
-
     case (205) ! 2D lung wave interaction problem
         h = 0.0           !non dim origin y
         lam = 1.0         !non dim lambda
         !wl = 1.0         !this is non dim wave length of 1
-        amp =  patch_icpp(patch_id)%a2         !to be changed later!       !non dim amplitude
-
-        !define liquids
-        gas = 1.18
-        liq = 996.0
-        gasn = gas/gas
-        liqn = liq/gas
-        
+        amp =  patch_icpp(patch_id)%a2         !to be changed later!       !non dim amplitude       
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2)+h
 
@@ -122,7 +113,7 @@
         !if (alph < eps) alph = eps
         !if (alph > 1 - eps) alph = 1 - eps
 
-       ! if (y_cc(j) > intH) then        !this is the liquid
+       if (y_cc(j) > intH) then        !this is the liquid
        !     q_prim_vf(advxb)%sf(i, j, 0) = alph
        !     q_prim_vf(advxe)%sf(i, j, 0) = 1 - alph
        !     q_prim_vf(contxb)%sf(i, j, 0) = alph*rhoH
@@ -132,7 +123,6 @@
        ! updatig with air, need to define wa
        
        
-       if (y_cc(j) > intH) then                             !this is the lung
             q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
             q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
@@ -153,6 +143,7 @@
             call s_int_to_str(patch_id, iStr)
             call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
         end if
+        
     end select
 
 #:enddef
