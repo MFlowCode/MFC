@@ -48,7 +48,7 @@ Gl_n = Gl/stress_char
 patmos_n = patmos/stress_char
 
 # spatial geometry
-dlengx = 1.0
+dlengx = 1.0 
 dlengy = 20.
 Nx = 200
 Ny = dlengy*Nx
@@ -70,7 +70,7 @@ cfl = 0.1
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
-Nframes = 60.
+Nframes = 60
 tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)

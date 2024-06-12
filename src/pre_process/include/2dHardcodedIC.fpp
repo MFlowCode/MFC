@@ -68,7 +68,7 @@
 
         q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1d0/gam)
 
-    case (204) ! Rayleigh-Taylor instability
+ case (204) ! Rayleigh-taylor problem
         rhoH = 3
         rhoL = 1
         pRef = 1e5
