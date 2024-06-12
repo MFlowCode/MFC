@@ -78,7 +78,7 @@ tstop = 100         #Nt
 tsave = 10            #int(Nt/Nframes)
 
 #interface profile
-interface_amp = 0.5       
+interface_amp = 0.5      
 
 # Configuring case dictionary
 print(json.dumps({
@@ -87,10 +87,11 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
+<<<<<<< HEAD
     'x_domain%beg'                 :  0.,
     'x_domain%end'                 :  dlengx,
     'y_domain%beg'                 :  -dlengy/2.,
-    'y_domain%end'                 :  dlengy/2.,
+   'y_domain%end'                 :  dlengy/2.,
     'm'                            : int(Nx),
     'n'                            : int(Ny),
     'p'                            : 0,
@@ -134,6 +135,7 @@ print(json.dumps({
                                                                 
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
+
     'patch_icpp(1)%x_centroid'     : dlengx/2,
     'patch_icpp(1)%y_centroid'     : 0.,
     'patch_icpp(1)%length_x'       : dlengx,
@@ -146,6 +148,7 @@ print(json.dumps({
     'patch_icpp(1)%alpha(1)'       : alphal_back,
     'patch_icpp(1)%alpha(2)'       : alphag_back,
     # ==========================================================================
+
 
     # Patch 2: Lung ============================================================
     'patch_icpp(2)%geometry'       : 7,
@@ -170,6 +173,7 @@ print(json.dumps({
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
     'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
+
     
     # Acoustic Wave source =====================================================
     # The acoustic wave is placed at y = 10
@@ -184,7 +188,7 @@ print(json.dumps({
     'Mono(1)%loc(2)'                : dlengy/2,                                       # update : upper boundary of the domain
     'Mono(1)%dir'                   : 0, #theta,                                    # update : direction: -pi/2
     'Mono(1)%support_width'         : 3,                                       # update : 49 cells in each direction
-# ==============================================================================
+ #==============================================================================
 }))
 
 # ==============================================================================

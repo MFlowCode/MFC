@@ -331,7 +331,6 @@ contains
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
-            
         else
         end if
 

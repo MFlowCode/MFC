@@ -69,7 +69,7 @@
 
         q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1d0/gam)
 
-    case (204) ! Rayleigh-Taylor instability
+ case (204) ! Rayleigh-taylor problem
         rhoH = 3
         rhoL = 1
         pRef = 1e5
@@ -100,6 +100,7 @@
             pInt = pref + rhoH*9.81*(1.2 - intH)
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
+
 
     case (205) ! 2D lung wave interaction problem
         h = 0.0           !non dim origin y
@@ -148,7 +149,7 @@
        !end if
 
     case default
-        if (proc_rank == 0) then
+       if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
             call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
         end if
