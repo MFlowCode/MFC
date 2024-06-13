@@ -451,7 +451,7 @@ function(MFC_SETUP_TARGET)
                 )
             endforeach()
 
-	    target_compile_options(${ARGS_TARGET}
+            target_compile_options(${ARGS_TARGET}
                 PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
 
@@ -465,7 +465,7 @@ function(MFC_SETUP_TARGET)
                     PRIVATE -gpu=unified
                 )
             endif()
-            
+
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
                     PRIVATE -gpu=autocompare,debug
