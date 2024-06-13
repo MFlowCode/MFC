@@ -451,17 +451,17 @@ function(MFC_SETUP_TARGET)
                 )
             endforeach()
 
-	    target_compile_options(${ARGS_TARGET}
+            target_compile_options(${ARGS_TARGET}
                 PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
 
-	    # GH-200 Unified Memory Suppory
-	    if (MFC_Unified)
+            # GH-200 Unified Memory Support
+            if (MFC_Unified)
                 target_compile_options(${ARGS_TARGET}
-	            PRIVATE -gpu=unified
+                    PRIVATE -gpu=unified
                 )
                 # "This option must appear in both the compile and link lines" -- NVHPC Docs
-	        target_link_options(${ARGS_TARGET}
+                target_link_options(${ARGS_TARGET}
                     PRIVATE -gpu=unified
                 )
             endif()
