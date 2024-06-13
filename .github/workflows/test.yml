@@ -49,8 +49,8 @@ jobs:
           echo "CC=gcc-14"      >> $GITHUB_ENV
           echo "CXX=g++-14"     >> $GITHUB_ENV
           echo "FC=gfortran-14" >> $GITHUB_ENV
-          export CPATH=/opt/homebrew/include
-          export LIBRARY_PATH=/opt/homebrew/lib
+          export CPATH="/opt/homebrew/include":$CPATH
+          export LIBRARY_PATH="/opt/homebrew/lib":$LIBRARY_PATH
           
       - name: (MacOS) Build OpenMPI
         if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
