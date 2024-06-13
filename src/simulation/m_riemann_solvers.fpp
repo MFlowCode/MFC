@@ -2271,6 +2271,7 @@ contains
                                                            (rho_R*s_S + (pres_R - tau_e_R(dir_idx_tau(1)))/ &
                                                            (s_R - vel_R(idx1)))) - E_R))
                                     if (num_dims > 1) then
+                                        !$acc loop seq
                                         do i = 1, num_dims - 1
                                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + &
                                                  xi_M*(s_S/(s_L-s_S))*(tau_e_L(dir_idx_tau(i+1))*vel_L(dir_idx(i+1))) + &
@@ -2315,6 +2316,7 @@ contains
 
                                 ! Elastic Stresses
                                 if (hypoelasticity) then
+                                    !$acc loop seq
                                     do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
                                         flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
                                             xi_M*(s_S/(s_L-s_S))*(s_L*rho_L*tau_e_L(i)-rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + &
