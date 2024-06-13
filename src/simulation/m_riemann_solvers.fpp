@@ -2260,16 +2260,34 @@ contains
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    xi_M*(vel_L(idx1)*(E_L + pres_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                     (rho_L*s_S + pres_L/ &
-                                                      (s_L - vel_L(idx1)))) - E_L)) &
-                                    + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                       (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(idx1)))) - E_R))
-
+                                if (hypoelasticity) then
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                        xi_M*(vel_L(idx1)*(E_L + pres_L - tau_e_L(dir_idx_tau(1))) + &
+                                              s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                                          (rho_L*s_S + (pres_L - tau_e_L(dir_idx_tau(1)))/ &
+                                                          (s_L - vel_L(idx1)))) - E_L)) &
+                                         + xi_P*(vel_R(idx1)*(E_R + pres_R - tau_e_R(dir_idx_tau(1))) + &
+                                                s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
+                                                           (rho_R*s_S + (pres_R - tau_e_R(dir_idx_tau(1)))/ &
+                                                           (s_R - vel_R(idx1)))) - E_R))
+                                    if (num_dims > 1) then
+                                        do i = 1, num_dims - 1
+                                            flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + &
+                                                 xi_M*(s_S/(s_L-s_S))*(tau_e_L(dir_idx_tau(i+1))*vel_L(dir_idx(i+1))) + &
+                                                 xi_P*(s_S/(s_R-s_S))*(tau_e_R(dir_idx_tau(i+1))*vel_R(dir_idx(i+1)))
+                                        end do
+                                    end if
+                                else ! SGR added Hypo statement to calc energy flux
+                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                        xi_M*(vel_L(idx1)*(E_L + pres_L) + &
+                                              s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                                          (rho_L*s_S + pres_L/ &
+                                                          (s_L - vel_L(idx1)))) - E_L)) &
+                                         + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
+                                                s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
+                                                           (rho_R*s_S + pres_R/ &
+                                                           (s_R - vel_R(idx1)))) - E_R))
+                                end if
                                 ! Volume fraction flux
                                 !$acc loop seq
                                 do i = advxb, advxe
@@ -2294,6 +2312,16 @@ contains
 
                                     !if ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
                                 end do
+
+                                ! Elastic Stresses
+                                if (hypoelasticity) then
+                                    do i = 1, strxe - strxb + 1 !TODO: this indexing may be slow
+                                        flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
+                                            xi_M*(s_S/(s_L-s_S))*(s_L*rho_L*tau_e_L(i)-rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + &
+                                            xi_P*(s_S/(s_R-s_S))*(s_R*rho_R*tau_e_R(i)-rho_R*vel_R(dir_idx(1))*tau_e_R(i)) 
+                                    end do
+                                end if
+
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
