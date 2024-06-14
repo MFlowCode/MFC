@@ -451,14 +451,11 @@ function(MFC_SETUP_TARGET)
                 )
             endforeach()
 
-            target_compile_options(${ARGS_TARGET}
-                PRIVATE -gpu=keep,ptxinfo,lineinfo,unified
-            )
-            # "This option must appear in both the compile and link lines" -- NVHPC Docs
-	    target_link_options(${ARGS_TARGET}
-                PRIVATE -gpu=unified
+	    target_compile_options(${ARGS_TARGET}
+                PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
 
+<<<<<<< HEAD
             # GH-200 Unified Memory Support
             if (MFC_Unified)
                 target_compile_options(${ARGS_TARGET}
@@ -470,6 +467,20 @@ function(MFC_SETUP_TARGET)
                 )
             endif()
 
+||||||| parent of 199abe18 (Okay, looks like it works)
+=======
+	    # GH-200 Unified Memory Suppory
+	    if (MFC_Unified)
+                target_compile_options(${ARGS_TARGET}
+	            PRIVATE -gpu=unified
+                )
+                # "This option must appear in both the compile and link lines" -- NVHPC Docs
+	        target_link_options(${ARGS_TARGET}
+                    PRIVATE -gpu=unified
+                )
+            endif()
+
+>>>>>>> 199abe18 (Okay, looks like it works)
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
                     PRIVATE -gpu=autocompare,debug
