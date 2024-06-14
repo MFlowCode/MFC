@@ -15,8 +15,7 @@ rhog = 1.18     #kg/m^3
 c_g = 347.2     #m/s
 G_g = 0         #pa
 
-    #material2 :: lung
-
+#material2 :: water
 gammal = 5.5
 Bl = 492.E+06
 rhol = 996.0
@@ -56,10 +55,10 @@ patmos_n = patmos/stress_char
 P_amp_n = P_amp/stress_char
 
 #geometry
-dlengx = 1.
-dlengy = 20.
-Nx = 200
-Ny = dlengy*Nx
+dlengx = 20.
+dlengy = 1.
+Ny = 100
+Nx = dlengx*Ny
 dx = dlengx/Nx
 dy = dlengy/Ny
 alphal_back = 1.0
@@ -70,8 +69,8 @@ alphag_lung = 1.0
 interface_amp = 0.5
 
 # time stepping requirements
-time_end = 2.5
-cfl = 0.5
+time_end = 5
+cfl = 0.75
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
@@ -80,9 +79,6 @@ tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)
 
-#interface profile
-interface_amp = 0.5      
-
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
@@ -90,10 +86,10 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    'x_domain%beg'                 :  0.,
-    'x_domain%end'                 :  dlengx,
-    'y_domain%beg'                 :  -dlengy/2.,
-    'y_domain%end'                 :  dlengy/2.,
+    'x_domain%beg'                 :  -dlengx/2.,
+    'x_domain%end'                 :  dlengx/2.,
+    'y_domain%beg'                 :  0.,
+    'y_domain%end'                 :  dlengy,
     'm'                            : int(Nx),
     'n'                            : int(Ny),
     'p'                            : 0,
@@ -135,24 +131,10 @@ print(json.dumps({
     'parallel_io'                  :'T',
     # ==========================================================================
     
-    # Monopole setting =========================================================
-    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
-    'num_mono'                      : 1,                                        # update : place in the middle and expand
-    'Mono(1)%pulse'                 : 3,                                        # update : sin  wave
-    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
-    'Mono(1)%mag'                   : 10.0*patmos_n,                                  # update : magnitude
-    'Mono(1)%length'                : 1*dlengx,                                    # update : impulse length
-    #'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    #'Mono(1)%support_width'         : 30,                                       # update : 49 cells in each direction
-    'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
-    'Mono(1)%loc(2)'                : 5.0*dlengx,                                       # update : upper boundary of the domain
-    'Mono(1)%dir'                   : -math.pi/2,                                    # update : direction: -pi/2
- #==============================================================================
-                                                                
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : dlengx/2,
-    'patch_icpp(1)%y_centroid'     : 0.,
+    'patch_icpp(1)%x_centroid'     : 0.,
+    'patch_icpp(1)%y_centroid'     : dlengy/2.,
     'patch_icpp(1)%length_x'       : dlengx,
     'patch_icpp(1)%length_y'       : dlengy,
     'patch_icpp(1)%vel(1)'         : 0.,
@@ -167,12 +149,12 @@ print(json.dumps({
 
     # Patch 2: Lung ============================================================
     'patch_icpp(2)%geometry'       : 7,
-    'patch_icpp(2)%hcid'           : 205,
+    'patch_icpp(2)%hcid'           : 206,
     'patch_icpp(2)%alter_patch(1)' : 'T',
-    'patch_icpp(2)%x_centroid'     : dlengx/2.,
-    'patch_icpp(2)%y_centroid'     : -dlengy/4.,                  #moved the center by amp/2 up and increased length of y to account for the bump
-    'patch_icpp(2)%length_x'       : dlengx,
-    'patch_icpp(2)%length_y'       : dlengy/2.+2,                 #add 2
+    'patch_icpp(2)%x_centroid'     : -dlengx/4.,
+    'patch_icpp(2)%y_centroid'     : dlengy/2.,                  
+    'patch_icpp(2)%length_x'       : dlengx/2.+2,
+    'patch_icpp(2)%length_y'       : dlengy,                 
     'patch_icpp(2)%a2'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
@@ -188,8 +170,22 @@ print(json.dumps({
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
     'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
-    # ========================================================================== 
+ 
+     # Monopole setting =========================================================
+    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
+    'num_mono'                      : 1,                                        # update : place in the middle and expand
+    'Mono(1)%pulse'                 : 3,                                        # update : square  wave
+    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
+    'Mono(1)%mag'                   : 10.0*patmos_n,                            # update : magnitude
+    'Mono(1)%length'                : 1*dlengy,                                 # update : impulse length
+    'Mono(1)%support'               : 2,                                       # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'Mono(1)%support_width'         : 30,                                      # update
+    'Mono(1)%loc(1)'                : 0.7*dlengy,                                 # update : x_center of the domain
+    'Mono(1)%loc(2)'                : dlengy/2,                               # update : upper boundary of the domain
+    'Mono(1)%dir'                   : -math.pi,                               # update : direction: -pi/2
     
+ 
+ #==============================================================================
 }))
 
 # ==============================================================================

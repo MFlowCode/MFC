@@ -331,6 +331,11 @@ contains
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
+        else if (pulse(nm) == 4) then
+            ! DUS_like wave
+            sigt = dsqrt(10.d0)
+            period = length(nm)/sos
+            f_g = mag(nm)*cos(2.d0*pi*the_time/period)*dexp(-((the_time)**2.d0)/(sigt**2.d0))
         else
         end if
 
