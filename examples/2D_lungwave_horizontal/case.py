@@ -130,7 +130,20 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
-    
+ 
+    # Monopole setting =========================================================
+    'Monopole'                      : 'T',           # creating an acoustic wave
+    'num_mono'                      : 1,             # place in the middle and expand
+    'Mono(1)%pulse'                 : 3,             # square  wave
+    'Mono(1)%npulse'                : 1,             # 1 pulse
+    'Mono(1)%mag'                   : 10.0*patmos_n, # magnitude
+    'Mono(1)%length'                : 1*dlengy,      # pulse length
+    'Mono(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'Mono(1)%support_width'         : 30,             
+    'Mono(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain
+    'Mono(1)%loc(2)'                : dlengy/2,      # upper boundary of the domain
+    'Mono(1)%dir'                   : -math.pi,      # direction: -pi/2
+   
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : 0.,
@@ -145,7 +158,6 @@ print(json.dumps({
     'patch_icpp(1)%alpha(1)'       : alphal_back,
     'patch_icpp(1)%alpha(2)'       : alphag_back,
     # ==========================================================================
-
 
     # Patch 2: Lung ============================================================
     'patch_icpp(2)%geometry'       : 7,
@@ -169,21 +181,7 @@ print(json.dumps({
     'fluid_pp(1)%gamma'            : 1.E+00/(gammal-1.E+00),
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
-    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
- 
-     # Monopole setting =========================================================
-    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
-    'num_mono'                      : 1,                                        # update : place in the middle and expand
-    'Mono(1)%pulse'                 : 3,                                        # update : square  wave
-    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
-    'Mono(1)%mag'                   : 10.0*patmos_n,                            # update : magnitude
-    'Mono(1)%length'                : 1*dlengy,                                 # update : impulse length
-    'Mono(1)%support'               : 2,                                       # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    'Mono(1)%support_width'         : 30,                                      # update
-    'Mono(1)%loc(1)'                : 0.7*dlengy,                                 # update : x_center of the domain
-    'Mono(1)%loc(2)'                : dlengy/2,                               # update : upper boundary of the domain
-    'Mono(1)%dir'                   : -math.pi,                               # update : direction: -pi/2
-    
+    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),   
  
  #==============================================================================
 }))

@@ -136,17 +136,15 @@ print(json.dumps({
     # ==========================================================================
     
     # Monopole setting =========================================================
-    'Monopole'                      : 'T',                                      # update : creating an acoustic wave
-    'num_mono'                      : 1,                                        # update : place in the middle and expand
-    'Mono(1)%pulse'                 : 3,                                        # update : sin  wave
-    'Mono(1)%npulse'                : 1,                                        # update : 1 impulse
-    'Mono(1)%mag'                   : 10.0*patmos_n,                                  # update : magnitude
-    'Mono(1)%length'                : 1*dlengx,                                    # update : impulse length
-    #'Mono(1)%support'               : 2,                                        # update : 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    #'Mono(1)%support_width'         : 30,                                       # update : 49 cells in each direction
-    'Mono(1)%loc(1)'                : dlengx/2,                                      # update : x_center of the domain
-    'Mono(1)%loc(2)'                : 5.0*dlengx,                                       # update : upper boundary of the domain
-    'Mono(1)%dir'                   : -math.pi/2,                                    # update : direction: -pi/2
+    'Monopole'                      : 'T',             # creating an acoustic wave
+    'num_mono'                      : 1,               # place in the middle and expand
+    'Mono(1)%pulse'                 : 3,               # sine  wave
+    'Mono(1)%npulse'                : 1,               # 1 pulse
+    'Mono(1)%mag'                   : 10.0*patmos_n,   # magnitude
+    'Mono(1)%length'                : 1*dlengx,        # impulse length
+    'Mono(1)%loc(1)'                : dlengx/2,        # x_center of the domain
+    'Mono(1)%loc(2)'                : 5.0*dlengx,      # upper boundary of the domain
+    'Mono(1)%dir'                   : -math.pi/2,      # direction: -pi/2
  #==============================================================================
                                                                 
     # Patch 1: Background ======================================================
@@ -170,9 +168,9 @@ print(json.dumps({
     'patch_icpp(2)%hcid'           : 205,
     'patch_icpp(2)%alter_patch(1)' : 'T',
     'patch_icpp(2)%x_centroid'     : dlengx/2.,
-    'patch_icpp(2)%y_centroid'     : -dlengy/4.,                  #moved the center by amp/2 up and increased length of y to account for the bump
+    'patch_icpp(2)%y_centroid'     : -dlengy/4.,
     'patch_icpp(2)%length_x'       : dlengx,
-    'patch_icpp(2)%length_y'       : dlengy/2.+2,                 #add 2
+    'patch_icpp(2)%length_y'       : dlengy/2.+2,
     'patch_icpp(2)%a2'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
