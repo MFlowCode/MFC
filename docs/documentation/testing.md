@@ -1,7 +1,7 @@
 ## Testing
  
 To run MFC's test suite, run
-```console
+```shell
 ./mfc.sh test -j <thread count>
 ```
 
@@ -21,7 +21,7 @@ To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instea
 ### Creating Tests
 
 To (re)generate *golden files*, append the `--generate` option:
-```console
+```shell
 ./mfc.sh test --generate -j 8
 ```
 
@@ -30,7 +30,7 @@ It is recommended that a range be specified when generating golden files for new
 **Note:** If you output new variables and want to update the golden files to include these without modifying the original data, use the `--add-new-variables` option instead.
 
 Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py).
-The function `generate_cases` is responsible for generating the list of test cases.
+The function `list_cases` is responsible for generating the list of test cases.
 Loops and conditionals are used to vary parameters, whose defaults can be found in the `BASE_CFG` case object within [case.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/case.py).
 The function operates on two variables:
 
@@ -54,7 +54,7 @@ where:
 - `params` is the fully resolved case dictionary, as would appear in a Python case input file.
 - `ppn` is the number of processes per node to use when running the case.
 
-To illustrate, consider the following excerpt from `generate_cases`:
+To illustrate, consider the following excerpt from `list_cases`:
 
 ```python
 for weno_order in [3, 5]:
@@ -67,14 +67,14 @@ for weno_order in [3, 5]:
       })
 
       if not (mp_weno == 'T' and weno_order != 5):
-          cases.append(create_case(stack, '', {}))
+          cases.append(define_case_d(stack, '', {}))
 
       stack.pop()
 
   stack.pop()
 ```
 
-When pushing to the stack, or creating a new case with the `create_case` function, you must specify:
+When pushing to the stack, or creating a new case with the `define_case_d` function, you must specify:
 - `stack`: The current stack.
 - `trace`: A human-readable string describing what you are currently varying.
 - `variations`: A Python dictionary with case parameter variations.
@@ -82,12 +82,12 @@ When pushing to the stack, or creating a new case with the `create_case` functio
 
 If a trace is empty (that is, the empty string `""`), it will not appear in the final trace, but any case parameter variations associated with it will still be applied.
 
-Finally, the case is appended to the `cases` list, which will be returned by the `generate_cases` function.
+Finally, the case is appended to the `cases` list, which will be returned by the `list_cases` function.
 
 ### Testing Post Process
 
 To test updated post process code, append the `-a` or `--test-all` option: 
-```console
+```shell
 ./mfc.sh test -a -j 8
 ```
 

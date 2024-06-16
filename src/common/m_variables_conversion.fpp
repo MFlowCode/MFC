@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'inline_conversions.fpp'
-#:include '../simulation/include/case.fpp'
+#:include 'case.fpp'
 
 !> @brief This module consists of subroutines used in the conversion of the
 !!              conservative variables into the primitive ones and vice versa. In
@@ -1014,6 +1014,10 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
+                    if (sigma /= dflt_real) then
+                        qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
+                    end if
+
                 end do
             end do
         end do
@@ -1163,6 +1167,11 @@ contains
                             end if
                         end do
                     end if
+
+                    if (sigma /= dflt_real) then
+                        q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
+                    end if
+
                 end do
             end do
         end do

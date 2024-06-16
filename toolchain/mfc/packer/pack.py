@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..       import common
+from ..run    import input
 from ..build  import get_configured_targets
 from ..state  import CFG
 
@@ -58,8 +59,9 @@ mfc.sh:
 
 """
 
-        for target in get_configured_targets():
-            cfg = target.get_configuration_txt()
+        case = input.load(None, {}, {})
+        for target in get_configured_targets(case):
+            cfg = target.get_configuration_txt(case)
 
             if cfg is None:
                 continue

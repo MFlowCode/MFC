@@ -1,7 +1,7 @@
 import typing
 
 from mfc   import common
-from .case import TestCase, create_case, CaseGeneratorStack
+from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -67,12 +67,17 @@ def get_dimensions():
 
 
 # pylint: disable=too-many-locals, too-many-statements
-def generate_cases() -> typing.List[TestCase]:
+def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
     def alter_bcs(dimInfo):
         for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
-            cases.append(create_case(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
+            cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
+
+    def alter_capillary():
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
+        stack.pop()
 
     def alter_weno():
         for weno_order in [3, 5]:
@@ -86,7 +91,7 @@ def generate_cases() -> typing.List[TestCase]:
                     trace.append("mp_weno")
 
                 if not (mp_weno == 'T' and weno_order != 5):
-                    cases.append(create_case(stack, [
+                    cases.append(define_case_d(stack, [
                         f"mapped_weno={mapped_weno}",
                         f"mp_weno={mp_weno}"
                     ], {
@@ -100,18 +105,18 @@ def generate_cases() -> typing.List[TestCase]:
         for riemann_solver in [1, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
-            cases.append(create_case(stack, "mixture_err",   {'mixture_err': 'T'}))
-            cases.append(create_case(stack, "avg_state=1",   {'avg_state':   1}))
-            cases.append(create_case(stack, "wave_speeds=2", {'wave_speeds': 2}))
+            cases.append(define_case_d(stack, "mixture_err",   {'mixture_err': 'T'}))
+            cases.append(define_case_d(stack, "avg_state=1",   {'avg_state':   1}))
+            cases.append(define_case_d(stack, "wave_speeds=2", {'wave_speeds': 2}))
 
             if riemann_solver == 2:
-                cases.append(create_case(stack, "model_eqns=3", {'model_eqns': 3}))
+                cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
 
             if num_fluids == 2:
                 if riemann_solver == 2:
-                    cases.append(create_case(stack, 'alt_soundspeed', {'alt_soundspeed': 'T'}))
+                    cases.append(define_case_d(stack, 'alt_soundspeed', {'alt_soundspeed': 'T'}))
 
-                cases.append(create_case(stack, 'mpp_lim', {'mpp_lim': 'T'}))
+                cases.append(define_case_d(stack, 'mpp_lim', {'mpp_lim': 'T'}))
 
             stack.pop()
 
@@ -137,12 +142,12 @@ def generate_cases() -> typing.List[TestCase]:
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
-                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
-                cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+                cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
+                cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
 
                 for weno_Re_flux in ['T']:
                     stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
-                    cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
+                    cases.append(define_case_d(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
                 stack.pop()
@@ -151,15 +156,15 @@ def generate_cases() -> typing.List[TestCase]:
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
-                    'patch_icpp(1)%vel(1)': 1.0}) 
+                    'patch_icpp(1)%vel(1)': 1.0})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
-                cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
-                cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+                cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
+                cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
                 for weno_Re_flux in ['T']:
                     stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
-                    cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
+                    cases.append(define_case_d(stack, "weno_avg", {'weno_avg': 'T'}))
                     stack.pop()
 
                 stack.pop()
@@ -177,18 +182,18 @@ def generate_cases() -> typing.List[TestCase]:
             'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8,  'patch_icpp(1)%vel(1)': 0.0
         })
 
-        cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
-        cases.append(create_case(stack, "model_eqns=3", {'model_eqns': 3}))
+        cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
+        cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11}) 
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11})
 
-        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
-        cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+        cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
+        cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
             stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
-            cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
+            cases.append(define_case_d(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
         stack.pop()
@@ -196,15 +201,15 @@ def generate_cases() -> typing.List[TestCase]:
 
     def alter_3d():
         stack.push("Cylindrical", {
-            'bc_y%beg': -14, 'bc_z%beg': -1, 'bc_z%end': -1, 'cyl_coord': 'T', 'x_domain%beg': 0.E+00, 
+            'bc_y%beg': -14, 'bc_z%beg': -1, 'bc_z%end': -1, 'cyl_coord': 'T', 'x_domain%beg': 0.E+00,
             'x_domain%end': 5.E+00, 'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00, 'z_domain%beg': 0.E+00,
             'z_domain%end' : 2.0*3.141592653589793E+00, 'm': 29, 'n': 29, 'p': 29,
             'patch_icpp(1)%geometry': 10, 'patch_icpp(1)%x_centroid' : 0.5, 'patch_icpp(1)%y_centroid' : 0.E+00,
             'patch_icpp(1)%z_centroid' : 0.E+00, 'patch_icpp(1)%radius' : 1.0, 'patch_icpp(1)%length_x' : 1.0,
-            'patch_icpp(1)%length_y' : -1E+6, 'patch_icpp(1)%length_z' : -1E+6, 
+            'patch_icpp(1)%length_y' : -1E+6, 'patch_icpp(1)%length_z' : -1E+6,
             'patch_icpp(2)%geometry': 10, 'patch_icpp(2)%x_centroid' : 2.5, 'patch_icpp(2)%y_centroid' : 0.E+00,
             'patch_icpp(2)%z_centroid' : 0.E+00, 'patch_icpp(2)%radius' : 1.0, 'patch_icpp(2)%length_x' : 3.0,
-            'patch_icpp(2)%length_y' : -1E+6, 'patch_icpp(2)%length_z' : -1E+6, 
+            'patch_icpp(2)%length_y' : -1E+6, 'patch_icpp(2)%length_z' : -1E+6,
             'patch_icpp(3)%geometry': 10, 'patch_icpp(3)%x_centroid' : 4.5, 'patch_icpp(3)%y_centroid' : 0.E+00,
             'patch_icpp(3)%z_centroid' : 0.E+00, 'patch_icpp(3)%radius' : 1.0, 'patch_icpp(3)%length_x' : 1.0,
             'patch_icpp(3)%length_y' : -1E+6, 'patch_icpp(3)%length_z' : -1E+6, 'patch_icpp(1)%vel(1)' :0.0,
@@ -216,18 +221,18 @@ def generate_cases() -> typing.List[TestCase]:
             'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8
         })
 
-        cases.append(create_case(stack, "model_eqns=2", {'model_eqns': 2}))
+        cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
             'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
             })
 
-        cases.append(create_case(stack, "",             {'weno_Re_flux': 'F'}))
-        cases.append(create_case(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
+        cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
+        cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
         for weno_Re_flux in ['T']:
             stack.push("weno_Re_flux" if weno_Re_flux == 'T' else '', {'weno_Re_flux' : 'T'})
-            cases.append(create_case(stack, "weno_avg", {'weno_avg': 'T'}))
+            cases.append(define_case_d(stack, "weno_avg", {'weno_avg': 'T'}))
             stack.pop()
 
         stack.pop()
@@ -235,28 +240,27 @@ def generate_cases() -> typing.List[TestCase]:
 
     def alter_ppn(dimInfo):
         if len(dimInfo[0]) == 3:
-            cases.append(create_case(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
+            cases.append(define_case_d(stack, '2 MPI Ranks', {'m': 29, 'n': 29, 'p': 49}, ppn=2))
         else:
-            cases.append(create_case(stack, '2 MPI Ranks', {}, ppn=2))
+            cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False):
-
         stack.push(f'IBM', {
-            'ib': 'T', 'num_ibs': 1, 
-            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5, 
+            'ib': 'T', 'num_ibs': 1,
+            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
             'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
             'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
         })
 
         if len(dimInfo[0]) == 3:
-            cases.append(create_case(stack, f'', {
+            cases.append(define_case_d(stack, f'', {
                 'patch_ib(1)%z_centroid': 0.5,
                 'patch_ib(1)%geometry': 8,
             }))
         elif len(dimInfo[0]) == 2:
-            cases.append(create_case(stack, f'', {'patch_ib(1)%geometry': 2 }))
+            cases.append(define_case_d(stack, f'', {'patch_ib(1)%geometry': 2 }))
             if six_eqn_model:
-                cases.append(create_case(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
+                cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
 
@@ -291,39 +295,39 @@ def generate_cases() -> typing.List[TestCase]:
                     stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
 
                     if not (polytropic == 'F' and bubble_model == 3):
-                        cases.append(create_case(stack, '', {}))
+                        cases.append(define_case_d(stack, '', {}))
 
                     stack.pop()
 
                 stack.pop()
 
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
-            cases.append(create_case(stack, 'nb=1', {'nb': 1}))
+            cases.append(define_case_d(stack, 'nb=1', {'nb': 1}))
 
             stack.push("adv_n=T", {'adv_n': 'T'})
-            cases.append(create_case(stack, '', {}))
-            cases.append(create_case(stack, 'adap_dt=T', {'adap_dt': 'T'}))
+            cases.append(define_case_d(stack, '', {}))
+            cases.append(define_case_d(stack, 'adap_dt=T', {'adap_dt': 'T'}))
             stack.pop()
 
             stack.push('', {'fluid_pp(1)%pi_inf': 351.5})
-            cases.append(create_case(stack, 'artificial_Ma', {'pi_fac': 0.1}))
+            cases.append(define_case_d(stack, 'artificial_Ma', {'pi_fac': 0.1}))
 
             stack.pop()
 
             stack.push("QBMM", {'qbmm': 'T'})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
 
             stack.push("Non-polytropic", {'polytropic': 'F'})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             stack.pop()
 
             stack.push('bubble_model=3', {'bubble_model': 3, 'polytropic': 'T'})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             stack.push('Non-polytropic', { 'polytropic': 'F'})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             for _ in range(7):
                 stack.pop()
@@ -372,7 +376,7 @@ def generate_cases() -> typing.List[TestCase]:
                     'patch_icpp(3)%tau_e(4)': 0.E+00, 'patch_icpp(3)%tau_e(5)': 0.0E+00, 'patch_icpp(3)%tau_e(6)': 0.0E+00
                 })
 
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             stack.pop()
 
@@ -386,6 +390,34 @@ def generate_cases() -> typing.List[TestCase]:
                 for _ in range(2):
                     stack.pop()
 
+    def alter_body_forces(dimInfo):
+        ndims = len(dimInfo[0])
+
+        stack.push("Bodyforces",{
+                'bf_x' : 'T', 'k_x' : 1, 'w_x' : 1, 'p_x': 1, 'g_x' : 10
+            })
+
+        if ndims >= 2:
+            stack.push("",{
+                    'bf_y' : 'T', 'k_y' : 1, 'w_y' : 1, 'p_y': 1, 'g_y' : 10
+                })
+
+        if ndims == 3:
+            stack.push("",{
+                    'bf_z' : 'T', 'k_z' : 1, 'w_z' : 1, 'p_z': 1, 'g_z' : 10
+                })
+
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
+        if ndims >= 2:
+            stack.pop()
+
+        if ndims == 3:
+            stack.pop()
+
+
     def alter_phasechange(dimInfo):
         ndims = len(dimInfo[0])
 
@@ -397,7 +429,7 @@ def generate_cases() -> typing.List[TestCase]:
                     "relax_model": relax_model,
                     'model_eqns': 3,
                     'palpha_eps': 1E-02,
-                    'ptgalpha_eps': 1E-02,                    
+                    'ptgalpha_eps': 1E-02,
                     "num_fluids": num_fluids,
                     'riemann_solver':           2,
                     'fluid_pp(1)%gamma':        0.7409,       'fluid_pp(1)%pi_inf':   1.7409E+09,
@@ -446,7 +478,7 @@ def generate_cases() -> typing.List[TestCase]:
                         'patch_icpp(1)%vel(3)':   606.15, 'patch_icpp(2)%vel(3)': 10.0, 'patch_icpp(3)%vel(3)': 10.0
                     })
 
-                cases.append(create_case(stack, '', {}))
+                cases.append(define_case_d(stack, '', {}))
 
                 stack.pop()
                 stack.pop()
@@ -479,20 +511,20 @@ def generate_cases() -> typing.List[TestCase]:
                     stack.push(f"bubble_model={bubble_model}", {'bubble_model' : bubble_model})
 
                     if not (polytropic == 'F' and bubble_model == 3):
-                        cases.append(create_case(stack, '', {}))
+                        cases.append(define_case_d(stack, '', {}))
 
                     stack.pop()
 
                 stack.pop()
 
             stack.push('', {'polytropic': 'T', 'bubble_model': 2})
-            cases.append(create_case(stack, 'nb=1', {'nb': 1}))
+            cases.append(define_case_d(stack, 'nb=1', {'nb': 1}))
 
             stack.push("QBMM", {'qbmm': 'T'})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             stack.push('bubble_model=3', {'bubble_model': 3})
-            cases.append(create_case(stack, '', {}))
+            cases.append(define_case_d(stack, '', {}))
 
             for _ in range(5):
                 stack.pop()
@@ -505,14 +537,17 @@ def generate_cases() -> typing.List[TestCase]:
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
+                alter_capillary()
             if len(dimInfo[0]) == 3:
                 alter_3d()
+                alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_bubbles(dimInfo)
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
+            alter_body_forces(dimInfo)
             stack.pop()
             stack.pop()
 
@@ -520,12 +555,12 @@ def generate_cases() -> typing.List[TestCase]:
 
     # Sanity Check 1
     if stack.size() != 0:
-        raise common.MFCException("generate_cases: stack isn't fully pop'ed")
+        raise common.MFCException("list_cases: stack isn't fully pop'ed")
 
     # Sanity Check 2
     uuids  = [ case.get_uuid() for case in cases ]
     l1, l2 = len(uuids), len(set(uuids))
     if l1 != l2:
-        raise common.MFCException(f"generate_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
+        raise common.MFCException(f"list_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
 
     return cases

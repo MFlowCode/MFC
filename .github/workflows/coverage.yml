@@ -1,0 +1,45 @@
+name: Coverage Check
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  run:
+    name: Coverage Test on CodeCov
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkouts
+        uses: actions/checkout@v4
+
+      - name: Setup Ubuntu
+        run: |
+            sudo apt update -y
+            sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+            
+      
+      - name: Build
+        run: /bin/bash mfc.sh build -j $(nproc) --gcov
+
+      - name: Test
+        run: /bin/bash mfc.sh test -a -j $(nproc)
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -68,6 +68,10 @@ module m_start_up
     use m_compile_specific
 
     use m_checker
+
+    use m_surface_tension
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -126,12 +130,13 @@ contains
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, num_fluids, adv_alphan, &
+            model_eqns, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
-            riemann_flat, cu_mpi, cu_tensor, &
+            riemann_flat, rdma_mpi, cu_tensor, &
             mapped_weno, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
+            x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
             fluid_pp, probe_wrt, prim_vars_wrt, &
@@ -141,7 +146,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, &
+            nb, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
@@ -150,8 +155,10 @@ contains
             polydisperse, poly_sigma, qbmm, &
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
-            R0_type, file_per_process, &
-            pi_fac, adv_n, adap_dt
+            R0_type, file_per_process, sigma, &
+            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
+            g_x, g_y, g_z
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -174,6 +181,10 @@ contains
 
             close (1)
 
+            if ((bf_x) .or. (bf_y) .or. (bf_z)) then
+                bodyForces = .true.
+            endif
+
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
@@ -190,8 +201,8 @@ contains
         if (CRAY_ACC_MODULE == "") then
             call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
         end if
-#endif        
-#endif        
+#endif
+#endif
 
     end subroutine s_read_input_file ! -------------------------------------
 
@@ -480,7 +491,7 @@ contains
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
         end if
-        
+
         ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         ! Computing the cell width distribution
@@ -631,6 +642,7 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         else
+
             ! Open the file to read conservative variables
             write (file_loc, '(I0,A)') t_step_start, '.dat'
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
@@ -644,8 +656,11 @@ contains
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
+
                     call s_initialize_mpi_data(q_cons_vf)
+
                 end if
+
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -696,6 +711,7 @@ contains
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
+
                     end do
                 end if
 
@@ -1127,12 +1143,11 @@ contains
             if (num_procs == 1) then
                 time_final = time_avg
                 io_time_final = io_time_avg
-                print *, "Final Time", time_final
             else
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
-                print *, "Final Time", time_final
             end if
+            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
@@ -1237,16 +1252,20 @@ contains
         if (monopole) then
             call s_initialize_monopole_module()
         end if
+
         if (any(Re_size > 0)) then
             call s_initialize_viscous_module()
         end if
+
         call s_initialize_rhs_module()
+
+        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()      
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1267,8 +1286,10 @@ contains
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
+
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
+        if (bodyForces) call s_initialize_body_forces_module()
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
@@ -1354,7 +1375,9 @@ contains
         ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
+
         call s_initialize_parallel_io()
+
         call s_mpi_decompose_computational_domain()
 
     end subroutine s_initialize_mpi_domain
@@ -1370,7 +1393,12 @@ contains
         end if
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
-        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)    
+
+        !$acc update device(monopole, num_mono)
+        !$acc update device(sigma)
+
+        !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
+
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
@@ -1399,10 +1427,13 @@ contains
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
-        if (relax) call s_finalize_relaxation_solver_module()      
+        if (relax) call s_finalize_relaxation_solver_module()
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
+
+        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
+        if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

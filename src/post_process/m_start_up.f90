@@ -71,8 +71,8 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma, file_per_process, relax, relax_model, &
-            adv_n
+            polydisperse, poly_sigma, file_per_process, relax, &
+            relax_model, cf_wrt, sigma, adv_n
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -512,6 +512,32 @@ contains
             write (varname, '(A)') 'schlieren'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
+            varname(:) = ' '
+
+        end if
+        ! ----------------------------------------------------------------------
+
+        ! Adding the color function to formatted database file
+        if (cf_wrt) then
+            q_sf = q_cons_vf(c_idx)%sf( &
+                   -offset_x%beg:m + offset_x%end, &
+                   -offset_y%beg:n + offset_y%end, &
+                   -offset_z%beg:p + offset_z%end)
+
+            !do k = -offset_z%beg, p + offset_z%end
+            !    do j = -offset_y%beg, n + offset_y%end
+            !        do i = -offset_x%beg, m + offset_x%end
+            !            if (q_sf(i,j,k) > 0.5) then
+            !                q_sf(i,j,k) = 100000 + 8/0.15
+            !            else
+            !                q_sf(i,j,k) = 100000
+            !            end if
+            !        end do
+            !    end do
+            !end do
+
+            write (varname, '(A,I0)') 'color_function'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
 
         end if

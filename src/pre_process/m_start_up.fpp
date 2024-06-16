@@ -135,8 +135,8 @@ contains
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
-            palpha_eps, ptgalpha_eps, adv_n, &
-            ib, num_ibs, patch_ib
+            palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
+            sigma, adv_n
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -861,10 +861,10 @@ contains
             time_final = 0d0
             if (num_procs == 1) then
                 time_final = time_avg
-                print *, "Final Time", time_final
+                print *, "Elapsed Time", time_final
             else
                 time_final = maxval(proc_time)
-                print *, "Final Time", time_final
+                print *, "Elapsed Time", time_final
             end if
             inquire (FILE='pre_time_data.dat', EXIST=file_exists)
             if (file_exists) then

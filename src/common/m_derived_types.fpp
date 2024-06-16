@@ -191,6 +191,8 @@ module m_derived_types
         integer :: hcid
         !! id for hard coded initial condition
 
+        real(kind(0d0)) :: cf_val !! color function value
+
     end type ic_patch_parameters
 
     type ib_patch_parameters
@@ -276,6 +278,7 @@ module m_derived_types
         real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
+        integer, dimension(3) :: DB
 
     end type ghost_point
 

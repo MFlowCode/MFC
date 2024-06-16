@@ -21,7 +21,7 @@ MFC_LOGO = """\
 .:++=----------====+*= ==..:%.....
  .:-=++++===--==+=-+=   +.  :=
  +#=::::::::=%=. -+:    =+   *:
-.*=-=*=..    :=+*+:      -...--\
+.*=-=*=..    :=+*+:      -...--
 """
 
 
@@ -99,7 +99,7 @@ def delete_directory(dirpath: str) -> None:
 
 
 def get_program_output(arguments: typing.List[str] = None, cwd=None):
-    with subprocess.Popen(arguments or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
+    with subprocess.Popen([ str(_) for _ in arguments ] or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
         return (proc.communicate()[0].decode(), proc.returncode)
 
 
