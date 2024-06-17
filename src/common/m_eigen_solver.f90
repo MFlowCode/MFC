@@ -11,7 +11,6 @@ module m_eigen_solver
     implicit none
 
     private; 
-    
     public :: cg, cbal, corth, comqr2, csroot, cdiv, pythag
 
 contains
@@ -473,7 +472,7 @@ contains
 !     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl, low, igh
         real(kind(0d0)), dimension(nm, nl), intent(inout) :: hr, hi
-        real(kind(0d0)), dimension(nl), intent(out):: wr, wi
+        real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
         real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
         real(kind(0d0)), dimension(igh), intent(inout) :: ortr, orti
         integer, intent(out) :: ierr

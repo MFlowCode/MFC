@@ -29,9 +29,9 @@ module m_phase_change
     implicit none
 
     private; public :: s_initialize_phasechange_module, &
-        s_relaxation_solver, &
-        s_infinite_relaxation_k, &
-        s_finalize_relaxation_solver_module
+ s_relaxation_solver, &
+ s_infinite_relaxation_k, &
+ s_finalize_relaxation_solver_module
 
     !> @name Abstract interface for creating function pointers
     !> @{
@@ -584,7 +584,7 @@ contains
         real(kind(0.0d0)), dimension(2, 2), intent(out) :: InvJac
         integer, intent(in) :: j
         real(kind(0.0d0)), dimension(2, 2), intent(out) :: Jac
-        integer, intent(in) ::  k, l
+        integer, intent(in) :: k, l
         real(kind(0.0d0)), intent(in) :: mCPD, mCVGP, mCVGP2, pS
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(kind(0.0d0)), dimension(2, 2), intent(out) :: TJac

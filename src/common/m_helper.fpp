@@ -20,24 +20,23 @@ module m_helper
     implicit none
 
     private; 
-    
     public :: s_compute_finite_difference_coefficients, &
-        s_comp_n_from_prim, &
-        s_comp_n_from_cons, &
-        s_initialize_nonpoly, &
-        s_simpson, &
-        s_transcoeff, &
-        s_int_to_str, &
-        s_transform_vec, &
-        s_transform_triangle, &
-        s_transform_model, &
-        s_swap, &
-        f_cross, &
-        f_create_transform_matrix, &
-        f_create_bbox, &
-        s_print_2D_array, &
-        f_xor, &
-        f_logical_to_int
+              s_comp_n_from_prim, &
+              s_comp_n_from_cons, &
+              s_initialize_nonpoly, &
+              s_simpson, &
+              s_transcoeff, &
+              s_int_to_str, &
+              s_transform_vec, &
+              s_transform_triangle, &
+              s_transform_model, &
+              s_swap, &
+              f_cross, &
+              f_create_transform_matrix, &
+              f_create_bbox, &
+              s_print_2D_array, &
+              f_xor, &
+              f_logical_to_int
 
 contains
 
@@ -295,7 +294,7 @@ contains
 
         real(kind(0.d0)), intent(in) :: omega, peclet
         real(kind(0.d0)), intent(out) :: Re_trans, Im_trans
-        
+
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
         real(kind(0.d0)) :: f_transcoeff
@@ -522,7 +521,7 @@ contains
     end function f_xor
 
     function f_logical_to_int(predicate) result(int)
-        
+
         logical, intent(in) :: predicate
         integer :: int
 

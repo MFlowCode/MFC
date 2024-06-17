@@ -25,21 +25,20 @@ module m_variables_conversion
     implicit none
 
     private; 
-    
     public :: s_initialize_variables_conversion_module, &
-        s_initialize_pb, &
-        s_initialize_mv, &
-        s_convert_to_mixture_variables, &
-        s_convert_mixture_to_mixture_variables, &
-        s_convert_species_to_mixture_variables_bubbles, &
-        s_convert_species_to_mixture_variables_bubbles_acc, &
-        s_convert_species_to_mixture_variables, &
-        s_convert_species_to_mixture_variables_acc, &
-        s_convert_conservative_to_primitive_variables, &
-        s_convert_primitive_to_conservative_variables, &
-        s_convert_primitive_to_flux_variables, &
-        s_compute_pressure, &
-        s_finalize_variables_conversion_module
+              s_initialize_pb, &
+              s_initialize_mv, &
+              s_convert_to_mixture_variables, &
+              s_convert_mixture_to_mixture_variables, &
+              s_convert_species_to_mixture_variables_bubbles, &
+              s_convert_species_to_mixture_variables_bubbles_acc, &
+              s_convert_species_to_mixture_variables, &
+              s_convert_species_to_mixture_variables_acc, &
+              s_convert_conservative_to_primitive_variables, &
+              s_convert_primitive_to_conservative_variables, &
+              s_convert_primitive_to_flux_variables, &
+              s_compute_pressure, &
+              s_finalize_variables_conversion_module
 
     !> Abstract interface to two subroutines designed for the transfer/conversion
     !! of the mixture/species variables to the mixture variables
@@ -119,7 +118,7 @@ contains
         !! @param rho Density
         !! @param qv fluid reference energy
         !! @param pres Pressure to calculate
-        !! @param stress Shear Stress        
+        !! @param stress Shear Stress
         !! @param mom Momentum
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, pres, stress, mom, G)
         !$acc routine seq
@@ -836,7 +835,7 @@ contains
         type(scalar_field), &
             allocatable, optional, dimension(:), &
             intent(in) :: gm_alphaK_vf
-            
+
         type(int_bounds_info), optional, intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K

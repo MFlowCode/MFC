@@ -13,7 +13,7 @@ contains
     subroutine DelayFileAccess(ProcessRank)
 
         integer, intent(in) :: ProcessRank
-        
+
         integer :: iDelay, nFileAccessDelayIterations
         real(kind(0d0)) :: Number, Dummy
 
