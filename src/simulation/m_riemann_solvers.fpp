@@ -2142,9 +2142,9 @@ contains
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                     end do
                                 end if
-
                                 if (wave_speeds == 1) then
                                     if (hypoelasticity) then
+
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
