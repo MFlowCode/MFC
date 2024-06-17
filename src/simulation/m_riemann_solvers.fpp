@@ -1542,6 +1542,7 @@ contains
                                 pi_inf_L = 0d0
                                 qv_L = 0d0
 
+                                ! Retain this in the refactor
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -2005,6 +2006,8 @@ contains
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
 
+                                ! Change this by splitting it into the cases
+                                ! present in the bubbles
                                 if (mpp_lim) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
