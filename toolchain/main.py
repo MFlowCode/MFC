@@ -31,8 +31,9 @@ def __print_greeting():
     ]
 
     for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
+        a = a or ''
         lhs = a.ljust(max_logo_line_length)
-        rhs = b if b is not None else ''
+        rhs = b or ''
         cons.print(
             f"[bold]{lhs}[/bold] | {rhs}",
             highlight=False
