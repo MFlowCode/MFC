@@ -2111,7 +2111,7 @@ contains
                                         if ((G_L > 1000) .and. (G_R > 1000)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
-                                            ! Additional terms in 2D and 3D
+                                           ! Additional terms in 2D and 3D
                                             if ((i == 2) .or. (i == 4) .or. (i == 5)) then
                                                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4d0*G_L)
                                                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4d0*G_R)
@@ -2175,7 +2175,7 @@ contains
                                                (s_R - vel_R(idx1))) &
                                                /(rho_L*(s_L - vel_L(idx1)) - &
                                                rho_R*(s_R - vel_R(idx1)))
-                                    end if
+                                   end if
 
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
@@ -2241,21 +2241,22 @@ contains
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
                                                 dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
-                                    end if  !SGR added this if statement for hypo
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                        xi_M*(rho_L*(vel_L(idx1)* &
-                                                     vel_L(idxi) + &
-                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                (1d0 - dir_flg(idxi))* &
-                                                                vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L)) &
-                                        + xi_P*(rho_R*(vel_R(idx1)* &
-                                                       vel_R(idxi) + &
-                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                  (1d0 - dir_flg(idxi))* &
-                                                                  vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                                    else  !SGR added this if statement for hypo
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                            xi_M*(rho_L*(vel_L(idx1)* &
+                                                          vel_L(idxi) + &
+                                                         s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                                                    (1d0 - dir_flg(idxi))* &
+                                                                    vel_L(idxi)) - vel_L(idxi))) + &
+                                                  dir_flg(idxi)*(pres_L)) &
+                                            + xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idxi) + &
+                                                           s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                                                      (1d0 - dir_flg(idxi))* &
+                                                                      vel_R(idxi)) - vel_R(idxi)))+ &
+                                                   dir_flg(idxi)*(pres_R))
+                                    end if
+                  ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
                                 ! Energy flux.
