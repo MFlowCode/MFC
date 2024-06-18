@@ -11,12 +11,16 @@ A test is considered passing when our error tolerances are met, in order to main
 Run `./mfc.sh test -h` for a full list of accepted arguments.
 
 Most notably, you can consult the full list of tests by running
-```
+```shell
 ./mfc.sh test -l
 ```
 
 To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
 To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
+To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
+```shell
+./mfc.sh test -j <thread count> -- -c <computer name>
+```
 
 ### Creating Tests
 
