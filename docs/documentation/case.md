@@ -356,14 +356,17 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Loginal | Strang splitting scheme with adaptive time stepping |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
-| `weno_eps`	           | Real    | WENO perturbation (avoid division by zero) |
-| `mapped_weno`	         | Logical | WENO with mapping of nonlinear weights |
+| `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
+| `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
+| `wenoz`	             | Logical | WENO-Z |
+| `teno`                 | Logical | TENO (Targeted ENO) |
+| `teno_CT`              | Real    | TENO threshold for smoothness detection | 
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
-| `avg_state`	           | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
+| `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
-| `weno_Re_flux`          | Logical | Compute velocity gradient using scaler divergence theorem	 |
+| `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 
 - \* Options that work only with `model_eqns =2`.
@@ -416,7 +419,13 @@ Note that `time_stepper = 3` specifies the total variation diminishing (TVD), th
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
 Practically, `weno_eps` $<10^{-6}$ is used.
 
-- `mapped_weno` activates mapping of the nonlinear WENO weights to the more accurate nonlinear weights in order to reinstate the optimal order of accuracy of the reconstruction in the proximity of critical points ([Henrick et al., 2005](references.md#Henrick05)).
+- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](references.md#Henrick05)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
+
+- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](references.md#Borges08)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
+
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5`. Requires `teno_CT` to be set.
+
+- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. The default value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`. 
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]\%beg[end]} = -4`).
 
