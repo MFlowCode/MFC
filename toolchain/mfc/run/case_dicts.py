@@ -6,17 +6,16 @@ class ParamType(Enum):
     REAL = {"type": "number"}
     LOG = {"enum": ["T", "F"]}
     STR = {"type": "string"}
-    
+
     _ANALYTIC_INT = {"type": ["integer", "string"]}
     _ANALYTIC_REAL = {"type": ["number", "string"]}
 
     def analytic(self):
         if self == self.INT:
             return self._ANALYTIC_INT
-        elif self == self.REAL:
+        if self == self.REAL:
             return self._ANALYTIC_REAL
-        else:
-            return self.STR
+        return self.STR
 
 COMMON = {
     'hypoelasticity': ParamType.LOG,
