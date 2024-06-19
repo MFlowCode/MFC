@@ -1,5 +1,4 @@
 from enum import Enum
-
 from ..state import ARG
 
 class ParamType(Enum):
@@ -7,6 +6,17 @@ class ParamType(Enum):
     REAL = {"type": "number"}
     LOG = {"enum": ["T", "F"]}
     STR = {"type": "string"}
+    
+    _ANALYTIC_INT = {"type": ["integer", "string"]}
+    _ANALYTIC_REAL = {"type": ["number", "string"]}
+
+    def analytic(self):
+        if self == self.INT:
+            return self._ANALYTIC_INT
+        elif self == self.REAL:
+            return self._ANALYTIC_REAL
+        else:
+            return self.STR
 
 COMMON = {
     'hypoelasticity': ParamType.LOG,
@@ -105,9 +115,10 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%{attribute}"] = ty
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
-                      "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
+                      "smooth_coeff", "rho", "vel", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
+    PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
     # (cameron): This parameter has since been removed.
     # for i in range(100):
@@ -127,15 +138,16 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f'patch_icpp({p_id})%{cmp}_centroid'] = ParamType.REAL
         PRE_PROCESS[f'patch_icpp({p_id})%length_{cmp}'] = ParamType.REAL
 
-        for append in ["radii", "normal", "vel"]:
+        for append in ["radii", "normal"]:
             PRE_PROCESS[f'patch_icpp({p_id})%{append}({cmp_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%vel({cmp_id})'] = ParamType.REAL.analytic()
 
     for arho_id in range(1, 10+1):
-        PRE_PROCESS[f'patch_icpp({p_id})%alpha({arho_id})'] = ParamType.REAL
-        PRE_PROCESS[f'patch_icpp({p_id})%alpha_rho({arho_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%alpha({arho_id})'] = ParamType.REAL.analytic()
+        PRE_PROCESS[f'patch_icpp({p_id})%alpha_rho({arho_id})'] = ParamType.REAL.analytic()
 
     for taue_id in range(1, 6+1):
-        PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL.analytic()
 
     if p_id >= 2:
         PRE_PROCESS[f'patch_icpp({p_id})%alter_patch'] = ParamType.LOG
