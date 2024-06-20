@@ -133,7 +133,7 @@ contains
 !     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl
         real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
-        integer, intent(out) :: igh, low
+        integer, intent(out) :: low, igh
         real(kind(0d0)), dimension(nl), intent(out) :: scale
 
         integer :: i, j, k, l, ml, jj, iexc
