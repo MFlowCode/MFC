@@ -34,6 +34,8 @@ module m_time_steppers
     use m_fftw
 
     use m_nvtx
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -196,6 +198,13 @@ contains
                     iz_t%beg:iz_t%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
+        end if
+
+        if (sigma /= dflt_real) then
+            @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(c_idx))
         end if
 
         @:ALLOCATE_GLOBAL(pb_ts(1:2))
@@ -368,6 +377,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
@@ -473,6 +486,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -543,6 +560,10 @@ contains
                 end do
             end do
         end if
+
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -655,6 +676,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -727,6 +752,10 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+        call nvtxEndRange
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3 .and. (.not. relax)) then
@@ -797,6 +826,10 @@ contains
                 end do
             end do
         end if
+
+        call nvtxStartRange("body_forces")
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -881,6 +914,31 @@ contains
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+    !> This subroutine applies the body forces source term at each
+        !! Runge-Kutta stage
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
+
+        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
+        real(kind(0d0)) :: ldt !< local dt
+
+        integer :: i, j, k, l
+
+        call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = momxb, E_idx
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                                                   ldt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_apply_bodyforces
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

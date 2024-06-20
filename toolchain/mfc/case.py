@@ -1,4 +1,5 @@
-import re, json, math, copy, dataclasses
+import re, json, math, copy, dataclasses, jsonschema
+import jsonschema.exceptions
 
 from . import common
 from . import build
@@ -65,10 +66,25 @@ class Case:
 
         return f"&user_inputs\n{dict_str}&end/\n"
 
+    def validate_params(self, origin_txt: str = None):
+        '''Typechecks parameters read from case file. If a parameter
+        is assigned a vlaie of the wrong type, this method throws an exception
+        highlighting the violating parameter and specifying what it expects.'''
+        try:
+            jsonschema.validate(self.params, case_dicts.SCHEMA)
+        except jsonschema.exceptions.ValidationError as e:
+            exception_txt = f"Case parameter '{e.path[0]}' is of the wrong type. Expected type: '{e.schema['type']}'. Got value '{e.instance}' of type '{type(e.instance).__name__}'."
+            if origin_txt:
+                exception_txt = f"Origin: {origin_txt}. {exception_txt}"
+
+            raise common.MFCException(exception_txt)
+
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
 
     def __is_ic_analytical(self, key: str, val: str) -> bool:
+        '''Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?'''
         if common.is_number(val) or not isinstance(val, str):
             return False
 
