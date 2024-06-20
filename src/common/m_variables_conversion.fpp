@@ -24,20 +24,21 @@ module m_variables_conversion
 
     implicit none
 
-    private; public :: s_initialize_variables_conversion_module, &
- s_initialize_pb, &
- s_initialize_mv, &
- s_convert_to_mixture_variables, &
- s_convert_mixture_to_mixture_variables, &
- s_convert_species_to_mixture_variables_bubbles, &
- s_convert_species_to_mixture_variables_bubbles_acc, &
- s_convert_species_to_mixture_variables, &
- s_convert_species_to_mixture_variables_acc, &
- s_convert_conservative_to_primitive_variables, &
- s_convert_primitive_to_conservative_variables, &
- s_convert_primitive_to_flux_variables, &
- s_compute_pressure, &
- s_finalize_variables_conversion_module
+    private; 
+    public :: s_initialize_variables_conversion_module, &
+              s_initialize_pb, &
+              s_initialize_mv, &
+              s_convert_to_mixture_variables, &
+              s_convert_mixture_to_mixture_variables, &
+              s_convert_species_to_mixture_variables_bubbles, &
+              s_convert_species_to_mixture_variables_bubbles_acc, &
+              s_convert_species_to_mixture_variables, &
+              s_convert_species_to_mixture_variables_acc, &
+              s_convert_conservative_to_primitive_variables, &
+              s_convert_primitive_to_conservative_variables, &
+              s_convert_primitive_to_flux_variables, &
+              s_compute_pressure, &
+              s_finalize_variables_conversion_module
 
     !> Abstract interface to two subroutines designed for the transfer/conversion
     !! of the mixture/species variables to the mixture variables
@@ -62,19 +63,12 @@ module m_variables_conversion
             ! the abstract interface does not inherently have access to them
             import :: scalar_field, sys_size, num_fluids
 
-            type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
-
-            integer, intent(IN) :: i, j, k
-
-            real(kind(0d0)), intent(OUT), target :: rho
-            real(kind(0d0)), intent(OUT), target :: gamma
-            real(kind(0d0)), intent(OUT), target :: pi_inf
-            real(kind(0d0)), intent(OUT), target :: qv
-
-            real(kind(0d0)), optional, dimension(2), intent(OUT) :: Re_K
-
-            real(kind(0d0)), optional, intent(OUT) :: G_K
-            real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
+            type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+            integer, intent(in) :: i, j, k
+            real(kind(0d0)), intent(out), target :: rho, gamma, pi_inf, qv
+            real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+            real(kind(0d0)), optional, intent(out) :: G_K
+            real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         end subroutine s_convert_xxxxx_to_mixture_variables
 
@@ -118,23 +112,22 @@ contains
     !>  This procedure conditionally calculates the appropriate pressure
         !! @param energy Energy
         !! @param alf Void Fraction
-        !! @param stress Shear Stress
-        !! @param mom Momentum
         !! @param dyn_p Dynamic Pressure
         !! @param pi_inf Liquid Stiffness
-        !! @param qv fluid reference energy
         !! @param gamma Specific Heat Ratio
+        !! @param rho Density
+        !! @param qv fluid reference energy
         !! @param pres Pressure to calculate
+        !! @param stress Shear Stress
+        !! @param mom Momentum
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, pres, stress, mom, G)
         !$acc routine seq
 
-        real(kind(0d0)), intent(IN) :: energy, alf
-        real(kind(0d0)), intent(IN), optional :: stress, mom, G
-
-        real(kind(0d0)), intent(IN) :: dyn_p
-        real(kind(0d0)), intent(OUT) :: pres
-
-        real(kind(0d0)), intent(IN) :: pi_inf, gamma, rho, qv
+        real(kind(0d0)), intent(in) :: energy, alf
+        real(kind(0d0)), intent(in) :: dyn_p
+        real(kind(0d0)), intent(in) :: pi_inf, gamma, rho, qv
+        real(kind(0d0)), intent(out) :: pres
+        real(kind(0d0)), intent(in), optional :: stress, mom, G
 
         real(kind(0d0)) :: E_e
 
@@ -191,22 +184,22 @@ contains
         !! @param rho density
         !! @param gamma  specific heat ratio function
         !! @param pi_inf liquid stiffness
+        !! @param qv fluid reference energy
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        integer, intent(in) :: i, j, k
 
-        integer, intent(IN) :: i, j, k
+        real(kind(0d0)), intent(out), target :: rho
+        real(kind(0d0)), intent(out), target :: gamma
+        real(kind(0d0)), intent(out), target :: pi_inf
+        real(kind(0d0)), intent(out), target :: qv
 
-        real(kind(0d0)), intent(OUT), target :: rho
-        real(kind(0d0)), intent(OUT), target :: gamma
-        real(kind(0d0)), intent(OUT), target :: pi_inf
-        real(kind(0d0)), intent(OUT), target :: qv
+        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
 
-        real(kind(0d0)), optional, dimension(2), intent(OUT) :: Re_K
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         ! Transferring the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -232,32 +225,31 @@ contains
         !!      counterparts. Specifically designed for when subgrid bubbles
         !!      must be included.
         !! @param q_vf primitive variables
-        !! @param rho_K density
-        !! @param gamma_K specific heat ratio
-        !! @param pi_inf_K liquid stiffness
-        !! @param qv_K fluid reference energy
         !! @param j Cell index
         !! @param k Cell index
         !! @param l Cell index
+        !! @param rho density
+        !! @param gamma specific heat ratio
+        !! @param pi_inf liquid stiffness
+        !! @param qv fluid reference energy
     subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
 
-        integer, intent(IN) :: j, k, l
+        integer, intent(in) :: j, k, l
 
-        real(kind(0d0)), intent(OUT), target :: rho
-        real(kind(0d0)), intent(OUT), target :: gamma
-        real(kind(0d0)), intent(OUT), target :: pi_inf
-        real(kind(0d0)), intent(OUT), target :: qv
+        real(kind(0d0)), intent(out), target :: rho
+        real(kind(0d0)), intent(out), target :: gamma
+        real(kind(0d0)), intent(out), target :: pi_inf
+        real(kind(0d0)), intent(out), target :: qv
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K
-        real(kind(0d0)), optional, dimension(2), intent(OUT) :: Re_K
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
+        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, q
+        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K
 
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
@@ -357,32 +349,31 @@ contains
         !!              function and the liquid stiffness function from q_vf and
         !!              stores the results into rho, gamma and pi_inf.
         !! @param q_vf primitive variables
+        !! @param k Cell index
+        !! @param l Cell index
+        !! @param r Cell index
         !! @param rho density
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
-        !! @param fluid reference energy
-        !! @param j Cell index
-        !! @param k Cell index
-        !! @param l Cell index
+        !! @param qv fluid reference energy
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
 
-        integer, intent(IN) :: k, l, r
+        integer, intent(in) :: k, l, r
 
-        real(kind(0d0)), intent(OUT), target :: rho
-        real(kind(0d0)), intent(OUT), target :: gamma
-        real(kind(0d0)), intent(OUT), target :: pi_inf
-        real(kind(0d0)), intent(OUT), target :: qv
+        real(kind(0d0)), intent(out), target :: rho
+        real(kind(0d0)), intent(out), target :: gamma
+        real(kind(0d0)), intent(out), target :: pi_inf
+        real(kind(0d0)), intent(out), target :: qv
 
-        real(kind(0d0)), optional, dimension(2), intent(OUT) :: Re_K
+        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+            !! Partial densities and volume fractions
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
-            !! Partial densities and volume fractions
-
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
 
         integer :: i, j !< Generic loop iterator
 
@@ -461,16 +452,16 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0d0)), intent(OUT) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(kind(0d0)), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
 
-        real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_rho_K, alpha_K !<
-        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
+        real(kind(0d0)), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(2), intent(out) :: Re_K
         !! Partial densities and volume fractions
 
-        real(kind(0d0)), optional, intent(OUT) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
 
-        integer, intent(IN) :: k, l, r
+        integer, intent(in) :: k, l, r
 
         integer :: i, j !< Generic loop iterators
         real(kind(0d0)) :: alpha_K_sum
@@ -543,14 +534,14 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0d0)), intent(INOUT) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(kind(0d0)), intent(inout) :: rho_K, gamma_K, pi_inf_K, qv_K
 
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: alpha_rho_K, alpha_K !<
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: alpha_K, alpha_rho_K !<
             !! Partial densities and volume fractions
 
-        real(kind(0d0)), dimension(2), intent(OUT) :: Re_K
+        real(kind(0d0)), dimension(2), intent(out) :: Re_K
+        integer, intent(in) :: k, l, r
 
-        integer, intent(IN) :: k, l, r
         integer :: i, j !< Generic loop iterators
 
 #ifdef MFC_SIMULATION
@@ -605,7 +596,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_variables_conversion_module() ! ----------------
+    subroutine s_initialize_variables_conversion_module ! ----------------
 
         integer :: i, j
 
@@ -765,8 +756,9 @@ contains
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     subroutine s_initialize_mv(qK_cons_vf, mv)
-        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: mv
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: mv
+
         integer :: i, j, k, l
         real(kind(0d0)) :: mu, sig, nbub_sc
 
@@ -795,10 +787,10 @@ contains
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(in) :: mv
+        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: pb
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(IN) :: mv
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(INOUT) :: pb
         integer :: i, j, k, l
         real(kind(0d0)) :: mu, sig, nbub_sc
 
@@ -838,14 +830,13 @@ contains
                                                              gm_alphaK_vf, &
                                                              ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: qK_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: qK_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(scalar_field), &
             allocatable, optional, dimension(:), &
-            intent(IN) :: gm_alphaK_vf
+            intent(in) :: gm_alphaK_vf
 
-        type(int_bounds_info), optional, intent(IN) :: ix, iy, iz
+        type(int_bounds_info), optional, intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -1038,11 +1029,11 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1199,12 +1190,12 @@ contains
                                                      FK_src_vf, &
                                                      is1, is2, is3, s2b, s3b)
 
-        integer :: s2b, s3b
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(IN) :: qK_prim_vf
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(INOUT) :: FK_vf
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, advxb:), intent(INOUT) :: FK_src_vf
+        integer, intent(in) :: s2b, s3b
+        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(in) :: qK_prim_vf
+        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(inout) :: FK_vf
+        real(kind(0d0)), dimension(0:, s2b:, s3b:, advxb:), intent(inout) :: FK_src_vf
 
-        type(int_bounds_info), intent(IN) :: is1, is2, is3
+        type(int_bounds_info), intent(in) :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
@@ -1320,7 +1311,7 @@ contains
 
     end subroutine s_convert_primitive_to_flux_variables ! -----------------
 
-    subroutine s_finalize_variables_conversion_module() ! ------------------
+    subroutine s_finalize_variables_conversion_module ! ------------------
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function

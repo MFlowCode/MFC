@@ -30,7 +30,7 @@ contains
     !> The subroutine initializes the MPI execution environment
         !!      and queries both the number of processors which will be
         !!      available for the job and the local processor rank.
-    subroutine s_mpi_initialize() ! ----------------------------------------
+    subroutine s_mpi_initialize ! ----------------------------------------
 
 #ifndef MFC_MPI
 
@@ -64,11 +64,11 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_cons_vf
+            intent(in) :: q_cons_vf
 
         type(integer_field), &
             optional, &
-            intent(IN) :: ib_markers
+            intent(in) :: ib_markers
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -192,8 +192,8 @@ contains
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
-        real(kind(0d0)), dimension(0:num_procs - 1), intent(INOUT) :: proc_time
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(kind(0d0)), dimension(0:num_procs - 1), intent(inout) :: proc_time
+        real(kind(0d0)), intent(inout) :: time_avg
 
 #ifdef MFC_MPI
 
@@ -226,15 +226,15 @@ contains
                                                        ccfl_max_glb, &
                                                        Rc_min_glb)
 
-        real(kind(0d0)), intent(IN) :: icfl_max_loc
-        real(kind(0d0)), intent(IN) :: vcfl_max_loc
-        real(kind(0d0)), intent(IN) :: ccfl_max_loc
-        real(kind(0d0)), intent(IN) :: Rc_min_loc
+        real(kind(0d0)), intent(in) :: icfl_max_loc
+        real(kind(0d0)), intent(in) :: vcfl_max_loc
+        real(kind(0d0)), intent(in) :: ccfl_max_loc
+        real(kind(0d0)), intent(in) :: Rc_min_loc
 
-        real(kind(0d0)), intent(OUT) :: icfl_max_glb
-        real(kind(0d0)), intent(OUT) :: vcfl_max_glb
-        real(kind(0d0)), intent(OUT) :: ccfl_max_glb
-        real(kind(0d0)), intent(OUT) :: Rc_min_glb
+        real(kind(0d0)), intent(out) :: icfl_max_glb
+        real(kind(0d0)), intent(out) :: vcfl_max_glb
+        real(kind(0d0)), intent(out) :: ccfl_max_glb
+        real(kind(0d0)), intent(out) :: Rc_min_glb
 
 #ifdef MFC_MPI
 #ifdef MFC_SIMULATION
@@ -268,8 +268,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_sum(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(kind(0d0)), intent(in) :: var_loc
+        real(kind(0d0)), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -290,8 +290,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_min(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(kind(0d0)), intent(in) :: var_loc
+        real(kind(0d0)), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -312,8 +312,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_max(var_loc, var_glb) ! ---------------------
 
-        real(kind(0d0)), intent(IN) :: var_loc
-        real(kind(0d0)), intent(OUT) :: var_glb
+        real(kind(0d0)), intent(in) :: var_loc
+        real(kind(0d0)), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -333,7 +333,7 @@ contains
         !!      the minimum value, reduced amongst all of the local values.
     subroutine s_mpi_reduce_min(var_loc) ! ---------------------------------
 
-        real(kind(0d0)), intent(INOUT) :: var_loc
+        real(kind(0d0)), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
 
@@ -368,7 +368,7 @@ contains
         !!  belongs.
     subroutine s_mpi_reduce_maxloc(var_loc) ! ------------------------------
 
-        real(kind(0d0)), dimension(2), intent(INOUT) :: var_loc
+        real(kind(0d0)), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
 
@@ -415,7 +415,7 @@ contains
     end subroutine s_mpi_abort ! -------------------------------------------
 
     !>Halts all processes until all have reached barrier.
-    subroutine s_mpi_barrier() ! -------------------------------------------
+    subroutine s_mpi_barrier ! -------------------------------------------
 
 #ifdef MFC_MPI
 
@@ -427,7 +427,7 @@ contains
     end subroutine s_mpi_barrier ! -----------------------------------------
 
     !> The subroutine finalizes the MPI execution environment.
-    subroutine s_mpi_finalize() ! ------------------------------------------
+    subroutine s_mpi_finalize ! ------------------------------------------
 
 #ifdef MFC_MPI
 
