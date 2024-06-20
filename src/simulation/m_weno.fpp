@@ -749,6 +749,8 @@ contains
 
                                     if (mapped_weno) then
 
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                        omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
