@@ -63,3 +63,4 @@ d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 c     DoD Carpenter
 c-all python
 c-cpu gcc/12.2.0 cmake/3.28.1-gcc-12.2.0 openmpi/4.1.6
+c-gpu nvhpc/23.7 cuda/12.2
