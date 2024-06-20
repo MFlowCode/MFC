@@ -438,7 +438,8 @@ module m_global_parameters
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, cu_mpi
+    logical :: weno_flat, riemann_flat, rdma_mpi
+
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), pb_ts)
 
@@ -506,7 +507,7 @@ contains
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
-        cu_mpi = .false.
+        rdma_mpi = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

@@ -194,12 +194,12 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',   &
-            & 'mapped_weno', 'mp_weno', 'cu_mpi', 'weno_flat', 'riemann_flat', &
-            & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
-            & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
-            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',        &
+        #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',    &
+            & 'mapped_weno', 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
+            & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
+            & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
+            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt',   &
+            & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -1045,9 +1045,9 @@ contains
         #:endfor
 
         ! Send/Recv
-        #:for cu_mpi in [False, True]
-            if (cu_mpi .eqv. ${'.true.' if cu_mpi else '.false.'}$) then
-                #:if cu_mpi
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
                     !$acc host_data use_device(q_cons_buff_recv, q_cons_buff_send, ib_buff_recv, ib_buff_send)
                 #:else
                     !$acc update host(q_cons_buff_send, ib_buff_send)
@@ -1058,7 +1058,7 @@ contains
                     q_cons_buff_recv(0), buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                #:if cu_mpi
+                #:if rdma_mpi
                     !$acc end host_data
                     !$acc wait
                 #:else
@@ -1294,7 +1294,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send, ib_buff_recv, ib_buff_send)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1344,7 +1344,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1380,7 +1380,7 @@ contains
             end if
 
 #if defined(MFC_OpenACC)
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 #endif
@@ -1416,7 +1416,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1464,7 +1464,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1499,7 +1499,7 @@ contains
 
             end if
 
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 
@@ -1538,7 +1538,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1589,7 +1589,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1626,7 +1626,7 @@ contains
             end if
 
 #if defined(MFC_OpenACC)
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 #endif
@@ -1664,7 +1664,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1715,7 +1715,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1752,7 +1752,7 @@ contains
             end if
 
 #if defined(MFC_OpenACC)
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 #endif
@@ -1793,7 +1793,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1844,7 +1844,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1881,7 +1881,7 @@ contains
             end if
 
 #if defined(MFC_OpenACC)
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 #endif
@@ -1920,7 +1920,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -1971,7 +1971,7 @@ contains
                 !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
 #if defined(MFC_OpenACC)
-                if (cu_mpi) then
+                if (rdma_mpi) then
                     !$acc host_data use_device( ib_buff_recv, ib_buff_send )
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
@@ -2007,7 +2007,7 @@ contains
             end if
 
 #if defined(MFC_OpenACC)
-            if (cu_mpi .eqv. .false.) then
+            if (rdma_mpi .eqv. .false.) then
                 !$acc update device(ib_buff_recv)
             end if
 #endif
@@ -2143,9 +2143,9 @@ contains
         #:endfor
 
         ! Send/Recv
-        #:for cu_mpi in [False, True]
-            if (cu_mpi .eqv. ${'.true.' if cu_mpi else '.false.'}$) then
-                #:if cu_mpi
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
                     !$acc host_data use_device(c_divs_buff_recv, c_divs_buff_send)
                 #:else
                     !$acc update host(c_divs_buff_send)
@@ -2156,7 +2156,7 @@ contains
                     c_divs_buff_recv(0), buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                #:if cu_mpi
+                #:if rdma_mpi
                     !$acc end host_data
                     !$acc wait
                 #:else

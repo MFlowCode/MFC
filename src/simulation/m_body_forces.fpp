@@ -78,7 +78,7 @@ contains
 
     end subroutine s_compute_acceleration
 
-    !> This subroutine calculates teh mixture density at each cell
+    !> This subroutine calculates the mixture density at each cell
     !! center
     subroutine s_compute_mixture_density(q_cons_vf)
 

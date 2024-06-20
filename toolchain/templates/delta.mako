@@ -45,7 +45,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rh
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; ${profiler}    \
+        (set -x; ${profiler}                                   \
             mpirun -np ${nodes*tasks_per_node}                 \
                    ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath(case)}")
