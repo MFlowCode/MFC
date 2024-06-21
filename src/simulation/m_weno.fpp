@@ -606,19 +606,18 @@ contains
 
                                     if (wenojs) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
-                                    end if
 
-                                    if (mapped_weno) then
+                                    elseif (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
-                                    end if
 
-                                    ! Borges, et al. (2008)
-                                    if (wenoz) then
+                                        ! Borges, et al. (2008)
+                                    elseif (wenoz) then
                                         tau5 = abs(beta(1) - beta(0))
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -634,17 +633,16 @@ contains
 
                                     if (wenojs) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
-                                    end if
 
-                                    if (mapped_weno) then
+                                    elseif (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
-                                    end if
 
-                                    if (wenoz) then
+                                    elseif (wenoz) then
                                         alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -703,29 +701,27 @@ contains
 
                                     if (wenojs) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
-                                    end if
 
-                                    if (mapped_weno) then
+                                    elseif (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
-                                    end if
 
-                                    ! Borges, et al. (2008)
-                                    if (wenoz) then
+                                        ! Borges, et al. (2008)
+                                    elseif (wenoz) then
                                         tau5 = abs(beta(2) - beta(0))                   ! Equation 25
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
-                                    end if
 
-                                    ! Fu, et al. (2016)
-                                    ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-                                    if (teno) then
+                                        ! Fu, et al. (2016)
+                                        ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
+                                    elseif (teno) then
                                         tau5 = abs(beta(2) - beta(0))
                                         alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                         delta = merge(0d0, 1d0, omega < teno_CT)    ! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
+
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -746,21 +742,19 @@ contains
 
                                     if (wenojs) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
-                                    end if
 
-                                    if (mapped_weno) then
+                                    elseif (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
-                                    end if
 
-                                    if (wenoz) then
+                                    elseif (wenoz) then
                                         alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
-                                    end if
 
-                                    if (teno) then
+                                    elseif (teno) then
                                         alpha = delta*d_cbR_${XYZ}$ (:, j)
+
                                     end if
 
                                     omega = alpha/sum(alpha)

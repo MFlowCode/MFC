@@ -116,13 +116,13 @@ module m_global_parameters
     logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: weno_polyn  = ${weno_polyn}$  !< Degree of the WENO polynomials (polyn)
-        integer, parameter :: weno_order  = ${weno_order}$  !< Order of the WENO reconstruction
-        integer, parameter :: num_fluids  = ${num_fluids}$  !< number of fluids in the simulation
-        logical, parameter :: wenojs      = ${wenojs}$      !< WENO-JS (default)
+        integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
+        integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
+        logical, parameter :: wenojs = ${wenojs}$           !< WENO-JS (default)
         logical, parameter :: mapped_weno = ${mapped_weno}$ !< WENO-M (WENO with mapping of nonlinear weights)
-        logical, parameter :: wenoz       = ${wenoz}$       !< WENO-Z
-        logical, parameter :: teno        = ${teno}$        !< TENO (Targeted ENO)
+        logical, parameter :: wenoz = ${wenoz}$             !< WENO-Z
+        logical, parameter :: teno = ${teno}$               !< TENO (Targeted ENO)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
