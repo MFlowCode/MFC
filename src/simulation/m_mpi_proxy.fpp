@@ -195,7 +195,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',    &
-            & 'mapped_weno', 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
+            & 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat',                &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt',   &
@@ -215,6 +215,9 @@ contains
         #:endfor
 
         #:if not MFC_CASE_OPTIMIZATION
+            call MPI_BCAST(mapped_weno, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(wenoz, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(teno, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(nb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(num_fluids, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)

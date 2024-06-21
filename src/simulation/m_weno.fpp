@@ -604,22 +604,21 @@ contains
                                     beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-                                    if (mapped_weno) then
+                                    if (wenojs) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                    end if
 
+                                    if (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
+                                    end if
 
-                                    elseif (wenoz) then
-
+                                    ! Borges, et al. (2008)
+                                    if (wenoz) then
                                         tau5 = abs(beta(1) - beta(0))
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
-
-                                    else ! WENO-JS by default
-
-                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
-
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -633,21 +632,19 @@ contains
                                     poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
                                               + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(-1)
 
-                                    if (mapped_weno) then
+                                    if (wenojs) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                    end if
 
+                                    if (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
+                                    end if
 
-                                    elseif (wenoz) then
-
+                                    if (wenoz) then
                                         alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
-
-                                    else ! WENO-JS by default
-
-                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
-
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -664,7 +661,7 @@ contains
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, delta, tau5)
+                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau5, delta)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -704,31 +701,31 @@ contains
                                               + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
-                                    if (mapped_weno) then
+                                    if (wenojs) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                    end if
 
+                                    if (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
+                                    end if
 
-                                    elseif (wenoz) then ! Borges, et al. (2008)
-
+                                    ! Borges, et al. (2008)
+                                    if (wenoz) then
                                         tau5 = abs(beta(2) - beta(0))                   ! Equation 25
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
+                                    end if
 
-                                    elseif (teno) then ! Fu, et al. (2016)
-                                        ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-
+                                    ! Fu, et al. (2016)
+                                    ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
+                                    if (teno) then
                                         tau5 = abs(beta(2) - beta(0))
                                         alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                         delta = merge(0d0, 1d0, omega < teno_CT)    ! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
-
-                                    else ! WENO-JS by default
-
-                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
-
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -747,25 +744,23 @@ contains
                                               + poly_coef_cbR_${XYZ}$ (j, 2, 0)*dvd(-1) &
                                               + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                    if (mapped_weno) then
+                                    if (wenojs) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                    end if
 
+                                    if (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
+                                    end if
 
-                                    elseif (wenoz) then
-
+                                    if (wenoz) then
                                         alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                    end if
 
-                                    elseif (teno) then
-
+                                    if (teno) then
                                         alpha = delta*d_cbR_${XYZ}$ (:, j)
-
-                                    else ! WENO-JS by default
-
-                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
-
                                     end if
 
                                     omega = alpha/sum(alpha)
