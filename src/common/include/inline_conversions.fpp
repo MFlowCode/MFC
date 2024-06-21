@@ -21,13 +21,13 @@
              c = 0d0
              !$acc loop seq
              do i = 1, num_fluids
-                 if (hypoelasticity) then
+             !    if (hypoelasticity) then
                      blkmod(i) = ((gammas(i) + 1d0)*pres + &
                                   pi_infs(i))/gammas(i)+4/3*G(i)
-                 else
-                     blkmod(i) = ((gammas(i) + 1d0)*pres + &
-                                  pi_infs(i))/gammas(i)
-                 end if
+              !   else
+              !       blkmod(i) = ((gammas(i) + 1d0)*pres + &
+              !                    pi_infs(i))/gammas(i)
+              !   end if
                  c = c + adv(i)/blkmod(i)
              end do 
              c = 1d0/(rho*c)
