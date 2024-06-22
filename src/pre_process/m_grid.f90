@@ -28,11 +28,12 @@ module m_grid
 
     implicit none
 
-    private; public :: s_initialize_grid_module, &
-                    s_generate_grid, &
-                    s_generate_serial_grid, &
-                    s_generate_parallel_grid, &
-                    s_finalize_grid_module
+    private; 
+    public :: s_initialize_grid_module, &
+              s_generate_grid, &
+              s_generate_serial_grid, &
+              s_generate_parallel_grid, &
+              s_finalize_grid_module
 
     abstract interface ! ===================================================
 

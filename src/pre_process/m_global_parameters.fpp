@@ -33,7 +33,7 @@ module m_global_parameters
     !! Number of cells in the x-, y- and z-coordinate directions
     integer :: m
     integer :: n
-    integer :: p 
+    integer :: p
 
     integer(8) :: nGlobal !< Global number of cells in the domain
 

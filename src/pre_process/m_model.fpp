@@ -22,6 +22,8 @@ module m_model
 contains
 
     !> This procedure reads a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model The binary of the STL file.
     subroutine s_read_stl_binary(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -69,6 +71,8 @@ contains
     end subroutine s_read_stl_binary
 
     !> This procedure reads an ASCII STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     subroutine s_read_stl_ascii(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -148,6 +152,8 @@ contains
     end subroutine s_read_stl_ascii
 
     !> This procedure reads an STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     subroutine s_read_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -180,6 +186,8 @@ contains
     end subroutine
 
     !> This procedure reads an OBJ file.
+    !! @param filepath Path to the odj file.
+    !! @param model The obj file.
     subroutine s_read_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -276,6 +284,8 @@ contains
     end function f_model_read
 
     !> This procedure writes a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model STL to write
     subroutine s_write_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -324,6 +334,8 @@ contains
     end subroutine s_write_stl
 
     !> This procedure writes an OBJ file.
+    !! @param filepath Path to the obj file.
+    !! @param model obj to write.
     subroutine s_write_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath

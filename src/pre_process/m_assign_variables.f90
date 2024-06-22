@@ -35,6 +35,9 @@ module m_assign_variables
         !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                             eta, q_prim_vf, patch_id_fp)
 
@@ -42,19 +45,20 @@ module m_assign_variables
 
             integer, intent(in) :: patch_id
             integer, intent(in) :: j, k, l
-            real(kind(0d0)), intent(in) :: eta 
+            real(kind(0d0)), intent(in) :: eta
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-            integer, dimension(0:m, 0:n, 0:p), intent(inout):: patch_id_fp
+            integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
     end interface
 
-    private; public :: s_initialize_assign_variables_module, &
- s_assign_patch_primitive_variables, &
- s_assign_patch_mixture_primitive_variables, &
- s_assign_patch_species_primitive_variables, &
- s_finalize_assign_variables_module
+    private; 
+    public :: s_initialize_assign_variables_module, &
+              s_assign_patch_primitive_variables, &
+              s_assign_patch_mixture_primitive_variables, &
+              s_assign_patch_species_primitive_variables, &
+              s_finalize_assign_variables_module
 
 contains
 
@@ -87,16 +91,19 @@ contains
         !!              with those of the smoothing patch. The specific details
         !!              of the combination may be found in Shyue's work (1998).
         !! @param patch_id the patch identifier
-        !! @param j  the x-dir node index
-        !! @param k  the y-dir node index
-        !! @param l  the z-dir node index
+        !! @param j the x-dir node index
+        !! @param k the y-dir node index
+        !! @param l the z-dir node index
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
         !$acc routine seq
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
-        real(kind(0d0)), intent(in) :: eta 
+        real(kind(0d0)), intent(in) :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
@@ -154,11 +161,14 @@ contains
     end subroutine s_assign_patch_mixture_primitive_variables ! ------------
 
     !Stable perturbation in pressure (Ando)
+    !! @param j the x-dir node index
+    !! @param k the y-dir node index
+    !! @param l the z-dir node index
+    !! @param q_prim_vf Primitive variables
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        
 
         integer :: i
         real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
@@ -233,16 +243,19 @@ contains
         !!  s_assign_patch_species_primitive_variables with adaptation for
         !!  ensemble-averaged bubble modeling
         !! @param patch_id the patch identifier
-        !! @param j  the x-dir node index
-        !! @param k  the y-dir node index
-        !! @param l  the z-dir node index
+        !! @param j the x-dir node index
+        !! @param k the y-dir node index
+        !! @param l the z-dir node index
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
     subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
         !$acc routine seq
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
-        real(kind(0d0)), intent(in) :: eta 
+        real(kind(0d0)), intent(in) :: eta
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -250,7 +263,7 @@ contains
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
         real(kind(0d0)) :: rho         !< density
-        real(kind(0d0)) :: gamma 
+        real(kind(0d0)) :: gamma
         real(kind(0d0)) :: lit_gamma   !< specific heat ratio
         real(kind(0d0)) :: pi_inf      !< stiffness from SEOS
         real(kind(0d0)) :: qv          !< reference energy from SEOS

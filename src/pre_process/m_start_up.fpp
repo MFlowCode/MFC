@@ -50,20 +50,21 @@ module m_start_up
 
     implicit none
 
-    private; public :: s_read_input_file, &
-        s_check_input_file, &
-        s_read_grid_data_files, &
-        s_read_ic_data_files, &
-        s_read_serial_grid_data_files, &
-        s_read_serial_ic_data_files, &
-        s_read_parallel_grid_data_files, &
-        s_read_parallel_ic_data_files, &
-        s_check_grid_data_files, &
-        s_initialize_modules, &
-        s_initialize_mpi_domain, &
-        s_finalize_modules, &
-        s_apply_initial_condition, &
-        s_save_data, s_read_grid
+    private; 
+    public :: s_read_input_file, &
+              s_check_input_file, &
+              s_read_grid_data_files, &
+              s_read_ic_data_files, &
+              s_read_serial_grid_data_files, &
+              s_read_serial_ic_data_files, &
+              s_read_parallel_grid_data_files, &
+              s_read_parallel_ic_data_files, &
+              s_check_grid_data_files, &
+              s_initialize_modules, &
+              s_initialize_mpi_domain, &
+              s_finalize_modules, &
+              s_apply_initial_condition, &
+              s_save_data, s_read_grid
 
     abstract interface ! ===================================================
 
@@ -71,16 +72,16 @@ module m_start_up
 
         end subroutine s_read_abstract_grid_data_files ! ---------------
 
+        !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
         subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers) ! -----------
 
             import :: scalar_field, integer_field, sys_size, pres_field
 
-            ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf
 
-            ! IB markers
             type(integer_field), &
                 intent(inout) :: ib_markers
 
@@ -396,6 +397,7 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers) ! ---------------------------
 
         type(scalar_field), &
@@ -633,6 +635,7 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers) ! ------------------
 
         type(scalar_field), &

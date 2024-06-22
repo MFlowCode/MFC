@@ -462,7 +462,7 @@ contains
         ! THESE VARIABLES ARE UNUSED WITHIN THE FUNCTION
         real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(out) :: wave !< instability wave
-        real(kind(0d0)), intent(in):: shift !< phase shift
+        real(kind(0d0)), intent(in) :: shift !< phase shift
 
         real(kind(0d0)), dimension(0:n) :: rho_mean, u_mean !<  mean density and velocity profiles
         real(kind(0d0)) :: p_mean !< mean pressure profile

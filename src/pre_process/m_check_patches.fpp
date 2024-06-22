@@ -29,7 +29,7 @@ module m_check_patches
 
 contains
 
-    subroutine s_check_patches()
+    subroutine s_check_patches
 
         integer :: i
 
@@ -412,7 +412,7 @@ contains
     end subroutine s_check_sphere_patch_geometry ! -------------------------
 
     !>  This subroutine verifies that the geometric parameters of
-        !!      the spherical harmonic  patch have consistently been
+        !!      the spherical harmonic patch have consistently been
         !!      inputted by the user.
         !!  @param patch_id Patch identifier
     subroutine s_check_spherical_harmonic_patch_geometry(patch_id) ! -------
