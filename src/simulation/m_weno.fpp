@@ -613,8 +613,8 @@ contains
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
-                                        ! Borges, et al. (2008)
                                     elseif (wenoz) then
+                                        ! Borges, et al. (2008)
                                         tau5 = abs(beta(1) - beta(0))
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
 
@@ -708,14 +708,14 @@ contains
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
-                                        ! Borges, et al. (2008)
                                     elseif (wenoz) then
+                                        ! Borges, et al. (2008)
                                         tau5 = abs(beta(2) - beta(0))                   ! Equation 25
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
 
+                                    elseif (teno) then
                                         ! Fu, et al. (2016)
                                         ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-                                    elseif (teno) then
                                         tau5 = abs(beta(2) - beta(0))
                                         alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
