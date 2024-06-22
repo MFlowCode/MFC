@@ -2,8 +2,6 @@
 !!@file m_checker.f90
 !!@brief Contains module m_checker
 
-#define UNSUPPORTED_MESSAGE(f, s) "Unsupported combination of values of " + f + " and " + s + "Exiting ..."
-
 !> @brief The purpose of the module is to check for compatible input files
 module m_checker
 
