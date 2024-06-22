@@ -126,7 +126,7 @@ contains
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer :: idir
+        integer, intent(IN) :: idir
         integer :: i, j, k, l, q
 
         if (idir == 1) then

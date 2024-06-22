@@ -83,6 +83,8 @@ class Case:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
 
     def __is_ic_analytical(self, key: str, val: str) -> bool:
+        '''Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?'''
         if common.is_number(val) or not isinstance(val, str):
             return False
 
