@@ -36,10 +36,10 @@ module m_data_output
     implicit none
 
     private; public :: s_write_serial_data_files, &
- s_write_parallel_data_files, &
- s_write_data_files, &
- s_initialize_data_output_module, &
- s_finalize_data_output_module
+                    s_write_parallel_data_files, &
+                    s_write_data_files, &
+                    s_initialize_data_output_module, &
+                    s_finalize_data_output_module
 
     abstract interface ! ===================================================
 
@@ -52,11 +52,11 @@ module m_data_output
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(IN) :: q_cons_vf
+                intent(in) :: q_cons_vf
 
             ! IB markers
             type(integer_field), &
-                intent(IN) :: ib_markers
+                intent(in) :: ib_markers
 
         end subroutine s_write_abstract_data_files ! -------------------
     end interface ! ========================================================
@@ -77,11 +77,11 @@ contains
     subroutine s_write_serial_data_files(q_cons_vf, ib_markers) ! -----------
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_cons_vf
+            intent(in) :: q_cons_vf
 
         ! IB markers
         type(integer_field), &
-            intent(IN) :: ib_markers
+            intent(in) :: ib_markers
 
         logical :: file_exist !< checks if file exists
 
@@ -471,11 +471,11 @@ contains
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_cons_vf
+            intent(in) :: q_cons_vf
 
         ! IB markers
         type(integer_field), &
-            intent(IN) :: ib_markers
+            intent(in) :: ib_markers
 
 #ifdef MFC_MPI
 

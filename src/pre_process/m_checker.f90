@@ -2,6 +2,8 @@
 !!@file m_checker.f90
 !!@brief Contains module m_checker
 
+#define UNSUPPORTED_MESSAGE(f, s) "Unsupported combination of values of " + f + " and " + s + "Exiting ..."
+
 !> @brief The purpose of the module is to check for compatible input files
 module m_checker
 
@@ -19,12 +21,10 @@ contains
 
     subroutine s_check_inputs()
 
-        integer :: bub_fac !<
-            !! For allowing an extra fluid_pp if there are subgrid bubbles
+        integer :: bub_fac !< For allowing an extra fluid_pp if there are subgrid bubbles
         character(len=5) :: iStr !< for int to string conversion
         integer :: i
-        logical :: dir_check !<
-            !! Logical variable used to test the existence of folders
+        logical :: dir_check !< Logical variable used to test the existence of folders
 
 #ifndef MFC_MPI
         if (parallel_io .eqv. .true.) then

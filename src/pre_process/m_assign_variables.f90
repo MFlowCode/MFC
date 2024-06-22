@@ -40,11 +40,11 @@ module m_assign_variables
 
             import :: scalar_field, sys_size, n, m, p
 
-            integer, intent(IN) :: patch_id
-            integer, intent(IN) :: j, k, l
-            integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-            type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-            real(kind(0d0)) :: eta !<
+            integer, intent(in) :: patch_id
+            integer, intent(in) :: j, k, l
+            real(kind(0d0)), intent(in) :: eta 
+            type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+            integer, dimension(0:m, 0:n, 0:p), intent(inout):: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
@@ -92,14 +92,13 @@ contains
         !! @param l  the z-dir node index
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
-
         !$acc routine seq
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
 
-        integer, intent(IN) :: j, k, l
+        integer, intent(in) :: patch_id
+        integer, intent(in) :: j, k, l
+        real(kind(0d0)), intent(in) :: eta 
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         real(kind(0d0)) :: rho    !< density
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
@@ -157,8 +156,9 @@ contains
     !Stable perturbation in pressure (Ando)
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
-        type(scalar_field), dimension(1:sys_size), intent(INOUT) :: q_prim_vf
-        integer, intent(IN) :: j, k, l
+        integer, intent(in) :: j, k, l
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        
 
         integer :: i
         real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
@@ -238,22 +238,22 @@ contains
         !! @param l  the z-dir node index
     subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
-
         !$acc routine seq
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
-        integer, intent(IN) :: j, k, l
+
+        integer, intent(in) :: patch_id
+        integer, intent(in) :: j, k, l
+        real(kind(0d0)), intent(in) :: eta 
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
-        real(kind(0d0)) :: rho          !< density
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: lit_gamma    !< specific heat ratio
-        real(kind(0d0)) :: pi_inf       !< stiffness from SEOS
-        real(kind(0d0)) :: qv       !< reference energy from SEOS
+        real(kind(0d0)) :: rho         !< density
+        real(kind(0d0)) :: gamma 
+        real(kind(0d0)) :: lit_gamma   !< specific heat ratio
+        real(kind(0d0)) :: pi_inf      !< stiffness from SEOS
+        real(kind(0d0)) :: qv          !< reference energy from SEOS
         real(kind(0d0)) :: orig_rho
         real(kind(0d0)) :: orig_gamma
         real(kind(0d0)) :: orig_pi_inf

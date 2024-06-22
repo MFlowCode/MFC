@@ -31,8 +31,6 @@ contains
 
     subroutine s_check_ib_patches()
 
-        ! integer, intent(in) :: i
-
         integer :: i
 
         do i = 1, num_patches_max
@@ -76,7 +74,8 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_circle_ib_patch_geometry(patch_id) ! -------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the circle patch
@@ -96,7 +95,8 @@ contains
 
     subroutine s_check_airfoil_ib_patch_geometry(patch_id) ! -------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the circle patch
@@ -115,7 +115,8 @@ contains
 
     subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id) ! -------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the circle patch
@@ -139,7 +140,8 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_rectangle_ib_patch_geometry(patch_id) ! ----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the rectangle patch
@@ -167,7 +169,8 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_sphere_ib_patch_geometry(patch_id) ! ----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the rectangle patch
@@ -195,8 +198,8 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_cylinder_ib_patch_geometry(patch_id) ! -----------------
 
-        ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the cylinder patch
@@ -239,7 +242,8 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_inactive_ib_patch_geometry(patch_id) ! -----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+        
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the inactive patch
