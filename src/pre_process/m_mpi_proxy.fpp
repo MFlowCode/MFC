@@ -33,7 +33,7 @@ contains
         !!       these are not available to the remaining processors. This
         !!       subroutine is then in charge of broadcasting the required
         !!       information.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs ! ---------------------------------
 
 #ifdef MFC_MPI
 
@@ -119,7 +119,7 @@ contains
         !!             as well as recomputing some of the global parameters so
         !!              that they reflect the configuration of sub-domain that is
         !!              overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain ! --------------------
 
 #ifdef MFC_MPI
 
