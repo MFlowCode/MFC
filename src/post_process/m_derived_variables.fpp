@@ -63,7 +63,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_derived_variables_module() ! ----------------------
+    subroutine s_initialize_derived_variables_module
 
         ! Allocating the gradient magnitude of the density variable provided
         ! that numerical Schlieren function is outputted during post-process
@@ -112,14 +112,14 @@ contains
             flg = 0
         end if
 
-    end subroutine s_initialize_derived_variables_module ! --------------------
+    end subroutine s_initialize_derived_variables_module
 
     !>  This subroutine receives as input the specific heat ratio
         !!      function, gamma_sf, and derives from it the specific heat
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
         !!  @param q_sf Specific heat ratio
-    subroutine s_derive_specific_heat_ratio(q_sf) ! --------------
+    subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -138,7 +138,7 @@ contains
             end do
         end do
 
-    end subroutine s_derive_specific_heat_ratio ! --------------------------
+    end subroutine s_derive_specific_heat_ratio
 
     !>  This subroutine admits as inputs the specific heat ratio
         !!      function and the liquid stiffness function, gamma_sf and
@@ -146,7 +146,7 @@ contains
         !!      values of the liquid stiffness, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
         !!  @param q_sf Liquid stiffness
-    subroutine s_derive_liquid_stiffness(q_sf) ! ------
+    subroutine s_derive_liquid_stiffness(q_sf)
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -166,7 +166,7 @@ contains
             end do
         end do
 
-    end subroutine s_derive_liquid_stiffness ! -----------------------------
+    end subroutine s_derive_liquid_stiffness
 
     !> This subroutine admits as inputs the primitive variables,
         !!      the density, the specific heat ratio function and liquid
@@ -222,7 +222,7 @@ contains
             end do
         end do
 
-    end subroutine s_derive_sound_speed ! ----------------------------------
+    end subroutine s_derive_sound_speed
 
     !>  This subroutine derives the flux_limiter at cell boundary
         !!      i+1/2. This is an approximation because the velocity used
@@ -232,7 +232,7 @@ contains
         !!  @param i Component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Flux limiter
-    subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf) ! -----------------
+    subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
         integer, intent(IN) :: i
 
@@ -319,7 +319,7 @@ contains
                 end do
             end do
         end do
-    end subroutine s_derive_flux_limiter ! ---------------------------------
+    end subroutine s_derive_flux_limiter
 
     !>  Computes the solution to the linear system Ax=b w/ sol = x
         !!  @param A Input matrix
@@ -367,7 +367,7 @@ contains
             end do
         end do
 
-    end subroutine s_solve_linear_system ! -------------------------------------
+    end subroutine s_solve_linear_system
 
     !>  This subroutine receives as inputs the indicator of the
         !!      component of the vorticity that should be outputted and
@@ -378,7 +378,7 @@ contains
         !!  @param i Vorticity component indicator
         !!  @param q_prim_vf Primitive variables
         !!  @param q_sf Vorticity component
-    subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf) ! ----------
+    subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(IN) :: i
 
@@ -472,7 +472,7 @@ contains
             end do
         end if
 
-    end subroutine s_derive_vorticity_component ! --------------------------
+    end subroutine s_derive_vorticity_component
 
     !> This subroutine gets as inputs the primitive variables. From those
         !!      inputs, it proceeds to calculate the value of the Q_M
@@ -714,10 +714,10 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_derive_numerical_schlieren_function ! -----------------
+    end subroutine s_derive_numerical_schlieren_function
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_derived_variables_module() ! -------------------
+    subroutine s_finalize_derived_variables_module
 
         ! Deallocating the variable containing the gradient magnitude of the
         ! density field provided that the numerical Schlieren function was
@@ -730,6 +730,6 @@ contains
         if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
         if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)
 
-    end subroutine s_finalize_derived_variables_module ! -----------------
+    end subroutine s_finalize_derived_variables_module
 
 end module m_derived_variables

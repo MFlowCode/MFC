@@ -158,7 +158,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_weno_module() ! --------------------------------
+    subroutine s_initialize_weno_module
 
         integer :: i, j
         if (weno_order == 1) return
@@ -256,7 +256,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_weno_module ! ------------------------------
+    end subroutine s_initialize_weno_module
 
     !>  The purpose of this subroutine is to compute the grid
         !!      dependent coefficients of the WENO polynomials, ideal
@@ -265,7 +265,7 @@ contains
         !!      reconstruction.
         !! @param weno_dir Coordinate direction of the WENO reconstruction
         !! @param is Index bounds in the s-direction
-    subroutine s_compute_weno_coefficients(weno_dir, is) ! -------
+    subroutine s_compute_weno_coefficients(weno_dir, is)
 
         integer, intent(IN) :: weno_dir
         type(int_bounds_info), intent(IN) :: is
@@ -500,9 +500,9 @@ contains
 
         nullify (s_cb)
 
-    end subroutine s_compute_weno_coefficients ! ---------------------------
+    end subroutine s_compute_weno_coefficients
 
-    subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
+    subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                       norm_dir, weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
@@ -789,7 +789,7 @@ contains
         !! @param is1_weno Index bounds in first coordinate direction
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
-    subroutine s_initialize_weno(v_vf, & ! ---------
+    subroutine s_initialize_weno(v_vf, &
                                  norm_dir, weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
@@ -897,7 +897,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_weno ! -------------------------------------
+    end subroutine s_initialize_weno
 
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by
@@ -910,7 +910,7 @@ contains
         !!  @param j First-coordinate cell index
         !!  @param k Second-coordinate cell index
         !!  @param l Third-coordinate cell index
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf) ! --------------------------
+    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
@@ -1071,10 +1071,10 @@ contains
         end do
         !$acc end parallel loop
 
-    end subroutine s_preserve_monotonicity ! -------------------------------
+    end subroutine s_preserve_monotonicity
 
     !>  Module deallocation and/or disassociation procedures
-    subroutine s_finalize_weno_module() ! ----------------------------------
+    subroutine s_finalize_weno_module()
 
         integer :: i, j
 
@@ -1113,6 +1113,6 @@ contains
         @:DEALLOCATE_GLOBAL(beta_coef_z)
         ! ==================================================================
 
-    end subroutine s_finalize_weno_module ! --------------------------------
+    end subroutine s_finalize_weno_module
 
 end module m_weno

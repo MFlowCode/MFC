@@ -49,7 +49,7 @@ module m_hypoelastic
 
 contains
 
-    subroutine s_initialize_hypoelastic_module() ! --------------------
+    subroutine s_initialize_hypoelastic_module
 
         integer :: i
 

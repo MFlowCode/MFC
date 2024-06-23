@@ -62,7 +62,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module ! -------------------
+    subroutine s_initialize_initial_condition_module
 
         integer :: i !< generic loop iterator
 
@@ -107,7 +107,7 @@ contains
         patch_id_fp = 0
         ib_markers%sf = 0
 
-    end subroutine s_initialize_initial_condition_module ! -----------------
+    end subroutine s_initialize_initial_condition_module
 
     !>  This subroutine peruses the patches and depending on the
         !!              type of geometry associated with a particular patch, it
@@ -115,7 +115,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition ! ----------------------------
+    subroutine s_generate_initial_condition
 
         integer :: i  !< Generic loop operator
 
@@ -320,9 +320,9 @@ contains
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
 
-    end subroutine s_generate_initial_condition ! --------------------------
+    end subroutine s_generate_initial_condition
 
-    subroutine s_perturb_sphere ! ----------------------------------------
+    subroutine s_perturb_sphere
 
         integer :: i, j, k, l !< generic loop operators
 
@@ -352,9 +352,9 @@ contains
             end do
         end do
 
-    end subroutine s_perturb_sphere ! --------------------------------------
+    end subroutine s_perturb_sphere
 
-    subroutine s_perturb_surrounding_flow ! ------------------------------
+    subroutine s_perturb_surrounding_flow
 
         integer :: i, j, k, l !<  generic loop iterators
 
@@ -386,7 +386,7 @@ contains
             end do
         end do
 
-    end subroutine s_perturb_surrounding_flow ! ----------------------------
+    end subroutine s_perturb_surrounding_flow
 
     !>  This subroutine computes velocity perturbations for a temporal mixing
         !!              layer with hypertangent mean streamwise velocity profile
@@ -394,7 +394,7 @@ contains
         !!              instability waves with spatial wavenumbers, (4,0), (2,0),
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
-    subroutine s_superposition_instability_wave ! ------------------------
+    subroutine s_superposition_instability_wave
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)) :: tr, ti
         real(kind(0d0)) :: Lx, Lz
@@ -450,7 +450,7 @@ contains
             end do
         end do
 
-    end subroutine s_superposition_instability_wave ! ----------------------
+    end subroutine s_superposition_instability_wave
 
     !>  This subroutine computes instability waves for a given set of spatial
         !!              wavenumbers (alpha, beta) in x and z directions.
@@ -638,7 +638,7 @@ contains
     end subroutine s_generate_wave
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module ! ---------------------
+    subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 
@@ -655,6 +655,6 @@ contains
         deallocate (patch_id_fp)
         deallocate (ib_markers%sf)
 
-    end subroutine s_finalize_initial_condition_module ! -------------------
+    end subroutine s_finalize_initial_condition_module
 
 end module m_initial_condition

@@ -37,11 +37,11 @@ module m_data_input
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
-        subroutine s_read_abstract_data_files(t_step) ! ------------
+        subroutine s_read_abstract_data_files(t_step)
 
             integer, intent(IN) :: t_step
 
-        end subroutine s_read_abstract_data_files ! ----------------
+        end subroutine s_read_abstract_data_files
 
     end interface ! ========================================================
 
@@ -60,7 +60,7 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_serial_data_files(t_step) ! -----------------------------
+    subroutine s_read_serial_data_files(t_step)
 
         integer, intent(IN) :: t_step
 
@@ -207,14 +207,14 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_read_serial_data_files ! ---------------------------------
+    end subroutine s_read_serial_data_files
 
     !>  This subroutine is called at each time-step that has to
         !!      be post-processed in order to parallel-read the raw data files
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_parallel_data_files(t_step) ! ---------------------------
+    subroutine s_read_parallel_data_files(t_step)
 
         integer, intent(IN) :: t_step
 
@@ -417,7 +417,7 @@ contains
 
 #endif
 
-    end subroutine s_read_parallel_data_files ! -------------------------------
+    end subroutine s_read_parallel_data_files
 
     !>  The following subroutine populates the buffer regions of
         !!      the cell-width spacings, the cell-boundary locations and
@@ -427,7 +427,7 @@ contains
         !!      are used in aiding the multidimensional visualization of
         !!      Silo database files, in VisIt, when processor boundary
         !!      conditions are present.
-    subroutine s_populate_grid_variables_buffer_regions() ! ----------------
+    subroutine s_populate_grid_variables_buffer_regions
 
         integer :: i !< Generic loop iterator
 
@@ -667,12 +667,12 @@ contains
 
         ! END: Populating Buffer Regions in the z-direction ================
 
-    end subroutine s_populate_grid_variables_buffer_regions ! --------------
+    end subroutine s_populate_grid_variables_buffer_regions
 
     !>  The purpose of this procedure is to populate the buffers
         !!      of the cell-average conservative variables, depending on
         !!      the boundary conditions.
-    subroutine s_populate_conservative_variables_buffer_regions() ! --------
+    subroutine s_populate_conservative_variables_buffer_regions
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1046,11 +1046,11 @@ contains
 
         ! END: Populating Buffer Regions in the z-direction ================
 
-    end subroutine s_populate_conservative_variables_buffer_regions ! ------
+    end subroutine s_populate_conservative_variables_buffer_regions
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_data_input_module() ! -----------------------------
+    subroutine s_initialize_data_input_module
 
         integer :: i !< Generic loop iterator
 
@@ -1113,10 +1113,10 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
-    end subroutine s_initialize_data_input_module ! ---------------------------
+    end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_data_input_module() ! --------------------------
+    subroutine s_finalize_data_input_module()
 
         integer :: i !< Generic loop iterator
 
@@ -1131,6 +1131,6 @@ contains
 
         s_read_data_files => null()
 
-    end subroutine s_finalize_data_input_module ! ------------------------
+    end subroutine s_finalize_data_input_module
 
 end module m_data_input
