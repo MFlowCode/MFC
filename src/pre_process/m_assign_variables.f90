@@ -62,7 +62,7 @@ module m_assign_variables
 
 contains
 
-    subroutine s_initialize_assign_variables_module()
+    subroutine s_initialize_assign_variables_module
 
         allocate (alf_sum%sf(0:m, 0:n, 0:p))
 
@@ -158,7 +158,7 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
 
-    end subroutine s_assign_patch_mixture_primitive_variables ! ------------
+    end subroutine s_assign_patch_mixture_primitive_variables
 
     !Stable perturbation in pressure (Ando)
     !! @param j the x-dir node index
@@ -595,7 +595,7 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
 
-    end subroutine s_assign_patch_species_primitive_variables! ------------
+    end subroutine s_assign_patch_species_primitive_variables
 
     subroutine s_finalize_assign_variables_module
 

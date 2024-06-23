@@ -37,11 +37,11 @@ module m_grid
 
     abstract interface ! ===================================================
 
-        subroutine s_generate_abstract_grid ! ------------------------
+        subroutine s_generate_abstract_grid
 
             ! integer, intent(IN), optional :: dummy
 
-        end subroutine s_generate_abstract_grid ! ----------------------
+        end subroutine s_generate_abstract_grid
 
     end interface ! ========================================================
 
@@ -54,7 +54,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_serial_grid ! -----------------------------------------
+    subroutine s_generate_serial_grid
 
         ! Generic loop iterator
         integer :: i, j             !< generic loop operatorss
@@ -189,14 +189,14 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_generate_serial_grid ! ---------------------------------------
+    end subroutine s_generate_serial_grid
 
     !> The following subroutine generates either a uniform or
         !!              non-uniform rectilinear grid in parallel, defined by the parameters
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_parallel_grid !-------------------------
+    subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI
 
@@ -341,11 +341,11 @@ contains
 
 #endif
 
-    end subroutine s_generate_parallel_grid ! ------------------------------
+    end subroutine s_generate_parallel_grid
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_grid_module ! -----------------------------------
+    subroutine s_initialize_grid_module
 
         if (parallel_io .neqv. .true.) then
             s_generate_grid => s_generate_serial_grid
@@ -353,13 +353,13 @@ contains
             s_generate_grid => s_generate_parallel_grid
         end if
 
-    end subroutine s_initialize_grid_module ! ---------------------------------
+    end subroutine s_initialize_grid_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_grid_module ! --------------------------------
+    subroutine s_finalize_grid_module
 
         s_generate_grid => null()
 
-    end subroutine s_finalize_grid_module ! ------------------------------
+    end subroutine s_finalize_grid_module
 
 end module m_grid
