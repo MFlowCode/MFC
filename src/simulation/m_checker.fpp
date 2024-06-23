@@ -191,6 +191,11 @@ contains
                              'p and weno_order. Exiting ...')
         elseif (weno_eps <= 0d0 .or. weno_eps > 1d-6) then
             call s_mpi_abort('Unsupported value of weno_eps. Exiting ...')
+        elseif (teno .and. teno_CT <= 0d0) then
+            call s_mpi_abort('Unsupported value of teno_CT, or teno_CT '// &
+                             'is not set. teno requires teno_CT to be '// &
+                             'set to a small positive value. The '// &
+                             'recommended value is 1e-6. Exiting ...')
         elseif (count([mapped_weno, wenoz, teno]) >= 2) then
             call s_mpi_abort('Unsupported combination of values of '// &
                              'mapped_weno, wenoz, and teno. '// &

@@ -93,6 +93,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 trace = [f"{var}={val}" for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T']
                 data = {var: 'T' for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T'}
+
+                if "teno" in data:
+                    data["teno_CT"] = 1e-6
+
                 cases.append(define_case_d(stack, trace, data))
 
             stack.pop()

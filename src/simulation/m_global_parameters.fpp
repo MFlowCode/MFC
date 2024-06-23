@@ -495,7 +495,7 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_eps = dflt_real
-        teno_CT = 1d-6
+        teno_CT = dflt_real
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
