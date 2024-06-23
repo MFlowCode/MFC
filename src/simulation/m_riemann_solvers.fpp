@@ -120,7 +120,7 @@ module m_riemann_solvers
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-        subroutine s_compute_abstract_viscous_source_flux(velL_vf, & ! -------------
+        subroutine s_compute_abstract_viscous_source_flux(velL_vf, &
                                                           dvelL_dx_vf, &
                                                           dvelL_dy_vf, &
                                                           dvelL_dz_vf, &
@@ -266,7 +266,7 @@ contains
 
     @:s_compute_speed_of_sound()
 
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
@@ -807,7 +807,7 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
+    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
                                      qL_prim_vf, &
@@ -2328,7 +2328,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_riemann_solvers_module() ! ---------------------
+    subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the
         ! left, right, and average states of the Riemann problem, as well
@@ -2454,7 +2454,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-    end subroutine s_initialize_riemann_solvers_module ! -------------------
+    end subroutine s_initialize_riemann_solvers_module
 
     !>  The purpose of this subroutine is to populate the buffers
         !!      of the left and right Riemann states variables, depending
@@ -2481,7 +2481,7 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-    subroutine s_populate_riemann_states_variables_buffers( & ! ------------
+    subroutine s_populate_riemann_states_variables_buffers( &
         qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
@@ -2846,7 +2846,7 @@ contains
         end if
         ! END: Population of Buffers in z-direction ========================
 
-    end subroutine s_populate_riemann_states_variables_buffers ! -----------
+    end subroutine s_populate_riemann_states_variables_buffers
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -2980,7 +2980,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_riemann_solver ! ---------------------------
+    end subroutine s_initialize_riemann_solver
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -2998,7 +2998,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                          dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
                                                          dvelL_dz_vf, &
@@ -3507,7 +3507,7 @@ contains
         end if
         ! END: Viscous Stresses in theta-direction =============================
 
-    end subroutine s_compute_cylindrical_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cylindrical_viscous_source_flux
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -3525,7 +3525,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                        dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
                                                        dvelL_dz_vf, &
@@ -4000,7 +4000,7 @@ contains
         end if
         ! END: Viscous Stresses in z-direction =============================
 
-    end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cartesian_viscous_source_flux
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
@@ -4011,7 +4011,7 @@ contains
         !!  @param ix   Index bounds in  first coordinate direction
         !!  @param iy   Index bounds in second coordinate direction
         !!  @param iz   Index bounds in  third coordinate direction
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, & ! --------
+    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
                                          norm_dir, ix, iy, iz)
 
@@ -4173,10 +4173,10 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_finalize_riemann_solver ! -----------------------------
+    end subroutine s_finalize_riemann_solver
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_riemann_solvers_module() ! -----------------------
+    subroutine s_finalize_riemann_solvers_module
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
@@ -4227,6 +4227,6 @@ contains
             @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
         end if
 
-    end subroutine s_finalize_riemann_solvers_module ! ---------------------
+    end subroutine s_finalize_riemann_solvers_module
 
 end module m_riemann_solvers

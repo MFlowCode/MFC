@@ -41,7 +41,7 @@ contains
     !>  Reads the configuration file post_process.inp, in order
         !!      to populate parameters in module m_global_parameters.f90
         !!      with the user provided inputs
-    subroutine s_read_input_file() ! ---------------------------------------
+    subroutine s_read_input_file
 
         character(LEN=name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -104,13 +104,13 @@ contains
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if
 
-    end subroutine s_read_input_file ! -------------------------------------
+    end subroutine s_read_input_file
 
     !>  Checking that the user inputs make sense, i.e. that the
         !!      individual choices are compatible with the code's options
         !!      and that the combination of these choices results into a
         !!      valid configuration for the post-process
-    subroutine s_check_input_file() ! --------------------------------------
+    subroutine s_check_input_file
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -133,7 +133,7 @@ contains
 
         call s_check_inputs()
 
-    end subroutine s_check_input_file ! ------------------------------------
+    end subroutine s_check_input_file
 
     subroutine s_perform_time_step(t_step)
 

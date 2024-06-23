@@ -318,7 +318,7 @@ contains
 
     end subroutine s_get_capilary
 
-    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf

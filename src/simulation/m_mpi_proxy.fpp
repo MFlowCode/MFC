@@ -93,7 +93,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_mpi_proxy_module() ! ---------------------------
+    subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -164,14 +164,14 @@ contains
 
 #endif
 
-    end subroutine s_initialize_mpi_proxy_module ! -------------------------
+    end subroutine s_initialize_mpi_proxy_module
 
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
         !!      remaining processors in the communicator.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -260,7 +260,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !>  The purpose of this procedure is to optimally decompose
         !!      the computational domain among the available processors.
@@ -268,7 +268,7 @@ contains
         !!      in each of the coordinate directions, approximately the
         !!      same number of cells, and then recomputing the affected
         !!      global parameters.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -636,7 +636,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the grid variables by communicating with the neighboring
@@ -646,7 +646,7 @@ contains
         !!      directly from those of the cell-width distributions.
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc) ! ---
+    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
@@ -821,7 +821,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_grid_variables_buffers ! -----------------
+    end subroutine s_mpi_sendrecv_grid_variables_buffers
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
@@ -1242,7 +1242,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_variables_buffers ! ---------
+    end subroutine s_mpi_sendrecv_variables_buffers
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
@@ -2034,7 +2034,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_ib_buffers ! ---------
+    end subroutine s_mpi_sendrecv_ib_buffers
 
     subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
 
@@ -2244,7 +2244,7 @@ contains
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_mpi_proxy_module() ! -----------------------------
+    subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -2260,6 +2260,6 @@ contains
 
 #endif
 
-    end subroutine s_finalize_mpi_proxy_module ! ---------------------------
+    end subroutine s_finalize_mpi_proxy_module
 
 end module m_mpi_proxy
