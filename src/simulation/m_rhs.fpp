@@ -2091,7 +2091,7 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & 
+    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
@@ -2382,5 +2382,5 @@ contains
         s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_rhs_module
-    
+
 end module m_rhs

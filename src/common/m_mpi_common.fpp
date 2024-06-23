@@ -192,7 +192,6 @@ contains
 
     end subroutine s_initialize_mpi_data
 
-
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(kind(0d0)), dimension(0:num_procs - 1), intent(inout) :: proc_time

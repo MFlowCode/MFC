@@ -991,5 +991,5 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
-    
+
 end module m_data_output

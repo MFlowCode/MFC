@@ -137,7 +137,7 @@ contains
         !!      pass filter to the flow variables in the azimuthal direction
         !!      to remove the high-frequency content. This alleviates the
         !!      restrictive CFL condition arising from cells near the axis.
-`       !! @param q_cons_vf Conservative variables
+        !! @param q_cons_vf Conservative variables
     subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
@@ -303,7 +303,7 @@ contains
     !>  The purpose of this subroutine is to destroy the fftw plan
         !!      that will be used in the forward and backward DFTs when
         !!      applying the Fourier filter in the azimuthal direction.
-    subroutine s_finalize_fftw_module()
+    subroutine s_finalize_fftw_module
 
 #if defined(MFC_OpenACC)
         @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)

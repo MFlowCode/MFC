@@ -865,7 +865,7 @@ contains
                         lambda(3) = vel(dir_idx(1)) + c
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) 
+                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
@@ -873,7 +873,7 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
-                            call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) 
+                            call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -11) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -11)) then
@@ -1562,5 +1562,5 @@ contains
         ! to convert mixture or species variables to the mixture variables
 
     end subroutine s_finalize_cbc_module
-    
+
 end module m_cbc

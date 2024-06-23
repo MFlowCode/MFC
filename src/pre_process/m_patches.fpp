@@ -893,7 +893,7 @@ contains
             end do
         end do
 
-    end subroutine s_ellipsoid 
+    end subroutine s_ellipsoid
 
     !> The rectangular patch is a 2D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
@@ -1073,7 +1073,7 @@ contains
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
-    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf) 
+    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp

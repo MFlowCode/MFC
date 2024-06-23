@@ -29,11 +29,10 @@ module m_phase_change
     implicit none
 
     private; 
-    
     public :: s_initialize_phasechange_module, &
-        s_relaxation_solver, &
-        s_infinite_relaxation_k, &
-        s_finalize_relaxation_solver_module
+              s_relaxation_solver, &
+              s_infinite_relaxation_k, &
+              s_finalize_relaxation_solver_module
 
     !> @name Abstract interface for creating function pointers
     !> @{
