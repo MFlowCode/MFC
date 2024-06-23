@@ -133,7 +133,7 @@ contains
             model_eqns, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
-            mapped_weno, mp_weno, weno_avg, &
+            teno_CT, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             x_domain, y_domain, z_domain, &
@@ -146,7 +146,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &

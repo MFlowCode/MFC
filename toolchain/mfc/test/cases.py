@@ -1,4 +1,4 @@
-import typing
+import typing, itertools
 
 from mfc   import common
 from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
@@ -82,22 +82,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_weno():
         for weno_order in [3, 5]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
+            for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
-            for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                trace = []
-                if mapped_weno == 'T':
-                    trace.append("mapped_weno")
-                if mp_weno:
-                    trace.append("mp_weno")
+                if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
+                    continue
+                if mp_weno == 'T' and weno_order == 3:
+                    continue
+                if teno == 'T' and weno_order == 3:
+                    continue
 
-                if not (mp_weno == 'T' and weno_order != 5):
-                    cases.append(define_case_d(stack, [
-                        f"mapped_weno={mapped_weno}",
-                        f"mp_weno={mp_weno}"
-                    ], {
-                        'mapped_weno': mapped_weno,
-                        'mp_weno':     mp_weno
-                    }))
+                trace = [f"{var}={val}" for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T']
+                data = {var: 'T' for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T'}
+
+                if "teno" in data:
+                    data["teno_CT"] = 1e-6
+
+                cases.append(define_case_d(stack, trace, data))
 
             stack.pop()
 
