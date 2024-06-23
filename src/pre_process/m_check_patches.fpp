@@ -29,9 +29,7 @@ module m_check_patches
 
 contains
 
-    subroutine s_check_patches()
-
-        ! integer, intent(in) :: i
+    subroutine s_check_patches
 
         integer :: i
 
@@ -145,7 +143,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_line_segment_patch_geometry(patch_id) ! -------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the line segment patch
@@ -169,7 +167,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_circle_patch_geometry(patch_id) ! -------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the circle patch
@@ -193,7 +191,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_rectangle_patch_geometry(patch_id) ! ----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the rectangle patch
@@ -221,7 +219,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_line_sweep_patch_geometry(patch_id) ! ---------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the line sweep patch
@@ -251,7 +249,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_ellipse_patch_geometry(patch_id) ! ------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the ellipse patch
@@ -281,7 +279,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id) ! --------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the TaylorGreen vortex patch geometric parameters
@@ -311,7 +309,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_1D_analytical_patch_geometry(patch_id) ! ---------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the analytical patch
@@ -335,7 +333,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_2D_analytical_patch_geometry(patch_id) ! ---------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the analytical patch
@@ -361,7 +359,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_3D_analytical_patch_geometry(patch_id) ! ---------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the analytical patch
@@ -391,7 +389,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_sphere_patch_geometry(patch_id) ! -------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the sphere patch
@@ -414,12 +412,13 @@ contains
     end subroutine s_check_sphere_patch_geometry ! -------------------------
 
     !>  This subroutine verifies that the geometric parameters of
-        !!      the spherical harmonic  patch have consistently been
+        !!      the spherical harmonic patch have consistently been
         !!      inputted by the user.
         !!  @param patch_id Patch identifier
     subroutine s_check_spherical_harmonic_patch_geometry(patch_id) ! -------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the spherical harmonic patch
@@ -454,7 +453,7 @@ contains
     subroutine s_check_cuboid_patch_geometry(patch_id) ! -------------------
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the cuboid patch
@@ -487,7 +486,7 @@ contains
     subroutine s_check_cylinder_patch_geometry(patch_id) ! -----------------
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the cylinder patch
@@ -532,7 +531,7 @@ contains
     subroutine s_check_plane_sweep_patch_geometry(patch_id) ! --------------
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the plane sweep patch
@@ -564,7 +563,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_ellipsoid_patch_geometry(patch_id) ! ----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the ellipsoid patch
@@ -595,7 +594,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_inactive_patch_geometry(patch_id) ! -----------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the inactive patch
@@ -643,7 +642,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_active_patch_alteration_rights(patch_id) ! ----------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the alteration rights of an active patch
@@ -666,7 +665,7 @@ contains
     subroutine s_check_inactive_patch_alteration_rights(patch_id) ! --------
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the alteration rights of an inactive patch
@@ -688,7 +687,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_supported_patch_smoothing(patch_id) ! ---------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the smoothing parameters of a supported patch
@@ -721,7 +720,7 @@ contains
     subroutine s_check_unsupported_patch_smoothing(patch_id) ! -------------
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         ! call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the smoothing parameters of an unsupported patch
@@ -745,7 +744,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_active_patch_primitive_variables(patch_id) ! --------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the primitive variables of an active patch
@@ -806,7 +805,7 @@ contains
         !!  @param patch_id Patch identifier
     subroutine s_check_inactive_patch_primitive_variables(patch_id) ! ------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the primitive variables of an inactive patch
@@ -834,7 +833,7 @@ contains
 
     subroutine s_check_model_geometry(patch_id) ! ------------------------------
 
-        integer, intent(IN) :: patch_id
+        integer, intent(in) :: patch_id
 
         logical :: file_exists
 

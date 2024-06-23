@@ -50,39 +50,40 @@ module m_start_up
 
     implicit none
 
-    private; public :: s_read_input_file, &
- s_check_input_file, &
- s_read_grid_data_files, &
- s_read_ic_data_files, &
- s_read_serial_grid_data_files, &
- s_read_serial_ic_data_files, &
- s_read_parallel_grid_data_files, &
- s_read_parallel_ic_data_files, &
- s_check_grid_data_files, &
- s_initialize_modules, &
- s_initialize_mpi_domain, &
- s_finalize_modules, &
- s_apply_initial_condition, &
- s_save_data, s_read_grid
+    private; 
+    public :: s_read_input_file, &
+              s_check_input_file, &
+              s_read_grid_data_files, &
+              s_read_ic_data_files, &
+              s_read_serial_grid_data_files, &
+              s_read_serial_ic_data_files, &
+              s_read_parallel_grid_data_files, &
+              s_read_parallel_ic_data_files, &
+              s_check_grid_data_files, &
+              s_initialize_modules, &
+              s_initialize_mpi_domain, &
+              s_finalize_modules, &
+              s_apply_initial_condition, &
+              s_save_data, s_read_grid
 
     abstract interface ! ===================================================
 
-        subroutine s_read_abstract_grid_data_files()! ----------
+        subroutine s_read_abstract_grid_data_files! ----------
 
         end subroutine s_read_abstract_grid_data_files ! ---------------
 
+        !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
         subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers) ! -----------
 
             import :: scalar_field, integer_field, sys_size, pres_field
 
-            ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_cons_vf
+                intent(inout) :: q_cons_vf
 
-            ! IB markers
             type(integer_field), &
-                intent(INOUT) :: ib_markers
+                intent(inout) :: ib_markers
 
         end subroutine s_read_abstract_ic_data_files ! -----------------
 
@@ -103,7 +104,7 @@ contains
     !>  Reads the configuration file pre_process.inp, in order to
         !!      populate the parameters in module m_global_parameters.f90
         !!      with the user provided inputs
-    subroutine s_read_input_file() ! ---------------------------------------
+    subroutine s_read_input_file ! ---------------------------------------
 
         character(LEN=name_len) :: file_loc  !<
             !! Generic string used to store the address of a particular file
@@ -172,7 +173,7 @@ contains
     !!      individual choices are compatible with the code's options
     !!      and that the combination of these choices results into a
     !!      valid configuration for the pre-process
-    subroutine s_check_input_file() ! --------------------------------------
+    subroutine s_check_input_file ! --------------------------------------
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -206,7 +207,7 @@ contains
     !> The goal of this subroutine is to read in any preexisting
         !!      grid data as well as based on the imported grid, complete
         !!      the necessary global computational domain parameters.
-    subroutine s_read_serial_grid_data_files() ! ---
+    subroutine s_read_serial_grid_data_files ! ---
 
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
@@ -350,7 +351,7 @@ contains
         !!      at the (non-)uniform cell-width distributions for all the
         !!      active coordinate directions and making sure that all of
         !!      the cell-widths are positively valued
-    subroutine s_check_grid_data_files() ! -----------------
+    subroutine s_check_grid_data_files ! -----------------
 
         ! Cell-boundary Data Consistency Check in x-direction ==============
 
@@ -396,14 +397,15 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers) ! ---------------------------
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
         type(integer_field), &
-            intent(INOUT) :: ib_markers
+            intent(inout) :: ib_markers
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -529,7 +531,7 @@ contains
         !!      at the (non-)uniform cell-width distributions for all the
         !!      active coordinate directions and making sure that all of
         !!      the cell-widths are positively valued
-    subroutine s_read_parallel_grid_data_files()
+    subroutine s_read_parallel_grid_data_files ! ----------------------------------
 
 #ifdef MFC_MPI
 
@@ -633,14 +635,15 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers) ! ------------------
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
         type(integer_field), &
-            intent(INOUT) :: ib_markers
+            intent(inout) :: ib_markers
 
 #ifdef MFC_MPI
 
@@ -748,7 +751,7 @@ contains
 
     end subroutine s_read_parallel_ic_data_files ! -------------------------
 
-    subroutine s_initialize_modules()
+    subroutine s_initialize_modules ! ----------------------------------
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
@@ -812,9 +815,10 @@ contains
 
     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
 
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: start, finish, time_avg, time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
+        real(kind(0d0)), intent(inout) :: start, finish
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        logical, intent(inout) :: file_exists
 
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is
@@ -847,9 +851,10 @@ contains
     end subroutine s_apply_initial_condition
 
     subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
+
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        logical, intent(inout) :: file_exists
 
         call s_mpi_barrier()
 
@@ -879,7 +884,7 @@ contains
         end if
     end subroutine s_save_data
 
-    subroutine s_initialize_mpi_domain()
+    subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
 
         call s_mpi_initialize()
@@ -905,7 +910,7 @@ contains
         call s_mpi_decompose_computational_domain()
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_finalize_modules()
+    subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_generate_grid => null()
         s_read_grid_data_files => null()
