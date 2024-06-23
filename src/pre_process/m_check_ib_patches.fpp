@@ -73,7 +73,7 @@ contains
         !!      the circle patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_circle_ib_patch_geometry(patch_id) ! -------------------
+    subroutine s_check_circle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -92,13 +92,13 @@ contains
 
         end if
 
-    end subroutine s_check_circle_ib_patch_geometry ! -------------------------
+    end subroutine s_check_circle_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_airfoil_ib_patch_geometry(patch_id) ! -------------------
+    subroutine s_check_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -116,13 +116,13 @@ contains
 
         end if
 
-    end subroutine s_check_airfoil_ib_patch_geometry ! -------------------------
+    end subroutine s_check_airfoil_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the 3d airfoil patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id) ! -------------------
+    subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -141,13 +141,13 @@ contains
 
         end if
 
-    end subroutine s_check_3d_airfoil_ib_patch_geometry ! -------------------------
+    end subroutine s_check_3d_airfoil_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the rectangle patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_rectangle_ib_patch_geometry(patch_id) ! ----------------
+    subroutine s_check_rectangle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -170,13 +170,13 @@ contains
 
         end if
 
-    end subroutine s_check_rectangle_ib_patch_geometry ! ----------------------
+    end subroutine s_check_rectangle_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the sphere patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_sphere_ib_patch_geometry(patch_id) ! ----------------
+    subroutine s_check_sphere_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -199,13 +199,13 @@ contains
 
         end if
 
-    end subroutine s_check_sphere_ib_patch_geometry ! ----------------------
+    end subroutine s_check_sphere_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the cylinder patch have consistently been inputted by
         !!      the user.
         !!  @param patch_id Patch identifier
-    subroutine s_check_cylinder_ib_patch_geometry(patch_id) ! -----------------
+    subroutine s_check_cylinder_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -244,12 +244,12 @@ contains
 
         end if
 
-    end subroutine s_check_cylinder_ib_patch_geometry ! -----------------------
+    end subroutine s_check_cylinder_ib_patch_geometry
 
     !!>  This subroutine verifies that the geometric parameters of
         !!      the inactive patch remain unaltered by the user inputs.
         !!  @param patch_id Patch identifier
-    subroutine s_check_inactive_ib_patch_geometry(patch_id) ! -----------------
+    subroutine s_check_inactive_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
@@ -276,6 +276,6 @@ contains
 
         end if
 
-    end subroutine s_check_inactive_ib_patch_geometry ! -----------------------
+    end subroutine s_check_inactive_ib_patch_geometry
 
 end module m_check_ib_patches

@@ -72,7 +72,7 @@ contains
     !  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
     subroutine s_compute_viscous_stress_tensor(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, &
                                                tau_Re_vf, &
-                                               ix, iy, iz) ! ---
+                                               ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
@@ -522,7 +522,7 @@ contains
                 end do
             end do
         end if
-    end subroutine s_compute_viscous_stress_tensor ! ----------------------------------------
+    end subroutine s_compute_viscous_stress_tensor
 
 !>  Computes viscous terms
     !!  @param q_cons_vf Cell-averaged conservative variables
@@ -981,7 +981,7 @@ contains
 
     end subroutine s_get_viscous
 
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
@@ -1082,9 +1082,9 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values_visc
 
-    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
@@ -1184,7 +1184,7 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
     !>  The purpose of this subroutine is to employ the inputted
         !!      left and right cell-boundary integral-averaged variables
@@ -1195,7 +1195,7 @@ contains
         !!  @param vR_vf Right cell-boundary integral averages
         !!  @param dv_ds_vf Cell-average first-order spatial derivatives
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
+    subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, &
                                                  dv_ds_vf, &
                                                  norm_dir, &
                                                  ix, iy, iz, iv_in, &
@@ -1311,7 +1311,7 @@ contains
         end if
         ! END: First-Order Spatial Derivatives in z-direction ==============
 
-    end subroutine s_apply_scalar_divergence_theorem ! ---------------------
+    end subroutine s_apply_scalar_divergence_theorem
 
     !>  Computes the scalar gradient fields via finite differences
         !!  @param var Variable to compute derivative of
@@ -1501,9 +1501,9 @@ contains
             end if
         end if
 
-    end subroutine s_compute_fd_gradient ! --------------------------------------
+    end subroutine s_compute_fd_gradient
 
-    subroutine s_finalize_viscous_module()
+    subroutine s_finalize_viscous_module
 
         integer :: i
 

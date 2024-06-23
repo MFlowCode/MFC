@@ -228,7 +228,7 @@ contains
     !>  Assigns default values to user inputs prior to reading
         !!              them in. This allows for an easier consistency check of
         !!              these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs ! ------------------
+    subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop operator
 
@@ -427,11 +427,11 @@ contains
             fluid_pp(i)%G = 0d0
         end do
 
-    end subroutine s_assign_default_values_to_user_inputs ! ----------------
+    end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or
         !! any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module ! ----------------------
+    subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
@@ -730,9 +730,9 @@ contains
 
         allocate (logic_grid(0:m, 0:n, 0:p))
 
-    end subroutine s_initialize_global_parameters_module ! --------------------
+    end subroutine s_initialize_global_parameters_module
 
-    subroutine s_initialize_parallel_io ! --------------------------------
+    subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -757,9 +757,9 @@ contains
 
 #endif
 
-    end subroutine s_initialize_parallel_io ! ------------------------------
+    end subroutine s_initialize_parallel_io
 
-    subroutine s_finalize_global_parameters_module() ! ------------------------
+    subroutine s_finalize_global_parameters_module
 
         integer :: i
 
@@ -791,6 +791,6 @@ contains
 
 #endif
 
-    end subroutine s_finalize_global_parameters_module ! ----------------------
+    end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

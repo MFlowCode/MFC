@@ -60,7 +60,7 @@ module m_data_output
             type(integer_field), &
                 intent(in) :: ib_markers
 
-        end subroutine s_write_abstract_data_files ! -------------------
+        end subroutine s_write_abstract_data_files
     end interface ! ========================================================
 
     character(LEN=path_len + 2*name_len), private :: t_step_dir !<
@@ -77,7 +77,7 @@ contains
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_serial_data_files(q_cons_vf, ib_markers) ! -----------
+    subroutine s_write_serial_data_files(q_cons_vf, ib_markers)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
@@ -464,13 +464,13 @@ contains
             end do
         end if
 
-    end subroutine s_write_serial_data_files ! ------------------------------------
+    end subroutine s_write_serial_data_files
 
     !> Writes grid and initial condition data files in parallel to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers)
 
         ! Conservative variables
         type(scalar_field), &
@@ -714,11 +714,11 @@ contains
         end if
 #endif
 
-    end subroutine s_write_parallel_data_files ! ---------------------------
+    end subroutine s_write_parallel_data_files
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_data_output_module ! ----------------------------
+    subroutine s_initialize_data_output_module
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
 
@@ -779,13 +779,13 @@ contains
 
         close (1)
 
-    end subroutine s_initialize_data_output_module ! --------------------------
+    end subroutine s_initialize_data_output_module
 
     !> Resets s_write_data_files pointer
-    subroutine s_finalize_data_output_module ! ---------------------------
+    subroutine s_finalize_data_output_module
 
         s_write_data_files => null()
 
-    end subroutine s_finalize_data_output_module ! -------------------------
+    end subroutine s_finalize_data_output_module
 
 end module m_data_output

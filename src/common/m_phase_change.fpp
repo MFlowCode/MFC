@@ -28,10 +28,12 @@ module m_phase_change
 
     implicit none
 
-    private; public :: s_initialize_phasechange_module, &
- s_relaxation_solver, &
- s_infinite_relaxation_k, &
- s_finalize_relaxation_solver_module
+    private; 
+    
+    public :: s_initialize_phasechange_module, &
+        s_relaxation_solver, &
+        s_infinite_relaxation_k, &
+        s_finalize_relaxation_solver_module
 
     !> @name Abstract interface for creating function pointers
     !> @{
@@ -39,7 +41,7 @@ module m_phase_change
 
         !> @name Abstract subroutine for the infinite relaxation solver
         !> @{
-        subroutine s_abstract_relaxation_solver(q_cons_vf) ! -------
+        subroutine s_abstract_relaxation_solver(q_cons_vf)
             import :: scalar_field, sys_size
             type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         end subroutine
@@ -86,14 +88,14 @@ contains
         D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
             /((gs_min(vp) - 1.0d0)*cvs(vp))
 
-    end subroutine s_initialize_phasechange_module !-------------------------------
+    end subroutine s_initialize_phasechange_module
 
     !>  This subroutine is created to activate either the pT- (N fluids) or the
         !!      pTg-equilibrium (2 fluids for g-equilibrium)
         !!      model, also considering mass depletion, depending on the incoming
         !!      state conditions.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_infinite_relaxation_k(q_cons_vf) ! ----------------
+    subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(kind(0.0d0)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
@@ -283,7 +285,7 @@ contains
             end do
         end do
 
-    end subroutine s_infinite_relaxation_k ! ----------------
+    end subroutine s_infinite_relaxation_k
 
     !>  This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
         !!  @param j generic loop iterator for x direction
@@ -387,7 +389,7 @@ contains
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
 
-    end subroutine s_infinite_pt_relaxation_k ! -----------------------
+    end subroutine s_infinite_pt_relaxation_k
 
     !>  This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT
         !!      and 2 fluids under pTg-equilibrium. There is a final common p and T during relaxation
@@ -510,7 +512,7 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
-    end subroutine s_infinite_ptg_relaxation_k ! -----------------------
+    end subroutine s_infinite_ptg_relaxation_k
 
     !>  This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative
         !!      but their sum is positive. Inert phases are not corrected at this moment
@@ -782,7 +784,7 @@ contains
     end subroutine s_TSat
 
     !>  This subroutine finalizes the phase change module
-    subroutine s_finalize_relaxation_solver_module()
+    subroutine s_finalize_relaxation_solver_module
     end subroutine
 
 #endif

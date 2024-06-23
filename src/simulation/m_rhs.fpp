@@ -228,7 +228,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_rhs_module() ! ---------------------------------
+    subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -694,9 +694,9 @@ contains
             @:ALLOCATE_GLOBAL(nbub(0:m, 0:n, 0:p))
         end if
 
-    end subroutine s_initialize_rhs_module ! -------------------------------
+    end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
@@ -1037,7 +1037,7 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_compute_rhs ! -----------------------------------------
+    end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
@@ -1835,7 +1835,7 @@ contains
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_pressure_relaxation_procedure(q_cons_vf) ! ----------------
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
@@ -2079,7 +2079,7 @@ contains
             end do
         end do
 
-    end subroutine s_pressure_relaxation_procedure ! -----------------------
+    end subroutine s_pressure_relaxation_procedure
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
@@ -2091,7 +2091,7 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & 
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
@@ -2144,9 +2144,9 @@ contains
         end if
 
         ! ==================================================================
-    end subroutine s_reconstruct_cell_boundary_values ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values
 
-    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                               norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
@@ -2225,7 +2225,7 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_first_order
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_rhs_module() ! -----------------------------------
+    subroutine s_finalize_rhs_module
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -2381,6 +2381,6 @@ contains
         s_riemann_solver => null()
         s_convert_to_mixture_variables => null()
 
-    end subroutine s_finalize_rhs_module ! ---------------------------------
-
+    end subroutine s_finalize_rhs_module
+    
 end module m_rhs
