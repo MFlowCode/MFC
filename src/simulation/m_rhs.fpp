@@ -698,15 +698,16 @@ contains
 
     subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
+
         real(kind(0d0)) :: t_start, t_finish
         real(kind(0d0)) :: gp_sum
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
-        integer, intent(IN) :: t_step
 
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
@@ -1041,12 +1042,12 @@ contains
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
-        type(vector_field), intent(INOUT) :: q_cons_vf
-        type(vector_field), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(vector_field), intent(INOUT) :: flux_src_n_vf
-
         integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(vector_field), intent(inout) :: q_cons_vf
+        type(vector_field), intent(inout) :: q_prim_vf
+        type(vector_field), intent(inout) :: flux_src_n_vf
+
         integer :: i, j, k, l, q
 
         if (alt_soundspeed) then
@@ -1597,14 +1598,13 @@ contains
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
-                                                               flux_src_n, &
-                                                               dq_prim_dx_vf, &
-                                                               dq_prim_dy_vf, &
-                                                               dq_prim_dz_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(int_bounds_info) :: ixt, iyt, izt
-        integer, intent(IN) :: idir
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
+        type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
+        type(int_bounds_info), intent(in) :: ixt, iyt, izt
+        
         integer :: i, j, k, l, q
 
         if (idir == 1) then ! x-direction
@@ -1837,7 +1837,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
             !! derivative df(p), isentropic partial density, sum of volume fractions,
@@ -2094,11 +2094,10 @@ contains
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
@@ -2149,11 +2148,10 @@ contains
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                               norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 

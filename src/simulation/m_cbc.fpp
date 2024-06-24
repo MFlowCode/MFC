@@ -440,7 +440,7 @@ contains
         !              provided the CBC coordinate direction and location.
 
         ! CBC coordinate direction and location
-        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
+        integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
         real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
@@ -544,7 +544,7 @@ contains
     !!  @param cbc_loc_in CBC coordinate location
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
-        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
+        integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         integer :: i !< Generic loop iterator
 
@@ -622,15 +622,15 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf
+            intent(inout) :: flux_vf, flux_src_vf
 
-        integer, intent(IN) :: cbc_dir_norm, cbc_loc_norm
+        integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
@@ -1024,13 +1024,13 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: flux_vf, flux_src_vf
+            intent(in) :: flux_vf, flux_src_vf
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 
@@ -1305,9 +1305,9 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf
+            intent(inout) :: flux_vf, flux_src_vf
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 
