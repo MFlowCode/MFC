@@ -54,9 +54,13 @@ f-all cray-fftw cray-hdf5 cray-mpich/8.1.26 cce/16.0.1
 f-all rocm/5.5.1 cray-python omniperf
 f-cpu
 
-
 d     NCSA Delta
 d-all python/3.11.6
 d-cpu gcc/11.4.0 openmpi
 d-gpu nvhpc/22.11 openmpi+cuda/4.1.5+cuda cmake
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
+
+c     DoD Carpenter
+c-all python
+c-cpu gcc/12.2.0 cmake/3.28.1-gcc-12.2.0 openmpi/4.1.6
+c-gpu nvhpc/23.7 cuda/12.2
