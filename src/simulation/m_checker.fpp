@@ -19,7 +19,7 @@ module m_checker
 
 contains
 
-    subroutine s_check_inputs()
+    subroutine s_check_inputs
 
         character(len=5) :: iStr
         character(len=5) :: jStr

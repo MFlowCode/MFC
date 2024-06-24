@@ -648,8 +648,8 @@ contains
         !!  @param pbc_loc Processor boundary condition (PBC) location
     subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 
-        integer, intent(IN) :: mpi_dir
-        integer, intent(IN) :: pbc_loc
+        integer, intent(in) :: mpi_dir
+        integer, intent(in) :: pbc_loc
 
         integer :: dst_proc(1:3)
 
@@ -834,10 +834,9 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-
-        integer, intent(IN) :: mpi_dir, pbc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
@@ -1247,14 +1246,10 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
-        type(integer_field), intent(INOUT) :: ib_markers
-
-        integer, intent(IN) :: gp_layers
+        type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: gp_layers
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
@@ -2038,9 +2033,8 @@ contains
 
     subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
 
-        type(scalar_field), dimension(num_dims + 1), intent(INOUT) :: c_divs_vf
-
-        integer, intent(IN) :: mpi_dir, pbc_loc
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs_vf
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 

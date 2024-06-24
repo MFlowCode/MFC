@@ -19,9 +19,10 @@ module m_body_forces
 
     implicit none
 
-    private; public :: s_compute_body_forces_rhs, &
- s_initialize_body_forces_module, &
- s_finalize_body_forces_module
+    private; 
+    public :: s_compute_body_forces_rhs, &
+              s_initialize_body_forces_module, &
+              s_finalize_body_forces_module
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rhoM)
@@ -35,7 +36,7 @@ contains
 
     !> This subroutine inializes the module global array of mixture
     !! densities in each grid cell
-    subroutine s_initialize_body_forces_module()
+    subroutine s_initialize_body_forces_module
 
         ! Simulation is at least 2D
         if (n > 0) then
@@ -62,7 +63,7 @@ contains
     !> This subroutine computes the acceleration at time t
     subroutine s_compute_acceleration(t)
 
-        real(kind(0d0)) :: t
+        real(kind(0d0)), intent(in) :: t
 
         if (m > 0) then
             accel_bf(1) = g_x + k_x*sin(w_x*t - p_x)
@@ -80,9 +81,10 @@ contains
 
     !> This subroutine calculates the mixture density at each cell
     !! center
+    !! param q_cons_vf Conservative variable
     subroutine s_compute_mixture_density(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -102,11 +104,13 @@ contains
 
     !> This subroutine calculates the source term due to body forces
     !! so the system can be advanced in time
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
     subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l !< Loop variables
 
@@ -172,7 +176,7 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
-    subroutine s_finalize_body_forces_module()
+    subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE_GLOBAL(rhoM)
 

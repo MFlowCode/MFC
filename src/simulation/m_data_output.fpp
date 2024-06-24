@@ -34,22 +34,24 @@ module m_data_output
 
     implicit none
 
-    private; public :: s_initialize_data_output_module, &
- s_open_run_time_information_file, &
- s_open_probe_files, &
- s_write_run_time_information, &
- s_write_data_files, &
- s_write_serial_data_files, &
- s_write_parallel_data_files, &
- s_write_probe_files, &
- s_close_run_time_information_file, &
- s_close_probe_files, &
- s_finalize_data_output_module
+    private; 
+    public :: s_initialize_data_output_module, &
+              s_open_run_time_information_file, &
+              s_open_probe_files, &
+              s_write_run_time_information, &
+              s_write_data_files, &
+              s_write_serial_data_files, &
+              s_write_parallel_data_files, &
+              s_write_probe_files, &
+              s_close_run_time_information_file, &
+              s_close_probe_files, &
+              s_finalize_data_output_module
 
     abstract interface ! ===================================================
 
         !> Write data files
         !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
         subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
@@ -57,13 +59,13 @@ module m_data_output
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(IN) :: q_cons_vf
+                intent(in) :: q_cons_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_prim_vf
+                intent(inout) :: q_prim_vf
 
-            integer, intent(IN) :: t_step
+            integer, intent(in) :: t_step
 
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
@@ -455,13 +457,13 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
     subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -826,18 +828,13 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
     subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf
-
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
 
@@ -1014,9 +1011,9 @@ contains
         !!  @param accel_mag Acceleration magnitude information
     subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
-        integer, intent(IN) :: t_step
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(IN) :: accel_mag
+        integer, intent(in) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(kind(0d0)), dimension(-1:m) :: distx
         real(kind(0d0)), dimension(-1:n) :: disty
@@ -1659,7 +1656,7 @@ contains
     end subroutine s_close_run_time_information_file
 
     !> Closes probe files
-    subroutine s_close_probe_files()
+    subroutine s_close_probe_files
 
         integer :: i !< Generic loop iterator
 
@@ -1713,7 +1710,7 @@ contains
     end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_data_output_module()
+    subroutine s_finalize_data_output_module
 
         integer :: i !< Generic loop iterator
 
