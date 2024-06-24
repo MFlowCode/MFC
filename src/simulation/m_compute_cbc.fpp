@@ -33,11 +33,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -61,11 +63,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !< Generic loop iterator
 
@@ -101,11 +105,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -127,11 +133,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -167,11 +175,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -203,11 +213,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -240,12 +252,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
-
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
         integer :: i
 
         do i = 1, advxe
@@ -264,11 +277,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(IN) :: lambda
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: mf, dalpha_rho_ds, dadv_ds
-        real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
-        real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
-        real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(sys_size), intent(inout) :: L
+        real(kind(0d0)), intent(in) :: rho, c
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        real(kind(0d0)), intent(in) :: dpres_ds
+        real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !< Generic loop iterator
 

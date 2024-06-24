@@ -140,7 +140,7 @@ contains
         !! @param q_cons_vf Conservative variables
     subroutine s_apply_fourier_filter(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         integer :: i, j, k, l !< Generic loop iterators
 

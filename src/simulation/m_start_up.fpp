@@ -97,7 +97,7 @@ module m_start_up
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_cons_vf
+                intent(inout) :: q_cons_vf
 
         end subroutine s_read_abstract_data_files
 
@@ -1030,7 +1030,8 @@ contains
         !! @param v_vf conservative variables
     subroutine s_initialize_internal_energy_equations(v_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
+
         real(kind(0d0)) :: rho
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: gamma
@@ -1066,17 +1067,17 @@ contains
             end do
         end do
 
-    end subroutine s_initialize_internal_energy_equations !-----------------
+    end subroutine s_initialize_internal_energy_equations
 
     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
-        integer, intent(INOUT) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
-        real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: start, finish
-        integer, intent(INOUT) :: nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        logical, intent(inout) :: file_exists
+        real(kind(0d0)), intent(inout) :: start, finish
+        integer, intent(inout) :: nt
 
         integer :: i, j, k, l
 
@@ -1120,14 +1121,14 @@ contains
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 
-        integer, intent(INOUT) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
-        real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: start, finish
-        integer, intent(INOUT) :: nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        logical, intent(inout) :: file_exists
+        real(kind(0d0)), intent(inout) :: start, finish
+        integer, intent(inout) :: nt
 
         call s_mpi_barrier()
 
@@ -1175,8 +1176,10 @@ contains
     end subroutine s_save_performance_metrics
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
-        real(kind(0d0)), intent(INOUT) :: start, finish, io_time_avg
-        integer, intent(INOUT) :: t_step, nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
+        integer, intent(inout) :: nt
+        
         integer :: i, j, k, l
 
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
@@ -1215,7 +1218,7 @@ contains
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules()
+    subroutine s_initialize_modules
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
@@ -1310,7 +1313,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain()
+    subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_OpenACC
         real(kind(0d0)) :: starttime, endtime
@@ -1382,7 +1385,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_initialize_gpu_vars()
+    subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
         do i = 1, sys_size
@@ -1411,7 +1414,7 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
-    subroutine s_finalize_modules()
+    subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
         s_write_data_files => null()
