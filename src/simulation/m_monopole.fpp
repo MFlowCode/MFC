@@ -112,7 +112,6 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
-
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
 
         integer :: i, j, k, l, q, ii !< generic loop variables

@@ -19,9 +19,8 @@ module m_boundary_conditions
     implicit none
 
     private; 
-    
     public :: s_populate_primitive_variables_buffers, &
-        s_populate_capillary_buffers
+              s_populate_capillary_buffers
 
 contains
 
@@ -1226,7 +1225,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: bc_dir, bc_loc
-        
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================

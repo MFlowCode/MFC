@@ -39,7 +39,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -69,7 +69,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !< Generic loop iterator
 
@@ -111,7 +111,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i
 
@@ -139,7 +139,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -181,7 +181,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -219,7 +219,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !> Generic loop iterator
 
@@ -258,7 +258,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
         integer :: i
 
         do i = 1, advxe
@@ -283,7 +283,7 @@ contains
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(kind(0d0)), intent(in) :: dpres_ds
         real(kind(0d0)), dimension(num_dims), intent(in) :: dvel_ds
-        real(kind(0d0)), dimension(num_fluids), intent(in) ::  dadv_ds
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: dadv_ds
 
         integer :: i !< Generic loop iterator
 

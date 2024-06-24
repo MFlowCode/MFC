@@ -20,10 +20,9 @@ module m_body_forces
     implicit none
 
     private; 
-    
     public :: s_compute_body_forces_rhs, &
-        s_initialize_body_forces_module, &
-        s_finalize_body_forces_module
+              s_initialize_body_forces_module, &
+              s_finalize_body_forces_module
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rhoM)
@@ -61,7 +60,7 @@ contains
 
     end subroutine s_initialize_body_forces_module
 
-    !> This subroutine computes the acceleration at time t 
+    !> This subroutine computes the acceleration at time t
     subroutine s_compute_acceleration(t)
 
         real(kind(0d0)), intent(in) :: t

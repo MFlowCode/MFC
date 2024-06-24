@@ -35,18 +35,17 @@ module m_data_output
     implicit none
 
     private; 
-    
     public :: s_initialize_data_output_module, &
-        s_open_run_time_information_file, &
-        s_open_probe_files, &
-        s_write_run_time_information, &
-        s_write_data_files, &
-        s_write_serial_data_files, &
-        s_write_parallel_data_files, &
-        s_write_probe_files, &
-        s_close_run_time_information_file, &
-        s_close_probe_files, &
-        s_finalize_data_output_module
+              s_open_run_time_information_file, &
+              s_open_probe_files, &
+              s_write_run_time_information, &
+              s_write_data_files, &
+              s_write_serial_data_files, &
+              s_write_parallel_data_files, &
+              s_write_probe_files, &
+              s_close_run_time_information_file, &
+              s_close_probe_files, &
+              s_finalize_data_output_module
 
     abstract interface ! ===================================================
 

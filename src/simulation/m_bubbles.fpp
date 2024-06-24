@@ -127,7 +127,7 @@ contains
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        
+
         integer :: i, j, k, l, q
 
         if (idir == 1) then

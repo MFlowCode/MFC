@@ -426,12 +426,12 @@ contains
     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
 
         integer, intent(in) :: idir
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf 
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
-        
+
         integer :: i, j, k, l, q
 
         real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -1152,7 +1152,7 @@ contains
         !$acc routine seq
         real(kind(0.d0)), dimension(nnode), intent(in) :: abscX, abscY, wght_in
         real(kind(0.d0)), dimension(3), intent(in) :: pow
-        
+
         real(kind(0.d0)) :: f_quad2D
 
         f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))

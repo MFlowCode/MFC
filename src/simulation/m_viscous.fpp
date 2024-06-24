@@ -1088,7 +1088,6 @@ contains
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-
         integer, intent(IN) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -1198,19 +1197,17 @@ contains
 
         ! arrays of cell widths
         type(scalar_field), &
-        dimension(iv%beg:iv%end), &
-        intent(in) :: vL_vf, vR_vf
+            dimension(iv%beg:iv%end), &
+            intent(in) :: vL_vf, vR_vf
 
         type(scalar_field), &
-        dimension(iv%beg:iv%end), &
-        intent(inout) :: dv_ds_vf
+            dimension(iv%beg:iv%end), &
+            intent(inout) :: dv_ds_vf
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz, iv_in
         integer, intent(in) :: dim, buff_size_in
         real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
-
-
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1325,7 +1322,6 @@ contains
         integer, intent(in) :: buff_size_in
 
         integer :: j, k, l !< Generic loop iterators
-
 
         ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
