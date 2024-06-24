@@ -267,8 +267,8 @@ contains
         !! @param is Index bounds in the s-direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
-        integer, intent(IN) :: weno_dir
-        type(int_bounds_info), intent(IN) :: is
+        integer, intent(in) :: weno_dir
+        type(int_bounds_info), intent(in) :: is
         integer :: s
 
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
@@ -506,11 +506,12 @@ contains
                       norm_dir, weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
-        type(scalar_field), dimension(1:), intent(IN) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(IN) :: norm_dir
-        integer, intent(IN) :: weno_dir
-        type(int_bounds_info), intent(IN) :: is1_weno_d, is2_weno_d, is3_weno_d
+        type(scalar_field), dimension(1:), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        integer, intent(in) :: norm_dir
+        integer, intent(in) :: weno_dir
+        type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
         real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(kind(0d0)), dimension(0:weno_polyn) :: poly

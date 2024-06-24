@@ -114,7 +114,7 @@ contains
         !!  @param t_step Current time-step
     subroutine s_compute_derived_variables(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -178,14 +178,14 @@ contains
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                q_prim_vf2, q_prim_vf3, q_sf)
         !DIR$ INLINEALWAYS s_derive_acceleration_component
-        integer, intent(IN) :: i
+        integer, intent(in) :: i
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf0
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf1
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf2
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf3
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf0
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf1
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(OUT) :: q_sf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(out) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
 

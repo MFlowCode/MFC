@@ -68,7 +68,7 @@ module m_ibm
 contains
 
     !>  Initialize IBM module
-    subroutine s_initialize_ibm_module()
+    subroutine s_initialize_ibm_module
 
         gp_layers = 3
 
@@ -89,7 +89,7 @@ contains
 
     end subroutine s_initialize_ibm_module
 
-    subroutine s_ibm_setup()
+    subroutine s_ibm_setup
 
         integer :: i, j, k
 
@@ -121,18 +121,19 @@ contains
     end subroutine s_ibm_setup
 
     !>  Subroutine that updates the conservative variables at the ghost points
-        !!  @param q_cons_vf
+        !!  @param q_cons_vf Conservative variables
+        !!  @param q_prim_vf Primitive variables
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf !< Primitive Variables
+            intent(inout) :: q_cons_vf !< Conservative Variables
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf !< Primitive Variables
+            intent(inout) :: q_prim_vf !< Primitive Variables
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(inout) :: pb, mv
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -333,16 +334,12 @@ contains
 
     end subroutine s_ibm_correct_state
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
     subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(IN) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(IN) :: levelset_norm
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(in) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(in) :: levelset_norm
 
         real(kind(0d0)) :: dist
         real(kind(0d0)), dimension(3) :: norm
@@ -445,7 +442,7 @@ contains
 
     end subroutine s_compute_image_points
 
-    subroutine s_find_num_ghost_points()
+    subroutine s_find_num_ghost_points
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -487,8 +484,9 @@ contains
 
     subroutine s_find_ghost_points(ghost_points, inner_points)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
-        type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
+        type(ghost_point), dimension(num_inner_gps), intent(inout) :: inner_points
+
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -643,7 +641,7 @@ contains
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_interpolation_coeffs(ghost_points)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
 
         real(kind(0d0)), dimension(2, 2, 2) :: dist
         real(kind(0d0)), dimension(2, 2, 2) :: alpha
@@ -795,18 +793,15 @@ contains
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_prim_vf !< Primitive Variables
-        real(kind(0d0)), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-
-        type(ghost_point), intent(IN) :: gp
-        real(kind(0d0)), intent(INOUT) :: pres_IP
-        real(kind(0d0)), dimension(3), intent(INOUT) :: vel_IP
-        real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_IP, alpha_rho_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: r_IP, v_IP, pb_IP, mv_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: nmom_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: presb_IP, massv_IP
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf !< Primitive Variables
+        type(ghost_point), intent(in) :: gp
+        real(kind(0d0)), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
+        real(kind(0d0)), intent(inout) :: pres_IP
+        real(kind(0d0)), dimension(3), intent(inout) :: vel_IP
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: nmom_IP
+        real(kind(0d0)), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
 
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
@@ -905,15 +900,11 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
     subroutine s_compute_levelset(levelset, levelset_norm)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer :: i !< Iterator variables
         integer :: geometry
 
@@ -936,12 +927,8 @@ contains
 
     end subroutine s_compute_levelset
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
-    subroutine s_finalize_ibm_module()
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
+    subroutine s_finalize_ibm_module
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE_GLOBAL(levelset)

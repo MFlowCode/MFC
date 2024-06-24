@@ -36,7 +36,7 @@ module m_viscous
 
 contains
 
-    subroutine s_initialize_viscous_module()
+    subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
         type(int_bounds_info) :: ix, iy, iz
@@ -74,10 +74,10 @@ contains
                                                tau_Re_vf, &
                                                ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(num_dims), intent(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
-
-        type(scalar_field), dimension(1:sys_size) :: tau_Re_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
@@ -86,8 +86,6 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
-
-        type(int_bounds_info) :: ix, iy, iz
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
@@ -539,22 +537,21 @@ contains
                              ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
-            intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
+            intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
                              qL_prim_rsz_vf, qR_prim_rsz_vf
 
-        type(vector_field), dimension(num_dims), intent(INOUT) :: qL_prim, qR_prim
+        type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
 
-        type(vector_field) :: q_prim_qp
+        type(vector_field), intent(in) :: q_prim_qp
 
         type(vector_field), dimension(1:num_dims), &
-            intent(INOUT) :: dqL_prim_dx_n, dqR_prim_dx_n, &
+            intent(inout) :: dqL_prim_dx_n, dqR_prim_dx_n, &
                              dqL_prim_dy_n, dqR_prim_dy_n, &
                              dqL_prim_dz_n, dqR_prim_dz_n
 
-        type(vector_field), dimension(1), intent(INOUT) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(vector_field), dimension(1), intent(inout) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
+        type(int_bounds_info), intent(inout) :: ix, iy, iz
 
         integer :: i, j, k, l
 
@@ -984,18 +981,17 @@ contains
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
 
-        type(int_bounds_info) :: ix, iy, iz
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
@@ -1087,12 +1083,10 @@ contains
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
-
-        type(int_bounds_info) :: ix, iy, iz
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer, intent(IN) :: norm_dir
 
@@ -1201,21 +1195,19 @@ contains
                                                  ix, iy, iz, iv_in, &
                                                  dL, dim, buff_size_in)
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz, iv_in
-        integer :: buff_size_in, dim
-
-        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in) :: dL
         ! arrays of cell widths
+        type(scalar_field), &
+            dimension(iv%beg:iv%end), &
+            intent(in) :: vL_vf, vR_vf
 
         type(scalar_field), &
             dimension(iv%beg:iv%end), &
-            intent(IN) :: vL_vf, vR_vf
+            intent(inout) :: dv_ds_vf
 
-        type(scalar_field), &
-            dimension(iv%beg:iv%end), &
-            intent(INOUT) :: dv_ds_vf
-
-        integer, intent(IN) :: norm_dir
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz, iv_in
+        integer, intent(in) :: dim, buff_size_in
+        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1322,16 +1314,14 @@ contains
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
                                      ix, iy, iz, buff_size_in)
 
-        type(scalar_field), intent(IN) :: var
-        type(scalar_field), intent(INOUT) :: grad_x
-        type(scalar_field), intent(INOUT) :: grad_y
-        type(scalar_field), intent(INOUT) :: grad_z
-
-        integer, intent(IN) :: buff_size_in
+        type(scalar_field), intent(in) :: var
+        type(scalar_field), intent(inout) :: grad_x
+        type(scalar_field), intent(inout) :: grad_y
+        type(scalar_field), intent(inout) :: grad_z
+        type(int_bounds_info), intent(inout) :: ix, iy, iz
+        integer, intent(in) :: buff_size_in
 
         integer :: j, k, l !< Generic loop iterators
-
-        type(int_bounds_info) :: ix, iy, iz
 
         ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then

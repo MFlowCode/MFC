@@ -63,7 +63,7 @@ module m_monopole
 
 contains
 
-    subroutine s_initialize_monopole_module()
+    subroutine s_initialize_monopole_module
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
@@ -91,7 +91,7 @@ contains
 
     end subroutine
 
-    subroutine s_compute_monopole_rhs()
+    subroutine s_compute_monopole_rhs
 
     end subroutine s_compute_monopole_rhs
 
@@ -108,9 +108,9 @@ contains
         !! are calculated from the conservative variables and gradient magnitude (GM)
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer, intent(in) :: t_step, id
 
-        integer, intent(IN) :: t_step, id
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
 
@@ -297,12 +297,13 @@ contains
         !! @param mysos Alternative speed of sound for testing
     function f_g(the_time, sos, mysos, nm, term_index)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: the_time, sos, mysos
-        integer, intent(IN) :: nm
+        real(kind(0d0)), intent(in) :: the_time, sos, mysos
+        integer, intent(in) :: nm
+        integer, intent(in) :: term_index
+
         real(kind(0d0)) :: period, t0, sigt, pa
         real(kind(0d0)) :: offset
         real(kind(0d0)) :: f_g
-        integer :: term_index
 
         offset = 0d0
         if (delay(nm) /= dflt_real) offset = delay(nm)
@@ -345,10 +346,12 @@ contains
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 
         !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
-        integer, intent(IN) :: nm
-        real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
+        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        real(kind(0d0)), intent(in) :: mono_leng
+        integer, intent(in) :: nm
+        real(kind(0d0)), intent(out) :: angle
+        real(kind(0d0)), intent(out) :: angle_z
 
         integer :: q
         real(kind(0d0)) :: h, hx, hy, hz
@@ -357,8 +360,6 @@ contains
         real(kind(0d0)) :: hxnew_cyl, hynew_cyl
         real(kind(0d0)) :: sig
         real(kind(0d0)) :: f_delta
-        real(kind(0d0)) :: angle
-        real(kind(0d0)) :: angle_z
 
         if (n == 0) then
             sig = dx(j)
