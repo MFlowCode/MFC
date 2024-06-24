@@ -104,8 +104,8 @@ contains
 
     !> This subroutine calculates the source term due to body forces
     !! so the system can be advanced in time
-    !! @param q_cons_vf Conservative varaibles
-    !! @param q_prim_vf Primitive varaibles
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
     subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

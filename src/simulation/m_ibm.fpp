@@ -122,16 +122,16 @@ contains
 
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf Conservative variables
-        !!  @param q_prim_vf Primitive varaibles
+        !!  @param q_prim_vf Primitive variables
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf !< Conservative Variables
+            intent(inout) :: q_cons_vf !< Conservative Variables
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf !< Primitive Variables
+            intent(inout) :: q_prim_vf !< Primitive Variables
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(inout) :: pb, mv
 
