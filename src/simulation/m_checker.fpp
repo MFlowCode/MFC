@@ -19,15 +19,28 @@ module m_checker
 
 contains
 
-    subroutine s_check_inputs()
+    !> Checks compatibility of parameters in the input file.
+        !! Used by the simulation stage
+    subroutine s_check_inputs
 
-        character(len=5) :: iStr, jStr, numStr
-        integer :: bub_fac !< For allowing an extra fluid_pp if there are subgrid bubbles
-        integer :: i, j
+        call s_check_inputs_compilers
 
-        bub_fac = 0
-        if (bubbles .and. (num_fluids == 1)) bub_fac = 1
+        call s_check_inputs_weno
+        call s_check_inputs_riemann_solver
+        call s_check_inputs_time_stepping
+        call s_check_inputs_model_eqns
+        if (hypoelasticity) call s_check_inputs_hypoelasticity
+        if (bubbles) call s_check_inputs_bubbles
+        if (adap_dt) call s_check_inputs_adapt_dt
+        if (alt_soundspeed) call s_check_inputs_alt_soundspeed
+        call s_check_inputs_stiffened_eos_viscosity
+        call s_check_inputs_body_forces
+        call s_check_inputs_misc
 
+    end subroutine s_check_inputs
+
+    !> Checks constraints on compiler options
+    subroutine s_check_inputs_compilers
 #if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
         if (rdma_mpi) then
             call s_mpi_abort('Unsupported value of rdma_mpi. Exiting ...')
@@ -40,15 +53,12 @@ contains
                              'with the NVIDIA cuTENSOR library. Exiting ...')
         end if
 #endif
+    end subroutine s_check_inputs_compilers
 
-        ! Computational Domain Parameters ==================================
-        if (dt <= 0) then
-            call s_mpi_abort('dt must be positive. Exiting ...')
-        end if
-        ! END: Computational Domain Parameters =============================
+    !> Checks constraints on WENO scheme parameters
+    subroutine s_check_inputs_weno
+        character(len=5) :: numStr !< for int to string conversion
 
-        ! Simulation Algorithm Parameters ==================================
-        ! Constraints on WENO scheme parameters
         if (all(weno_order /= (/1, 3, 5/))) then
             call s_mpi_abort('weno_order must be 1, 3, or 5. Exiting ...')
         elseif (m + 1 < num_stcls_min*weno_order) then
@@ -99,9 +109,14 @@ contains
             call s_mpi_abort('weno_avg is not supported for '// &
                              'model_eqns = 1. Exiting ...')
         end if
+    end subroutine s_check_inputs_weno
 
-        ! Constraints on Riemann solver parameters
-        if (riemann_solver < 1 .or. riemann_solver > 3) then
+    !> Checks constraints on Riemann solver parameters
+    subroutine s_check_inputs_riemann_solver
+        if (riemann_solver /= 2 .and. model_eqns == 3) then
+            call s_mpi_abort('6-equation model (model_eqns = 3) '// &
+                             'requires riemann_solver = 2. Exiting ...')
+        elseif (riemann_solver < 1 .or. riemann_solver > 3) then
             call s_mpi_abort('riemann_solver must be 1, 2, or 3. Exiting ...')
         elseif (all(wave_speeds /= (/dflt_int, 1, 2/))) then
             call s_mpi_abort('wave_speeds must be 1 or 2. Exiting ...')
@@ -116,91 +131,95 @@ contains
             call s_mpi_abort('avg_state must be set if '// &
                              'riemann_solver != 3. Exiting ...')
         end if
+    end subroutine s_check_inputs_riemann_solver
 
-        ! Constraints on time stepping parameters
+    !> Checks constraints on time stepping parameters
+    subroutine s_check_inputs_time_stepping
+        if (dt <= 0) then
+            call s_mpi_abort('dt must be positive. Exiting ...')
+        end if
+
         if (time_stepper < 1 .or. time_stepper > 5) then
             if (time_stepper /= 23) then
                 call s_mpi_abort('time_stepper must be between 1 and 5. '// &
                                  'Exiting ...')
             end if
         end if
+    end subroutine s_check_inputs_time_stepping
 
-        ! Constraints on pairing parameters with 6-equation model
+    !> Checks constraints on parameters related to 6-equation model
+    subroutine s_check_inputs_model_eqns
         if (model_eqns == 3) then
-            if (riemann_solver /= 2) then
-                call s_mpi_abort('6-equation model (model_eqns = 3) '// &
-                                 'requires riemann_solver = 2. Exiting ...')
-            elseif (alt_soundspeed) then
-                call s_mpi_abort('6-equation model (model_eqns = 3) '// &
-                                 'does not support alt_sound_speed. Exiting ...')
-            elseif (avg_state /= 2) then
+            if (avg_state /= 2) then
                 call s_mpi_abort('6-equation model (model_eqns = 3) '// &
                                  'requires avg_state = 2. Exiting ...')
             elseif (wave_speeds /= 1) then
                 call s_mpi_abort('6-equation model (model_eqns = 3) '// &
                                  'requires wave_speeds = 1. Exiting ...')
-            elseif (cyl_coord .and. p /= 0) then
-                call s_mpi_abort('6-equation model (model_eqns = 3) '// &
-                                 'does not support cylindrical coordinates '// &
-                                 '(cyl_coord = T and p != 0). Exiting ...')
             end if
         end if
+    end subroutine s_check_inputs_model_eqns
 
-        ! Constraints on hypoelasticity parameters
-        if (hypoelasticity .and. (model_eqns /= 2)) then
+    !> Checks constraints on hypoelasticity parameters
+    subroutine s_check_inputs_hypoelasticity
+        if (model_eqns /= 2) then
             call s_mpi_abort('hypoelasticity requires 5-equation model'// &
                              '(model_eqns = 2). Exiting ...')
-        elseif (hypoelasticity .and. (riemann_solver /= 1)) then
+        elseif (riemann_solver /= 1) then
             call s_mpi_abort('hypoelasticity requires HLL Riemann solver '// &
                              '(riemann_solver = 1). Exiting ...')
         end if
+    end subroutine
 
-        ! Constraints on bubble parameters
-        if (bubbles) then
-            if (riemann_solver /= 2) then
-                call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
-            elseif (avg_state /= 2) then
-                call s_mpi_abort('Bubble modeling requires arithmetic average '// &
-                                 '(avg_state = 2). Exiting ...')
-            elseif (model_eqns == 2 .and. bubble_model == 1) then
-                call s_mpi_abort('The 5-equation bubbly flow model requires '// &
-                                 'bubble_model = 2 (Keller--Miksis). Exiting ...')
-            end if
+    !> Checks constraints on bubble parameters
+    subroutine s_check_inputs_bubbles
+        if (riemann_solver /= 2) then
+            call s_mpi_abort('Bubble modeling requires riemann_solver = 2')
+        elseif (avg_state /= 2) then
+            call s_mpi_abort('Bubble modeling requires arithmetic average '// &
+                             '(avg_state = 2). Exiting ...')
+        elseif (model_eqns == 2 .and. bubble_model == 1) then
+            call s_mpi_abort('The 5-equation bubbly flow model requires '// &
+                             'bubble_model = 2 (Keller--Miksis). Exiting ...')
         end if
+    end subroutine s_check_inputs_bubbles
 
-        ! Constraints on adaptive time stepping
-        if (adap_dt) then
-            if (time_stepper /= 3) then
-                call s_mpi_abort('adapt_dt requires Runge-Kutta 3 '// &
-                                 '(time_stepper = 3). Exiting ...')
-            else if (qbmm) then
-                call s_mpi_abort('adapt_dt is not supported with QBMM. Exiting ...')
-            else if (.not. polytropic) then
-                call s_mpi_abort('adapt_dt is enabled, but polytropic is not. '// &
-                                 'Exiting ...')
-            else if (.not. adv_n) then
-                call s_mpi_abort('adapt_dt is enabled, but adv_n is not. '// &
-                                 'Exiting ...')
-            end if
-        end if
-
-        ! Constraints on alt_soundspeed
-        if (model_eqns == 1 .and. alt_soundspeed) then
-            call s_mpi_abort('model_eqns = 1 does not support alt_soundspeed. '// &
+    !> Checks constraints on adaptive time stepping parameters (adap_dt)
+    subroutine s_check_inputs_adapt_dt
+        if (time_stepper /= 3) then
+            call s_mpi_abort('adapt_dt requires Runge-Kutta 3 '// &
+                             '(time_stepper = 3). Exiting ...')
+        else if (qbmm) then
+            call s_mpi_abort('adapt_dt is not supported with QBMM. Exiting ...')
+        else if (.not. polytropic) then
+            call s_mpi_abort('adapt_dt is enabled, but polytropic is not. '// &
                              'Exiting ...')
-        elseif (model_eqns == 4 .and. alt_soundspeed) then
-            call s_mpi_abort('4-equation model (model_eqns = 4) does not '// &
-                             'support alt_soundspeed. Exiting ...')
-        elseif ((num_fluids /= 2 .and. num_fluids /= 3) .and. alt_soundspeed) then
+        else if (.not. adv_n) then
+            call s_mpi_abort('adapt_dt is enabled, but adv_n is not. '// &
+                             'Exiting ...')
+        end if
+    end subroutine s_check_inputs_adapt_dt
+
+    !> Checks constraints on alternative sound speed parameters (alt_soundspeed)
+    subroutine s_check_inputs_alt_soundspeed
+        if (model_eqns /= 2) then
+            call s_mpi_abort('5-equation model (model_eqns = 2) '// &
+                             'is required for alt_soundspeed. Exiting ...')
+        elseif (num_fluids /= 2 .and. num_fluids /= 3) then
             call s_mpi_abort('alt_soundspeed requires num_fluids = 2 or 3. '// &
                              'Exiting ...')
-        elseif (riemann_solver /= 2 .and. alt_soundspeed) then
+        elseif (riemann_solver /= 2) then
             call s_mpi_abort('alt_soundspeed requires HLLC Riemann solver '// &
                              '(riemann_solver = 2). Exiting ...')
         end if
-        ! END: Simulation Algorithm Parameters =============================
+    end subroutine s_check_inputs_alt_soundspeed
 
-        ! Fluids Physical Parameters =======================================
+    !> Checks constraints on viscosity parameters (fluid_pp(i)%Re(1:2))
+        !! of the stiffened gas equation of state
+    subroutine s_check_inputs_stiffened_eos_viscosity
+        character(len=5) :: iStr, jStr
+        integer :: i, j
+
         do i = 1, num_fluids
             do j = 1, 2
                 call s_int_to_str(j, jStr)
@@ -241,19 +260,10 @@ contains
                 end if
             end do
         end do
-        ! END: Fluids Physical Parameters ===================================
+    end subroutine s_check_inputs_stiffened_eos_viscosity
 
-        ! Probe Parameters =================================================
-        if (probe_wrt .and. fd_order == dflt_int) then
-            call s_mpi_abort('probe_wrt is enabled, but fd_order is not set. '// &
-                             'Exiting ...')
-        elseif (integral_wrt .and. (.not. bubbles)) then
-            call s_mpi_abort('integral_wrt is enabled, but bubbles is not. '// &
-                             'Exiting ...')
-        end if
-        ! END: Probe Parameters ============================================
-
-        ! Constraints on body force parameters
+    !> Checks constraints on body forces parameters (bf_x[y,z], etc.)
+    subroutine s_check_inputs_body_forces
         #:for DIR in ['x', 'y', 'z']
             if (bf_${DIR}$ .and. f_approx_equal(k_${DIR}$, dflt_real)) then
                 call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true '// &
@@ -269,7 +279,20 @@ contains
                                  'Exiting ...')
             end if
         #:endfor
+    end subroutine s_check_inputs_body_forces
 
-    end subroutine s_check_inputs
+    !> Checks miscellaneous constraints,
+        !! including constraints on probe_wrt and integral_wrt
+    subroutine s_check_inputs_misc
+        ! Write probe data
+        if (probe_wrt .and. fd_order == dflt_int) then
+            call s_mpi_abort('probe_wrt is enabled, but fd_order is not set. '// &
+                             'Exiting ...')
+            ! Write integral data for bubbles
+        elseif (integral_wrt .and. (.not. bubbles)) then
+            call s_mpi_abort('integral_wrt is enabled, but bubbles is not. '// &
+                             'Exiting ...')
+        end if
+    end subroutine s_check_inputs_misc
 
 end module m_checker

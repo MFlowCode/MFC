@@ -17,27 +17,33 @@ module m_checker
 
 contains
 
+    !> Checks compatibility of parameters in the input file.
+        !! Used by the pre_process stage
     subroutine s_check_inputs
 
-        character(len=5) :: iStr, numStr !< for int to string conversion
-        integer :: i
+        call s_check_parallel_io
+        call s_check_inputs_restart
+        call s_check_inputs_grid_stretching
+        call s_check_inputs_qbmm_and_polydisperse
+        call s_check_inputs_perturb_density
+        call s_check_inputs_misc
 
+    end subroutine s_check_inputs
+
+    !> Checks if mpi is enabled with parallel_io
+    subroutine s_check_parallel_io
 #ifndef MFC_MPI
-        if parallel_io then
-        print '(A)', 'MFC built with --no-mpi requires parallel_io=F. '// &
-            'Exiting ...'
-        call s_mpi_abort()
+        if (parallel_io) then
+            print '(A)', 'MFC built with --no-mpi requires parallel_io=F. '// &
+                'Exiting ...'
+            call s_mpi_abort()
         end if
 #endif
+    end subroutine s_check_parallel_io
 
-        ! Constraints on the domain size
-        if (nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
-            call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
-            call s_mpi_abort('Total number of cells must be at least '// &
-                             '(2^[number of dimensions])*num_procs, which is currently '// &
-                             trim(numStr)//'. Exiting ...')
-        end if
-
+    !> Checks constraints on the restart parameters
+        !! (old_grid, old_ic, etc.)
+    subroutine s_check_inputs_restart
         if ((.not. old_grid) .and. old_ic) then
             call s_mpi_abort('old_ic cannot be enabled with old_grid disabled. '// &
                              'Exiting ...')
@@ -151,6 +157,17 @@ contains
             end if
         end if
 
+        if (num_patches < 0 .or. &
+            (num_patches == 0 .and. t_step_old == dflt_int)) then
+            call s_mpi_abort('num_patches must be non-negative for the '// &
+                             'non-restart case. Exiting ...')
+        end if
+
+    end subroutine s_check_inputs_restart
+
+    !> Checks constraints on grid stretching parameters
+        !! (loops_x[y,z], stretch_x[y,z], etc.)
+    subroutine s_check_inputs_grid_stretching
         ! Constraints on loops for grid stretching
         if (loops_z < 1) then
             call s_mpi_abort('loops_z must be positive. Exiting ...')
@@ -245,16 +262,30 @@ contains
                                  'for the given a_z. Exiting ...')
             end if
         end if
+    end subroutine s_check_inputs_grid_stretching
 
-        ! Constraints on number of patches making up the initial condition
-        if (num_patches < 0 .or. &
-            (num_patches == 0 .and. t_step_old == dflt_int)) then
-            call s_mpi_abort('num_patches must be non-negative for the '// &
-                             'non-restart case. Exiting ...')
-            ! Constraints on perturbing the initial condition
-        elseif (perturb_flow &
-                .and. &
-                (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) then
+    !> Checks constraints on the QBMM and polydisperse bubble parameters
+        !! (qbmm, polydisperse, dist_type, rhoRV, and R0_type)
+    subroutine s_check_inputs_qbmm_and_polydisperse
+        if (qbmm .and. dist_type == dflt_int) then
+            call s_mpi_abort('dist_type must be set if using QBMM. Exiting ...')
+        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then
+            call s_mpi_abort('rhoRV cannot be used with dist_type != 1. Exiting ...')
+        else if (polydisperse .and. R0_type == dflt_int) then
+            call s_mpi_abort('R0 type must be set if using Polydisperse. Exiting ...')
+        end if
+    end subroutine s_check_inputs_qbmm_and_polydisperse
+
+    !> Checks constraints on initial partial density perturbation
+        !! (perturb_flow, perturb_flow_fluid, perturb_flow_mag, perturb_sph,
+        !! perturb_sph_fluid, and fluid_rho)
+    subroutine s_check_inputs_perturb_density
+        character(len=5) :: iStr !< for int to string conversion
+        integer :: i
+
+        if (perturb_flow &
+            .and. &
+            (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) then
             call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
                              'must be set with perturb_flow = T. Exiting ...')
         elseif ((.not. perturb_flow) &
@@ -281,18 +312,7 @@ contains
         elseif ((any(fluid_rho /= dflt_real)) .and. (.not. perturb_sph)) then
             call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
                              'Exiting ...')
-        end if
-
-        ! Constraints on qbmm parameters
-        if (qbmm .and. dist_type == dflt_int) then
-            call s_mpi_abort('dist_type must be set if using QBMM. Exiting ...')
-        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then
-            call s_mpi_abort('rhoRV cannot be used with dist_type != 1. Exiting ...')
-        else if (polydisperse .and. R0_type == dflt_int) then
-            call s_mpi_abort('R0 type must be set if using Polydisperse. Exiting ...')
-        end if
-
-        if (perturb_sph) then
+        elseif (perturb_sph) then
             do i = 1, num_fluids
                 call s_int_to_str(i, iStr)
                 if (fluid_rho(i) == dflt_real) then
@@ -301,17 +321,19 @@ contains
                 end if
             end do
         end if
+    end subroutine s_check_inputs_perturb_density
 
-        ! Constraints on the hypertangent velocity profile
+    !> Checks miscellaneous constraints
+        !! (vel_profile and instability_wave)
+    subroutine s_check_inputs_misc
+        ! Hypertangent velocity profile
         if (vel_profile .and. (n == 0)) then
             call s_mpi_abort('vel_profile requires n > 0. Exiting ...')
         end if
-
-        ! Constraints on the instability wave
+        ! Instability wave
         if (instability_wave .and. (n == 0)) then
             call s_mpi_abort('instability_wave requires n > 0. Exiting ...')
         end if
+    end subroutine s_check_inputs_misc
 
-        end subroutine s_check_inputs
-
-    end module m_checker
+end module m_checker
