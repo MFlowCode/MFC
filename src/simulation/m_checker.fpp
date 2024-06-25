@@ -151,13 +151,15 @@ contains
         end if
 
         if (num_fluids /= dflt_int .and. num_fluids < 1) then
-            call s_mpi_abort('It is required that num_fluids >= 1. '// &
-                             'Exiting ...')
+            call s_mpi_abort('num_fluids must be positive. Exiting ...')
         elseif (model_eqns == 1 .and. num_fluids /= dflt_int) then
             call s_mpi_abort('num_fluids is not supported for '// &
                              'model_eqns = 1. Exiting ...')
         elseif (model_eqns == 2 .and. num_fluids == dflt_int) then
             call s_mpi_abort('5-equation model (model_eqns = 2) '// &
+                             'requires num_fluids to be set. Exiting ...')
+        elseif (model_eqns == 3 .and. num_fluids == dflt_int) then
+            call s_mpi_abort('6-equation model (model_eqns = 3) '// &
                              'requires num_fluids to be set. Exiting ...')
         elseif (model_eqns == 1 .and. adv_alphan) then
             call s_mpi_abort('adv_alphan is not supported for '// &
@@ -257,13 +259,13 @@ contains
                 .and. &
                 (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
             call s_mpi_abort('Unsupported value of bc_y%end. Exiting ...')
-        elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%beg == dflt_int)) then
+        elseif (n == 0 .and. bc_y%beg /= dflt_int) then
+            call s_mpi_abort('bc_y%beg is not supported for n = 0. Exiting ...')
+        elseif (n > 0 .and. bc_y%beg == dflt_int) then
             call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
-        elseif ((n == 0 .and. bc_y%end /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%end == dflt_int)) then
+        elseif (n == 0 .and. bc_y%end /= dflt_int) then
+            call s_mpi_abort('bc_y%end is not supported for n = 0. Exiting ...')
+        elseif (n > 0 .and. bc_y%end == dflt_int) then
             call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
         elseif ((bc_y%beg == -1 .and. bc_y%end /= -1) &
                 .or. &
@@ -278,13 +280,13 @@ contains
                 .and. &
                 (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then
             call s_mpi_abort('Unsupported value of bc_z%end. Exiting ...')
-        elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%beg == dflt_int)) then
+        elseif (p == 0 .and. bc_z%beg /= dflt_int) then
+            call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
+        elseif (p > 0 .and. bc_z%beg == dflt_int) then
             call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
-        elseif ((p == 0 .and. bc_z%end /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%end == dflt_int)) then
+        elseif (p == 0 .and. bc_z%end /= dflt_int) then
+            call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
+        elseif (p > 0 .and. bc_z%end == dflt_int) then
             call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
         elseif ((bc_z%beg == -1 .and. bc_z%end /= -1) &
                 .or. &

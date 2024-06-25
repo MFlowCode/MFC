@@ -21,169 +21,140 @@ contains
 
         integer :: bub_fac
         integer :: i
-        character(len=5) :: iStr
+        character(len=5) :: iStr, numStr
 
         bub_fac = 0; 
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
         ! Constraints on dimensionality and the number of cells for the grid
         if (m <= 0) then
-            call s_mpi_abort('Unsupported choice for the value of m. '// &
-                             'Exiting ...')
+            call s_mpi_abort('m must be positive. Exiting ...')
         elseif (n < 0) then
-            call s_mpi_abort('Unsupported choice for the value of n. '// &
-                             'Exiting ...')
+            call s_mpi_abort('n must be non-negative. Exiting ...')
         elseif (p < 0) then
-            call s_mpi_abort('Unsupported choice for the value of p. '// &
-                             'Exiting ...')
+            call s_mpi_abort('p must be non-negative. Exiting ...')
         elseif (cyl_coord .and. p > 0 .and. mod(p, 2) /= 1) then
-            call s_mpi_abort('Unsupported choice for the value of p. '// &
-                             'Exiting ...')
+            call s_mpi_abort('p must be odd for cylindrical coordinates '// &
+                             '(cyl_coord = T and p != 0). Exiting ...')
         elseif (n == 0 .and. p > 0) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and p. Exiting ...')
+            call s_mpi_abort('p must be 0 if n = 0. Exiting ...')
         elseif (nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for num_procs, m, n and p. '// &
-                             'Exiting ...')
+            call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
+            call s_mpi_abort('Total number of cells must be at least '// &
+                             '(2^[number of dimensions])*num_procs, which is currently '// &
+                             trim(numStr)//'. Exiting ...')
 
             ! Constraints on the time-stepping parameters
         elseif (t_step_start < 0) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             't_step_start. Exiting ...')
+            call s_mpi_abort('t_step_start must be non-negative. Exiting ...')
         elseif (t_step_stop < t_step_start) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for t_step_start and t_step_stop. '// &
-                             'Exiting ...')
+            call s_mpi_abort('t_step_stop must be greater than or equal to '// &
+                             't_step_start. Exiting ...')
         elseif (t_step_save > t_step_stop - t_step_start) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for t_step_start, t_step_stop and '// &
-                             't_step_save. Exiting ...')
+            call s_mpi_abort('t_step_save must be less than or equal to '// &
+                             't_step_stop - t_step_start. Exiting ...')
 
             ! Constraints on model equations and number of fluids in the flow
         elseif (all(model_eqns /= (/1, 2, 3, 4/))) then
-            call s_mpi_abort('Unsupported value of model_eqns. Exiting ...')
-        elseif (num_fluids /= dflt_int &
-                .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids)) then
-            call s_mpi_abort('Unsupported value of num_fluids. Exiting ...')
-        elseif ((model_eqns == 1 .and. num_fluids /= dflt_int) &
-                .or. &
-                (model_eqns == 2 .and. num_fluids == dflt_int) &
-                .or. &
-                (model_eqns == 3 .and. num_fluids == dflt_int)) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                             'model_eqns and num_fluids. '// &
-                             'Exiting ...')
+            call s_mpi_abort('model_eqns must be 1, 2, 3, or 4. Exiting ...')
+        elseif (num_fluids /= dflt_int .and. num_fluids < 1) then
+            call s_mpi_abort('num_fluids must be positive. Exiting ...')
+        elseif (model_eqns == 1 .and. num_fluids /= dflt_int) then
+            call s_mpi_abort('num_fluids is not supported for '// &
+                             'model_eqns = 1. Exiting ...')
+        elseif (model_eqns == 2 .and. num_fluids == dflt_int) then
+            call s_mpi_abort('5-equation model (model_eqns = 2) '// &
+                             'requires num_fluids to be set. Exiting ...')
+        elseif (model_eqns == 3 .and. num_fluids == dflt_int) then
+            call s_mpi_abort('6-equation model (model_eqns = 3) '// &
+                             'requires num_fluids to be set. Exiting ...')
         elseif (model_eqns == 1 .and. adv_alphan) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                             'model_eqns and adv_alphan. '// &
-                             'Exiting ...')
+            call s_mpi_abort('adv_alphan is not supported for '// &
+                             'model_eqns = 1. Exiting ...')
 
             ! Constraints on the order of the WENO scheme
-        elseif (weno_order /= 1 .and. weno_order /= 3 &
-                .and. &
-                weno_order /= 5) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'weno_order. Exiting ...')
+        elseif (all(weno_order /= (/1, 3, 5/))) then
+            call s_mpi_abort('weno_order must be 1, 3, or 5. Exiting ...')
         elseif (m + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for m and weno_order. Exiting ...')
+            call s_mpi_abort('m must be at least weno_order - 1. Exiting ...')
         elseif (n > 0 .and. n + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and weno_order. Exiting ...')
+            call s_mpi_abort('n must be at least weno_order - 1. Exiting ...')
         elseif (p > 0 .and. p + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and weno_order. Exiting ...')
-        elseif (nGlobal < weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
-            then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for num_procs, m, n, p and '// &
-                             'weno_order. Exiting ...')
+            call s_mpi_abort('p must be at least weno_order - 1. Exiting ...')
+        elseif (nGlobal < weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
+            call s_int_to_str(weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
+            call s_mpi_abort('Total number of cells must be at least '// &
+                             '(weno_order^[number of dimensions])*num_procs, '// &
+                             'which is currently '//trim(numStr)//'. Exiting ...')
 
             ! Constraints on the boundary conditions in the x-direction
         elseif (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_x%beg. Exiting ...')
+            call s_mpi_abort('Unsupported value of bc_x%beg. Exiting ...')
         elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_x%end. Exiting ...')
+            call s_mpi_abort('Unsupported value of bc_x%end. Exiting ...')
         elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
                 .or. &
                 (bc_x%end == -1 .and. bc_x%beg /= -1)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for bc_x%beg and bc_x%end. '// &
-                             'Exiting ...')
+            call s_mpi_abort('bc_x%beg and bc_x%end must be both periodic '// &
+                             '(= -1) or both non-periodic. Exiting ...')
 
             ! Constraints on the boundary conditions in the y-direction
-        elseif (bc_y%beg /= dflt_int &
+            if (bc_y%beg /= dflt_int &
                 .and. &
-                ((((cyl_coord .neqv. .true.) &
-                   .or. &
-                   (cyl_coord .and. p == 0)) &
-                  .and. &
-                  (bc_y%beg < -16 .or. bc_y%beg > -1 .or. bc_y%beg == -14)) &
-                 .or. &
-                 (cyl_coord .and. p > 0 &
-                  .and. &
-                  (bc_y%beg < -16 .or. bc_y%beg > -1)))) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_y%beg. Exiting ...')
-        elseif (bc_y%end /= dflt_int &
-                .and. &
-                (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_y%end. Exiting ...')
-        elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%beg == dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of n and '// &
-                             'bc_y%beg. Exiting ...')
-        elseif ((n == 0 .and. bc_y%end /= dflt_int) &
-                .or. &
-                (n > 0 .and. bc_y%end == dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of n and '// &
-                             'bc_y%end. Exiting ...')
-        elseif (n > 0 &
-                .and. &
-                ((bc_y%beg == -1 .and. bc_y%end /= -1) &
-                 .or. &
-                 (bc_y%end == -1 .and. bc_y%beg /= -1))) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n, bc_y%beg and bc_y%end. '// &
-                             'Exiting ...')
+                (bc_y%beg < -16 .or. bc_y%beg > -1 .or. bc_y%beg == -14)) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'bc_y%beg. Exiting ...')
+            elseif (bc_y%end /= dflt_int &
+                    .and. &
+                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'bc_y%end. Exiting ...')
+            elseif (n == 0 .and. bc_y%beg /= dflt_int) then
+                call s_mpi_abort('bc_y%beg is not supported for n = 0. Exiting ...')
+            elseif (n > 0 .and. bc_y%beg == dflt_int) then
+                call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
+            elseif (n == 0 .and. bc_y%end /= dflt_int) then
+                call s_mpi_abort('bc_y%end is not supported for n = 0. Exiting ...')
+            elseif (n > 0 .and. bc_y%end == dflt_int) then
+                call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
+            elseif (n > 0 &
+                    .and. &
+                    ((bc_y%beg == -1 .and. bc_y%end /= -1) &
+                     .or. &
+                     (bc_y%end == -1 .and. bc_y%beg /= -1))) then
+                call s_mpi_abort('bc_y%beg and bc_y%end must be both periodic '// &
+                                 '(= -1) or both non-periodic. Exiting ...')
 
-            ! Constraints on the boundary conditions in the z-direction
-        elseif (bc_z%beg /= dflt_int &
-                .and. &
-                (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -14)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_z%beg. Exiting ...')
-        elseif (bc_z%end /= dflt_int &
-                .and. &
-                (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_z%end. Exiting ...')
-        elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
-            call s_mpi_abort('Unsupported choice of boundary condition -13')
-        elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%beg == dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of p and '// &
-                             'bc_z%beg. Exiting ...')
-        elseif ((p == 0 .and. bc_z%end /= dflt_int) &
-                .or. &
-                (p > 0 .and. bc_z%end == dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of p and '// &
-                             'bc_z%end. Exiting ...')
-        elseif (p > 0 &
-                .and. &
-                ((bc_z%beg == -1 .and. bc_z%end /= -1) &
-                 .or. &
-                 (bc_z%end == -1 .and. bc_z%beg /= -1))) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p, bc_z%beg and bc_z%end. '// &
-                             'Exiting ...')
+                ! Constraints on the boundary conditions in the z-direction
+            elseif (bc_z%beg /= dflt_int &
+                    .and. &
+                    (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -14)) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'bc_z%beg. Exiting ...')
+            elseif (bc_z%end /= dflt_int &
+                    .and. &
+                    (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                                 'bc_z%end. Exiting ...')
+            elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
+                call s_mpi_abort('Unsupported choice of boundary condition -13')
+            elseif (p == 0 .and. bc_z%beg /= dflt_int) then
+                call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%beg == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
+            elseif (p == 0 .and. bc_z%end /= dflt_int) then
+                call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%end == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
+            elseif (p > 0 &
+                    .and. &
+                    ((bc_z%beg == -1 .and. bc_z%end /= -1) &
+                     .or. &
+                     (bc_z%end == -1 .and. bc_z%beg /= -1))) then
+                call s_mpi_abort('bc_z%beg and bc_z%end must be both periodic '// &
+                                 '(= -1) or both non-periodic. Exiting ...')
+            end if
+
         end if
 
         ! Constraints on the stiffened equation of state fluids parameters
@@ -192,15 +163,13 @@ contains
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
                 fluid_pp(i)%gamma <= 0d0) then
-                call s_mpi_abort('Unsupported value of '// &
-                                 'fluid_pp('//trim(iStr)//')%'// &
-                                 'gamma. Exiting ...')
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'gamma must be positive. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
                     fluid_pp(i)%gamma /= dflt_real) then
-                call s_mpi_abort('Unsupported combination '// &
-                                 'of values of model_eqns '// &
-                                 'and fluid_pp('//trim(iStr)//')%'// &
+                call s_mpi_abort('model_eqns = 1 does not support '// &
+                                 'fluid_pp('//trim(iStr)//')%'// &
                                  'gamma. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
                     .or. &
@@ -213,15 +182,13 @@ contains
             elseif (fluid_pp(i)%pi_inf /= dflt_real &
                     .and. &
                     fluid_pp(i)%pi_inf < 0d0) then
-                call s_mpi_abort('Unsupported value of '// &
-                                 'fluid_pp('//trim(iStr)//')%'// &
-                                 'pi_inf. Exiting ...')
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'pi_inf must be non-negative. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
                     fluid_pp(i)%pi_inf /= dflt_real) then
-                call s_mpi_abort('Unsupported combination '// &
-                                 'of values of model_eqns '// &
-                                 'and fluid_pp('//trim(iStr)//')%'// &
+                call s_mpi_abort('model_eqns = 1 does not support '// &
+                                 'fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
                     .or. &
@@ -231,113 +198,79 @@ contains
                                  'of values of num_fluids '// &
                                  'and fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf. Exiting ...')
+            elseif (fluid_pp(i)%cv < 0d0) then
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'cv must be positive. Exiting ...')
             end if
 
         end do
 
         ! Constraints on the format of the formatted database file(s)
         if (format /= 1 .and. format /= 2) then
-            call s_mpi_abort('Unsupported choice for the value of format. '// &
-                             'Exiting ...')
+            call s_mpi_abort('format must be 1 or 2. Exiting ...')
 
             ! Constraints on the precision of the formatted database file(s)
         elseif (precision /= 1 .and. precision /= 2) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'precision. Exiting ...')
+            call s_mpi_abort('precision must be 1 or 2. Exiting ...')
         end if
 
         ! Constraints on the post-processing of the partial densities
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if (((i > num_fluids .or. model_eqns == 1) &
-                 .and. &
-                 alpha_rho_wrt(i)) &
-                .or. &
-                ((i <= num_fluids .and. model_eqns == 1) &
-                 .and. &
-                 alpha_rho_wrt(i))) then
-                call s_mpi_abort('Unsupported choice of the '// &
-                                 'combination of values for '// &
-                                 'model_eqns, num_fluids and '// &
-                                 'alpha_rho_wrt('//trim(iStr)//'). Exiting ...')
+            if (alpha_rho_wrt(i) .and. model_eqns == 1) then
+                call s_mpi_abort('alpha_rho_wrt('//trim(iStr)//') is not '// &
+                                 'supported for model_eqns = 1. Exiting ...')
+            end if
+            if (alpha_rho_wrt(i) .and. i > num_fluids) then
+                call s_mpi_abort('Index of alpha_rho_wrt('//trim(iStr)//') '// &
+                                 'exceeds the total number of fluids. Exiting ...')
             end if
         end do
 
         ! Constraints on the post-processing of the momentum
         if (n == 0 .and. mom_wrt(2)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and mom_wrt(2). Exiting ...')
-        elseif (n == 0 .and. mom_wrt(3)) then
-            call s_mpi_abort('Unsupported cohice of the combination of '// &
-                             'values for n and mom_wrt(3). Exiting ...')
+            call s_mpi_abort('mom_wrt(2) is not supported for n = 0. Exiting ...')
         elseif (p == 0 .and. mom_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and mom_wrt(3). Exiting ...')
+            call s_mpi_abort('mom_wrt(3) is not supported for p = 0. Exiting ...')
 
             ! Constraints on the post-processing of the velocity
         elseif (n == 0 .and. vel_wrt(2)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and vel_wrt(2). Exiting ...')
-        elseif (n == 0 .and. vel_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and vel_wrt(3). Exiting ...')
+            call s_mpi_abort('vel_wrt(2) is not supported for n = 0. Exiting ...')
         elseif (p == 0 .and. vel_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and vel_wrt(3). Exiting ...')
+            call s_mpi_abort('vel_wrt(3) is not supported for p = 0. Exiting ...')
         end if
 
         ! Constraints on the post-processing of the flux limiter function
         if (n == 0 .and. flux_wrt(2)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and flux_wrt(2). Exiting ...')
-        elseif (n == 0 .and. flux_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and flux_wrt(3). Exiting ...')
+            call s_mpi_abort('flux_wrt(2) is not supported for n = 0. Exiting ...')
         elseif (p == 0 .and. flux_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and flux_wrt(3). Exiting ...')
+            call s_mpi_abort('flux_wrt(3) is not supported for p = 0. Exiting ...')
         elseif (all(flux_lim /= (/dflt_int, 1, 2, 3, 4, 5, 6, 7/))) then
-            call s_mpi_abort('Unsupported value of flux_lim. Exiting ...')
+            call s_mpi_abort('flux_lim must be between 1 and 7. Exiting ...')
         end if
 
         ! Constraints on the post-processing of the volume fractions
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if (((i > num_fluids .or. model_eqns == 1) &
-                 .and. &
-                 alpha_wrt(i)) &
-                .or. &
-                ((i <= num_fluids .and. model_eqns == 1) &
-                 .and. &
-                 alpha_wrt(i))) then
-                call s_mpi_abort('Unsupported choice of the '// &
-                                 'combination of values for '// &
-                                 'model_eqns, num_fluids and '// &
-                                 'alpha_wrt('//trim(iStr)//'). Exiting ...')
+            if (alpha_wrt(i) .and. model_eqns == 1) then
+                call s_mpi_abort('alpha_wrt('//trim(iStr)//') is not '// &
+                                 'supported for model_eqns = 1. Exiting ...')
+            end if
+            if (alpha_wrt(i) .and. i > num_fluids) then
+                call s_mpi_abort('Index of alpha_wrt('//trim(iStr)//') '// &
+                                 'exceeds the total number of fluids. Exiting ...')
             end if
         end do
 
         ! Constraints on the post-processing of the vorticity
-        if (n == 0 .and. omega_wrt(1)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and omega_wrt(1). Exiting ...')
-        elseif (n == 0 .and. omega_wrt(2)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and omega_wrt(2). Exiting ...')
-        elseif (n == 0 .and. omega_wrt(3)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and omega_wrt(3). Exiting ...')
-        elseif (p == 0 .and. omega_wrt(1)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and omega_wrt(1). Exiting ...')
+        if (p == 0 .and. omega_wrt(1)) then
+            call s_mpi_abort('omega_wrt(1) is not supported for p = 0. Exiting ...')
         elseif (p == 0 .and. omega_wrt(2)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and omega_wrt(2). Exiting ...')
+            call s_mpi_abort('omega_wrt(2) is not supported for p = 0. Exiting ...')
 
             ! Constraints on post-processing of numerical Schlieren function
         elseif (n == 0 .and. schlieren_wrt) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and schlieren_wrt. Exiting ...')
+            call s_mpi_abort('schlieren_wrt is not supported for n = 0. Exiting ...')
 
             ! Constraints on post-processing combination of flow variables
         elseif ((any(alpha_rho_wrt) .neqv. .true.) &
@@ -365,22 +298,15 @@ contains
         ! Constraints on the coefficients of numerical Schlieren function
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if (schlieren_alpha(i) /= dflt_real &
-                .and. &
-                schlieren_alpha(i) <= 0d0) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'schlieren_alpha('//trim(iStr)//'). Exiting ...')
-            elseif (((i > num_fluids .or. (schlieren_wrt .neqv. .true.)) &
-                     .and. &
-                     schlieren_alpha(i) /= dflt_real) &
-                    .or. &
-                    ((i <= num_fluids .and. schlieren_wrt) &
-                     .and. &
-                     schlieren_alpha(i) <= 0d0)) then
-                call s_mpi_abort('Unsupported choice of the '// &
-                                 'combination of values for '// &
-                                 'num_fluids, schlieren_wrt and '// &
-                                 'schlieren_alpha('//trim(iStr)//'). Exiting ...')
+            if (schlieren_alpha(i) /= dflt_real .and. schlieren_alpha(i) <= 0d0) then
+                call s_mpi_abort('schlieren_alpha('//trim(iStr)//') must be '// &
+                                 'greater than zero. Exiting ...')
+            elseif (i > num_fluids .and. schlieren_alpha(i) /= dflt_real) then
+                call s_mpi_abort('Index of schlieren_alpha('//trim(iStr)//') '// &
+                                 'exceeds the total number of fluids. Exiting ...')
+            elseif (.not. schlieren_wrt .and. schlieren_alpha(i) /= dflt_real) then
+                call s_mpi_abort('schlieren_alpha('//trim(iStr)//') should '// &
+                                 'be set only with schlieren_wrt enabled. Exiting ...')
             end if
         end do
 
@@ -388,14 +314,12 @@ contains
         if (fd_order /= dflt_int &
             .and. &
             fd_order /= 1 .and. fd_order /= 2 .and. fd_order /= 4) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'fd_order. Exiting ...')
+            call s_mpi_abort('fd_order must be 1, 2, or 4. Exiting ...')
         elseif ((any(omega_wrt) .or. schlieren_wrt) &
                 .and. &
                 fd_order == dflt_int) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for omega_wrt, schlieren_wrt and '// &
-                             'fd_order. Exiting ...')
+            call s_mpi_abort('fd_order must be set for omega_wrt or '// &
+                             'schlieren_wrt. Exiting ...')
         end if
 
         ! Moving Boundaries Checks: x boundaries

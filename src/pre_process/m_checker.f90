@@ -20,15 +20,15 @@ contains
     subroutine s_check_inputs
 
         integer :: bub_fac !< For allowing an extra fluid_pp if there are subgrid bubbles
-        character(len=5) :: iStr !< for int to string conversion
+        character(len=5) :: iStr, numStr !< for int to string conversion
         integer :: i
         logical :: dir_check !< Logical variable used to test the existence of folders
 
 #ifndef MFC_MPI
-        if (parallel_io .eqv. .true.) then
-            print '(A)', 'MFC built with --no-mpi requires parallel_io=F. '// &
-                'Exiting ...'
-            call s_mpi_abort()
+        if parallel_io then
+        print '(A)', 'MFC built with --no-mpi requires parallel_io=F. '// &
+            'Exiting ...'
+        call s_mpi_abort()
         end if
 #endif
 
@@ -37,8 +37,7 @@ contains
         ! Startup checks for bubbles and bubble variables
         if (bubbles) then
             if (model_eqns /= 4 .and. model_eqns /= 2) then
-                call s_mpi_abort('Unsupported combination of values of '// &
-                                 'bubbles and model_eqns. '// &
+                call s_mpi_abort('Bubbles require model_eqns = 4 or 2. '// &
                                  'Exiting ...')
             elseif (nb < 1) then
                 call s_mpi_abort('The Ensemble-Averaged Bubble Model requires nb >= 1'// &
@@ -50,41 +49,34 @@ contains
                 call s_mpi_abort('nb must be odd '// &
                                  'Exiting ...')
             elseif (model_eqns == 4 .and. (rhoref == dflt_real)) then
-                call s_mpi_abort('Unsupported combination of values of '// &
-                                 'bubbles and rhoref. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('rhoref must be set if using bubbles with '// &
+                                 'model_eqns = 4. Exiting ...')
             elseif (model_eqns == 4 .and. (pref == dflt_real)) then
-                call s_mpi_abort('Unsupported combination of values of '// &
-                                 'bubbles and pref. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('pref must be set if using bubbles with '// &
+                                 'model_eqns = 4. Exiting ...')
             elseif (model_eqns == 4 .and. (num_fluids > 1)) then
-                call s_mpi_abort('Unsupported combination of values of '// &
-                                 'model_eqns and num_fluids. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('num_fluids must be 1 if using bubbles with '// &
+                                 'model_eqns = 4. Exiting ...')
             elseif ((.not. polytropic) .and. R0ref == dflt_real) then
-                call s_mpi_abort('Unsupported combination of values of '// &
-                                 'polytropic and R0ref. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('R0ref must be set if using bubbles with '// &
+                                 'polytropic = .false.. Exiting ...')
             elseif (nb == dflt_int) then
-                call s_mpi_abort('unsupported combination of values of '// &
-                                 'bubbles and nb. '// &
-                                 'exiting ...')
+                call s_mpi_abort('nb must be set if using bubbles. Exiting ...')
             elseif (thermal > 3) then
-                call s_mpi_abort('unsupported combination of values of '// &
-                                 'bubbles and thermal. '// &
-                                 'exiting ...')
+                call s_mpi_abort('thermal must be less than 4 if using bubbles. '// &
+                                 'Exiting ...')
             end if
 
         end if
 
         if (adv_n) then
-            if (bubbles .neqv. .true.) then
+            if (.not. bubbles) then
                 call s_mpi_abort('adv_n requires bubbles = true.'// &
                                  'Exiting ...')
             else if (num_fluids > 1) then
                 call s_mpi_abort('adv_n requires num_fluids = 1. '// &
                                  'Exiting ...')
-            else if (qbmm .eqv. .true.) then
+            else if (qbmm) then
                 call s_mpi_abort('adv_n is incompatible with qbmm.'// &
                                  'Exiting ...')
             end if
@@ -121,57 +113,49 @@ contains
             call s_mpi_abort('relax is not set as true, but other phase change parameters have &
 &            been modified. Either activate phase change or set the values to default. '//'Exiting ...')
         end if
-        if ((old_grid .neqv. .true.) .and. old_ic) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for old_grid and old_ic. Exiting ...')
+        if ((.not. old_grid) .and. old_ic) then
+            call s_mpi_abort('old_ic cannot be enabled with old_grid disabled. '// &
+                             'Exiting ...')
 
         elseif ((old_grid .or. old_ic) .and. t_step_old == dflt_int) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for old_grid and old_ic and t_step_old. Exiting ...')
+            call s_mpi_abort('old_grid or old_ic enabled, but t_step_old not set. '// &
+                             'Exiting ...')
 
             ! Constraints on dimensionality and the number of cells for the grid
         elseif (m <= 0) then
-            call s_mpi_abort('Unsupported choice for the value of m. '// &
-                             'Exiting ...')
+            call s_mpi_abort('m must be positive. Exiting ...')
         elseif (n < 0) then
-            call s_mpi_abort('Unsupported choice for the value of n. '// &
-                             'Exiting ...')
+            call s_mpi_abort('n must be non-negative. Exiting ...')
         elseif (p < 0) then
-            call s_mpi_abort('Unsupported choice for the value of p. '// &
-                             'Exiting ...')
+            call s_mpi_abort('p must be non-negative. Exiting ...')
         elseif (cyl_coord .and. p > 0 .and. mod(p, 2) /= 1) then
-            call s_mpi_abort('Unsupported choice for the value of p. '// &
-                             'Total number of cells in azimuthal direction '// &
-                             'must be an even number. Exiting ...')
+            call s_mpi_abort('p must be odd for cylindrical coordinates '// &
+                             '(cyl_coord = T and p != 0). Exiting ...')
         elseif (n == 0 .and. p > 0) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and p. Exiting ...')
+            call s_mpi_abort('p must be 0 if n = 0. Exiting ...')
         elseif (nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for num_procs, m, n and p. '// &
-                             'Exiting ...')
-
+            call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
+            call s_mpi_abort('Total number of cells must be at least '// &
+                             '(2^[number of dimensions])*num_procs, which is currently '// &
+                             trim(numStr)//'. Exiting ...')
             ! Constraints on domain boundaries locations in the x-direction
         elseif ((old_grid .and. x_domain%beg /= dflt_real) &
                 .or. &
-                ((old_grid .neqv. .true.) .and. &
+                ((.not. old_grid) .and. &
                  x_domain%beg == dflt_real)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for old_grid and x_domain%beg. '// &
-                             'Exiting ...')
+            call s_mpi_abort('old_grid is not enabled but x_domain%beg is '// &
+                             'not set. Exiting ...')
         elseif ((old_grid .and. x_domain%end /= dflt_real) &
                 .or. &
-                ((old_grid .neqv. .true.) .and. &
+                ((.not. old_grid) .and. &
                  x_domain%end == dflt_real)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for old_grid and x_domain%end. '// &
-                             'Exiting ...')
-        elseif ((old_grid .neqv. .true.) &
+            call s_mpi_abort('old_grid is not enabled but x_domain%end is '// &
+                             'not set. Exiting ...')
+        elseif ((.not. old_grid) &
                 .and. &
                 x_domain%beg >= x_domain%end) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for old_grid, x_domain%beg and '// &
-                             'x_domain%end. Exiting ...')
+            call s_mpi_abort('x_domain%beg must be less than x_domain%end. '// &
+                             'Exiting ...')
         end if
 
         if (cyl_coord) then ! Cartesian coordinates
@@ -184,273 +168,208 @@ contains
                     (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real) &
                     .or. &
                     (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real)) then
-                    call s_mpi_abort('domain are not dflt_real.'// &
-                                     'Please, correct them')
+                    call s_mpi_abort('x_domain, y_domain, and/or z_domain '// &
+                                     'are not supported in restart mode. '// &
+                                     '(old_grid = T and old_ic = T). Exiting ...')
                 elseif (m == dflt_int .or. n == dflt_int .or. p == dflt_int) then
-                    call s_mpi_abort('m, n, and/or p are set to dflt_int.'// &
-                                     'Please, correct them')
+                    call s_mpi_abort('m, n, and p must be set in restart mode. '// &
+                                     '(old_grid = T and old_ic = T). Exiting ...')
                 end if
                 ! in case it is NOT restart
                 ! Constraints on domain boundaries for cylindrical coordinates
-            elseif (n == 0 &
-                    .or. &
-                    y_domain%beg /= 0d0 &
+            elseif (n == 0) then
+                call s_mpi_abort('n must be positive for cylindrical coordinates. '// &
+                                 'Exiting ...')
+            elseif (y_domain%beg /= 0d0 &
                     .or. &
                     y_domain%end == dflt_real &
                     .or. &
                     y_domain%end < 0d0 &
                     .or. &
                     y_domain%beg >= y_domain%end) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'cyl_coord and n, y_domain%beg, or         '// &
-                                 'y_domain%end. Exiting ...')
+                call s_mpi_abort('y_domain%beg must be 0 and '// &
+                                 'y_domain%end must be positive and '// &
+                                 'greater than y_domain%beg for cylindrical '// &
+                                 'coordinates. Exiting ...')
             elseif ((p == 0 .and. z_domain%beg /= dflt_real) &
                     .or. &
                     (p == 0 .and. z_domain%end /= dflt_real)) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'cyl_coord and p, z_domain%beg, or '// &
-                                 'z_domain%end. Exiting ...')
+                call s_mpi_abort('z_domain%beg and z_domain%end '// &
+                                 'are not supported for p = 0. Exiting ...')
             elseif (p > 0 .and. (z_domain%beg /= 0d0 &
                                  .or. &
                                  z_domain%end /= 2d0*pi)) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'cyl_coord and p, z_domain%beg, or '// &
-                                 'z_domain%end. Exiting ...')
+                call s_mpi_abort('z_domain%beg must be 0 and '// &
+                                 'z_domain%end must be 2*pi for 3D cylindrical '// &
+                                 'coordinates. Exiting ...')
             end if
 
         else
-
             ! Constraints on domain boundaries locations in the y-direction
-            if ((n == 0 .and. y_domain%beg /= dflt_real) &
-                .or. &
-                (n > 0 &
-                 .and. &
-                 ((old_grid .and. y_domain%beg /= dflt_real) &
-                  .or. &
-                  ((old_grid .neqv. .true.) .and. &
-                   y_domain%beg == dflt_real)))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, n and y_domain%beg. '// &
+            if ((n == 0 .and. y_domain%beg /= dflt_real) .or. &
+                (n > 0 .and. ((old_grid .and. y_domain%beg /= dflt_real) .or. &
+                              (.not. old_grid .and. y_domain%beg == dflt_real)))) then
+                call s_mpi_abort('y_domain%beg must not be set '// &
+                                 'when n = 0 or when n > 0 and old_grid = F, and '// &
+                                 'must be set otherwise. Exiting ...')
+            elseif ((n == 0 .and. y_domain%end /= dflt_real) .or. &
+                    (n > 0 .and. ((old_grid .and. y_domain%end /= dflt_real) .or. &
+                                  (.not. old_grid .and. y_domain%end == dflt_real)))) then
+                call s_mpi_abort('y_domain%end must not be set '// &
+                                 'when n = 0 or when n > 0 and old_grid = F, and '// &
+                                 'must be set otherwise. Exiting ...')
+            elseif (n > 0 .and. .not. old_grid .and. y_domain%beg >= y_domain%end) then
+                call s_mpi_abort('y_domain%beg must be less than y_domain%end '// &
+                                 'when both are set. '// &
                                  'Exiting ...')
-            elseif ((n == 0 .and. y_domain%end /= dflt_real) &
-                    .or. &
-                    (n > 0 &
-                     .and. &
-                     ((old_grid .and. y_domain%end /= dflt_real) &
-                      .or. &
-                      ((old_grid .neqv. .true.) .and. &
-                       y_domain%end == dflt_real)))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, n and y_domain%end. '// &
-                                 'Exiting ...')
-            elseif (n > 0 &
-                    .and. &
-                    (old_grid .neqv. .true.) &
-                    .and. &
-                    y_domain%beg >= y_domain%end) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, n, y_domain%beg and '// &
-                                 'y_domain%end. Exiting ...')
 
                 ! Constraints on domain boundaries locations in the z-direction
-            elseif ((p == 0 .and. z_domain%beg /= dflt_real) &
-                    .or. &
-                    (p > 0 &
-                     .and. &
-                     ((old_grid .and. z_domain%beg /= dflt_real) &
-                      .or. &
-                      ((old_grid .neqv. .true.) .and. &
-                       z_domain%beg == dflt_real)))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, p and z_domain%beg. '// &
+            elseif ((p == 0 .and. z_domain%beg /= dflt_real) .or. &
+                    (p > 0 .and. ((old_grid .and. z_domain%beg /= dflt_real) .or. &
+                                  (.not. old_grid .and. z_domain%beg == dflt_real)))) then
+                call s_mpi_abort('z_domain%beg must not be set '// &
+                                 'when p = 0 or when p > 0 and old_grid = F, and '// &
+                                 'must be set otherwise. Exiting ...')
+            elseif ((p == 0 .and. z_domain%end /= dflt_real) .or. &
+                    (p > 0 .and. ((old_grid .and. z_domain%end /= dflt_real) .or. &
+                                  (.not. old_grid .and. z_domain%end == dflt_real)))) then
+                call s_mpi_abort('z_domain%end must not be set '// &
+                                 'when p = 0 or when p > 0 and old_grid = F, and '// &
+                                 'must be set otherwise. Exiting ...')
+            elseif (p > 0 .and. .not. old_grid .and. z_domain%beg >= z_domain%end) then
+                call s_mpi_abort('z_domain%beg must be less than z_domain%end '// &
+                                 'when both are set. '// &
                                  'Exiting ...')
-            elseif ((p == 0 .and. z_domain%end /= dflt_real) &
-                    .or. &
-                    (p > 0 &
-                     .and. &
-                     ((old_grid .and. z_domain%end /= dflt_real) &
-                      .or. &
-                      ((old_grid .neqv. .true.) .and. &
-                       z_domain%end == dflt_real)))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, p and z_domain%end. '// &
-                                 'Exiting ...')
-            elseif (p > 0 &
-                    .and. &
-                    (old_grid .neqv. .true.) &
-                    .and. &
-                    z_domain%beg >= z_domain%end) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid, p, z_domain%beg and '// &
-                                 'z_domain%end. Exiting ...')
             end if
         end if
 
         if (loops_z < 1) then
-            call s_mpi_abort('Unsupported choice for the value of loops_z. '// &
-                             'Exiting ...')
+            call s_mpi_abort('loops_z must be positive. Exiting ...')
         elseif (loops_y < 1) then
-            call s_mpi_abort('Unsupported choice for the value of loops_y. '// &
-                             'Exiting ...')
+            call s_mpi_abort('loops_y must be positive. Exiting ...')
         end if
 
         ! Constraints on the grid stretching in the x-direction
         if (stretch_x) then
             if (old_grid) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid and stretch_x. '// &
+                call s_mpi_abort('old_grid and stretch_x are incompatible. '// &
                                  'Exiting ...')
             elseif (a_x == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_x and a_x. Exiting ...')
+                call s_mpi_abort('a_x must be set if stretch_x = T. Exiting ...')
             elseif (x_a == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_x and x_a. Exiting ...')
+                call s_mpi_abort('x_a must be set if stretch_x = T. Exiting ...')
             elseif (x_b == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_x and x_b. Exiting ...')
+                call s_mpi_abort('x_b must be set if stretch_x = T. Exiting ...')
             elseif (x_a >= x_b) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_x, x_a and x_b. '// &
+                call s_mpi_abort('x_a must be less than x_b if stretch_x = T. '// &
                                  'Exiting ...')
             elseif ((a_x + log(cosh(a_x*(x_domain%beg - x_a))) &
                      + log(cosh(a_x*(x_domain%beg - x_b))) &
                      - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for x_domain%beg, stretch_x, a_x, '// &
-                                 'x_a, and x_b. Exiting ...')
+                call s_mpi_abort('x_domain%beg is too close to x_a and x_b '// &
+                                 'for the given a_x. Exiting ...')
             elseif ((a_x + log(cosh(a_x*(x_domain%end - x_a))) &
                      + log(cosh(a_x*(x_domain%end - x_b))) &
                      - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for x_domain%end, stretch_x, a_x, '// &
-                                 'x_a, and x_b. Exiting ...')
+                call s_mpi_abort('x_domain%end is too close to x_a and x_b '// &
+                                 'for the given a_x. Exiting ...')
             end if
         end if
 
         if (stretch_y) then
             ! Constraints on the grid stretching in the y-direction
             if (old_grid) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid and stretch_y. '// &
+                call s_mpi_abort('old_grid and stretch_y are incompatible. '// &
                                  'Exiting ...')
             elseif (n == 0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for n and stretch_y. Exiting ...')
+                call s_mpi_abort('n must be positive if stretch_y = T. Exiting ...')
             elseif (a_y == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_y and a_y. Exiting ...')
+                call s_mpi_abort('a_y must be set if stretch_y = T. Exiting ...')
             elseif (y_a == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_y and y_a. Exiting ...')
+                call s_mpi_abort('y_a must be set if stretch_y = T. Exiting ...')
             elseif (y_b == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_y and y_b. Exiting ...')
+                call s_mpi_abort('y_b must be set if stretch_y = T. Exiting ...')
             elseif (y_a >= y_b) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_y, y_a and y_b. '// &
+                call s_mpi_abort('y_a must be less than y_b if stretch_y = T. '// &
                                  'Exiting ...')
             elseif ((a_y + log(cosh(a_y*(y_domain%beg - y_a))) &
                      + log(cosh(a_y*(y_domain%beg - y_b))) &
                      - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for y_domain%beg, stretch_y, a_y, '// &
-                                 'y_a, and y_b. Exiting ...')
+                call s_mpi_abort('y_domain%beg is too close to y_a and y_b '// &
+                                 'for the given a_y. Exiting ...')
             elseif ((a_y + log(cosh(a_y*(y_domain%end - y_a))) &
                      + log(cosh(a_y*(y_domain%end - y_b))) &
                      - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for y_domain%end, stretch_y, a_y, '// &
-                                 'y_a, and y_b. Exiting ...')
+                call s_mpi_abort('y_domain%end is too close to y_a and y_b '// &
+                                 'for the given a_y. Exiting ...')
             end if
         end if
 
         ! Constraints on the grid stretching in the z-direction
         if (stretch_z) then
             if (old_grid) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for old_grid and stretch_z. '// &
+                call s_mpi_abort('old_grid and stretch_z are incompatible. '// &
                                  'Exiting ...')
             elseif (cyl_coord) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for cyl_coord and stretch_z. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('stretch_z is not supported for cylindrical '// &
+                                 'coordinates. Exiting ...')
             elseif (p == 0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for p and stretch_z. Exiting ...')
+                call s_mpi_abort('p must be positive if stretch_z = T. Exiting ...')
             elseif (a_z == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_z and a_z. Exiting ...')
+                call s_mpi_abort('a_z must be set if stretch_z = T. Exiting ...')
             elseif (z_a == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_z and z_a. Exiting ...')
+                call s_mpi_abort('z_a must be set if stretch_z = T. Exiting ...')
             elseif (z_b == dflt_real) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_z and z_b. Exiting ...')
+                call s_mpi_abort('z_b must be set if stretch_z = T. Exiting ...')
             elseif (z_a >= z_b) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for stretch_z, z_a and z_b. '// &
+                call s_mpi_abort('z_a must be less than z_b if stretch_z = T. '// &
                                  'Exiting ...')
             elseif ((a_z + log(cosh(a_z*(z_domain%beg - z_a))) &
                      + log(cosh(a_z*(z_domain%beg - z_b))) &
                      - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for z_domain%beg, stretch_z, a_z, '// &
-                                 'z_a, and z_b. Exiting ...')
+                call s_mpi_abort('z_domain%beg is too close to z_a and z_b '// &
+                                 'for the given a_z. Exiting ...')
             elseif ((a_z + log(cosh(a_z*(z_domain%end - z_a))) &
                      + log(cosh(a_z*(z_domain%end - z_b))) &
                      - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for z_domain%end, stretch_z, a_z, '// &
-                                 'z_a, and z_b. Exiting ...')
+                call s_mpi_abort('z_domain%end is too close to z_a and z_b '// &
+                                 'for the given a_z. Exiting ...')
             end if
         end if
 
         ! Constraints on model equations and number of fluids in the flow
         if (all(model_eqns /= (/1, 2, 3, 4/))) then
-            call s_mpi_abort('Unsupported value of model_eqns. Exiting ...')
-        elseif (num_fluids /= dflt_int &
-                .and. &
-                (num_fluids < 1 .or. num_fluids > num_fluids)) then
-            call s_mpi_abort('Unsupported value of num_fluids. Exiting ...')
+            call s_mpi_abort('model_eqns must be 1, 2, 3, or 4. Exiting ...')
+        elseif (num_fluids /= dflt_int .and. num_fluids < 1) then
+            call s_mpi_abort('num_fluids must be positive. Exiting ...')
         elseif (model_eqns == 1 .and. adv_alphan) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                             'model_eqns and adv_alphan. '// &
+            call s_mpi_abort('adv_alphan is not supported for model_eqns = 1. '// &
                              'Exiting ...')
             ! Constraints on the order of the WENO scheme
-        elseif (weno_order /= 1 .and. weno_order /= 3 &
-                .and. &
-                weno_order /= 5) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'weno_order. Exiting ...')
+        elseif (all(weno_order /= (/1, 3, 5/))) then
+            call s_mpi_abort('weno_order must be 1, 3, or 5. Exiting ...')
         elseif (m + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for m and weno_order. Exiting ...')
+            call s_mpi_abort('m must be at least weno_order - 1. Exiting ...')
         elseif (n > 0 .and. n + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for n and weno_order. Exiting ...')
+            call s_mpi_abort('n must be at least weno_order - 1. Exiting ...')
         elseif (p > 0 .and. p + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for p and weno_order. Exiting ...')
-        elseif (nGlobal < weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
-            then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for num_procs, m, n, p and '// &
-                             'weno_order. Exiting ...')
+            call s_mpi_abort('p must be at least weno_order - 1. Exiting ...')
+        elseif (nGlobal < weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) then
+            call s_int_to_str(weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
+            call s_mpi_abort('Total number of cells must be at least '// &
+                             '(weno_order^[number of dimensions])*num_procs, '// &
+                             'which is currently '//trim(numStr)//'. Exiting ...')
 
             ! Constraints on the boundary conditions in the x-direction
         elseif (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_x%beg. Exiting ...')
+            call s_mpi_abort('Unsupported value of bc_x%beg. Exiting ...')
         elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'bc_x%end. Exiting ...')
+            call s_mpi_abort('Unsupported value of bc_x%end. Exiting ...')
         elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
                 .or. &
                 (bc_x%end == -1 .and. bc_x%beg /= -1)) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for bc_x%beg and bc_x%end. '// &
-                             'Exiting ...')
+            call s_mpi_abort('bc_x%beg and bc_x%end must be both periodic '// &
+                             '(= -1) or both non-periodic. Exiting ...')
         end if
 
         if (cyl_coord) then ! Cartesian coordinates
@@ -461,49 +380,40 @@ contains
                 ((p > 0 .and. bc_y%beg /= -14) &
                  .or. &
                  (p == 0 .and. bc_y%beg /= -2))) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_y%beg. Exiting ...')
+                call s_mpi_abort('Unsupported value of bc_y%beg. Exiting ...')
             elseif (bc_y%end /= dflt_int &
                     .and. &
                     (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_y%end. Exiting ...')
+                call s_mpi_abort('Unsupported value of bc_y%end. Exiting ...')
             elseif ((n > 0 .and. bc_y%beg == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of n and '// &
-                                 'bc_y%beg. Exiting ...')
+                call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
             elseif ((n > 0 .and. bc_y%end == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of n and '// &
-                                 'bc_y%end. Exiting ...')
+                call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
 
                 ! Constraints on the boundary conditions in the theta-direction
             elseif (bc_z%beg /= dflt_int &
                     .and. &
                     (bc_z%beg /= -1 .and. bc_z%beg /= -2)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_z%beg. Exiting ...')
+                call s_mpi_abort('Unsupported value of bc_z%beg. Exiting ...')
             elseif (bc_z%end /= dflt_int &
                     .and. &
                     (bc_z%end /= -1 .and. bc_z%end /= -2)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_z%end. Exiting ...')
-            elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
-                    .or. &
-                    (p > 0 .and. bc_z%beg == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of p and '// &
-                                 'bc_z%beg. Exiting ...')
-            elseif ((p == 0 .and. bc_z%end /= dflt_int) &
-                    .or. &
-                    (p > 0 .and. bc_z%end == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of p and '// &
-                                 'bc_z%end. Exiting ...')
+                call s_mpi_abort('Unsupported value of bc_z%end. Exiting ...')
+            elseif (p == 0 .and. bc_z%beg /= dflt_int) then
+                call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%beg == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
+            elseif (p == 0 .and. bc_z%end /= dflt_int) then
+                call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%end == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
             elseif (p > 0 &
                     .and. &
                     ((bc_z%beg == -1 .and. bc_z%end /= -1) &
                      .or. &
                      (bc_z%end == -1 .and. bc_z%beg /= -1))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for p, bc_z%beg and bc_z%end. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('bc_z%beg and bc_z%end must be both periodic '// &
+                                 '(= -1) or both non-periodic. Exiting ...')
             end if
 
         else
@@ -519,24 +429,21 @@ contains
                     (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
                 call s_mpi_abort('Unsupported choice for the value of '// &
                                  'bc_y%end. Exiting ...')
-            elseif ((n == 0 .and. bc_y%beg /= dflt_int) &
-                    .or. &
-                    (n > 0 .and. bc_y%beg == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of n and '// &
-                                 'bc_y%beg. Exiting ...')
-            elseif ((n == 0 .and. bc_y%end /= dflt_int) &
-                    .or. &
-                    (n > 0 .and. bc_y%end == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of n and '// &
-                                 'bc_y%end. Exiting ...')
+            elseif (n == 0 .and. bc_y%beg /= dflt_int) then
+                call s_mpi_abort('bc_y%beg is not supported for n = 0. Exiting ...')
+            elseif (n > 0 .and. bc_y%beg == dflt_int) then
+                call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
+            elseif (n == 0 .and. bc_y%end /= dflt_int) then
+                call s_mpi_abort('bc_y%end is not supported for n = 0. Exiting ...')
+            elseif (n > 0 .and. bc_y%end == dflt_int) then
+                call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
             elseif (n > 0 &
                     .and. &
                     ((bc_y%beg == -1 .and. bc_y%end /= -1) &
                      .or. &
                      (bc_y%end == -1 .and. bc_y%beg /= -1))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for n, bc_y%beg and bc_y%end. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('bc_y%beg and bc_y%end must be both periodic '// &
+                                 '(= -1) or both non-periodic. Exiting ...')
 
                 ! Constraints on the boundary conditions in the z-direction
             elseif (bc_z%beg /= dflt_int &
@@ -551,101 +458,96 @@ contains
                                  'bc_z%end. Exiting ...')
             elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
                 call s_mpi_abort('Unsupported choice of boundary condition -13')
-            elseif ((p == 0 .and. bc_z%beg /= dflt_int) &
-                    .or. &
-                    (p > 0 .and. bc_z%beg == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of p and '// &
-                                 'bc_z%beg. Exiting ...')
-            elseif ((p == 0 .and. bc_z%end /= dflt_int) &
-                    .or. &
-                    (p > 0 .and. bc_z%end == dflt_int)) then
-                call s_mpi_abort('Unsupported choice for the value of p and '// &
-                                 'bc_z%end. Exiting ...')
+            elseif (p == 0 .and. bc_z%beg /= dflt_int) then
+                call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%beg == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
+            elseif (p == 0 .and. bc_z%end /= dflt_int) then
+                call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
+            elseif (p > 0 .and. bc_z%end == dflt_int) then
+                call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
             elseif (p > 0 &
                     .and. &
                     ((bc_z%beg == -1 .and. bc_z%end /= -1) &
                      .or. &
                      (bc_z%end == -1 .and. bc_z%beg /= -1))) then
-                call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 'values for p, bc_z%beg and bc_z%end. '// &
-                                 'Exiting ...')
+                call s_mpi_abort('bc_z%beg and bc_z%end must be both periodic '// &
+                                 '(= -1) or both non-periodic. Exiting ...')
             end if
 
         end if
 
         ! Constraints on number of patches making up the initial condition
-        if (num_patches < 0 .or. num_patches > num_patches .or. &
+        if (num_patches < 0 .or. &
             (num_patches == 0 .and. t_step_old == dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'num_patches. Exiting ...')
+            call s_mpi_abort('num_patches must be non-negative for the '// &
+                             'non-restart case. Exiting ...')
             ! Constraints on perturbing the initial condition
-        elseif ((perturb_flow &
-                 .and. &
-                 (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) &
-                .or. &
-                ((perturb_flow .neqv. .true.) &
-                 .and. &
-                 (perturb_flow_fluid /= dflt_int .or. perturb_flow_mag /= dflt_real))) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for perturb_flow, perturb_flow_fluid, and perturb_flow_mag. '// &
-                             'Exiting ...')
+        elseif (perturb_flow &
+                .and. &
+                (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) then
+            call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
+                             'must be set with perturb_flow = T. Exiting ...')
+        elseif ((.not. perturb_flow) &
+                .and. &
+                (perturb_flow_fluid /= dflt_int .or. perturb_flow_mag /= dflt_real)) then
+            call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
+                             'must not be set with perturb_flow = F. Exiting ...')
         elseif ((perturb_flow_fluid > num_fluids) &
                 .or. &
                 (perturb_flow_fluid < 0 .and. perturb_flow_fluid /= dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'perturb_flow_fluid. Exiting ...')
-        elseif ((perturb_sph .and. perturb_sph_fluid == dflt_int) &
-                .or. &
-                ((perturb_sph .neqv. .true.) .and. (perturb_sph_fluid /= dflt_int))) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                             'values for perturb_sph and perturb_sph_fluid. '// &
+            call s_mpi_abort('perturb_flow_fluid must be between 0 and '// &
+                             'num_fluids. Exiting ...')
+        elseif (perturb_sph .and. perturb_sph_fluid == dflt_int) then
+            call s_mpi_abort('perturb_sph_fluid must be set with perturb_sph = T. '// &
+                             'Exiting ...')
+        elseif (.not. perturb_sph .and. perturb_sph_fluid /= dflt_int) then
+            call s_mpi_abort('perturb_sph_fluid must not be set with perturb_sph = F. '// &
                              'Exiting ...')
         elseif ((perturb_sph_fluid > num_fluids) &
                 .or. &
                 (perturb_sph_fluid < 0 .and. perturb_sph_fluid /= dflt_int)) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                             'perturb_sph_fluid. Exiting ...')
-        elseif ((any(fluid_rho /= dflt_real)) .and. (perturb_sph .neqv. .true.)) then
-            call s_mpi_abort('Unsupported choices for values of perturb_sph '// &
-                             'and fluid_rho. Exiting ...')
+            call s_mpi_abort('perturb_sph_fluid must be between 0 and '// &
+                             'num_fluids. Exiting ...')
+        elseif ((any(fluid_rho /= dflt_real)) .and. (.not. perturb_sph)) then
+            call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
+                             'Exiting ...')
         end if
 
         if (perturb_sph) then
             do i = 1, num_fluids
                 call s_int_to_str(i, iStr)
                 if (fluid_rho(i) == dflt_real) then
-                    call s_mpi_abort('Unsupported choice for value of fluid_rho('// &
-                                     trim(iStr)//'). Exiting ...')
+                    call s_mpi_abort('fluid_rho('//trim(iStr)//') must be set '// &
+                                     'if perturb_sph = T. Exiting ...')
                 end if
             end do
         end if
 
         ! Constraints on the hypertangent velocity profile
-        if ((vel_profile .eqv. .true.) .and. (n == 0)) then
-            call s_mpi_abort('Unsupported choices of the combination of values for '// &
-                             'vel_profile and n. Exiting ...')
+        if (vel_profile .and. (n == 0)) then
+            call s_mpi_abort('vel_profile requires n > 0. Exiting ...')
         end if
 
         ! Constraints on the instability wave
-        if ((instability_wave .eqv. .true.) .and. (n == 0)) then
-            call s_mpi_abort('Unsupported choices of the combination of values for '// &
-                             'instability_wave and n. Exiting ...')
+        if (instability_wave .and. (n == 0)) then
+            call s_mpi_abort('instability_wave requires n > 0. Exiting ...')
         end if
 
         ! Constraints on Immersed Boundary Method
         if (ib) then
             if (n <= 0) then
-                call s_mpi_abort('Unsupported choices of the combination of values for '// &
-                                 'ib and n. Immersed Boundaries do not work in 1D. Exiting ...')
+                call s_mpi_abort('ib is enabled but n = 0. '// &
+                                 'Immersed Boundaries do not work in 1D. '// &
+                                 'Exiting ...')
             else if (num_ibs <= 0 .or. num_ibs > num_patches_max) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'num_ibs. Exiting ...')
+                call s_mpi_abort('num_ibs must be between 1 and '// &
+                                 'num_patches_max. Exiting ...')
             end if
         end if
 
         if (num_ibs > 0 .and. .not. ib) then
-            call s_mpi_abort('Unsupported choices of the combination of values for '// &
-                             'num_ibs and ib. Exiting ...')
+            call s_mpi_abort('num_ibs is set, but ib is not enabled. Exiting ...')
         end if
 
         ! Constraints on the stiffened equation of state fluids parameters
@@ -654,15 +556,13 @@ contains
             if (fluid_pp(i)%gamma /= dflt_real &
                 .and. &
                 fluid_pp(i)%gamma <= 0d0) then
-                call s_mpi_abort('Unsupported value of '// &
-                                 'fluid_pp('//trim(iStr)//')%'// &
-                                 'gamma. Exiting ...')
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'gamma must be positive. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
                     fluid_pp(i)%gamma /= dflt_real) then
-                call s_mpi_abort('Unsupported combination '// &
-                                 'of values of model_eqns '// &
-                                 'and fluid_pp('//trim(iStr)//')%'// &
+                call s_mpi_abort('model_eqns = 1 does not support '// &
+                                 'fluid_pp('//trim(iStr)//')%'// &
                                  'gamma. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
                     .or. &
@@ -675,15 +575,13 @@ contains
             elseif (fluid_pp(i)%pi_inf /= dflt_real &
                     .and. &
                     fluid_pp(i)%pi_inf < 0d0) then
-                call s_mpi_abort('Unsupported value of '// &
-                                 'fluid_pp('//trim(iStr)//')%'// &
-                                 'pi_inf. Exiting ...')
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'pi_inf must be non-negative. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
                     fluid_pp(i)%pi_inf /= dflt_real) then
-                call s_mpi_abort('Unsupported combination '// &
-                                 'of values of model_eqns '// &
-                                 'and fluid_pp('//trim(iStr)//')%'// &
+                call s_mpi_abort('model_eqns = 1 does not support '// &
+                                 'fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
                     .or. &
@@ -694,9 +592,8 @@ contains
                                  'and fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf. Exiting ...')
             elseif (fluid_pp(i)%cv < 0d0) then
-                call s_mpi_abort('Unsupported value of '// &
-                                 'fluid_pp('//trim(iStr)//')%'// &
-                                 'cv. Make sure cv is positive. Exiting ...')
+                call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
+                                 'cv must be positive. Exiting ...')
             end if
 
         end do
@@ -785,6 +682,6 @@ contains
             end if
         end if
 
-    end subroutine s_check_inputs
+        end subroutine s_check_inputs
 
-end module m_checker
+    end module m_checker
