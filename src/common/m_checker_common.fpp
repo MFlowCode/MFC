@@ -214,7 +214,13 @@ contains
     !> Checks constraints on dimensionality and the number of cells for the grid.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_simulation_domain
-        if (m <= 0) then
+        if (m == dflt_int) then
+            call s_mpi_abort('m must be set. Exiting ...')
+        elseif (n == dflt_int) then
+            call s_mpi_abort('n must be set. Exiting ...')
+        elseif (p == dflt_int) then
+            call s_mpi_abort('p must be set. Exiting ...')
+        elseif (m <= 0) then
             call s_mpi_abort('m must be positive. Exiting ...')
         elseif (n < 0) then
             call s_mpi_abort('n must be non-negative. Exiting ...')

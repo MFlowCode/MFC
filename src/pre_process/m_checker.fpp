@@ -45,115 +45,89 @@ contains
         !! (old_grid, old_ic, etc.)
     subroutine s_check_inputs_restart
         if ((.not. old_grid) .and. old_ic) then
-            call s_mpi_abort('old_ic cannot be enabled with old_grid disabled. '// &
-                             'Exiting ...')
-
-        elseif ((old_grid .or. old_ic) .and. t_step_old == dflt_int) then
-            call s_mpi_abort('old_grid or old_ic enabled, but t_step_old not set. '// &
-                             'Exiting ...')
-
-            ! Constraints on domain boundaries locations in the x-direction
-        elseif ((old_grid .and. x_domain%beg /= dflt_real) &
-                .or. &
-                ((.not. old_grid) .and. &
-                 x_domain%beg == dflt_real)) then
-            call s_mpi_abort('old_grid is not enabled but x_domain%beg is '// &
-                             'not set. Exiting ...')
-        elseif ((old_grid .and. x_domain%end /= dflt_real) &
-                .or. &
-                ((.not. old_grid) .and. &
-                 x_domain%end == dflt_real)) then
-            call s_mpi_abort('old_grid is not enabled but x_domain%end is '// &
-                             'not set. Exiting ...')
-        elseif ((.not. old_grid) &
-                .and. &
-                x_domain%beg >= x_domain%end) then
-            call s_mpi_abort('x_domain%beg must be less than x_domain%end. '// &
+            call s_mpi_abort('old_ic can only be enabled with old_grid enabled. '// &
                              'Exiting ...')
         end if
 
-        if (cyl_coord) then ! Cartesian coordinates
-
-            ! in case restart of a simulation
-            if (old_grid .and. old_ic) then
-                ! checking of there is any input to the domains
-                if ((x_domain%beg /= dflt_real .or. x_domain%end /= dflt_real) &
+        if (old_grid) then
+            if (t_step_old == dflt_int) then
+                call s_mpi_abort('old_grid is enabled, but t_step_old not set. '// &
+                                 'Exiting ...')
+            elseif ((x_domain%beg /= dflt_real .or. x_domain%end /= dflt_real) &
                     .or. &
                     (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real) &
                     .or. &
-                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real)) then
-                    call s_mpi_abort('x_domain, y_domain, and/or z_domain '// &
-                                     'are not supported in restart mode. '// &
-                                     '(old_grid = T and old_ic = T). Exiting ...')
-                elseif (m == dflt_int .or. n == dflt_int .or. p == dflt_int) then
-                    call s_mpi_abort('m, n, and p must be set in restart mode. '// &
-                                     '(old_grid = T and old_ic = T). Exiting ...')
-                end if
-                ! in case it is NOT restart
-                ! Constraints on domain boundaries for cylindrical coordinates
-            elseif (n == 0) then
-                call s_mpi_abort('n must be positive for cylindrical coordinates. '// &
+                    (z_domain%beg /= dflt_real .or. z_domain%end /= dflt_real)) then
+                call s_mpi_abort('x_domain, y_domain, and/or z_domain '// &
+                                 'are not supported with old_grid enabled. '// &
                                  'Exiting ...')
-            elseif (y_domain%beg /= 0d0 &
-                    .or. &
-                    y_domain%end == dflt_real &
-                    .or. &
-                    y_domain%end < 0d0 &
-                    .or. &
-                    y_domain%beg >= y_domain%end) then
-                call s_mpi_abort('y_domain%beg must be 0 and '// &
-                                 'y_domain%end must be positive and '// &
-                                 'greater than y_domain%beg for cylindrical '// &
+            end if
+        end if
+
+        #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
+            ! y and z directions are checked differently for cylindrical coordinates
+            #:if (DIR == 'y')
+                if (.not. cyl_coord) then
+            #:elif (DIR == 'z')
+                if (.not. cyl_coord) then
+            #:endif
+
+            #:for BOUND in ['beg', 'end']
+                if (${VAR}$ == 0) then
+                    if (${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                        'be set when ${VAR}$ = 0. Exiting ...')
+                    end if
+                else ! ${VAR}$ > 0
+                    if (old_grid .and. ${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                        'be set when ${VAR}$ > 0 and '// &
+                                        'old_grid = T. Exiting ...')
+                    elseif (.not. old_grid .and. ${DIR}$_domain%${BOUND}$ == dflt_real) then
+                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
+                                        'set when ${VAR}$ > 0 and '// &
+                                        'old_grid = F. Exiting ...')
+                    elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
+                        call s_mpi_abort('${DIR}$_domain%beg must be less '// &
+                                        'than ${DIR}$_domain%end when '// &
+                                        'both are set. Exiting ...')
+                    end if
+                end if
+            #:endfor
+
+            #:if (DIR == 'y')
+                end if ! this ends 'if (cyl_coord)'
+            #:elif (DIR == 'z')
+                end if
+            #:endif
+        #:endfor
+
+        if (cyl_coord) then
+            if (n == 0) then
+                call s_mpi_abort('n must be positive for cylindrical '// &
                                  'coordinates. Exiting ...')
-            elseif ((p == 0 .and. z_domain%beg /= dflt_real) &
-                    .or. &
-                    (p == 0 .and. z_domain%end /= dflt_real)) then
-                call s_mpi_abort('z_domain%beg and z_domain%end '// &
-                                 'are not supported for p = 0. Exiting ...')
-            elseif (p > 0 .and. (z_domain%beg /= 0d0 &
-                                 .or. &
-                                 z_domain%end /= 2d0*pi)) then
-                call s_mpi_abort('z_domain%beg must be 0 and '// &
-                                 'z_domain%end must be 2*pi for 3D cylindrical '// &
+            elseif (y_domain%beg == dflt_real .or. y_domain%end == dflt_real) then
+                call s_mpi_abort('y_domain%beg and y_domain%end '// &
+                                 'must be set for n = 0 '// &
+                                 '(2D cylindrical coordinates). Exiting ...')
+            elseif (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0) then
+                call s_mpi_abort('y_domain%beg must be 0 and y_domain%end '// &
+                                 'must be positive for cylindrical '// &
                                  'coordinates. Exiting ...')
             end if
 
-        else
-            ! Constraints on domain boundaries locations in the y-direction
-            if ((n == 0 .and. y_domain%beg /= dflt_real) .or. &
-                (n > 0 .and. ((old_grid .and. y_domain%beg /= dflt_real) .or. &
-                              (.not. old_grid .and. y_domain%beg == dflt_real)))) then
-                call s_mpi_abort('y_domain%beg must not be set '// &
-                                 'when n = 0 or when n > 0 and old_grid = F, and '// &
-                                 'must be set otherwise. Exiting ...')
-            elseif ((n == 0 .and. y_domain%end /= dflt_real) .or. &
-                    (n > 0 .and. ((old_grid .and. y_domain%end /= dflt_real) .or. &
-                                  (.not. old_grid .and. y_domain%end == dflt_real)))) then
-                call s_mpi_abort('y_domain%end must not be set '// &
-                                 'when n = 0 or when n > 0 and old_grid = F, and '// &
-                                 'must be set otherwise. Exiting ...')
-            elseif (n > 0 .and. .not. old_grid .and. y_domain%beg >= y_domain%end) then
-                call s_mpi_abort('y_domain%beg must be less than y_domain%end '// &
-                                 'when both are set. '// &
-                                 'Exiting ...')
-
-                ! Constraints on domain boundaries locations in the z-direction
-            elseif ((p == 0 .and. z_domain%beg /= dflt_real) .or. &
-                    (p > 0 .and. ((old_grid .and. z_domain%beg /= dflt_real) .or. &
-                                  (.not. old_grid .and. z_domain%beg == dflt_real)))) then
-                call s_mpi_abort('z_domain%beg must not be set '// &
-                                 'when p = 0 or when p > 0 and old_grid = F, and '// &
-                                 'must be set otherwise. Exiting ...')
-            elseif ((p == 0 .and. z_domain%end /= dflt_real) .or. &
-                    (p > 0 .and. ((old_grid .and. z_domain%end /= dflt_real) .or. &
-                                  (.not. old_grid .and. z_domain%end == dflt_real)))) then
-                call s_mpi_abort('z_domain%end must not be set '// &
-                                 'when p = 0 or when p > 0 and old_grid = F, and '// &
-                                 'must be set otherwise. Exiting ...')
-            elseif (p > 0 .and. .not. old_grid .and. z_domain%beg >= z_domain%end) then
-                call s_mpi_abort('z_domain%beg must be less than z_domain%end '// &
-                                 'when both are set. '// &
-                                 'Exiting ...')
+            if (p == 0) then
+                if (z_domain%beg /= dflt_real .or. z_domain%end /= dflt_real) then
+                    call s_mpi_abort('z_domain%beg and z_domain%end '// &
+                                     'are not supported for p = 0 '// &
+                                     '(2D cylindrical coordinates). Exiting ...')
+                end if
+            else if (p > 0) then
+                if (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi) then
+                    call s_mpi_abort('z_domain%beg must be 0 and z_domain%end '// &
+                                     'must be 2*pi for 3D cylindrical '// &
+                                     'coordinates. Exiting ...')
+                end if
             end if
         end if
 
@@ -175,93 +149,53 @@ contains
             call s_mpi_abort('loops_y must be positive. Exiting ...')
         end if
 
-        ! Constraints on the grid stretching in the x-direction
-        if (stretch_x) then
-            if (old_grid) then
-                call s_mpi_abort('old_grid and stretch_x are incompatible. '// &
-                                 'Exiting ...')
-            elseif (a_x == dflt_real) then
-                call s_mpi_abort('a_x must be set if stretch_x = T. Exiting ...')
-            elseif (x_a == dflt_real) then
-                call s_mpi_abort('x_a must be set if stretch_x = T. Exiting ...')
-            elseif (x_b == dflt_real) then
-                call s_mpi_abort('x_b must be set if stretch_x = T. Exiting ...')
-            elseif (x_a >= x_b) then
-                call s_mpi_abort('x_a must be less than x_b if stretch_x = T. '// &
-                                 'Exiting ...')
-            elseif ((a_x + log(cosh(a_x*(x_domain%beg - x_a))) &
-                     + log(cosh(a_x*(x_domain%beg - x_b))) &
-                     - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
-                call s_mpi_abort('x_domain%beg is too close to x_a and x_b '// &
-                                 'for the given a_x. Exiting ...')
-            elseif ((a_x + log(cosh(a_x*(x_domain%end - x_a))) &
-                     + log(cosh(a_x*(x_domain%end - x_b))) &
-                     - 2d0*log(cosh(0.5d0*a_x*(x_b - x_a))))/a_x <= 0d0) then
-                call s_mpi_abort('x_domain%end is too close to x_a and x_b '// &
-                                 'for the given a_x. Exiting ...')
-            end if
+        ! Constraints specific to stretch_y
+        if (stretch_y .and. n == 0) then
+            call s_mpi_abort('n must be positive if stretch_y = T. Exiting ...')
         end if
 
-        ! Constraints on the grid stretching in the y-direction
-        if (stretch_y) then
-            if (old_grid) then
-                call s_mpi_abort('old_grid and stretch_y are incompatible. '// &
-                                 'Exiting ...')
-            elseif (n == 0) then
-                call s_mpi_abort('n must be positive if stretch_y = T. Exiting ...')
-            elseif (a_y == dflt_real) then
-                call s_mpi_abort('a_y must be set if stretch_y = T. Exiting ...')
-            elseif (y_a == dflt_real) then
-                call s_mpi_abort('y_a must be set if stretch_y = T. Exiting ...')
-            elseif (y_b == dflt_real) then
-                call s_mpi_abort('y_b must be set if stretch_y = T. Exiting ...')
-            elseif (y_a >= y_b) then
-                call s_mpi_abort('y_a must be less than y_b if stretch_y = T. '// &
-                                 'Exiting ...')
-            elseif ((a_y + log(cosh(a_y*(y_domain%beg - y_a))) &
-                     + log(cosh(a_y*(y_domain%beg - y_b))) &
-                     - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
-                call s_mpi_abort('y_domain%beg is too close to y_a and y_b '// &
-                                 'for the given a_y. Exiting ...')
-            elseif ((a_y + log(cosh(a_y*(y_domain%end - y_a))) &
-                     + log(cosh(a_y*(y_domain%end - y_b))) &
-                     - 2d0*log(cosh(0.5d0*a_y*(y_b - y_a))))/a_y <= 0d0) then
-                call s_mpi_abort('y_domain%end is too close to y_a and y_b '// &
-                                 'for the given a_y. Exiting ...')
-            end if
-        end if
-
-        ! Constraints on the grid stretching in the z-direction
+        ! Constraints specific to stretch_z
         if (stretch_z) then
-            if (old_grid) then
-                call s_mpi_abort('old_grid and stretch_z are incompatible. '// &
-                                 'Exiting ...')
-            elseif (cyl_coord) then
-                call s_mpi_abort('stretch_z is not supported for cylindrical '// &
-                                 'coordinates. Exiting ...')
+            if (cyl_coord) then
+                call s_mpi_abort('stretch_z is not supported for '// &
+                                 'cylindrical coordinates. Exiting ...')
             elseif (p == 0) then
-                call s_mpi_abort('p must be positive if stretch_z = T. Exiting ...')
-            elseif (a_z == dflt_real) then
-                call s_mpi_abort('a_z must be set if stretch_z = T. Exiting ...')
-            elseif (z_a == dflt_real) then
-                call s_mpi_abort('z_a must be set if stretch_z = T. Exiting ...')
-            elseif (z_b == dflt_real) then
-                call s_mpi_abort('z_b must be set if stretch_z = T. Exiting ...')
-            elseif (z_a >= z_b) then
-                call s_mpi_abort('z_a must be less than z_b if stretch_z = T. '// &
+                call s_mpi_abort('p must be positive if stretch_z = T. '// &
                                  'Exiting ...')
-            elseif ((a_z + log(cosh(a_z*(z_domain%beg - z_a))) &
-                     + log(cosh(a_z*(z_domain%beg - z_b))) &
-                     - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
-                call s_mpi_abort('z_domain%beg is too close to z_a and z_b '// &
-                                 'for the given a_z. Exiting ...')
-            elseif ((a_z + log(cosh(a_z*(z_domain%end - z_a))) &
-                     + log(cosh(a_z*(z_domain%end - z_b))) &
-                     - 2d0*log(cosh(0.5d0*a_z*(z_b - z_a))))/a_z <= 0d0) then
-                call s_mpi_abort('z_domain%end is too close to z_a and z_b '// &
-                                 'for the given a_z. Exiting ...')
             end if
         end if
+
+        ! Common checks for all directions (stretch_x, stretch_y, and stretch_z)
+        #:for X in ['x', 'y', 'z']
+            if (stretch_${X}$) then
+                if (old_grid) then
+                    call s_mpi_abort('old_grid and stretch_${X}$ are '// &
+                                     'incompatible. Exiting ...')
+                elseif (a_${X}$ == dflt_real) then
+                    call s_mpi_abort('a_${X}$ must be set with stretch_${X}$ '// &
+                                     'enabled. Exiting ...')
+                elseif (${X}$_a == dflt_real) then
+                    call s_mpi_abort('${X}$_a must be set with stretch_${X}$ '// &
+                                     'enabled. Exiting ...')
+                elseif (${X}$_b == dflt_real) then
+                    call s_mpi_abort('${X}$_b must be set with stretch_${X}$ '// &
+                                     'enabled. Exiting ...')
+                elseif (${X}$_a >= ${X}$_b) then
+                    call s_mpi_abort('${X}$_a must be less than ${X}$_b with '// &
+                                     'stretch_${X}$ enabled. Exiting ...')
+                #:for BOUND in ['beg', 'end']
+                    elseif ((a_${X}$ &
+                             + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) &
+                             + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) &
+                             - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) &
+                             /a_${X}$ <= 0d0) then
+                        call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
+                                        'to ${X}$_a and ${X}$_b for the given '// &
+                                        'a_${X}$. Exiting ...')
+                #:endfor
+                end if
+            end if
+        #:endfor
     end subroutine s_check_inputs_grid_stretching
 
     !> Checks constraints on the QBMM and polydisperse bubble parameters
