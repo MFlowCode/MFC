@@ -39,7 +39,7 @@ module m_data_input
         !!  @param t_step Current time-step to input
         subroutine s_read_abstract_data_files(t_step)
 
-            integer, intent(IN) :: t_step
+            integer, intent(in) :: t_step
 
         end subroutine s_read_abstract_data_files
 
@@ -62,7 +62,7 @@ contains
         !!  @param t_step Current time-step
     subroutine s_read_serial_data_files(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !<
             !! Location of the time-step directory associated with t_step
@@ -216,7 +216,7 @@ contains
         !!  @param t_step Current time-step
     subroutine s_read_parallel_data_files(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
 
@@ -1116,7 +1116,7 @@ contains
     end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_data_input_module()
+    subroutine s_finalize_data_input_module
 
         integer :: i !< Generic loop iterator
 
