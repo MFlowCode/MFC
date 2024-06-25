@@ -102,7 +102,7 @@ module m_data_output
 
 contains
 
-    subroutine s_initialize_data_output_module()
+    subroutine s_initialize_data_output_module
         ! Description: Computation of parameters, allocation procedures, and/or
         !              any other tasks needed to properly setup the module
 
@@ -425,7 +425,7 @@ contains
         !              not performed in multidimensions.
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
@@ -552,7 +552,7 @@ contains
         !              subroutine s_write_variable_to_formatted_database_file.
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Bookkeeping variables storing the name and type of mesh that is
         ! handled by the local processor(s). Note that due to an internal
@@ -749,10 +749,10 @@ contains
 
         ! Name of the flow variable, which will be written to the formatted
         ! database file at the current time-step, t_step
-        character(LEN=*), intent(IN) :: varname
+        character(LEN=*), intent(in) :: varname
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Bookkeeping variables storing the name and type of flow variable
         ! that is about to be handled by the local processor(s). Note that

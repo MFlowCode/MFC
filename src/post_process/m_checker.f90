@@ -17,7 +17,7 @@ module m_checker
 
 contains
 
-    subroutine s_check_inputs()
+    subroutine s_check_inputs
 
         integer :: bub_fac
         integer :: i

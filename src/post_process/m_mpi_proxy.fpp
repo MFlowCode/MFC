@@ -649,8 +649,8 @@ contains
         !!  @param sweep_coord Coordinate direction normal to the processor boundary
     subroutine s_mpi_sendrecv_grid_vars_buffer_regions(pbc_loc, sweep_coord)
 
-        character(LEN=3), intent(IN) :: pbc_loc
-        character, intent(IN) :: sweep_coord
+        character(LEN=3), intent(in) :: pbc_loc
+        character, intent(in) :: sweep_coord
 
 #ifdef MFC_MPI
 
@@ -851,11 +851,11 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
-        character(LEN=3), intent(IN) :: pbc_loc
+        character(LEN=3), intent(in) :: pbc_loc
 
-        character, intent(IN) :: sweep_coord
+        character, intent(in) :: sweep_coord
 
 #ifdef MFC_MPI
 
@@ -1413,7 +1413,7 @@ contains
         !!  the second dimension corresponds to the processor rank.
     subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
+        real(kind(0d0)), dimension(1:, 0:), intent(inout) :: spatial_extents
 
 #ifdef MFC_MPI
 
@@ -1568,11 +1568,11 @@ contains
         !!  to each processor's rank.
     subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
-        real(kind(0d0)), dimension(:, :, :), intent(IN) :: q_sf
+        real(kind(0d0)), dimension(:, :, :), intent(in) :: q_sf
 
         real(kind(0d0)), &
             dimension(1:2, 0:num_procs - 1), &
-            intent(INOUT) :: data_extents
+            intent(inout) :: data_extents
 
 #ifdef MFC_MPI
 
@@ -1600,11 +1600,11 @@ contains
 
         real(kind(0d0)), &
             dimension(0:m, 0:0, 0:0), &
-            intent(IN) :: q_sf
+            intent(in) :: q_sf
 
         real(kind(0d0)), &
             dimension(0:m_root, 0:0, 0:0), &
-            intent(INOUT) :: q_root_sf
+            intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
 
