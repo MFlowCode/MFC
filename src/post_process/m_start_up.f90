@@ -31,6 +31,8 @@ module m_start_up
 
     use m_compile_specific
 
+    use m_checker_common
+
     use m_checker
     ! ==========================================================================
 
@@ -131,6 +133,7 @@ contains
                              'case_dir. Exiting ...')
         end if
 
+        call s_check_inputs_common()
         call s_check_inputs()
 
     end subroutine s_check_input_file
