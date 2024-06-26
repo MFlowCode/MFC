@@ -1097,7 +1097,7 @@ contains
             end do
         end if
 
-        call s_compute_derived_variables(q_prim_vf,t_step)
+        call s_compute_derived_variables(t_step)
 
 #ifdef DEBUG
         print *, 'Computed derived vars'

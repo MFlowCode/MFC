@@ -257,10 +257,7 @@ contains
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
-                
-                elseif (patch_icpp(i)%geometry == 22) then
-                    call s_2D_lung(i, patch_id_fp, q_prim_vf, .false.)
-                
+             
                 end if
                 !> @}
             end do

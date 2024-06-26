@@ -1420,7 +1420,6 @@ contains
         !! @param q_prim_vf Array of primitive variables
     subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
-<<<<<<< HEAD
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
@@ -1431,16 +1430,6 @@ contains
         logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
-=======
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-        integer :: i, j, k !< generic loop iterators
-        real(kind(0d0)) :: radius, epsilon, beta
-        complex(kind(0d0)) :: cmplx_i = (0d0, 1d0)
-        complex(kind(0d0)) :: H
->>>>>>> source
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
