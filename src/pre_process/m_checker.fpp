@@ -39,11 +39,14 @@ contains
             call s_mpi_abort()
         end if
 #endif
-    end subroutine s_check_parallel_io
-
+    end subroutine s_check_parallel_io              
+        
     !> Checks constraints on the restart parameters
         !! (old_grid, old_ic, etc.)
     subroutine s_check_inputs_restart
+        logical :: skip_check !< Flag to skip the check when iterating over
+        !! x, y, and z directions, for special treatment of cylindrical coordinates
+
         if ((.not. old_grid) .and. old_ic) then
             call s_mpi_abort('old_ic can only be enabled with old_grid enabled. '// &
                              'Exiting ...')
@@ -67,37 +70,39 @@ contains
         #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
             ! For cylindrical coordinates, the y and z directions use a different check
             #:if (DIR == 'y') or (DIR == 'z')
-                if (.not. cyl_coord) then
+                skip_check = cyl_coord
+            #:else
+                skip_check = .false.
             #:endif
 
-            #:for BOUND in ['beg', 'end']
-                if (${VAR}$ == 0) then
-                    if (${DIR}$_domain%${BOUND}$ /= dflt_real) then
-                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                        'be set when ${VAR}$ = 0. Exiting ...')
+            if (.not. skip_check) then
+                #:for BOUND in ['beg', 'end']
+                    if (${VAR}$ == 0) then
+                        if (${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                            'be set when ${VAR}$ = 0. Exiting ...')
+                        end if
+                    else ! ${VAR}$ > 0
+                        if (old_grid .and. ${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                            'be set when ${VAR}$ > 0 and '// &
+                                            'old_grid = T. Exiting ...')
+                        elseif (.not. old_grid .and. ${DIR}$_domain%${BOUND}$ == dflt_real) then
+                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
+                                            'set when ${VAR}$ > 0 and '// &
+                                            'old_grid = F. Exiting ...')
+                        elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
+                            call s_mpi_abort('${DIR}$_domain%beg must be less '// &
+                                            'than ${DIR}$_domain%end when '// &
+                                            'both are set. Exiting ...')
+                        end if
                     end if
-                else ! ${VAR}$ > 0
-                    if (old_grid .and. ${DIR}$_domain%${BOUND}$ /= dflt_real) then
-                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                        'be set when ${VAR}$ > 0 and '// &
-                                        'old_grid = T. Exiting ...')
-                    elseif (.not. old_grid .and. ${DIR}$_domain%${BOUND}$ == dflt_real) then
-                        call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
-                                        'set when ${VAR}$ > 0 and '// &
-                                        'old_grid = F. Exiting ...')
-                    elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
-                        call s_mpi_abort('${DIR}$_domain%beg must be less '// &
-                                        'than ${DIR}$_domain%end when '// &
-                                        'both are set. Exiting ...')
-                    end if
-                end if
-            #:endfor
+                #:endfor
+            end if
 
-            #:if (DIR == 'y') or (DIR == 'z')
-                end if
-            #:endif
         #:endfor
 
+        ! Check for y and z directions for cylindrical coordinates
         if (cyl_coord) then
             if (n == 0) then
                 call s_mpi_abort('n must be positive for cylindrical '// &

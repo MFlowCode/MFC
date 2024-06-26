@@ -283,37 +283,45 @@ contains
     !> Checks constraints on the boundary conditions in the x-direction.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_bc
+        logical :: skip_check !< Flag to skip the check when iterating over
+        !! x, y, and z directions, for special treatment of cylindrical coordinates
+
         #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
             #:for BOUND in ['beg', 'end']
                 if (${VAR}$ == 0 .and. bc_${DIR}$%${BOUND}$ /= dflt_int) then
-                    call s_mpi_abort('bc_${DIR}$%${BOUND}$ is not supported for ${VAR}$ = 0. Exiting ...')
+                    call s_mpi_abort('bc_${DIR}$%${BOUND}$ is not '// &
+                                     'supported for ${VAR}$ = 0. Exiting ...')
                 elseif (${VAR}$ > 0 .and. bc_${DIR}$%${BOUND}$ == dflt_int) then
-                    call s_mpi_abort('${VAR}$ != 0 but bc_${DIR}$%${BOUND}$ is not set. Exiting ...')
+                    call s_mpi_abort('${VAR}$ != 0 but bc_${DIR}$%${BOUND}$ '// &
+                                     'is not set. Exiting ...')
                 elseif ((bc_${DIR}$%beg == -1 .and. bc_${DIR}$%end /= -1) &
                         .or. &
                         (bc_${DIR}$%end == -1 .and. bc_${DIR}$%beg /= -1)) then
-                    call s_mpi_abort('bc_${DIR}$%beg and bc_${DIR}$%end must be both periodic '// &
-                                     '(= -1) or both non-periodic. Exiting ...')
+                    call s_mpi_abort('bc_${DIR}$%beg and bc_${DIR}$%end '// &
+                                     'must be both periodic (= -1) or both '// &
+                                     'non-periodic. Exiting ...')
                 end if
 
-                ! For cylindrical coordinates, the y and z directions use a different check
+                ! For cylindrical coordinates, y and z directions use a different check
                 #:if (DIR == 'y') or (DIR == 'z')
-                    if (.not. cyl_coord) then
+                    skip_check = cyl_coord
+                #:else
+                    skip_check = .false.
                 #:endif
 
+                if (.not. skip_check) then
                     if (bc_${DIR}$%${BOUND}$ /= dflt_int) then
                         if (bc_${DIR}$%${BOUND}$ > -1 .or. bc_${DIR}$%${BOUND}$ < -16) then
-                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must be ' // &
+                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must be '// &
                                              'between -1 and -16. Exiting ...')
                         elseif (bc_${DIR}$%${BOUND}$ == -14) then
-                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must not be -14 '// &
-                                             'for non-cylindrical coordinates. Exiting ...')
+                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must not '// &
+                                             'be -14 for non-cylindrical '// &
+                                             'coordinates. Exiting ...')
                         end if
                     end if
-                
-                #:if (DIR == 'y') or (DIR == 'z')
-                    end if ! this ends 'if (cyl_coord)'
-                #:endif
+                end if
+
             #:endfor
         #:endfor
 
@@ -321,6 +329,7 @@ contains
             call s_mpi_abort('Boundary condition -13 is not supported. Exiting ...')
         end if
 
+        ! Check for y and z directions for cylindrical coordinates
         if (cyl_coord) then
             if (n == 0) then
                 call s_mpi_abort('n must be positive for cylindrical '// &

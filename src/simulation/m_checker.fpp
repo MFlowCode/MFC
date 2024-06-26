@@ -230,23 +230,23 @@ contains
                                      'Exiting ...')
 
                 else if (model_eqns == 1 &
-                    .and. &
-                    (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         .and. &
+                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('model_eqns = 1 does not support '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//'). Exiting ...')
 
                 else if (i > num_fluids &
-                    .and. &
-                    (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         .and. &
+                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('First index ('//trim(iStr)//') of '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//') exceeds '// &
                                      'num_fluids. Exiting ...')
 
                 else if (weno_order == 1 .and. (.not. weno_avg) &
-                    .and. &
-                    (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         .and. &
+                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('weno_order = 1 without weno_avg '// &
                                      'does not support '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
