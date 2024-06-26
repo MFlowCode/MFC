@@ -28,28 +28,29 @@ module m_patches
 
     implicit none
 
-    private; public :: s_line_segment, &
- s_spiral, &
- s_circle, &
- s_airfoil, &
- s_3D_airfoil, &
- s_varcircle, &
- s_3dvarcircle, &
- s_ellipse, &
- s_ellipsoid, &
- s_rectangle, &
- s_sweep_line, &
- s_2D_TaylorGreen_vortex, &
- s_1D_analytical, &
- s_1d_bubble_pulse, &
- s_2D_analytical, &
- s_3D_analytical, &
- s_spherical_harmonic, &
- s_sphere, &
- s_cuboid, &
- s_cylinder, &
- s_sweep_plane, &
- s_model
+    private; 
+    public :: s_line_segment, &
+              s_spiral, &
+              s_circle, &
+              s_airfoil, &
+              s_3D_airfoil, &
+              s_varcircle, &
+              s_3dvarcircle, &
+              s_ellipse, &
+              s_ellipsoid, &
+              s_rectangle, &
+              s_sweep_line, &
+              s_2D_TaylorGreen_vortex, &
+              s_1D_analytical, &
+              s_1d_bubble_pulse, &
+              s_2D_analytical, &
+              s_3D_analytical, &
+              s_spherical_harmonic, &
+              s_sphere, &
+              s_cuboid, &
+              s_cylinder, &
+              s_sweep_plane, &
+              s_model
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
@@ -88,11 +89,13 @@ contains
     !!              line segment patch DOES NOT allow for the smearing of its
     !!              boundaries.
     !! @param patch_id patch identifier
-    subroutine s_line_segment(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------
+    !! @param patch_id_fp Array to track patch ids
+    !! @param q_prim_vf Array of primitive variables
+    subroutine s_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma
 
@@ -137,18 +140,20 @@ contains
             end if
         end do
 
-    end subroutine s_line_segment ! ----------------------------------------
+    end subroutine s_line_segment
 
     !>  The spiral patch is a 2D geometry that may be used, The geometry
         !!              of the patch is well-defined when its centroid and radius
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
-        !!  @param patch_id patch identifier
-    subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+        !! @param patch_id patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_spiral(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(kind(0d0)) :: th, thickness, nturns, mya
@@ -199,7 +204,7 @@ contains
             end do
         end do
 
-    end subroutine s_spiral ! ----------------------------------------------
+    end subroutine s_spiral
 
     !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -207,12 +212,16 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib) ! ----------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+        !! @param ib True if this patch is an immersed boundary
+    subroutine s_circle(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib
+
         real(kind(0d0)) :: radius
 
         integer :: i, j, k !< Generic loop iterators
@@ -280,14 +289,19 @@ contains
             end do
         end do
 
-    end subroutine s_circle ! ----------------------------------------------
+    end subroutine s_circle
 
+    !! @param patch_id is the patch identifier
+    !! @param patch_id_fp Array to track patch ids
+    !! @param q_prim_vf Array of primitive variables
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib
+
         real(kind(0d0)) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
         integer :: Np1, Np2
@@ -439,12 +453,17 @@ contains
 
     end subroutine s_airfoil
 
+    !! @param patch_id is the patch identifier
+    !! @param patch_id_fp Array to track patch ids
+    !! @param q_prim_vf Array of primitive variables
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib
+
         real(kind(0d0)) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
         integer :: Np1, Np2
@@ -605,21 +624,21 @@ contains
 
     end subroutine s_3D_airfoil
 
-    !>             The varcircle patch is a 2D geometry that may be used
+    !>  The varcircle patch is a 2D geometry that may be used
         !!             . It  generatres an annulus
         !! @param patch_id is the patch identifier
-    subroutine s_varcircle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_varcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
-
-        real(kind(0d0)) :: myr, thickness
+        real(kind(0d0)) :: radius, myr, thickness
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -663,20 +682,21 @@ contains
             end do
         end do
 
-    end subroutine s_varcircle ! ----------------------------------------------
+    end subroutine s_varcircle
 
-    subroutine s_3dvarcircle(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+    !! @param patch_id is the patch identifier
+    !! @param patch_id_fp Array to track patch ids
+    !! @param q_prim_vf Array of primitive variables
+    subroutine s_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
-
-        real(kind(0d0)) :: myr, thickness
+        real(kind(0d0)) :: radius, myr, thickness
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -726,21 +746,23 @@ contains
             end do
         end do
 
-    end subroutine s_3dvarcircle ! ----------------------------------------------
+    end subroutine s_3dvarcircle
 
-    !>      The elliptical patch is a 2D geometry. The geometry of
+    !> The elliptical patch is a 2D geometry. The geometry of
         !!      the patch is well-defined when its centroid and radii
         !!      are provided. Note that the elliptical patch DOES allow
         !!      for the smoothing of its boundary
         !! @param patch_id is the patch identifier
-    subroutine s_ellipse(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
+        real(kind(0d0)) :: a, b
 
         ! Transferring the elliptical patch's radii, centroid, smearing
         ! patch identity, and smearing coefficient information
@@ -790,23 +812,25 @@ contains
             end do
         end do
 
-    end subroutine s_ellipse ! ---------------------------------------------
+    end subroutine s_ellipse
 
-    !>      The ellipsoidal patch is a 3D geometry. The geometry of
+    !> The ellipsoidal patch is a 3D geometry. The geometry of
         !!       the patch is well-defined when its centroid and radii
         !!       are provided. Note that the ellipsoidal patch DOES allow
         !!       for the smoothing of its boundary
         !! @param patch_id is the patch identifier
-    subroutine s_ellipsoid(patch_id, patch_id_fp, q_prim_vf) ! -------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
+        real(kind(0d0)) :: a, b, c
 
         ! Transferring the ellipsoidal patch's radii, centroid, smearing
         ! patch identity, and smearing coefficient information
@@ -869,9 +893,9 @@ contains
             end do
         end do
 
-    end subroutine s_ellipsoid ! -------------------------------------------
+    end subroutine s_ellipsoid
 
-    !>      The rectangular patch is a 2D geometry that may be used,
+    !> The rectangular patch is a 2D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
         !!              shock region, in alignment with the axes of the Cartesian
         !!              coordinate system. The geometry of such a patch is well-
@@ -880,16 +904,18 @@ contains
         !!              rectangular patch DOES NOT allow for the smoothing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib) ! -------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+        !! @param ib True if this patch is an immersed boundary
+    subroutine s_rectangle(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
-        logical :: ib !< True if this patch is an immersed boundary
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< generic loop iterators
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -970,9 +996,9 @@ contains
             end do
         end do
 
-    end subroutine s_rectangle ! -------------------------------------------
+    end subroutine s_rectangle
 
-    !>  The swept line patch is a 2D geometry that may be used,
+    !> The swept line patch is a 2D geometry that may be used,
         !!      for example, in creating a solid boundary, or pre-/post-
         !!      shock region, at an angle with respect to the axes of the
         !!      Cartesian coordinate system. The geometry of the patch is
@@ -980,14 +1006,16 @@ contains
         !!      in the sweep direction, are provided. Note that the sweep
         !!      line patch DOES allow the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-    subroutine s_sweep_line(patch_id, patch_id_fp, q_prim_vf) ! ------------------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
+        real(kind(0d0)) :: a, b, c
 
         ! Transferring the centroid information of the line to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1036,23 +1064,24 @@ contains
             end do
         end do
 
-    end subroutine s_sweep_line ! ------------------------------------------
+    end subroutine s_sweep_line
 
     !> The Taylor Green vortex is 2D decaying vortex that may be used,
         !!              for example, to verify the effects of viscous attenuation.
         !!              Geometry of the patch is well-defined when its centroid
         !!              are provided.
         !! @param patch_id is the patch identifier
-    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(kind(0d0)) :: L0, U0 !< Taylor Green Vortex parameters
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        real(kind(0d0)) :: L0, U0 !< Taylor Green Vortex parameters
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1113,23 +1142,24 @@ contains
             end do
         end do
 
-    end subroutine s_2D_TaylorGreen_Vortex ! -----------------------------------
+    end subroutine s_2D_TaylorGreen_Vortex
 
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
-        !!  @param patch_id is the patch identifier
-    subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_1D_analytical(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        ! Placeholders for the cell boundary values
-        real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
+        ! Placeholders for the cell boundary values
+        real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
 
         @:Hardcoded1DVariables()
 
@@ -1172,22 +1202,24 @@ contains
             end if
         end do
 
-    end subroutine s_1D_analytical ! ---------------------------------------
+    end subroutine s_1D_analytical
 
-    subroutine s_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
         ! Description: This patch assigns the primitive variables as analytical
         !       functions such that the code can be verified.
 
         ! Patch identifier
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        ! Placeholders for the cell boundary values
-        real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+        integer, intent(in) :: patch_id
+        integer, intent(inout), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
+        ! Placeholders for the cell boundary values
+        real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
@@ -1225,22 +1257,23 @@ contains
             end if
         end do
 
-    end subroutine s_1D_bubble_pulse ! ---------------------------------------
+    end subroutine s_1D_bubble_pulse
 
     !>  This patch assigns the primitive variables as analytical
         !!  functions such that the code can be verified.
-        !!  @param patch_id is the patch identifier
-    subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_2D_analytical(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
+        integer :: i, j, k !< generic loop iterators
         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
         real(kind(0d0)) :: l, U0 !< Taylor Green Vortex parameters
-
-        integer :: i, j, k !< generic loop iterators
 
         @:Hardcoded2DVariables()
 
@@ -1293,19 +1326,21 @@ contains
             end do
         end do
 
-    end subroutine s_2D_analytical ! ---------------------------------------
+    end subroutine s_2D_analytical
 
-    !>      This patch assigns the primitive variables as analytical
+    !> This patch assigns the primitive variables as analytical
         !!      functions such that the code can be verified.
-        !!      @param patch_id is the patch identifier
-    subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf) ! ---------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_3D_analytical(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         @:Hardcoded3DVariables()
 
@@ -1375,22 +1410,21 @@ contains
             end do
         end do
 
-    end subroutine s_3D_analytical ! ---------------------------------------
+    end subroutine s_3D_analytical
 
-    !>      This patch generates the shape of the spherical harmonics
+    !> This patch generates the shape of the spherical harmonics
         !!      as a perturbation to a perfect sphere
-        !!      @param patch_id is the patch identifier
-    subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-
-        real(kind(0d0)) :: epsilon, beta
-        real(kind(0d0)) :: radius
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
-
+        real(kind(0d0)) :: radius, epsilon, beta
         complex(kind(0d0)) :: cmplx_i = (0d0, 1d0)
         complex(kind(0d0)) :: H
 
@@ -1505,24 +1539,27 @@ contains
             end do
         end do
 
-    end subroutine s_spherical_harmonic ! ----------------------------------
+    end subroutine s_spherical_harmonic
 
     !>          The spherical patch is a 3D geometry that may be used,
         !!              for example, in creating a bubble or a droplet. The patch
         !!              geometry is well-defined when its centroid and radius are
         !!              provided. Please note that the spherical patch DOES allow
         !!              for the smoothing of its boundary.
-        !!      @param patch_id is the patch identifier
-    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib) ! ----------------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+        !! @param ib True if this patch is an immersed boundary
+    subroutine s_sphere(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         ! Generic loop iterators
         integer :: i, j, k !< generic loop iterators
+        real(kind(0d0)) :: radius
 
         real(kind(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !<
             !! Variables to initialize the pressure field that corresponds to the
@@ -1604,9 +1641,9 @@ contains
             end do
         end do
 
-    end subroutine s_sphere ! ----------------------------------------------
+    end subroutine s_sphere
 
-    !>      The cuboidal patch is a 3D geometry that may be used, for
+    !> The cuboidal patch is a 3D geometry that may be used, for
         !!              example, in creating a solid boundary, or pre-/post-shock
         !!              region, which is aligned with the axes of the Cartesian
         !!              coordinate system. The geometry of such a patch is well-
@@ -1614,12 +1651,14 @@ contains
         !!              z-coordinate directions are provided. Please notice that
         !!              the cuboidal patch DOES NOT allow for the smearing of its
         !!              boundaries.
-        !!      @param patch_id is the patch identifier
-    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf) ! ----------------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+    subroutine s_cuboid(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1684,9 +1723,9 @@ contains
             end do
         end do
 
-    end subroutine s_cuboid ! ----------------------------------------------
+    end subroutine s_cuboid
 
-    !>              The cylindrical patch is a 3D geometry that may be used,
+    !> The cylindrical patch is a 3D geometry that may be used,
         !!              for example, in setting up a cylindrical solid boundary
         !!              confinement, like a blood vessel. The geometry of this
         !!              patch is well-defined when the centroid, the radius and
@@ -1694,16 +1733,19 @@ contains
         !!              y- or z-coordinate direction, are provided. Please note
         !!              that the cylindrical patch DOES allow for the smoothing
         !!              of its lateral boundary.
-        !!      @param patch_id is the patch identifier
-    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib) ! --------------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Array of primitive variables
+        !! @param ib True if this patch is an immersed boundary
+    subroutine s_cylinder(patch_id, patch_id_fp, q_prim_vf, ib)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: radius
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        logical, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< Generic loop iterators
+        real(kind(0d0)) :: radius
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
@@ -1839,7 +1881,7 @@ contains
             end do
         end do
 
-    end subroutine s_cylinder ! --------------------------------------------
+    end subroutine s_cylinder
 
     !>      The swept plane patch is a 3D geometry that may be used,
         !!              for example, in creating a solid boundary, or pre-/post-
@@ -1848,15 +1890,17 @@ contains
         !!              well-defined when its centroid and normal vector, aimed
         !!              in the sweep direction, are provided. Note that the sweep
         !!              plane patch DOES allow the smoothing of its boundary.
-        !!      @param patch_id is the patch identifier
-    subroutine s_sweep_plane(patch_id, patch_id_fp, q_prim_vf) ! -----------------------------------
+        !! @param patch_id is the patch identifier
+        !! @param patch_id_fp Array to track patch ids
+        !! @param q_prim_vf Primitive variables
+    subroutine s_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: a, b, c, d
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
+        real(kind(0d0)) :: a, b, c, d
 
         ! Transferring the centroid information of the plane to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -1919,15 +1963,17 @@ contains
             end do
         end do
 
-    end subroutine s_sweep_plane ! -----------------------------------------
+    end subroutine s_sweep_plane
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
-    subroutine s_model(patch_id, patch_id_fp, q_prim_vf) ! ---------------------
+    !! @param patch_id_fp Array to track patch ids
+    !! @param q_prim_vf Primitive variables
+    subroutine s_model(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -2028,17 +2074,17 @@ contains
 
         call s_model_free(model)
 
-    end subroutine s_model ! ---------------------------------------------------
+    end subroutine s_model
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         !$acc routine seq
 
-        real(kind(0d0)), intent(IN) :: cyl_y, cyl_z
+        real(kind(0d0)), intent(in) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
         cart_z = cyl_y*cos(cyl_z)
 
-    end subroutine s_convert_cylindrical_to_cartesian_coord ! --------------
+    end subroutine s_convert_cylindrical_to_cartesian_coord
 
     function f_convert_cyl_to_cart(cyl) result(cart)
 
@@ -2060,7 +2106,7 @@ contains
 
         sph_phi = atan(cyl_y/cyl_x)
 
-    end subroutine s_convert_cylindrical_to_spherical_coord ! --------------
+    end subroutine s_convert_cylindrical_to_spherical_coord
 
     !> Archimedes spiral function
     !! @param myth Angle
@@ -2068,7 +2114,7 @@ contains
     !! @param a Starting position
     function f_r(myth, offset, a)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: myth, offset, a
+        real(kind(0d0)), intent(in) :: myth, offset, a
         real(kind(0d0)) :: b
         real(kind(0d0)) :: f_r
 

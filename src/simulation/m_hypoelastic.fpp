@@ -49,7 +49,7 @@ module m_hypoelastic
 
 contains
 
-    subroutine s_initialize_hypoelastic_module() ! --------------------
+    subroutine s_initialize_hypoelastic_module
 
         integer :: i
 
@@ -78,9 +78,9 @@ contains
         !!  @param rhs_vf rhs variables
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        integer, intent(IN) :: idir
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(kind(0d0)) :: rho_K, G_K
 

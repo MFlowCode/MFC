@@ -104,7 +104,7 @@ contains
 
         end if
 
-    end subroutine s_compute_finite_difference_coefficients ! --------------
+    end subroutine s_compute_finite_difference_coefficients
 
     !> Computes the bubble number density n from the primitive variables
         !! @param vftmp is the void fraction

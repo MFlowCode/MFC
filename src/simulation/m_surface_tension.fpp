@@ -57,7 +57,7 @@ module m_surface_tension
 
 contains
 
-    subroutine s_initialize_surface_tension_module()
+    subroutine s_initialize_surface_tension_module
 
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -91,15 +91,15 @@ contains
                                               flux_src_vf, &
                                               id, isx, isy, isz)
 
-        type(int_bounds_info) :: isx, isy, isz
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(IN) :: vSrc_rsz_vf
+        type(scalar_field), dimension(sys_size) :: q_prim_vf !> unused so unsure what intent to give it
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
+        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
-        integer :: id
+            intent(inout) :: flux_src_vf
+        integer, intent(in) :: id
+        type(int_bounds_info), intent(in) :: isx, isy, isz
 
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
@@ -248,7 +248,8 @@ contains
 
     subroutine s_get_capilary(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
         type(int_bounds_info) :: isx, isy, isz
 
         isx%beg = -1; isy%beg = 0; isz%beg = 0
@@ -318,14 +319,14 @@ contains
 
     end subroutine s_get_capilary
 
-    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
@@ -395,7 +396,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
-    subroutine s_finalize_surface_tension_module()
+    subroutine s_finalize_surface_tension_module
 
         do j = 1, num_dims
             @:DEALLOCATE(c_divs(j)%sf)

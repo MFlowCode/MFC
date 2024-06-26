@@ -51,7 +51,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_derived_variables_module() ! ----------------------
+    subroutine s_initialize_derived_variables_module
 
         ! Allocating the variables which will store the coefficients of the
         ! centered family of finite-difference schemes. Note that sufficient
@@ -81,10 +81,10 @@ contains
             end if
         end if
 
-    end subroutine s_initialize_derived_variables_module ! --------------------
+    end subroutine s_initialize_derived_variables_module
 
     !> Allocate and open derived variables. Computing FD coefficients.
-    subroutine s_initialize_derived_variables() ! -----------------------------
+    subroutine s_initialize_derived_variables
 
         if (probe_wrt) then
             ! Opening and writing header of flow probe files
@@ -108,13 +108,13 @@ contains
 
         end if
 
-    end subroutine s_initialize_derived_variables ! -----------------------------
+    end subroutine s_initialize_derived_variables
 
     !> Writes coherent body information, communication files, and probes.
         !!  @param t_step Current time-step
-    subroutine s_compute_derived_variables(t_step) ! -----------------------
+    subroutine s_compute_derived_variables(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -161,7 +161,7 @@ contains
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
         end if
 
-    end subroutine s_compute_derived_variables ! ---------------------------
+    end subroutine s_compute_derived_variables
 
     !> This subroutine receives as inputs the indicator of the
         !!      component of the acceleration that should be outputted and
@@ -176,16 +176,16 @@ contains
         !!  @param q_prim_vf3 Primitive variables
         !!  @param q_sf Acceleration component
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
-                                               q_prim_vf2, q_prim_vf3, q_sf) ! ----------
+                                               q_prim_vf2, q_prim_vf3, q_sf)
         !DIR$ INLINEALWAYS s_derive_acceleration_component
-        integer, intent(IN) :: i
+        integer, intent(in) :: i
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf0
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf1
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf2
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf3
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf0
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf1
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(OUT) :: q_sf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(out) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
 
@@ -314,10 +314,10 @@ contains
             end do
         end if
 
-    end subroutine s_derive_acceleration_component ! --------------------------
+    end subroutine s_derive_acceleration_component
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_derived_variables_module() ! -------------------
+    subroutine s_finalize_derived_variables_module
 
         ! Closing CoM and flow probe files
         if (proc_rank == 0) then
@@ -342,6 +342,6 @@ contains
         if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
         if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)
 
-    end subroutine s_finalize_derived_variables_module ! -----------------
+    end subroutine s_finalize_derived_variables_module
 
 end module m_derived_variables
