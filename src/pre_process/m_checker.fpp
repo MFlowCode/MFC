@@ -39,8 +39,8 @@ contains
             call s_mpi_abort()
         end if
 #endif
-    end subroutine s_check_parallel_io              
-        
+    end subroutine s_check_parallel_io
+
     !> Checks constraints on the restart parameters
         !! (old_grid, old_ic, etc.)
     subroutine s_check_inputs_restart
@@ -80,21 +80,21 @@ contains
                     if (${VAR}$ == 0) then
                         if (${DIR}$_domain%${BOUND}$ /= dflt_real) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                            'be set when ${VAR}$ = 0. Exiting ...')
+                                             'be set when ${VAR}$ = 0. Exiting ...')
                         end if
                     else ! ${VAR}$ > 0
                         if (old_grid .and. ${DIR}$_domain%${BOUND}$ /= dflt_real) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                            'be set when ${VAR}$ > 0 and '// &
-                                            'old_grid = T. Exiting ...')
+                                             'be set when ${VAR}$ > 0 and '// &
+                                             'old_grid = T. Exiting ...')
                         elseif (.not. old_grid .and. ${DIR}$_domain%${BOUND}$ == dflt_real) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
-                                            'set when ${VAR}$ > 0 and '// &
-                                            'old_grid = F. Exiting ...')
+                                             'set when ${VAR}$ > 0 and '// &
+                                             'old_grid = F. Exiting ...')
                         elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
                             call s_mpi_abort('${DIR}$_domain%beg must be less '// &
-                                            'than ${DIR}$_domain%end when '// &
-                                            'both are set. Exiting ...')
+                                             'than ${DIR}$_domain%end when '// &
+                                             'both are set. Exiting ...')
                         end if
                     end if
                 #:endfor
@@ -184,17 +184,17 @@ contains
                 elseif (${X}$_a >= ${X}$_b) then
                     call s_mpi_abort('${X}$_a must be less than ${X}$_b with '// &
                                      'stretch_${X}$ enabled. Exiting ...')
-                    #:for BOUND in ['beg', 'end']
-                        elseif ((a_${X}$ &
-                                + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) &
-                                + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) &
-                                - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) &
-                                /a_${X}$ <= 0d0) then
-                            call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
-                                            'to ${X}$_a and ${X}$_b for the given '// &
-                                            'a_${X}$. Exiting ...')
-                    #:endfor
                 end if
+                #:for BOUND in ['beg', 'end']
+                    ! Note: `!&` is used to prevent fprettify errors
+                    if ((a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) & !&
+                                 + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) & !&
+                                 - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0) then !&
+                        call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
+                                         'to ${X}$_a and ${X}$_b for the given '// &
+                                         'a_${X}$. Exiting ...')
+                    end if
+                #:endfor
             end if
         #:endfor
     end subroutine s_check_inputs_grid_stretching
