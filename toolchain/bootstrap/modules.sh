@@ -23,8 +23,9 @@ if [ -v $u_c ]; then
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d)"
     log   "$Y""Gatech$W:  Phoenix    (p)"
     log   "$R""Caltech$W: Richardson (r)"
-    log   "$B""Brown$W: Oscar (o)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR/$B""o$CR): "
+    log   "$BR""Brown$W: Oscar (o)"
+    log   "$B""DoD$W:     Carpenter  (c)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d$CR/$Y""p$CR/$R""r$CR/$B""c$CR/$BR""o"$CR"): "
     read u_c
     log
 fi
@@ -43,9 +44,9 @@ fi
 u_c=$(echo "$u_c" | tr '[:upper:]' '[:lower:]')
 u_cg=$(echo "$u_cg" | tr '[:upper:]' '[:lower:]')
 
-if [ "$u_cg" == 'c' ] || [ "$u_cg" == 'cpu' ]; then
+if [ "$u_cg" '==' 'c' ] || [ "$u_cg" '==' 'cpu' ]; then
     CG='CPU'; cg='cpu'
-elif [ "$u_cg" == "g" ] || [ "$u_cg" == 'gpu' ]; then
+elif [ "$u_cg" '==' "g" ] || [ "$u_cg" '==' 'gpu' ]; then
     CG='GPU'; cg='gpu'
 fi
 

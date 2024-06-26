@@ -12,7 +12,6 @@
         real(kind(0d0)), intent(IN) :: vel_sum
         real(kind(0d0)), intent(OUT) :: c
         real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
-
         real(kind(0d0)), dimension(num_fluids) :: blkmod
 
         integer :: q, i

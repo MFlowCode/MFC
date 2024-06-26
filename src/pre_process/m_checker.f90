@@ -17,14 +17,12 @@ module m_checker
 
 contains
 
-    subroutine s_check_inputs()
+    subroutine s_check_inputs
 
-        integer :: bub_fac !<
-            !! For allowing an extra fluid_pp if there are subgrid bubbles
+        integer :: bub_fac !< For allowing an extra fluid_pp if there are subgrid bubbles
         character(len=5) :: iStr !< for int to string conversion
         integer :: i
-        logical :: dir_check !<
-            !! Logical variable used to test the existence of folders
+        logical :: dir_check !< Logical variable used to test the existence of folders
 
 #ifndef MFC_MPI
         if (parallel_io .eqv. .true.) then

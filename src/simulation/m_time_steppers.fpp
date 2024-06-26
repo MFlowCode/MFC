@@ -89,7 +89,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_time_steppers_module() ! -----------------------
+    subroutine s_initialize_time_steppers_module
 
         type(int_bounds_info) :: ix_t, iy_t, iz_t !<
             !! Indical bounds in the x-, y- and z-directions
@@ -285,14 +285,14 @@ contains
             call s_open_run_time_information_file()
         end if
 
-    end subroutine s_initialize_time_steppers_module ! ---------------------
+    end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
-    subroutine s_1st_order_tvd_rk(t_step, time_avg) ! --------------------------------
+    subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: nR3bar
@@ -399,14 +399,14 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_1st_order_tvd_rk ! ------------------------------------
+    end subroutine s_1st_order_tvd_rk
 
     !> 2nd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_2nd_order_tvd_rk(t_step, time_avg) ! --------------------------------
+    subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -586,15 +586,15 @@ contains
         call cpu_time(finish)
         ! ==================================================================
 
-    end subroutine s_2nd_order_tvd_rk ! ------------------------------------
+    end subroutine s_2nd_order_tvd_rk
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
+        real(kind(0d0)), intent(in) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -855,16 +855,16 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+    end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for
         !!      the source term
         !! @param t_step Current time-step
-    subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
+    subroutine s_strang_splitting(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -890,13 +890,13 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_strang_splitting ! ------------------------------------
+    end subroutine s_strang_splitting
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param q_cons_vf conservative variables
-    subroutine s_adaptive_dt_bubble(t_step) ! ------------------------
+        !! @param t_step Current time-step
+    subroutine s_adaptive_dt_bubble(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp
@@ -913,14 +913,17 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-    end subroutine s_adaptive_dt_bubble ! ------------------------------
+    end subroutine s_adaptive_dt_bubble
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
 
-        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
-        real(kind(0d0)) :: ldt !< local dt
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
+
+        real(kind(0d0)), intent(in) :: ldt !< local dt
 
         integer :: i, j, k, l
 
@@ -943,9 +946,9 @@ contains
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step
-    subroutine s_time_step_cycling(t_step) ! ----------------------------
+    subroutine s_time_step_cycling(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i !< Generic loop iterator
 
@@ -978,10 +981,9 @@ contains
             end do
         end if
 
-    end subroutine s_time_step_cycling ! -----------------------------------
-
+    end subroutine s_time_step_cycling
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_time_steppers_module() ! -------------------------
+    subroutine s_finalize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
 
@@ -1046,6 +1048,6 @@ contains
             call s_close_run_time_information_file()
         end if
 
-    end subroutine s_finalize_time_steppers_module ! -----------------------
+    end subroutine s_finalize_time_steppers_module
 
 end module m_time_steppers

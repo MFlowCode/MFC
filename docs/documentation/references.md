@@ -20,6 +20,10 @@
 
 - <a id="Henrick05">Henrick, A. K., Aslam, T. D., and Powers, J. M. (2005). Mapped weighted essentially nonoscillatory schemes: achieving optimal order near critical points. Journal of Computational Physics, 207(2):542–567.</a>
 
+- <a id="Borges08">Borges, R., Carmona, M., Costa, B., and Don, W. S. (2008). An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws. Journal of computational physics, 227(6):3191–3211.</a>
+
+- <a id="Fu16">Fu, L., Hu, X. Y., and Adams, N. A. (2016). A family of high-order targeted ENO schemes for compressible-fluid simulations. Journal of Computational Physics, 305:333–359.</a>
+
 - <a id="Johnsen08">Johnsen, E. (2008). Numerical simulations of non-spherical bubble collapse: With applications to shockwave lithotripsy. PhD thesis, California Institute of Technology.</a>
 
 - <a id="Maeda17">Maeda, K. and Colonius, T. (2017). A source term approach for generation of one-way acoustic waves in the euler and navier–stokes equations. Wave Motion, 75:36–49.</a>

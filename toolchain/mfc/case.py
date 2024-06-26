@@ -83,6 +83,8 @@ class Case:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
 
     def __is_ic_analytical(self, key: str, val: str) -> bool:
+        '''Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?'''
         if common.is_number(val) or not isinstance(val, str):
             return False
 
@@ -183,6 +185,11 @@ class Case:
             elif bubble_model == 3:
                 nterms = 7
 
+            mapped_weno = 1 if self.params.get("mapped_weno", 'F') == 'T' else 0
+            wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
+            teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
+            wenojs = 0 if (mapped_weno or wenoz or teno) else 1
+
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
 #:set weno_order            = {int(self.params["weno_order"])}
@@ -191,6 +198,10 @@ class Case:
 #:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
 #:set nterms                = {nterms}
 #:set num_fluids            = {int(self.params["num_fluids"])}
+#:set wenojs                = {wenojs}
+#:set mapped_weno           = {mapped_weno}
+#:set wenoz                 = {wenoz}
+#:set teno                  = {teno}
 """
 
         return """\

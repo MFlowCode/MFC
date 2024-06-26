@@ -5,69 +5,73 @@ import json
 
 pi = 3.141592653589
 # material parameters
-# material 1 :: gas
-# Patterson 2018 et al.
-gammag = 1.4  # unitless
-Bg = 0.       # Pascals
-rhog = 1.18   # kg/m^3
-c_g = 347.2   # m/sec
-Gg = 0.      # Pascals
 
-# material 2: lung
-# Patterson 2018 et al.
-gammal = 5.5  # unitless
-Bl = 492E+06  # Pascals
-rhol = 996.0  # kg/m^3
-c_l = 1648.7  # m/sec
-Gl = 1E3     # Pascals, homework!
+#material1 :: gas
+#patterson 2018
 
-# primitive variables (if any)
-patmos = 101325.0 # Pascals, at Standard temperature and pressure
+gammag = 1.4    #unitless
+Bg =0           #pascals
+rhog = 1.18     #kg/m^3
+c_g = 347.2     #m/s
+G_g = 0         #pa
 
-# problem specific variable
-lambda_wave = 1E-3 # meters
+    #material2 :: lung
 
-# non-dimensionalization
-# define a characteristic density, length, time, and stress
+gammal = 5.5
+Bl = 492.E+06
+rhol = 996.0
+c_l = 1648.7
+G_l = 1E3
+
+#primitive vartiables
+patmos = 101325. #pa
+
+#problem specific variable
+lambda_wave = 1E-3
+
+#define pulse
+P_amp = 10.E+6
+P_len = 45                  #length of the impulse
+theta = -math.pi/2          #direction of propagation 
+
+#non-dim
+
+#define characteristic density, length, time, stress material
 rho_char = rhog
 length_char = lambda_wave
-vel_char = c_g
-time_char = length_char/vel_char
-stress_char = rho_char*vel_char*vel_char/gammag
+c_char = c_g
+time_char = length_char/c_char
+stress_char = rho_char*c_char*c_char/gammag
 
-# nondimensionalize the material properties
-rhog_n = rhog/rho_char
-c_g_n = c_g/vel_char
-Bg_n = Bg/stress_char  
-Gg_n = Gg/stress_char
-
-rhol_n = rhol/rho_char  
-c_l_n = c_l/vel_char
+#non-dim the properties
+rhog_n  = rhog/rho_char    
+c_g_n = c_g/c_char    
+rhol_n = rhol/rho_char
+c_l_n = c_l/c_char
+Bg_n = Bg/stress_char
 Bl_n = Bl/stress_char
-Gl_n = Gl/stress_char
-
+G_g_n = G_g/stress_char
+G_l_n = G_l/stress_char
 patmos_n = patmos/stress_char
+P_amp_n = P_amp/stress_char
 
-# spatial geometry
-dlengx = 1.0 
+#geometry
+dlengx = 1.
 dlengy = 20.
 Nx = 200
 Ny = dlengy*Nx
-
 dx = dlengx/Nx
 dy = dlengy/Ny
-
 alphal_back = 1.0
 alphag_back = 0.0
-
 alphal_lung = 0.0
 alphag_lung = 1.0
 
 interface_amp = 0.5
 
 # time stepping requirements
-time_end = 0.5
-cfl = 0.1
+time_end = 2.5
+cfl = 0.5
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
@@ -76,6 +80,9 @@ tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)
 
+#interface profile
+interface_amp = 0.5      
+
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
@@ -83,9 +90,9 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    'x_domain%beg'                 :  0,
+    'x_domain%beg'                 :  0.,
     'x_domain%end'                 :  dlengx,
-    'y_domain%beg'                 : -dlengy/2.,
+    'y_domain%beg'                 :  -dlengy/2.,
     'y_domain%end'                 :  dlengy/2.,
     'm'                            : int(Nx),
     'n'                            : int(Ny),
@@ -121,34 +128,32 @@ print(json.dumps({
     'bc_y%end'                     : -6,
     # ==========================================================================
 
-    # Monopole settings ========================================================
-    'Monopole'                     :'T',
-    'num_mono'                     : 1,
-    'Mono(1)%pulse'                 : 3, # this is for a sine wave
-    'Mono(1)%npulse'                : 10, # one cycle for now
-    'Mono(1)%support'               : 2, # plane of monopole
-    'Mono(1)%support_width'         : 10,
-    'Mono(1)%loc(1)'                : dlengx/2.0,
-    'Mono(1)%loc(2)'                : 5.0*dlengx,
-    'Mono(1)%dir'                   : 0.0,
-    'Mono(1)%mag'                   : 5.0*patmos_n,
-    'Mono(1)%length'                : 100.*dlengx,
-    # ==========================================================================
-
     # Formatted Database Files Structure Parameters ============================
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
+    
+    # Monopole setting =========================================================
+    'Monopole'                      : 'T',             # creating an acoustic wave
+    'num_mono'                      : 1,               # place in the middle and expand
+    'Mono(1)%pulse'                 : 3,               # sine  wave
+    'Mono(1)%npulse'                : 1,               # 1 pulse
+    'Mono(1)%mag'                   : 10.0*patmos_n,   # magnitude
+    'Mono(1)%length'                : 1*dlengx,        # impulse length
+    'Mono(1)%loc(1)'                : dlengx/2,        # x_center of the domain
+    'Mono(1)%loc(2)'                : 5.0*dlengx,      # upper boundary of the domain
+    'Mono(1)%dir'                   : -math.pi/2,      # direction: -pi/2
+ #==============================================================================
                                                                 
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : dlengx/2.0,
+    'patch_icpp(1)%x_centroid'     : dlengx/2,
     'patch_icpp(1)%y_centroid'     : 0.,
     'patch_icpp(1)%length_x'       : dlengx,
     'patch_icpp(1)%length_y'       : dlengy,
-    'patch_icpp(1)%vel(1)'         : 0.E+00,
+    'patch_icpp(1)%vel(1)'         : 0.,
     'patch_icpp(1)%vel(2)'         : 0.E+00,
     'patch_icpp(1)%pres'           : patmos_n,
     'patch_icpp(1)%alpha_rho(1)'   : rhol_n*alphal_back,
@@ -157,17 +162,18 @@ print(json.dumps({
     'patch_icpp(1)%alpha(2)'       : alphag_back,
     # ==========================================================================
 
-    # Patch 2: Lung interface state ===================================================
+
+    # Patch 2: Lung ============================================================
     'patch_icpp(2)%geometry'       : 7,
     'patch_icpp(2)%hcid'           : 205,
     'patch_icpp(2)%alter_patch(1)' : 'T',
-    'patch_icpp(2)%x_centroid'     : dlengx/2.0,
-    'patch_icpp(2)%y_centroid'     : -dlengy/4.0,
+    'patch_icpp(2)%x_centroid'     : dlengx/2.,
+    'patch_icpp(2)%y_centroid'     : -dlengy/4.,
     'patch_icpp(2)%length_x'       : dlengx,
-    'patch_icpp(2)%length_y'       : dlengy/2.0 + 2.0,
-    'patch_icpp(2)%a2'             : interface_amp, # this is the interface amplitude
+    'patch_icpp(2)%length_y'       : dlengy/2.+2,
+    'patch_icpp(2)%a2'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
-    'patch_icpp(2)%vel(2)'         : 0.E+00,
+    'patch_icpp(2)%vel(2)'         : 0.0,
     'patch_icpp(2)%pres'           : patmos_n,
     'patch_icpp(2)%alpha_rho(1)'   : rhol_n*alphal_lung,
     'patch_icpp(2)%alpha_rho(2)'   : rhog_n*alphag_lung,
@@ -180,7 +186,8 @@ print(json.dumps({
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
     'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
-# ==============================================================================
+    # ========================================================================== 
+    
 }))
 
 # ==============================================================================
