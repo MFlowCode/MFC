@@ -16,7 +16,7 @@ contains
     !>  Creates a directory and all its parents if it does not exist
         !!  @param dir_name Directory path
     subroutine s_create_directory(dir_name)
-        character(LEN=*), intent(IN) :: dir_name
+        character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
         call system('mkdir "'//dir_name//'" 2> NUL')
@@ -27,7 +27,7 @@ contains
     end subroutine s_create_directory
 
     subroutine s_delete_file(filepath)
-        character(LEN=*), intent(IN) :: filepath
+        character(LEN=*), intent(in) :: filepath
 
 #ifdef _WIN32
         call system('del "'//filepath//'"')
@@ -38,7 +38,7 @@ contains
     end subroutine s_delete_file
 
     subroutine s_delete_directory(dir_name)
-        character(LEN=*), intent(IN) :: dir_name
+        character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
         call system('rmdir "'//dir_name//'" /s /q')
@@ -52,8 +52,8 @@ contains
         !!  @param fileloc File directory location
         !!  @param dircheck Switch that indicates if directory exists
     subroutine my_inquire(fileloc, dircheck)
-        character(LEN=*), intent(IN) :: fileloc
-        logical, intent(INOUT) :: dircheck
+        character(LEN=*), intent(in) :: fileloc
+        logical, intent(inout) :: dircheck
 
 #ifdef __INTEL_COMPILER
         inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)   !Intel
@@ -64,14 +64,14 @@ contains
     end subroutine my_inquire
 
     subroutine s_get_cwd(cwd)
-        character(LEN=*), intent(OUT) :: cwd
+        character(LEN=*), intent(out) :: cwd
 
         call GETCWD(cwd)
     end subroutine s_get_cwd
 
     subroutine s_get_basename(dirpath, basename)
-        character(LEN=*), intent(IN) :: dirpath
-        character(LEN=*), intent(OUT) :: basename
+        character(LEN=*), intent(in) :: dirpath
+        character(LEN=*), intent(out) :: basename
 
         integer :: iUnit
         character(len=30) :: tmpfilepath

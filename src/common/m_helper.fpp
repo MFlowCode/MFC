@@ -19,23 +19,24 @@ module m_helper
 
     implicit none
 
-    private; public :: s_compute_finite_difference_coefficients, &
- s_comp_n_from_prim, &
- s_comp_n_from_cons, &
- s_initialize_nonpoly, &
- s_simpson, &
- s_transcoeff, &
- s_int_to_str, &
- s_transform_vec, &
- s_transform_triangle, &
- s_transform_model, &
- s_swap, &
- f_cross, &
- f_create_transform_matrix, &
- f_create_bbox, &
- s_print_2D_array, &
- f_xor, &
- f_logical_to_int
+    private; 
+    public :: s_compute_finite_difference_coefficients, &
+              s_comp_n_from_prim, &
+              s_comp_n_from_cons, &
+              s_initialize_nonpoly, &
+              s_simpson, &
+              s_transcoeff, &
+              s_int_to_str, &
+              s_transform_vec, &
+              s_transform_triangle, &
+              s_transform_model, &
+              s_swap, &
+              f_cross, &
+              f_create_transform_matrix, &
+              f_create_bbox, &
+              s_print_2D_array, &
+              f_xor, &
+              f_logical_to_int
 
 contains
 
@@ -52,16 +53,16 @@ contains
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
                                                         fd_number_in, fd_order_in, offset_s)
 
-        integer :: lB, lE !< loop bounds
-        integer, intent(IN) :: q
-        integer, intent(IN) :: buff_size, fd_number_in, fd_order_in
-        type(int_bounds_info), optional, intent(IN) :: offset_s
-        real(kind(0d0)), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
+        integer, intent(in) :: q
+        real(kind(0d0)), allocatable, dimension(:, :), intent(inout) :: fd_coeff_s
+        integer, intent(in) :: buff_size, fd_number_in, fd_order_in
+        type(int_bounds_info), optional, intent(in) :: offset_s
 
         real(kind(0d0)), &
             dimension(-buff_size:q + buff_size), &
             intent(IN) :: s_cc
 
+        integer :: lB, lE !< loop bounds
         integer :: i !< Generic loop iterator
 
         if (present(offset_s)) then
@@ -103,7 +104,7 @@ contains
 
         end if
 
-    end subroutine s_compute_finite_difference_coefficients ! --------------
+    end subroutine s_compute_finite_difference_coefficients
 
     !> Computes the bubble number density n from the primitive variables
         !! @param vftmp is the void fraction
@@ -111,11 +112,12 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)), intent(in) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(in) :: Rtmp
+        real(kind(0.d0)), intent(out) :: ntmp
+        real(kind(0.d0)), dimension(nb), intent(in) :: weights
+
         real(kind(0.d0)) :: R3
-        real(kind(0.d0)), dimension(nb) :: weights
 
         R3 = dot_product(weights, Rtmp**3.d0)
         ntmp = (3.d0/(4.d0*pi))*vftmp/R3
@@ -124,11 +126,12 @@ contains
 
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
+        real(kind(0.d0)), intent(in) :: vftmp
+        real(kind(0.d0)), dimension(nb), intent(in) :: nRtmp
+        real(kind(0.d0)), intent(out) :: ntmp
+        real(kind(0.d0)), dimension(nb), intent(in) :: weights
+
         real(kind(0.d0)) :: nR3
-        real(kind(0.d0)), dimension(nb) :: weights
 
         nR3 = dot_product(weights, nRtmp**3.d0)
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
@@ -140,11 +143,12 @@ contains
 
     subroutine s_print_2D_array(A, div)
 
-        real(kind(0d0)), dimension(:, :) :: A
+        real(kind(0d0)), dimension(:, :), intent(in) :: A
+        real, optional, intent(in) :: div
+
         integer :: i, j
         integer :: m, n
         real :: c
-        real, optional :: div
 
         m = size(A, 1)
         n = size(A, 2)
@@ -169,18 +173,10 @@ contains
 
     !> Initializes non-polydisperse bubble modeling
     subroutine s_initialize_nonpoly
+
         integer :: ir
-        real(kind(0.d0)) :: rhol0
-        real(kind(0.d0)) :: pl0
-        real(kind(0.d0)) :: uu
-        real(kind(0.d0)) :: D_m
-        real(kind(0.d0)) :: temp
-        real(kind(0.d0)) :: omega_ref
-        real(kind(0.d0)), dimension(Nb) :: chi_vw0
-        real(kind(0.d0)), dimension(Nb) :: cp_m0
-        real(kind(0.d0)), dimension(Nb) :: k_m0
-        real(kind(0.d0)), dimension(Nb) :: rho_m0
-        real(kind(0.d0)), dimension(Nb) :: x_vw
+        real(kind(0.d0)) :: rhol0, pl0, uu, D_m, temp, omega_ref
+        real(kind(0.d0)), dimension(Nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw
 
         real(kind(0.d0)), parameter :: k_poly = 1.d0 !<
             !! polytropic index used to compute isothermal natural frequency
@@ -296,10 +292,9 @@ contains
         !! @param Im_trans Imaginary part of the transport coefficients
     subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
-        real(kind(0.d0)), intent(IN) :: omega
-        real(kind(0.d0)), intent(IN) :: peclet
-        real(kind(0.d0)), intent(OUT) :: Re_trans
-        real(kind(0.d0)), intent(OUT) :: Im_trans
+        real(kind(0.d0)), intent(in) :: omega, peclet
+        real(kind(0.d0)), intent(out) :: Re_trans, Im_trans
+
         complex :: trans, c1, c2, c3
         complex :: imag = (0., 1.)
         real(kind(0.d0)) :: f_transcoeff
@@ -315,8 +310,10 @@ contains
     end subroutine s_transcoeff
 
     subroutine s_int_to_str(i, res)
-        character(len=*) :: res
+
         integer, intent(in) :: i
+        character(len=*), intent(out) :: res
+
         write (res, '(I0)') i
         res = trim(res)
     end subroutine
@@ -325,11 +322,7 @@ contains
     subroutine s_simpson
 
         integer :: ir
-        real(kind(0.d0)) :: R0mn
-        real(kind(0.d0)) :: R0mx
-        real(kind(0.d0)) :: dphi
-        real(kind(0.d0)) :: tmp
-        real(kind(0.d0)) :: sd
+        real(kind(0.d0)) :: R0mn, R0mx, dphi, tmp, sd
         real(kind(0.d0)), dimension(nb) :: phi
 
         ! nondiml. min. & max. initial radii for numerical quadrature
@@ -378,6 +371,7 @@ contains
     !! @param b Second vector.
     !! @return The cross product of the two vectors.
     function f_cross(a, b) result(c)
+
         real(kind(0d0)), dimension(3), intent(in) :: a, b
         real(kind(0d0)), dimension(3) :: c
 
@@ -390,6 +384,7 @@ contains
     !! @param lhs Left-hand side.
     !! @param rhs Right-hand side.
     subroutine s_swap(lhs, rhs)
+
         real(kind(0d0)), intent(inout) :: lhs, rhs
         real(kind(0d0)) :: ltemp
 
@@ -403,8 +398,7 @@ contains
     !! @return Transformation matrix.
     function f_create_transform_matrix(p) result(out_matrix)
 
-        type(ic_model_parameters) :: p
-
+        type(ic_model_parameters), intent(in) :: p
         t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
 
         sc = transpose(reshape([ &
@@ -519,6 +513,7 @@ contains
     end function f_create_bbox
 
     function f_xor(lhs, rhs) result(res)
+
         logical, intent(in) :: lhs, rhs
         logical :: res
 
@@ -526,6 +521,7 @@ contains
     end function f_xor
 
     function f_logical_to_int(predicate) result(int)
+
         logical, intent(in) :: predicate
         integer :: int
 

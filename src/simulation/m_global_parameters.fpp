@@ -119,14 +119,22 @@ module m_global_parameters
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
         integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
+        logical, parameter :: wenojs = ${wenojs}$           !< WENO-JS (default)
+        logical, parameter :: mapped_weno = ${mapped_weno}$ !< WENO-M (WENO with mapping of nonlinear weights)
+        logical, parameter :: wenoz = ${wenoz}$             !< WENO-Z
+        logical, parameter :: teno = ${teno}$               !< TENO (Targeted ENO)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
         integer :: num_fluids     !< number of fluids in the simulation
+        logical :: wenojs         !< WENO-JS (default)
+        logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
+        logical :: wenoz          !< WENO-Z
+        logical :: teno           !< TENO (Targeted ENO)
     #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    logical :: mapped_weno    !< WENO with mapping of nonlinear weights
+    real(kind(0d0)) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -155,10 +163,10 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids)
+        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps,hypoelasticity,hyperelasticity)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err,alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT,hypoelasticity,hyperelasticity)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -468,7 +476,7 @@ contains
     !> Assigns default values to the user inputs before reading
         !!  them in. This enables for an easier consistency check of
         !!  these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs() ! ------------------
+    subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j !< Generic loop iterator
 
@@ -495,7 +503,7 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_eps = dflt_real
-        mapped_weno = .false.
+        teno_CT = dflt_real
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
@@ -518,6 +526,12 @@ contains
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
+
+        #:if not MFC_CASE_OPTIMIZATION
+            mapped_weno = .false.
+            wenoz = .false.
+            teno = .false.
+        #:endif
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -648,12 +662,12 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
-    end subroutine s_assign_default_values_to_user_inputs ! ----------------
+    end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_global_parameters_module() ! -------------------
+    subroutine s_initialize_global_parameters_module
 
         integer :: i, j, k
         integer :: fac
@@ -975,6 +989,11 @@ contains
         wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
         !$acc update device(wa_flg)
 
+        ! Resort to default WENO-JS if no other WENO scheme is selected
+        #:if not MFC_CASE_OPTIMIZATION
+            wenojs = .not. (mapped_weno .or. wenoz .or. teno)
+        #:endif
+
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
 
@@ -1050,7 +1069,11 @@ contains
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps, hyperelasticity)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity)
+
+        #:if not MFC_CASE_OPTIMIZATION
+            !$acc update device(wenojs, mapped_weno, wenoz, teno)
+        #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
@@ -1073,10 +1096,10 @@ contains
         @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
 
-    end subroutine s_initialize_global_parameters_module ! -----------------
+    end subroutine s_initialize_global_parameters_module
 
     !> Initializes parallel infrastructure
-    subroutine s_initialize_parallel_io() ! --------------------------------
+    subroutine s_initialize_parallel_io
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)
@@ -1104,10 +1127,10 @@ contains
 
 #endif
 
-    end subroutine s_initialize_parallel_io ! ------------------------------
+    end subroutine s_initialize_parallel_io
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_global_parameters_module() ! ---------------------
+    subroutine s_finalize_global_parameters_module
 
         integer :: i
 
@@ -1140,6 +1163,6 @@ contains
         if (p == 0) return; 
         @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
-    end subroutine s_finalize_global_parameters_module ! -------------------
+    end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters
