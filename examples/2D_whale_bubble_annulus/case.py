@@ -193,6 +193,5 @@ print(json.dumps({
     'Mono(1)%pulse'                : 1,
     'Mono(1)%mag'                  : 1.,
     'Mono(1)%length'               : 0.2,
-    'cu_mpi'                       : 'F',
-
+    'rdma_mpi'                     : 'F',
 }))

@@ -33,30 +33,26 @@ warn "Consider using a different template via the $MAGENTA--computer$COLOR_RESET
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath(case)}")
+        (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         if [ "$binary" == "jsrun" ]; then
-            (set -x; ${' '.join([f"'{x}'" for x in profiler ])}   \
-                jsrun --nrs          ${tasks_per_node*nodes}      \
-                      --cpu_per_rs   1                            \
-                      --gpu_per_rs   ${1 if gpu else 0}           \
-                      --tasks_per_rs 1                            \
-                      ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+            (set -x; ${profiler}   \
+                jsrun --nrs          ${tasks_per_node*nodes} \
+                      --cpu_per_rs   1                       \
+                      --gpu_per_rs   ${1 if gpu else 0}      \
+                      --tasks_per_rs 1                       \
                       "${target.get_install_binpath(case)}")
         elif [ "$binary" == "srun" ]; then
-            (set -x; ${' '.join([f"'{x}'" for x in profiler ])}  \
-                srun --ntasks-per-node ${tasks_per_node}         \
-                     ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+            (set -x; ${profiler}                            \
+                srun --ntasks ${nodes*tasks_per_node}       \
                      "${target.get_install_binpath(case)}")
         elif [ "$binary" == "mpirun" ]; then
-            (set -x; ${' '.join([f"'{x}'" for x in profiler ])}     \
-                $binary -np ${nodes*tasks_per_node}                 \
-                        ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+            (set -x; ${profiler}     \
+                $binary -np ${nodes*tasks_per_node}            \
                         "${target.get_install_binpath(case)}")
         elif [ "$binary" == "mpiexec" ]; then
-            (set -x; ${' '.join([f"'{x}'" for x in profiler ])}     \
-                $binary --ntasks ${nodes*tasks_per_node}            \
-                        ${' '.join([f"'{x}'" for x in ARG('--') ])} \
+            (set -x; ${profiler}                               \
+                $binary --ntasks ${nodes*tasks_per_node}       \
                         "${target.get_install_binpath(case)}")
         fi
     % endif

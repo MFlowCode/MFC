@@ -144,6 +144,8 @@ class MFCTarget:
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
             flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
+            flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
+            flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
 
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
@@ -286,7 +288,8 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
         targets = ARG("targets")
 
     targets = get_targets(list(REQUIRED_TARGETS) + targets)
-    case    = case or input.load(ARG("input"), ARG("arguments"), {})
+    case    = case or input.load(ARG("input"), ARG("--"), {})
+    case.validate_params()
 
     if len(history) == 0:
         cons.print(__generate_header("Build", targets))

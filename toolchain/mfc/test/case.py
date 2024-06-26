@@ -90,7 +90,7 @@ BASE_CFG = {
     'Mono(1)%dir'                   : 1.0,
     'Mono(1)%npulse'                : 1,
     'Mono(1)%pulse'                 : 1,
-    'cu_mpi'                        :'F',
+    'rdma_mpi'                      : 'F',
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -118,13 +118,14 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
+        rebuild           = [] if self.rebuild or ARG("case_optimization") else ["--no-build"]
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
         target_names = [ get_target(t).name for t in targets ]
 
         command = [
-            mfc_script, "run", filepath, *tasks, *case_optimization,
+            mfc_script, "run", filepath, *rebuild, *tasks, *case_optimization,
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 

@@ -979,16 +979,15 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file ! -----------
 
-    subroutine s_write_intf_data_file(q_prim_vf, t_step)
+    subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer, intent(IN) :: t_step
         integer :: i, j, k, l, w, cent !< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
         real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, maxalph_loc, maxalph_glb, thres
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb 
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
@@ -998,7 +997,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                            maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1006,42 +1005,42 @@ contains
 
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         do l = 0, p
-            if (z_cc(l) < dz(l) .and. z_cc(l) >= 0) then
+            if (z_cc(l) .lt. dz(l) .and. z_cc(l) .gt. 0) then
                 cent = l
             end if
         end do
-        thres = 0.6d0*maxalph_glb
+        thres = 0.9d0
         do k = 0, n
             OLoop: do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
-                axm = q_prim_vf(E_idx + 2)%sf(j - 1, k, cent)
+                axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
                 ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k - 1, cent)
-
-                if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
-                    .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
+                aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                if ((axp .gt. thres .and. axm .lt. thres) .or. (axp .lt. thres .and. axm .gt. thres) &
+                    .or. (ayp .gt. thres .and. aym .lt. thres) .or. (ayp .lt. thres .and. aym .gt. thres)) then
                     if (counter == 0) then
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
                         y_d1(counter) = y_cc(k)
-                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
-                        tgp = sqrt(dx(j)**2 + dy(k)**2)
                     else
+                        euc_d = dsqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = dsqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
-                            if (euc_d <= tgp .or. x_cc(j) == x_d1(i) .or. y_cc(k) == y_d1(i)) then
+                            if (euc_d .lt. tgp) then
                                 cycle OLoop
-                            elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
-                                !artificial bounding on the interface for bubble at a centroid.
-                                !need to remove eventually.
+                            elseif (euc_d .gt. tgp .and. i == counter) then
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)
+
                             end if
                         end do
                     end if
                 end if
             end do OLoop
         end do
+
+
         allocate (y_d(counter))
         allocate (x_d(counter))
         do i = 1, counter
@@ -1049,7 +1048,7 @@ contains
             x_d(i) = x_d1(i)
         end do
         root = 0
-        ! if (num_procs > 1) then
+
         call s_mpi_gather_data(x_d, counter, x_td, root)
         call s_mpi_gather_data(y_d, counter, y_td, root)
         if (proc_rank == 0) then
@@ -1062,14 +1061,15 @@ contains
                         x_td(i), y_td(i), 0d0
                 end if
             end do
-        end if
+         end if
+
+        
 
     end subroutine s_write_intf_data_file ! -----------------------------------
 
-    subroutine s_write_energy_data_file(q_prim_vf, t_step)
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer, intent(IN) :: t_step
-        real(kind(0d0)) :: Elk, Egk, Elint, Egint, Vb, Vl, pres_av
+    subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
+        real(kind(0d0)) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs, adv
@@ -1077,14 +1077,18 @@ contains
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
         Egk = 0d0
-        Elint = 0d0
+        Elp = 0d0
         Egint = 0d0
         Vb = 0d0
         maxvel = 0d0
         MaxMa = 0d0
         Vl = 0d0
         Elk = 0d0
-        if (p > 0) then
+        Et = 0d0
+        Vb = 0d0
+        dV = 0d0
+        pres_av = 0d0
+        pres = 0d0
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -1117,16 +1121,17 @@ contains
                                                       H, adv, 0d0, c)
 
                         Ma = maxvel/c
-                        if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-6) then
+                        if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
                             MaxMa = Ma
                         end if
                         Vl = Vl + adv(1)*dV
                         Vb = Vb + adv(2)*dV
                         pres_av = pres_av + adv(1)*pres*dV
+                        Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
                     end do
                 end do
             end do
-        end if
+
         tmp = pres_av
         call s_mpi_allreduce_sum(tmp, pres_av)
         tmp = Vl
@@ -1141,15 +1146,17 @@ contains
         call s_mpi_allreduce_sum(tmp, Egk)
         tmp = Vb
         call s_mpi_allreduce_sum(tmp, Vb)
+        tmp = Et
+        call s_mpi_allreduce_sum(tmp, Et)
 
-        Elint = pres_av/Vl*Vb
-
+        Elp = pres_av/Vl*Vb
         if (proc_rank == 0) then
-            write (251, '(6X, 7F24.12)') &
-                Elint, &
+            write (251, '(10X, 8F24.8)') &
+                Elp, &
                 Egint, &
                 Elk, &
                 Egk, &
+                Et, &
                 Vb, &
                 Vl, &
                 MaxMa_glb
@@ -1186,26 +1193,12 @@ contains
 
     subroutine s_close_intf_data_file() ! -----------------------
 
-        ! Writing the footer of and closing the run-time information file
-        write (211, '(A)') '----------------------------------------'// &
-            '----------------------------------------'
-        write (211, '(A)') ''
-        write (211, '(A)') ''
-        write (211, '(A)') '========================================'// &
-            '========================================'
         close (211)
 
     end subroutine s_close_intf_data_file !---------------------
 
     subroutine s_close_energy_data_file() ! -----------------------
 
-        ! Writing the footer of and closing the run-time information file
-        write (251, '(A)') '----------------------------------------'// &
-            '----------------------------------------'
-        write (251, '(A)') ''
-        write (251, '(A)') ''
-        write (251, '(A)') '========================================'// &
-            '========================================'
         close (251)
 
     end subroutine s_close_energy_data_file !---------------------

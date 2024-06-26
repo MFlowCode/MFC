@@ -49,6 +49,9 @@ module m_patches
  s_cuboid, &
  s_cylinder, &
  s_sweep_plane, &
+    !Naz adding stuff
+ s_2D_lung, &
+    !Naz adding stuff
  s_model
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
@@ -1654,8 +1657,6 @@ contains
             radius = patch_ib(patch_id)%radius
         end if
 
-        print *, x_centroid, y_centroid, z_centroid, radius
-
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
         ! case that smoothing of the spherical patch's boundary is enabled.
@@ -2032,6 +2033,112 @@ contains
         end do
 
     end subroutine s_sweep_plane ! -----------------------------------------
+
+        !Naz changing the code below
+
+    !>      The lung patch is a 2D geometry that may be used,
+        !!              for example, in creating a solid boundary, or pre-/post-
+        !!              shock region, in alignment with the axes of the Cartesian
+        !!              coordinate system. The geometry of such a patch is well-
+        !!              defined when its centroid and lengths in the x- and y-
+        !!              coordinate directions are provided. Please note that the
+        !!              rectangular patch DOES NOT allow for the smoothing of its
+        !!              boundaries.
+        !! @param patch_id is the patch identifier
+    subroutine s_2D_lung(patch_id, patch_id_fp, q_prim_vf, ib) ! -------------------------------------
+
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+
+        real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        logical :: ib !< True if this patch is an immersed boundary
+
+        integer :: i, j, k !< generic loop iterators
+
+        pi_inf = fluid_pp(1)%pi_inf
+        gamma = fluid_pp(1)%gamma
+        lit_gamma = (1d0 + gamma)/gamma
+
+        ! Transferring the rectangle's centroid and length information
+        if (.not. ib) then
+            x_centroid = patch_icpp(patch_id)%x_centroid
+            y_centroid = patch_icpp(patch_id)%y_centroid
+            length_x = patch_icpp(patch_id)%length_x
+            length_y = patch_icpp(patch_id)%length_y
+        else
+            x_centroid = patch_ib(patch_id)%x_centroid
+            y_centroid = patch_ib(patch_id)%y_centroid
+            length_x = patch_ib(patch_id)%length_x
+            length_y = patch_ib(patch_id)%length_y
+        end if
+
+        ! Computing the beginning and the end x- and y-coordinates of the
+        ! rectangle based on its centroid and lengths
+        x_boundary%beg = x_centroid - 0.5d0*length_x
+        x_boundary%end = x_centroid + 0.5d0*length_x
+        y_boundary%beg = y_centroid - 0.5d0*length_y - 0.03
+        y_boundary%end = y_centroid + 0.5d0*length_y
+
+        ! Since the rectangular patch does not allow for its boundaries to
+        ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
+        ! that only the current patch contributes to the fluid state in the
+        ! cells that this patch covers.
+        eta = 1d0
+
+        ! Checking whether the rectangle covers a particular cell in the
+        ! domain and verifying whether the current patch has the permission
+        ! to write to that cell. If both queries check out, the primitive
+        ! variables of the current patch are assigned to this cell.
+        do j = 0, n
+            do i = 0, m
+                if (.not. ib) then
+                    if (x_boundary%beg <= x_cc(i) .and. &
+                        x_boundary%end >= x_cc(i) .and. &
+                        (y_boundary%beg+0.03*sin(2*pi*x_cc(i)-pi/2)) <= y_cc(j) .and. &
+                        y_boundary%end >= y_cc(j) &
+                        .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                        then
+
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
+
+                        @:analytical()
+
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
+
+                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
+                            !zero density, reassign according to Tait EOS
+                            q_prim_vf(1)%sf(i, j, 0) = &
+                                (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                                rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
+                        end if
+
+                        ! Updating the patch identities bookkeeping variable
+                        if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
+
+                    end if
+                end if
+
+                if (ib .and. x_boundary%beg <= x_cc(i) .and. &
+                    x_boundary%end >= x_cc(i) .and. &
+                    y_boundary%beg+0.03*sin(2*pi*x_cc(i)-pi/2) <= y_cc(j) .and. &
+                    y_boundary%end >= y_cc(j)) &
+                    then
+
+                    patch_id_fp(i, j, 0) = patch_id
+
+                end if
+
+            end do
+        end do
+
+    end subroutine s_2d_lung ! -------------------------------------------
+
+            !Naz changing the code above
+
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier

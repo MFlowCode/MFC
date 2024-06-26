@@ -16,14 +16,16 @@ project(MFC LANGUAGES C CXX Fortran)
 
 # Build options exposed to users and their default values.
 
-option(MFC_MPI           "Build with MPI"       ON)
-option(MFC_OpenACC       "Build with OpenACC"  OFF)
-option(MFC_PRE_PROCESS   "Build pre_process"   OFF)
-option(MFC_SIMULATION    "Build simulation"    OFF)
-option(MFC_POST_PROCESS  "Build post_process"  OFF)
-option(MFC_SYSCHECK      "Build syscheck"      OFF)
-option(MFC_DOCUMENTATION "Build documentation" OFF)
-option(MFC_ALL           "Build everything"    OFF)
+option(MFC_MPI           "Build with MPI"                                     ON)
+option(MFC_OpenACC       "Build with OpenACC"                                OFF)
+option(MFC_GCov          "Build with GCov"                                   OFF)
+option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
+option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
+option(MFC_SIMULATION    "Build simulation"                                  OFF)
+option(MFC_POST_PROCESS  "Build post_process"                                OFF)
+option(MFC_SYSCHECK      "Build syscheck"                                    OFF)
+option(MFC_DOCUMENTATION "Build documentation"                               OFF)
+option(MFC_ALL           "Build everything"                                  OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -66,16 +68,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
         message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, v21.7 or newer is required to build MFC.")
     endif()
-    if (MAKE_BUILD_TYPE STREQUAL "Debug")
-        if (MFC_OpenACC)
-            if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.0)
-                message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, v23.0 or newer is required to build MFC with Debug and GPU options.")
-            endif()
-        else()
-            if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.8)
-                message(FATAL_ERROR "${__err_msg}ERROR: Debug is not working with NVHPC 23.X and older and CPU options at present.")
-            endif()
-        endif()
+    if ((CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
+        message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, MFC with Debug and GPU options is unavailable.")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
@@ -106,13 +100,34 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
     )
 
+    if (MFC_GCov)
+
+        # Warning present in gcc versions >= 12 that is treated as an error
+        # This flag doesn't exist in gcc versions < 12
+        if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 12)
+            add_compile_options(
+                -Wno-error=coverage-invalid-line-number
+            )
+        endif()
+
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
+            $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
+	    )
+
+        add_link_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
+            $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
+        )
+    endif()
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             #-ffpe-trap=invalid,zero,denormal,overflow
-	)
+        )
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
@@ -171,7 +186,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -O0 -traceback -Mchkptr -Mchkstk -Minform=inform -Mbounds)
+        add_compile_options(-C -g -O0 -traceback -Mchkptr -Minform=inform -Mbounds)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})
@@ -439,6 +454,17 @@ function(MFC_SETUP_TARGET)
             target_compile_options(${ARGS_TARGET}
                 PRIVATE -gpu=keep,ptxinfo,lineinfo
             )
+
+            # GH-200 Unified Memory Support
+            if (MFC_Unified)
+                target_compile_options(${ARGS_TARGET}
+                    PRIVATE -gpu=unified
+                )
+                # "This option must appear in both the compile and link lines" -- NVHPC Docs
+                target_link_options(${ARGS_TARGET}
+                    PRIVATE -gpu=unified
+                )
+            endif()
 
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}

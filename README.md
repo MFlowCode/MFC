@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396">
+  <a href="http://dx.doi.org/10.1016/j.cpc.2020.107396" target="_blank">
     <img src="https://zenodo.org/badge/doi/10.1016/j.cpc.2020.107396.svg" />
   </a>
   <a href="https://github.com/MFlowCode/MFC/actions">
@@ -17,17 +17,19 @@
   <a href="https://lbesson.mit-license.org/">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" />
   </a>
+  <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
+    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
+  </a>
 </p>
 
 Welcome to the home of MFC!
 MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale), like Oak Ridge Summit and Frontier.
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
 MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
   
-Get in touch with the maintainers, like <a href="mailto:shb@gatech.edu">Spencer</a>, if you have questions!
+Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
 MFC has high-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
-
 
 ## An example
 
@@ -52,33 +54,31 @@ You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_
 It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
-```console
+```shell
 brew install wget python cmake gcc@13 mpich
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
-```console
-git clone https://github.com/mflowcode/MFC.git
+```shell
+git clone https://github.com/MFlowCode/MFC.git
 cd MFC
 ```
-and make sure MFC knows what compilers to use by putting the following in your `~/.profile`
-```console
-export CC=gcc-13
-export CXX=g++-13
-export FC=gfortran-13
-```
-and source that file, build, and test!
-```console
+and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
+```shell
+echo -e "export CC=gcc-13 \nexport CXX=g++-13 \nexport FC=gfortran-13" >> ~/.profile
 source ~/.profile
-./mfc.sh build -j 8
-./mfc.sh test -j 8
+```
+then you can build MFC and run the test suite!
+```shell
+./mfc.sh build -j $(nproc)
+./mfc.sh test -j $(nproc)
 ```
 And... you're done!
 
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
 
 The shock-droplet interaction case above was run via
-```console
+```shell
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
@@ -97,25 +97,29 @@ The weak scaling of MFC on this machine is below, showing near-ideal utilization
 ## What else can this thing do
 
 MFC has many features.
-They are organized below, just click the drop-downs!
+They are organized below. Just click the drop-downs!
 
 <details>
 <summary>Physics</summary>
 
 * 1-3D
 * Compressible
+	* Low Mach number treatment available
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
+   	* Kapila and Allaire models
 * Multi- and single-phase 
 	* Phase change via p, pT, and pTg schemes
 * Grids
-	* 1-3D Cartesian, cylindrical, axi-symmetric. 
-	* Arbitrary grid stretching for multiple domain regions available.
+	* 1-3D Cartesian, cylindrical, axisymmetric. 
+	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary methods 
 	* STL geometry files supported
+* Surface tension for multiphase cases
 * Sub-grid Euler-Euler multiphase models for bubble dynamics and similar
 * Viscous effects (high-order accurate representations)
 * Ideal and stiffened gas equations of state
+* Body forces
 * Acoustic wave generation (one- and two-way sound sources)
 </details>
 
@@ -123,7 +127,8 @@ They are organized below, just click the drop-downs!
 <summary>Numerics</summary>
 
 * Shock and interface capturing schemes
-	* First-order upwinding, WENO3 and 5. 
+	* First-order upwinding, WENO3 and 5.
+   	* Monotonicity-preserving reconstructions
 	* Reliable handling of high density ratios.
 * Exact and approximate (e.g., HLL, HLLC) Riemann solvers
 * Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more.
@@ -134,11 +139,12 @@ They are organized below, just click the drop-downs!
 <details>
 <summary>Large-scale and accelerated simulation</summary>
 
-* GPU compatible on NVIDIA (P/V/A/H100, etc.) and AMD (MI200+) hardware
-* Ideal weak scaling to 100% of leadership class machines
-	* \>10K GPUs on [OLCF Summit](https://www.olcf.ornl.gov/summit/) (V100-based)
-	* \>60K GPUs on world's first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X-based)
-* Near roofline behavior
+* GPU compatible on NVIDIA (P/V/A/H100, GH200, etc.) and AMD (MI200+) hardware
+* Ideal weak scaling to 100% of the largest GPU supercomputers
+	* \>10K NVIDIA GPUs on [OLCF Summit](https://www.olcf.ornl.gov/summit/) (NV V100-based)
+	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
+* Near compute roofline behavior
+* RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
 </details>
 
 <details>
@@ -146,7 +152,9 @@ They are organized below, just click the drop-downs!
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* Regression test cases on CPU and GPU hardware with each PR. Performed with GNU, Intel, and NVIDIA compilers.
+	* \>100 Regression tests with each PR.
+ 		* Performed with GNU, Intel, and NVIDIA compilers on NVIDIA and AMD GPUs.
+		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
 * Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
 </details>
@@ -154,31 +162,49 @@ They are organized below, just click the drop-downs!
 
 ## Citation
 
-If you use MFC, consider citing it:
+If you use MFC, consider citing it as:
 
 <p align="center">
   <a href="https://doi.org/10.1016/j.cpc.2020.107396">
-    S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications 4655, 107396
+    S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications <b>266</b>, 107396
   </a>
 </p>
 
 ```bibtex
 @article{Bryngelson_2021,
-  title = {{MFC: A}n open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
-  author = {Spencer H. Bryngelson and Kevin Schmidmayer and Vedran Coralic and Jomela C. Meng and Kazuki Maeda and Tim Colonius},
+  title   = {{MFC: A}n open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver},
+  author  = {S. H. Bryngelson and K. Schmidmayer and V. Coralic and J. C. Meng and K. Maeda and T. Colonius},
   journal = {Computer Physics Communications},
-  doi = {10.1016/j.cpc.2020.107396},
-  year = {2021},
-  pages = {107396},
+  year    = {2021},
+  volume  = {266},
+  pages   = {107396},
+  doi     = {10.1016/j.cpc.2020.107396}
+}
+```
+
+```bibtex
+@article{Radhakrishnan_2024,
+  title   = {Method for portable, scalable, and performant {GPU}-accelerated simulation of multiphase compressible flow},
+  author  = {A. Radhakrishnan and H. {Le Berre} and B. Wilfong and J.-S. Spratt and M. {Rodriguez Jr.} and T. Colonius and S. H. Bryngelson},
+  journal = {Computer Physics Communications},
+  year    = {2024},
+  volume  = {302},
+  pages   = {109238},
+  doi     = {10.1016/j.cpc.2024.109238}
 }
 ```
 
 ## License
  
 Copyright 2021-2024 Spencer Bryngelson and Tim Colonius.
-MFC is under the MIT license (see [LICENSE](LICENSE) file for full text).
+MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 ## Acknowledgements
 
 Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), National Institutes of Health (NIH), Department of Energy (DOE), and National Science Foundation (NSF).
-MFC computations use OLCF Frontier, Summit, and Wombat under allocation CFD154 (PI Bryngelson) and ACCESS-CI under allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson).
+
+MFC computations have used many supercomputing systems. A partial list is below
+  * OLCF Frontier and Summit, and testbed systems Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
+  * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI (allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson))
+  * DOD systems Onyx, Carpenter, and Nautilus via the DOD HPCMP program
+  * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex

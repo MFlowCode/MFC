@@ -111,6 +111,7 @@ module m_global_parameters
     integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
+    integer :: c_idx                               !< Index of color function
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -193,6 +194,7 @@ module m_global_parameters
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
     logical :: schlieren_wrt
+    logical :: cf_wrt
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -240,6 +242,11 @@ module m_global_parameters
     integer :: nmom
 
     !> @}
+
+    !> @name surface tension coefficient
+    !> @{
+    real(kind(0d0)) :: sigma
+    !> #}
 
     !> @name Index variables used for m_variables_conversion
     !> @{
@@ -334,6 +341,7 @@ contains
         qm_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
+        cf_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -351,6 +359,7 @@ contains
         polydisperse = .false.
         poly_sigma = dflt_real
         sigR = dflt_real
+        sigma = dflt_real
         adv_n = .false.
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
@@ -500,6 +509,11 @@ contains
                 tensor_size = num_dims**2 + 1
             end if
 
+            if (sigma /= dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
             ! ==================================================================
 
             ! Volume Fraction Model (6-equation model) =========================
@@ -520,6 +534,11 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
+
+            if (sigma /= dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
 
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation

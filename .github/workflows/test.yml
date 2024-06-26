@@ -17,20 +17,45 @@ on:
   workflow_dispatch:
     
 jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
   github:
     name: Github
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
-        mpi:   ['mpi', 'no-mpi']
+        mpi:   ['mpi']
         debug: ['debug', 'no-debug']
         intel: [true, false]
         exclude:
-          - intel: true
-            os:    macos
+          - os:    macos
+            intel: true
+
+        include:
+          - os:    ubuntu
+            mpi:   no-mpi
+            debug: no-debug
+            intel: false
+
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.os }}-latest
+
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -38,10 +63,10 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run: |
-          echo "CC=gcc-13"      >> $GITHUB_ENV
-          echo "CXX=g++-13"     >> $GITHUB_ENV
-          echo "FC=gfortran-13" >> $GITHUB_ENV
-          brew install wget make python make cmake coreutils gcc@13
+          brew install wget make python make cmake coreutils gcc@14
+          echo "CC=gcc-14"      >> $GITHUB_ENV
+          echo "CXX=g++-14"     >> $GITHUB_ENV
+          echo "FC=gfortran-14" >> $GITHUB_ENV
           
       - name: (MacOS) Build OpenMPI
         if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
@@ -89,7 +114,9 @@ jobs:
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   docker:
-    name:    Github | Docker
+    name: Github | Docker
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     runs-on: ubuntu-latest
     steps:
     - name: Clone
@@ -100,7 +127,8 @@ jobs:
 
   self:
     name: Self Hosted
-    if: github.repository == 'MFlowCode/MFC'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     continue-on-error: true
     strategy:
       matrix:
