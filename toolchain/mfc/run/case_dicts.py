@@ -8,25 +8,6 @@ class ParamType(Enum):
     LOG = {"enum": ["T", "F"]}
     STR = {"type": "string"}
 
-<<<<<<< HEAD
-COMMON = [
-    "hypoelasticity", "hyperelasticity", "cyl_coord", "pref", "p", "parallel_io",
-    "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
-    "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
-    "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "file_per_process", "relax", "relax_model",
-    "adv_n"
-]
-
-
-PRE_PROCESS = COMMON + [
-    'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
-    'instability_wave', 'perturb_flow', 'perturb_flow_fluid', 'perturb_flow_mag',
-    'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "palpha_eps", "ptgalpha_eps",
-    'pi_fac', 'ib', 'num_ibs','pre_stress'
-]
-=======
 COMMON = {
     'hypoelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -58,6 +39,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -86,8 +68,8 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'pre_stress': ParamType.LOG,
 })
->>>>>>> master
 
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
