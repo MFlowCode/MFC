@@ -283,115 +283,70 @@ contains
     !> Checks constraints on the boundary conditions in the x-direction.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_bc
-        if (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported value of bc_x%beg. Exiting ...')
-        elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -14) then
-            call s_mpi_abort('Unsupported value of bc_x%end. Exiting ...')
-        elseif ((bc_x%beg == -1 .and. bc_x%end /= -1) &
-                .or. &
-                (bc_x%end == -1 .and. bc_x%beg /= -1)) then
-            call s_mpi_abort('bc_x%beg and bc_x%end must be both periodic '// &
-                             '(= -1) or both non-periodic. Exiting ...')
+        #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
+            #:for BOUND in ['beg', 'end']
+                if (${VAR}$ == 0 .and. bc_${DIR}$%${BOUND}$ /= dflt_int) then
+                    call s_mpi_abort('bc_${DIR}$%${BOUND}$ is not supported for ${VAR}$ = 0. Exiting ...')
+                elseif (${VAR}$ > 0 .and. bc_${DIR}$%${BOUND}$ == dflt_int) then
+                    call s_mpi_abort('${VAR}$ != 0 but bc_${DIR}$%${BOUND}$ is not set. Exiting ...')
+                elseif ((bc_${DIR}$%beg == -1 .and. bc_${DIR}$%end /= -1) &
+                        .or. &
+                        (bc_${DIR}$%end == -1 .and. bc_${DIR}$%beg /= -1)) then
+                    call s_mpi_abort('bc_${DIR}$%beg and bc_${DIR}$%end must be both periodic '// &
+                                     '(= -1) or both non-periodic. Exiting ...')
+                end if
+
+                ! For cylindrical coordinates, the y and z directions use a different check
+                #:if (DIR == 'y') or (DIR == 'z')
+                    if (.not. cyl_coord) then
+                #:endif
+
+                    if (bc_${DIR}$%${BOUND}$ /= dflt_int) then
+                        if (bc_${DIR}$%${BOUND}$ > -1 .or. bc_${DIR}$%${BOUND}$ < -16) then
+                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must be ' // &
+                                             'between -1 and -16. Exiting ...')
+                        elseif (bc_${DIR}$%${BOUND}$ == -14) then
+                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must not be -14 '// &
+                                             'for non-cylindrical coordinates. Exiting ...')
+                        end if
+                    end if
+                
+                #:if (DIR == 'y') or (DIR == 'z')
+                    end if ! this ends 'if (cyl_coord)'
+                #:endif
+            #:endfor
+        #:endfor
+
+        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
+            call s_mpi_abort('Boundary condition -13 is not supported. Exiting ...')
         end if
 
-        if (cyl_coord) then ! Cartesian coordinates
-
-            ! Constraints on the boundary conditions in the r-direction
-            if (bc_y%beg /= dflt_int &
-                .and. &
-                ((p > 0 .and. bc_y%beg /= -14) &
-                 .or. &
-                 (p == 0 .and. bc_y%beg /= -2))) then
-                call s_mpi_abort('Unsupported value of bc_y%beg. Exiting ...')
-            elseif (bc_y%end /= dflt_int &
-                    .and. &
-                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
-                call s_mpi_abort('Unsupported value of bc_y%end. Exiting ...')
-            elseif ((n > 0 .and. bc_y%beg == dflt_int)) then
-                call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
-            elseif ((n > 0 .and. bc_y%end == dflt_int)) then
-                call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
-
-                ! Constraints on the boundary conditions in the theta-direction
-            elseif (bc_z%beg /= dflt_int &
-                    .and. &
-                    (bc_z%beg /= -1 .and. bc_z%beg /= -2)) then
-                call s_mpi_abort('Unsupported value of bc_z%beg. Exiting ...')
-            elseif (bc_z%end /= dflt_int &
-                    .and. &
-                    (bc_z%end /= -1 .and. bc_z%end /= -2)) then
-                call s_mpi_abort('Unsupported value of bc_z%end. Exiting ...')
-            elseif (p == 0 .and. bc_z%beg /= dflt_int) then
-                call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
-            elseif (p > 0 .and. bc_z%beg == dflt_int) then
-                call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
-            elseif (p == 0 .and. bc_z%end /= dflt_int) then
-                call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
-            elseif (p > 0 .and. bc_z%end == dflt_int) then
-                call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
-            elseif (p > 0 &
-                    .and. &
-                    ((bc_z%beg == -1 .and. bc_z%end /= -1) &
-                     .or. &
-                     (bc_z%end == -1 .and. bc_z%beg /= -1))) then
-                call s_mpi_abort('bc_z%beg and bc_z%end must be both periodic '// &
-                                 '(= -1) or both non-periodic. Exiting ...')
+        if (cyl_coord) then
+            if (n == 0) then
+                call s_mpi_abort('n must be positive for cylindrical '// &
+                                 'coordinates. Exiting ...')
+            elseif (p > 0 .and. bc_y%beg /= -14) then
+                call s_mpi_abort('bc_y%beg must be -14 for 3D cylindrical '// &
+                                 'coordinates (p > 0). Exiting ...')
+            elseif (p == 0 .and. bc_y%beg /= -2) then
+                call s_mpi_abort('bc_y%beg must be -2 for 2D cylindrical '// &
+                                 'coordinates (p = 0). Exiting ...')
+            elseif (bc_y%end > -1 .or. bc_y%end < -16) then
+                call s_mpi_abort('bc_y%end must be between -1 and -16. '// &
+                                 'Exiting ...')
+            elseif (bc_y%end == -14) then
+                call s_mpi_abort('bc_y%end must not be -14. Exiting ...')
             end if
 
-        else ! not cylindrical
-
-            ! Constraints on the boundary conditions in the y-direction
-            if (bc_y%beg /= dflt_int &
-                .and. &
-                (bc_y%beg < -16 .or. bc_y%beg > -1 .or. bc_y%beg == -14)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_y%beg. Exiting ...')
-            elseif (bc_y%end /= dflt_int &
-                    .and. &
-                    (bc_y%end < -16 .or. bc_y%end > -1 .or. bc_y%end == -14)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_y%end. Exiting ...')
-            elseif (n == 0 .and. bc_y%beg /= dflt_int) then
-                call s_mpi_abort('bc_y%beg is not supported for n = 0. Exiting ...')
-            elseif (n > 0 .and. bc_y%beg == dflt_int) then
-                call s_mpi_abort('n != 0 but bc_y%beg is not set. Exiting ...')
-            elseif (n == 0 .and. bc_y%end /= dflt_int) then
-                call s_mpi_abort('bc_y%end is not supported for n = 0. Exiting ...')
-            elseif (n > 0 .and. bc_y%end == dflt_int) then
-                call s_mpi_abort('n != 0 but bc_y%end is not set. Exiting ...')
-            elseif ((bc_y%beg == -1 .and. bc_y%end /= -1) &
-                    .or. &
-                    (bc_y%end == -1 .and. bc_y%beg /= -1)) then
-                call s_mpi_abort('bc_y%beg and bc_y%end must be both periodic '// &
-                                 '(= -1) or both non-periodic. Exiting ...')
-            end if
-
-            ! Constraints on the boundary conditions in the z-direction
-            if (bc_z%beg /= dflt_int &
-                .and. &
-                (bc_z%beg < -16 .or. bc_z%beg > -1 .or. bc_z%beg == -14)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_z%beg. Exiting ...')
-            elseif (bc_z%end /= dflt_int &
-                    .and. &
-                    (bc_z%end < -16 .or. bc_z%end > -1 .or. bc_z%end == -14)) then
-                call s_mpi_abort('Unsupported choice for the value of '// &
-                                 'bc_z%end. Exiting ...')
-            elseif (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -13)) then
-                call s_mpi_abort('Unsupported choice of boundary condition -13')
-            elseif (p == 0 .and. bc_z%beg /= dflt_int) then
-                call s_mpi_abort('bc_z%beg is not supported for p = 0. Exiting ...')
-            elseif (p > 0 .and. bc_z%beg == dflt_int) then
-                call s_mpi_abort('p != 0 but bc_z%beg is not set. Exiting ...')
-            elseif (p == 0 .and. bc_z%end /= dflt_int) then
-                call s_mpi_abort('bc_z%end is not supported for p = 0. Exiting ...')
-            elseif (p > 0 .and. bc_z%end == dflt_int) then
-                call s_mpi_abort('p != 0 but bc_z%end is not set. Exiting ...')
-            elseif ((bc_z%beg == -1 .and. bc_z%end /= -1) &
-                    .or. &
-                    (bc_z%end == -1 .and. bc_z%beg /= -1)) then
-                call s_mpi_abort('bc_z%beg and bc_z%end must be both periodic '// &
-                                 '(= -1) or both non-periodic. Exiting ...')
+            ! 3D cylindrical coordinates
+            if (p /= 0) then
+                if (bc_z%beg /= -1 .and. bc_z%beg /= -2) then
+                    call s_mpi_abort('bc_z%beg must be -1 or -2 for 3D '// &
+                                     'cylindrical coordinates. Exiting ...')
+                elseif (bc_z%end /= -1 .and. bc_z%end /= -2) then
+                    call s_mpi_abort('bc_z%end must be -1 or -2 for 3D '// &
+                                     'cylindrical coordinates. Exiting ...')
+                end if
             end if
         end if
     end subroutine s_check_inputs_bc

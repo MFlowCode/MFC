@@ -65,10 +65,8 @@ contains
         end if
 
         #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
-            ! y and z directions are checked differently for cylindrical coordinates
-            #:if (DIR == 'y')
-                if (.not. cyl_coord) then
-            #:elif (DIR == 'z')
+            ! For cylindrical coordinates, the y and z directions use a different check
+            #:if (DIR == 'y') or (DIR == 'z')
                 if (.not. cyl_coord) then
             #:endif
 
@@ -95,9 +93,7 @@ contains
                 end if
             #:endfor
 
-            #:if (DIR == 'y')
-                end if ! this ends 'if (cyl_coord)'
-            #:elif (DIR == 'z')
+            #:if (DIR == 'y') or (DIR == 'z')
                 end if
             #:endif
         #:endfor
@@ -183,16 +179,16 @@ contains
                 elseif (${X}$_a >= ${X}$_b) then
                     call s_mpi_abort('${X}$_a must be less than ${X}$_b with '// &
                                      'stretch_${X}$ enabled. Exiting ...')
-                #:for BOUND in ['beg', 'end']
-                    elseif ((a_${X}$ &
-                             + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) &
-                             + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) &
-                             - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) &
-                             /a_${X}$ <= 0d0) then
-                        call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
-                                        'to ${X}$_a and ${X}$_b for the given '// &
-                                        'a_${X}$. Exiting ...')
-                #:endfor
+                    #:for BOUND in ['beg', 'end']
+                        elseif ((a_${X}$ &
+                                + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) &
+                                + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) &
+                                - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) &
+                                /a_${X}$ <= 0d0) then
+                            call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
+                                            'to ${X}$_a and ${X}$_b for the given '// &
+                                            'a_${X}$. Exiting ...')
+                    #:endfor
                 end if
             end if
         #:endfor

@@ -59,9 +59,7 @@ contains
     subroutine s_check_inputs_weno
         character(len=5) :: numStr !< for int to string conversion
 
-        if (all(weno_order /= (/1, 3, 5/))) then
-            call s_mpi_abort('weno_order must be 1, 3, or 5. Exiting ...')
-        elseif (m + 1 < num_stcls_min*weno_order) then
+        if (m + 1 < num_stcls_min*weno_order) then
             call s_int_to_str(num_stcls_min*weno_order, numStr)
             call s_mpi_abort('m must be greater than or equal to '// &
                              '(num_stcls_min*weno_order - 1), whose value is '// &
@@ -222,6 +220,7 @@ contains
 
         do i = 1, num_fluids
             do j = 1, 2
+
                 call s_int_to_str(j, jStr)
                 if ((.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real)) &
                     .and. &
@@ -229,28 +228,23 @@ contains
                     call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//') must be positive. '// &
                                      'Exiting ...')
-                end if
 
-                if (model_eqns == 1 &
+                else if (model_eqns == 1 &
                     .and. &
                     (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('model_eqns = 1 does not support '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//'). Exiting ...')
-                end if
 
-                if (i > num_fluids &
+                else if (i > num_fluids &
                     .and. &
                     (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('First index ('//trim(iStr)//') of '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//') exceeds '// &
                                      'num_fluids. Exiting ...')
-                end if
 
-                if (weno_order == 1 &
-                    .and. &
-                    (weno_avg .neqv. .true.) &
+                else if (weno_order == 1 .and. (.not. weno_avg) &
                     .and. &
                     (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
                     call s_mpi_abort('weno_order = 1 without weno_avg '// &
@@ -258,6 +252,7 @@ contains
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//'). Exiting ...')
                 end if
+
             end do
         end do
     end subroutine s_check_inputs_stiffened_eos_viscosity
