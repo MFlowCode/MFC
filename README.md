@@ -127,11 +127,13 @@ They are organized below. Just click the drop-downs!
 <summary>Numerics</summary>
 
 * Shock and interface capturing schemes
-	* First-order upwinding, WENO3 and 5.
+	* First-order upwinding
+ 	* WENO reconstructions of order 3 and 5
+  	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
-	* Reliable handling of high density ratios.
+	* Reliable handling of high density ratios
 * Exact and approximate (e.g., HLL, HLLC) Riemann solvers
-* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more.
+* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more
 * Runge-Kutta orders 1-3 (SSP TVD)
 * Interface sharpening (THINC-like)
 </details>
