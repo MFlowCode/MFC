@@ -55,9 +55,9 @@ patmos_n = patmos/stress_char
 P_amp_n = P_amp/stress_char
 
 #geometry
-dlengx = 20.
-dlengy = 1.
-Ny = 100
+dlengx = 10.
+dlengy = 2.
+Ny = 500
 Nx = dlengx*Ny
 dx = dlengx/Nx
 dy = dlengy/Ny
@@ -70,11 +70,11 @@ interface_amp = 0.5
 
 # time stepping requirements
 time_end = 5
-cfl = 0.75
+cfl = 8.0
 
 dt = cfl * dx/c_l 
 Nt = int(time_end/dt)
-Nframes = 50000
+Nframes = 500
 tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)
@@ -118,10 +118,10 @@ print(json.dumps({
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
-    'bc_x%beg'                     : -1,
-    'bc_x%end'                     : -1,
-    'bc_y%beg'                     : -6,
-    'bc_y%end'                     : -6,
+    'bc_x%beg'                     : -6,
+    'bc_x%end'                     : -6,
+    'bc_y%beg'                     : -1,
+    'bc_y%end'                     : -1,
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
@@ -136,8 +136,8 @@ print(json.dumps({
     'num_mono'                      : 1,             # place in the middle and expand
     'Mono(1)%pulse'                 : 3,             # square  wave
     'Mono(1)%npulse'                : 1,             # 1 pulse
-    'Mono(1)%mag'                   : 10.0*patmos_n, # magnitude
-    'Mono(1)%length'                : 1*dlengy,      # pulse length
+    'Mono(1)%mag'                   : 100.0*patmos_n,# magnitude
+    'Mono(1)%length'                : 45.0*dlengy,   # pulse length
     'Mono(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
     'Mono(1)%support_width'         : 30,             
     'Mono(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain

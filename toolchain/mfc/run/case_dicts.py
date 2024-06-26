@@ -117,6 +117,7 @@ for p_id in range(1, 10+4):
                       "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
                       "normal", "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
+
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
