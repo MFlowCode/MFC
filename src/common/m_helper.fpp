@@ -38,7 +38,8 @@ module m_helper
               f_xor, &
               f_logical_to_int, &
               f_approx_equal, &
-              f_is_default
+              f_is_default, &
+              f_all_default
 
 contains
 
@@ -571,5 +572,19 @@ contains
 
         res = f_approx_equal(var, dflt_real)
     end function f_is_default
+
+    !> Checks if ALL elements of a real(kind(0d0)) array are of default value.
+    !! @param var_array Array to check.
+    logical function f_all_default(var_array) result(res)
+        real(kind(0d0)), intent(in) :: var_array(:)
+        logical :: res_array(size(var_array))
+        integer :: i
+
+        do i = 1, size(var_array)
+            res_array(i) = f_is_default(var_array(i))
+        end do
+
+        res = all(res_array)
+    end function f_all_default
 
 end module m_helper

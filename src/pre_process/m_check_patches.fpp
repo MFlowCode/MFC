@@ -150,7 +150,7 @@ contains
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
             call s_mpi_abort('length_x must be greater than zero for '// &
                              'line segment patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for line segment '// &
                              'patch '//trim(iStr)//'. Exiting ...')
         elseif (cyl_coord) then
@@ -179,10 +179,10 @@ contains
         elseif (patch_icpp(patch_id)%radius <= 0d0) then
             call s_mpi_abort('radius must be greater than zero for '// &
                              'circle patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'circle patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'circle patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -205,10 +205,10 @@ contains
         elseif (p > 0) then
             call s_mpi_abort('p must be zero for rectangle patch '//trim(iStr)// &
                              '. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'rectangle patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'rectangle patch '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -237,19 +237,19 @@ contains
         elseif (p > 0) then
             call s_mpi_abort('p must be zero for sweep line patch '//trim(iStr)// &
                              '. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'sweep line patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'sweep line patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(1) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%normal(1))) then
             call s_mpi_abort('normal(1) must be set for '// &
                              'sweep line patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(2) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%normal(2))) then
             call s_mpi_abort('normal(2) must be set for '// &
                              'sweep line patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(3) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%normal(3))) then
             call s_mpi_abort('normal(3) must be equal to dflt_real for '// &
                              'sweep line patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -272,19 +272,19 @@ contains
         elseif (p > 0) then
             call s_mpi_abort('p must be zero for ellipse patch '//trim(iStr)// &
                              '. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'ellipse patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'ellipse patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(1) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%radii(1))) then
             call s_mpi_abort('radii(1) must be set for '// &
                              'ellipse patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(2) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%radii(2))) then
             call s_mpi_abort('radii(2) must be set for '// &
                              'ellipse patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(3) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%radii(3))) then
             call s_mpi_abort('radii(3) must be equal to dflt_real for '// &
                              'ellipse patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -307,10 +307,10 @@ contains
         elseif (p > 0) then
             call s_mpi_abort('p must be zero for vortex patch '//trim(iStr)// &
                              '. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'vortex patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'vortex patch '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -345,7 +345,7 @@ contains
         elseif (model_eqns /= 4 .and. model_eqns /= 2) then
             call s_mpi_abort('model_eqns must be either 4 or 2 for '// &
                              '1D analytical patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              '1D analytical patch '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -370,10 +370,10 @@ contains
         elseif (p > 0) then
             call s_mpi_abort('p must be zero for 2D analytical patch '//trim(iStr)// &
                              '. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              '2D analytical patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              '2D analytical patch '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -398,13 +398,13 @@ contains
         if (p == 0) then
             call s_mpi_abort('p must be greater than zero for '// &
                              '3D analytical '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              '3D analytical '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              '3D analytical '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              '3D analytical '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -435,13 +435,13 @@ contains
         elseif (patch_icpp(patch_id)%radius <= 0d0) then
             call s_mpi_abort('radius must be greater than zero for '// &
                              'sphere patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'sphere patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'sphere patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'sphere patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -464,13 +464,13 @@ contains
         elseif (patch_icpp(patch_id)%radius <= 0d0) then
             call s_mpi_abort('radius must be greater than zero for '// &
                              'spherical harmonic patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'spherical harmonic patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'spherical harmonic patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'spherical harmonic patch '//trim(iStr)//'. Exiting ...')
         elseif (all(patch_icpp(patch_id)%epsilon /= (/1d0, 2d0, 3d0, 4d0, 5d0/))) then
@@ -500,13 +500,13 @@ contains
         if (p == 0) then
             call s_mpi_abort('p must be greater than zero for '// &
                              'cuboid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'cuboid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'cuboid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'cuboid patch '//trim(iStr)//'. Exiting ...')
         elseif (patch_icpp(patch_id)%length_x <= 0d0) then
@@ -536,13 +536,13 @@ contains
         if (p == 0) then
             call s_mpi_abort('p must be greater than zero for '// &
                              'cylinder patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'cylinder patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'cylinder patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'cylinder patch '//trim(iStr)//'. Exiting ...')
         elseif ((patch_icpp(patch_id)%length_x <= 0d0 .and. &
@@ -550,16 +550,16 @@ contains
                  patch_icpp(patch_id)%length_z <= 0d0) &
                 .or. &
                 (patch_icpp(patch_id)%length_x > 0d0 .and. &
-                 (patch_icpp(patch_id)%length_y /= dflt_real .or. &
-                  patch_icpp(patch_id)%length_z /= dflt_real)) &
+                 ((.not. f_is_default(patch_icpp(patch_id)%length_y)) .or. &
+                  (.not. f_is_default(patch_icpp(patch_id)%length_z)))) &
                 .or. &
                 (patch_icpp(patch_id)%length_y > 0d0 .and. &
-                 (patch_icpp(patch_id)%length_x /= dflt_real .or. &
-                  patch_icpp(patch_id)%length_z /= dflt_real)) &
+                 ((.not. f_is_default(patch_icpp(patch_id)%length_x)) .or. &
+                  (.not. f_is_default(patch_icpp(patch_id)%length_z)))) &
                 .or. &
                 (patch_icpp(patch_id)%length_z > 0d0 .and. &
-                 (patch_icpp(patch_id)%length_x /= dflt_real .or. &
-                  patch_icpp(patch_id)%length_y /= dflt_real))) then
+                 ((.not. f_is_default(patch_icpp(patch_id)%length_x)) .or. &
+                  (.not. f_is_default(patch_icpp(patch_id)%length_y))))) then
             call s_mpi_abort('At least one of length_x, length_y, or length_z '// &
                              'must be defined for '// &
                              'cylinder patch '//trim(iStr)//'. Exiting ...')
@@ -584,22 +584,22 @@ contains
         if (p == 0) then
             call s_mpi_abort('p must be greater than zero for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(1) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%normal(1))) then
             call s_mpi_abort('normal(1) must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(2) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%normal(2))) then
             call s_mpi_abort('normal(2) must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(3) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%normal(3))) then
             call s_mpi_abort('normal(3) must be set for '// &
                              'plane sweep patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -619,22 +619,22 @@ contains
         if (p == 0) then
             call s_mpi_abort('p must be greater than zero for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%x_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(1) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%radii(1))) then
             call s_mpi_abort('radii(1) must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(2) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%radii(2))) then
             call s_mpi_abort('radii(2) must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(3) == dflt_real) then
+        elseif (f_is_default(patch_icpp(patch_id)%radii(3))) then
             call s_mpi_abort('radii(3) must be set for '// &
                              'ellipsoid patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -650,49 +650,49 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the geometric parameters of the inactive patch
-        if (patch_icpp(patch_id)%x_centroid /= dflt_real) then
+        if (.not. f_is_default(patch_icpp(patch_id)%x_centroid)) then
             call s_mpi_abort('x_centroid must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%y_centroid /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%y_centroid)) then
             call s_mpi_abort('y_centroid must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%z_centroid /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%z_centroid)) then
             call s_mpi_abort('z_centroid must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%length_x /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%length_x)) then
             call s_mpi_abort('length_x must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%length_y /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%length_y)) then
             call s_mpi_abort('length_y must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%length_z /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%length_z)) then
             call s_mpi_abort('length_z must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radius /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%radius)) then
             call s_mpi_abort('radius must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%epsilon /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%epsilon)) then
             call s_mpi_abort('epsilon must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%beta /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%beta)) then
             call s_mpi_abort('beta must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(1) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%normal(1))) then
             call s_mpi_abort('normal(1) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(2) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%normal(2))) then
             call s_mpi_abort('normal(2) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%normal(3) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%normal(3))) then
             call s_mpi_abort('normal(3) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(1) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%radii(1))) then
             call s_mpi_abort('radii(1) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(2) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%radii(2))) then
             call s_mpi_abort('radii(2) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%radii(3) /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%radii(3))) then
             call s_mpi_abort('radii(3) must not be set for '// &
                              'inactive patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -766,7 +766,7 @@ contains
             if (patch_icpp(patch_id)%smooth_patch_id /= patch_id) then
                 call s_mpi_abort('smooth_patch_id must be equal to patch_id when '// &
                                  'smoothen is false for supported patch '//trim(iStr)//'. Exiting ...')
-            elseif (patch_icpp(patch_id)%smooth_coeff /= dflt_real) then
+            elseif (.not. f_is_default(patch_icpp(patch_id)%smooth_coeff)) then
                 call s_mpi_abort('smooth_coeff must be equal to dflt_real when '// &
                                  'smoothen is false for supported patch '//trim(iStr)//'. Exiting ...')
             end if
@@ -791,7 +791,7 @@ contains
         elseif (patch_icpp(patch_id)%smooth_patch_id /= patch_id) then
             call s_mpi_abort('smooth_patch_id must be equal to patch_id for unsupported '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%smooth_coeff /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%smooth_coeff)) then
             call s_mpi_abort('smooth_coeff must not be set for unsupported '// &
                              'patch '//trim(iStr)//'. Exiting ...')
         end if
@@ -808,21 +808,21 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the primitive variables of an active patch
-        if (patch_icpp(patch_id)%vel(1) == dflt_real) then
+        if (f_is_default(patch_icpp(patch_id)%vel(1))) then
             call s_mpi_abort('vel(1) must be set for active patch '// &
                              trim(iStr)//'. Exiting ...')
-        elseif (n == 0 .and. patch_icpp(patch_id)%vel(2) /= dflt_real .and. &
+        elseif (n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. &
                 patch_icpp(patch_id)%vel(2) /= 0) then
             call s_mpi_abort('vel(2) must not be set when n = 0 '// &
                              'for active patch '//trim(iStr)//'. Exiting ...')
-        elseif (n > 0 .and. patch_icpp(patch_id)%vel(2) == dflt_real) then
+        elseif (n > 0 .and. f_is_default(patch_icpp(patch_id)%vel(2))) then
             call s_mpi_abort('vel(2) must be set when n > 0 for '// &
                              'active patch '//trim(iStr)//'. Exiting ...')
-        elseif (p == 0 .and. patch_icpp(patch_id)%vel(3) /= dflt_real .and. &
+        elseif (p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. &
                 patch_icpp(patch_id)%vel(3) /= 0) then
             call s_mpi_abort('vel(3) must not be set when p = 0 '// &
                              'for active patch '//trim(iStr)//'. Exiting ...')
-        elseif (p > 0 .and. patch_icpp(patch_id)%vel(3) == dflt_real) then
+        elseif (p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3))) then
             call s_mpi_abort('vel(3) must be set when p > 0 for '// &
                              'active patch '//trim(iStr)//'. Exiting ...')
         elseif (model_eqns == 1 .and. patch_icpp(patch_id)%rho <= 0d0) then
@@ -850,15 +850,15 @@ contains
         end if
 
         if (model_eqns == 2 .and. num_fluids < num_fluids) then
-            if (any(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:) /= dflt_real)) then
+            if (.not. f_all_default(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:))) then
                 call s_mpi_abort('alpha_rho(num_fluids+1:) must not be '// &
                                  'set when num_fluids < num_fluids '// &
                                  'for active patch '//trim(iStr)//'. Exiting ...')
-            elseif (any(patch_icpp(patch_id)%alpha(num_fluids + 1:) /= dflt_real)) then
+            elseif (.not. f_all_default(patch_icpp(patch_id)%alpha(num_fluids + 1:))) then
                 call s_mpi_abort('alpha(num_fluids+1:) must not be '// &
                                  'set when num_fluids < num_fluids '// &
                                  'for active patch '//trim(iStr)//'. Exiting ...')
-            elseif (patch_icpp(patch_id)%alpha(num_fluids) == dflt_real) then
+            elseif (f_is_default(patch_icpp(patch_id)%alpha(num_fluids))) then
                 call s_mpi_abort('alpha(num_fluids) must be set '// &
                                  'when num_fluids < num_fluids for active '// &
                                  'patch '//trim(iStr)//'. Exiting ...')
@@ -877,25 +877,25 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         ! Constraints on the primitive variables of an inactive patch
-        if (any(patch_icpp(patch_id)%alpha_rho /= dflt_real)) then
+        if (.not. f_all_default(patch_icpp(patch_id)%alpha_rho)) then
             call s_mpi_abort('alpha_rho must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%rho /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%rho)) then
             call s_mpi_abort('rho must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (any(patch_icpp(patch_id)%vel /= dflt_real)) then
+        elseif (.not. f_all_default(patch_icpp(patch_id)%vel)) then
             call s_mpi_abort('vel must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%pres /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%pres)) then
             call s_mpi_abort('pres must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (any(patch_icpp(patch_id)%alpha /= dflt_real)) then
+        elseif (.not. f_all_default(patch_icpp(patch_id)%alpha)) then
             call s_mpi_abort('alpha must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%gamma /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%gamma)) then
             call s_mpi_abort('gamma must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
-        elseif (patch_icpp(patch_id)%pi_inf /= dflt_real) then
+        elseif (.not. f_is_default(patch_icpp(patch_id)%pi_inf)) then
             call s_mpi_abort('pi_inf must not be altered for inactive '// &
                              'patch '//trim(iStr)//'. Exiting ...')
         end if

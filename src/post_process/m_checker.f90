@@ -163,13 +163,13 @@ contains
     !> Checks constraints on the absence of flow variables
     subroutine s_check_inputs_no_flow_variables
         if (.not. any([ &
-            (/rho_wrt, E_wrt, pres_wrt, &
-            gamma_wrt, heat_ratio_wrt, &
-            pi_inf_wrt, pres_inf_wrt, &
-            cons_vars_wrt, prim_vars_wrt, &
-            c_wrt, schlieren_wrt/), &
-            alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, &
-            alpha_wrt, omega_wrt])) then
+                      (/rho_wrt, E_wrt, pres_wrt, &
+                        gamma_wrt, heat_ratio_wrt, &
+                        pi_inf_wrt, pres_inf_wrt, &
+                        cons_vars_wrt, prim_vars_wrt, &
+                        c_wrt, schlieren_wrt/), &
+                      alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, &
+                      alpha_wrt, omega_wrt])) then
             call s_mpi_abort('None of the flow variables have been '// &
                              'selected for post-process. Exiting ...')
         end if

@@ -246,14 +246,14 @@ contains
                 (perturb_sph_fluid < 0 .and. perturb_sph_fluid /= dflt_int)) then
             call s_mpi_abort('perturb_sph_fluid must be between 0 and '// &
                              'num_fluids. Exiting ...')
+        elseif ((.not. perturb_sph) .and. (.not. f_all_default(fluid_rho))) then
+            call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
+                             'Exiting ...')
         end if
 
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if ((.not. perturb_sph) .and. (.not. f_is_default(fluid_rho(i)))) then
-                call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
-                                 'Exiting ...')
-            elseif (perturb_sph .and. f_is_default(fluid_rho(i))) then
+            if (perturb_sph .and. f_is_default(fluid_rho(i))) then
                 call s_mpi_abort('fluid_rho('//trim(iStr)//') must be set '// &
                                  'if perturb_sph = T. Exiting ...')
             end if
