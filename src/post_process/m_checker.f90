@@ -113,10 +113,11 @@ contains
 
     !> Checks constraints on vorticity parameters
     subroutine s_check_inputs_vorticity
-        if (p == 0 .and. omega_wrt(1)) then
-            call s_mpi_abort('omega_wrt(1) is not supported for p = 0. Exiting ...')
-        elseif (p == 0 .and. omega_wrt(2)) then
-            call s_mpi_abort('omega_wrt(2) is not supported for p = 0. Exiting ...')
+        if (n == 0 .and. any(omega_wrt)) then
+            call s_mpi_abort('omega_wrt is not supported for n = 0. Exiting ...')
+        elseif (p == 0 .and. (.not. omega_wrt(3))) then
+            call s_mpi_abort('omega_wrt(1) and omega_wrt(2) are not supported '// &
+                             'for p = 0. Exiting ...')
         elseif (any(omega_wrt) .and. fd_order == dflt_int) then
             call s_mpi_abort('fd_order must be set for omega_wrt. Exiting ...')
         end if
@@ -161,24 +162,14 @@ contains
 
     !> Checks constraints on the absence of flow variables
     subroutine s_check_inputs_no_flow_variables
-        if ((any(alpha_rho_wrt) .neqv. .true.) &
-            .and. &
-            (any(mom_wrt) .neqv. .true.) &
-            .and. &
-            (any(vel_wrt) .neqv. .true.) &
-            .and. &
-            (any(flux_wrt) .neqv. .true.) &
-            .and. &
-            (any((/rho_wrt, E_wrt, pres_wrt, &
-                   gamma_wrt, heat_ratio_wrt, &
-                   pi_inf_wrt, pres_inf_wrt, &
-                   cons_vars_wrt, &
-                   prim_vars_wrt, &
-                   c_wrt, schlieren_wrt/)) .neqv. .true.) &
-            .and. &
-            (any(alpha_wrt) .neqv. .true.) &
-            .and. &
-            (any(omega_wrt) .neqv. .true.)) then
+        if (.not. any([ &
+            (/rho_wrt, E_wrt, pres_wrt, &
+            gamma_wrt, heat_ratio_wrt, &
+            pi_inf_wrt, pres_inf_wrt, &
+            cons_vars_wrt, prim_vars_wrt, &
+            c_wrt, schlieren_wrt/), &
+            alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, &
+            alpha_wrt, omega_wrt])) then
             call s_mpi_abort('None of the flow variables have been '// &
                              'selected for post-process. Exiting ...')
         end if

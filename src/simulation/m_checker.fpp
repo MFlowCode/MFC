@@ -121,6 +121,7 @@ contains
         elseif (riemann_solver == 3 .and. wave_speeds /= dflt_int) then
             call s_mpi_abort('Exact Riemann (riemann_solver = 3) '// &
                              'does not support wave_speeds. Exiting ...')
+        elseif (all(avg_state /= (/dflt_int, 1, 2/))) then
             call s_mpi_abort('Unsupported value of avg_state. Exiting ...')
         elseif (riemann_solver /= 3 .and. wave_speeds == dflt_int) then
             call s_mpi_abort('wave_speeds must be set if '// &
@@ -160,10 +161,7 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        if (model_eqns /= 2) then
-            call s_mpi_abort('hypoelasticity requires 5-equation model'// &
-                             '(model_eqns = 2). Exiting ...')
-        elseif (riemann_solver /= 1) then
+        if (riemann_solver /= 1) then
             call s_mpi_abort('hypoelasticity requires HLL Riemann solver '// &
                              '(riemann_solver = 1). Exiting ...')
         end if

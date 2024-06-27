@@ -35,6 +35,7 @@ contains
         if (bubbles) call s_check_inputs_bubbles
         call s_check_inputs_qbmm_and_polydisperse
         if (adv_n) call s_check_inputs_adv_n
+        if (hypoelasticity) call s_check_inputs_hypoelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
 #endif
@@ -45,6 +46,7 @@ contains
         call s_check_inputs_weno
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
+        call s_check_inputs_surface_tension
         call s_check_inputs_moving_bc
 
     end subroutine s_check_inputs_common
@@ -68,7 +70,7 @@ contains
     !> Checks constraints on the finite difference parameters.
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_finite_difference
-        if (fd_order /= dflt_int .and. all(fd_order /= (/1, 2, 4/))) then
+        if (all(fd_order /= (/dflt_int, 1, 2, 4/))) then
             call s_mpi_abort('fd_order must be 1, 2, or 4. Exiting ...')
         end if
     end subroutine s_check_inputs_finite_difference
@@ -115,10 +117,10 @@ contains
                              'Exiting ...')
         elseif (model_eqns == 3) then
             call s_mpi_abort('Bubble models untested with '// &
-                             '6-equation model. Exiting ...')
+                             '6-equation model (model_eqns = 3). Exiting ...')
         elseif (model_eqns == 1) then
             call s_mpi_abort('Bubble models untested with '// &
-                             'pi-gamma model. Exiting ...')
+                             'pi-gamma model (model_eqns = 1). Exiting ...')
             !TODO: Comment this out when testing riemann with hll
         elseif (model_eqns == 4 .and. f_is_default(rhoref)) then
             call s_mpi_abort('rhoref must be set if using bubbles with '// &
@@ -166,6 +168,15 @@ contains
         end if
     end subroutine
 
+    !> Checks constraints on the hypoelasticity parameters.
+        !! Called by s_check_inputs_common for pre-processing and simulation
+    subroutine s_check_inputs_hypoelasticity
+        if (model_eqns /= 2) then
+            call s_mpi_abort('hypoelasticity requires 5-equation model'// &
+                             '(model_eqns = 2). Exiting ...')
+        end if
+    end subroutine s_check_inputs_hypoelasticity
+
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_phase_change
@@ -193,10 +204,6 @@ contains
     !> Checks constraints on the Immersed Boundaries parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_ibm
-        if (num_ibs > 0 .and. .not. ib) then
-            call s_mpi_abort('num_ibs is set, but ib is not enabled. Exiting ...')
-        end if
-
         if (ib) then
             if (n <= 0) then
                 call s_mpi_abort('ib is enabled but n = 0. '// &
@@ -206,6 +213,10 @@ contains
                 call s_mpi_abort('num_ibs must be between 1 and '// &
                                  'num_patches_max. Exiting ...')
             end if
+        end if
+
+        if ((.not. ib) .and. num_ibs > 0) then
+            call s_mpi_abort('num_ibs is set, but ib is not enabled. Exiting ...')
         end if
     end subroutine s_check_inputs_ibm
 
@@ -286,36 +297,36 @@ contains
         logical :: skip_check !< Flag to skip the check when iterating over
         !! x, y, and z directions, for special treatment of cylindrical coordinates
 
-        #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
+        #:for X, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
             #:for BOUND in ['beg', 'end']
-                if (${VAR}$ == 0 .and. bc_${DIR}$%${BOUND}$ /= dflt_int) then
-                    call s_mpi_abort('bc_${DIR}$%${BOUND}$ is not '// &
+                if (${VAR}$ == 0 .and. bc_${X}$%${BOUND}$ /= dflt_int) then
+                    call s_mpi_abort('bc_${X}$%${BOUND}$ is not '// &
                                      'supported for ${VAR}$ = 0. Exiting ...')
-                elseif (${VAR}$ > 0 .and. bc_${DIR}$%${BOUND}$ == dflt_int) then
-                    call s_mpi_abort('${VAR}$ != 0 but bc_${DIR}$%${BOUND}$ '// &
+                elseif (${VAR}$ > 0 .and. bc_${X}$%${BOUND}$ == dflt_int) then
+                    call s_mpi_abort('${VAR}$ != 0 but bc_${X}$%${BOUND}$ '// &
                                      'is not set. Exiting ...')
-                elseif ((bc_${DIR}$%beg == -1 .and. bc_${DIR}$%end /= -1) &
+                elseif ((bc_${X}$%beg == -1 .and. bc_${X}$%end /= -1) &
                         .or. &
-                        (bc_${DIR}$%end == -1 .and. bc_${DIR}$%beg /= -1)) then
-                    call s_mpi_abort('bc_${DIR}$%beg and bc_${DIR}$%end '// &
+                        (bc_${X}$%end == -1 .and. bc_${X}$%beg /= -1)) then
+                    call s_mpi_abort('bc_${X}$%beg and bc_${X}$%end '// &
                                      'must be both periodic (= -1) or both '// &
                                      'non-periodic. Exiting ...')
                 end if
 
                 ! For cylindrical coordinates, y and z directions use a different check
-                #:if (DIR == 'y') or (DIR == 'z')
+                #:if (X == 'y') or (X == 'z')
                     skip_check = cyl_coord
                 #:else
                     skip_check = .false.
                 #:endif
 
                 if (.not. skip_check) then
-                    if (bc_${DIR}$%${BOUND}$ /= dflt_int) then
-                        if (bc_${DIR}$%${BOUND}$ > -1 .or. bc_${DIR}$%${BOUND}$ < -16) then
-                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must be '// &
+                    if (bc_${X}$%${BOUND}$ /= dflt_int) then
+                        if (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16) then
+                            call s_mpi_abort('bc_${X}$%${BOUND}$ must be '// &
                                              'between -1 and -16. Exiting ...')
-                        elseif (bc_${DIR}$%${BOUND}$ == -14) then
-                            call s_mpi_abort('bc_${DIR}$%${BOUND}$ must not '// &
+                        elseif (bc_${X}$%${BOUND}$ == -14) then
+                            call s_mpi_abort('bc_${X}$%${BOUND}$ must not '// &
                                              'be -14 for non-cylindrical '// &
                                              'coordinates. Exiting ...')
                         end if
@@ -418,38 +429,9 @@ contains
         end do
     end subroutine s_check_inputs_stiffened_eos
 
-    !> Checks constraints on the inputs for moving boundaries.
+    !> Checks constraints on the surface tension parameters.
         !! Called by s_check_inputs_common for all three stages
-    subroutine s_check_inputs_moving_bc
-        #:for DIR, VB_CHECK1, VB_CHECK2 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
-            if (any((/bc_${DIR}$%vb1, bc_${DIR}$%vb2, bc_${DIR}$%vb3/) /= 0d0)) then
-                if (bc_${DIR}$%beg == -15) then
-                    if (any((/bc_${DIR}$%${VB_CHECK1}$, bc_${DIR}$%${VB_CHECK2}$/) /= 0d0)) then
-                        call s_mpi_abort("Unsupported combination of bc_${DIR}$%beg and"// &
-                                         "bc_${DIR}$%${VB_CHECK1}$ or bc_${DIR}$%${VB_CHECK2}$. Exiting ...")
-                    end if
-                elseif (bc_${DIR}$%beg /= -16) then
-                    call s_mpi_abort("Unsupported combination of bc_${DIR}$%beg and"// &
-                                     "bc_${DIR}$%vb1, bc_${DIR}$%vb2, or bc_${DIR}$%vb3. Exiting...")
-                end if
-            end if
-        #:endfor
-
-        #:for DIR, VE_CHECK1, VE_CHECK2 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
-            if (any((/bc_${DIR}$%ve1, bc_${DIR}$%ve2, bc_${DIR}$%ve3/) /= 0d0)) then
-                if (bc_${DIR}$%end == -15) then
-                    if (any((/bc_${DIR}$%${VE_CHECK1}$, bc_${DIR}$%${VE_CHECK2}$/) /= 0d0)) then
-                        call s_mpi_abort("Unsupported combination of bc_${DIR}$%end and"// &
-                                         "bc_${DIR}$%${VE_CHECK1}$ or bc_${DIR}$%${VE_CHECK2}$. Exiting ...")
-                    end if
-                elseif (bc_${DIR}$%end /= -16) then
-                    call s_mpi_abort("Unsupported combination of bc_${DIR}$%end and"// &
-                                     "bc_${DIR}$%ve1, bc_${DIR}$%ve2, or bc_${DIR}$%ve3. Exiting...")
-                end if
-            end if
-        #:endfor
-
-        ! Constraints on the surface tension model
+    subroutine s_check_inputs_surface_tension
         if (.not. f_is_default(sigma) .and. sigma < 0d0) then
             call s_mpi_abort('The surface tension coefficient must be'// &
                              'greater than or equal to zero. Exiting ...')
@@ -457,7 +439,40 @@ contains
             call s_mpi_abort("The surface tension model requires"// &
                              'model_eqns=3. Exiting ...')
         end if
+    end subroutine s_check_inputs_surface_tension
 
+    !> Checks constraints on the inputs for moving boundaries.
+        !! Called by s_check_inputs_common for all three stages
+    subroutine s_check_inputs_moving_bc
+        #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
+            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0d0)) then
+                if (bc_${X}$%beg == -15) then
+                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0d0)) then
+                        call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
+                                         "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
+                                         "is set. Exiting ...")
+                    end if
+                elseif (bc_${X}$%beg /= -16) then
+                    call s_mpi_abort("bc_${X}$%beg must be -15 or -16 if "// &
+                                     "bc_${X}$%vb[1,2,3] is set. Exiting ...")
+                end if
+            end if
+        #:endfor
+
+        #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
+            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0d0)) then
+                if (bc_${X}$%end == -15) then
+                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0d0)) then
+                        call s_mpi_abort("bc_${X}$%end must be -15 if "// &
+                                         "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
+                                         "is set. Exiting ...")
+                    end if
+                elseif (bc_${X}$%end /= -16) then
+                    call s_mpi_abort("bc_${X}$%end must be -15 or -16 if "// &
+                                     "bc_${X}$%ve[1,2,3] is set. Exiting ...")
+                end if
+            end if
+        #:endfor
     end subroutine s_check_inputs_moving_bc
 
 end module m_checker_common
