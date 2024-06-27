@@ -506,7 +506,7 @@ contains
                             end if
 
                             ! elastic energy update
-                            if ( hypoelasticity ) then
+                            if ( hyperelasticity ) then
                                 G_L = 0d0 
                                 G_R = 0d0
                             

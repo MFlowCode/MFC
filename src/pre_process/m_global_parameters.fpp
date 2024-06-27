@@ -597,24 +597,23 @@ contains
                 end if
             end if
 
-            if (hypoelasticity) then
+            if (hypoelasticity .or. hyperelasticity) then 
+                elasticity = .true.
+            end if
+
+            if (elasticity) then
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
                 sys_size = stress_idx%end
-                elasticity = .true.
             end if
 
             if (hyperelasticity) then
-                ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
-                stress_idx%beg = sys_size + 1
-                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2 
                 ! adding three more equations for the \xi field and the elastic energy
                 sys_size = stress_idx%end + num_dims + 1
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
                 tensor_size = num_dims**2 + 1
-                elasticity = .true.
             end if
 
             if (sigma /= dflt_real) then
