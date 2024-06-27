@@ -140,7 +140,7 @@ contains
 
     subroutine s_perform_time_step(t_step)
 
-        integer, intent(INOUT) :: t_step
+        integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
                 int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
@@ -167,9 +167,9 @@ contains
 
     subroutine s_save_data(t_step, varname, pres, c, H)
 
-        integer, intent(INOUT) :: t_step
-        character(LEN=name_len), intent(INOUT) :: varname
-        real(kind(0d0)), intent(INOUT) :: pres, c, H
+        integer, intent(inout) :: t_step
+        character(LEN=name_len), intent(inout) :: varname
+        real(kind(0d0)), intent(inout) :: pres, c, H
 
         integer :: i, j, k, l
 
@@ -623,7 +623,7 @@ contains
         call s_close_formatted_database_file()
     end subroutine s_save_data
 
-    subroutine s_initialize_modules()
+    subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
@@ -647,7 +647,7 @@ contains
         end if
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain()
+    subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -672,7 +672,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_finalize_modules()
+    subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 

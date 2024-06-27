@@ -125,7 +125,7 @@ contains
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -152,7 +152,7 @@ contains
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -179,13 +179,13 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -234,14 +234,14 @@ contains
         !!  @param q_sf Flux limiter
     subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
-        integer, intent(IN) :: i
+        integer, intent(in) :: i
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(kind(0d0)), dimension(-offset_x%beg:m + offset_x%end, &
                                    -offset_y%beg:n + offset_y%end, &
                                    -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         real(kind(0d0)) :: top, bottom, slope !< Flux limiter calcs
         integer :: j, k, l !< Generic loop iterators
@@ -328,10 +328,11 @@ contains
         !!  @param ndim Problem size
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
-        integer, intent(IN) :: ndim
-        real(kind(0d0)), dimension(ndim, ndim), intent(INOUT) :: A
-        real(kind(0d0)), dimension(ndim), intent(INOUT) :: b
-        real(kind(0d0)), dimension(ndim), intent(OUT) :: sol
+        integer, intent(in) :: ndim
+        real(kind(0d0)), dimension(ndim, ndim), intent(inout) :: A
+        real(kind(0d0)), dimension(ndim), intent(inout) :: b
+        real(kind(0d0)), dimension(ndim), intent(out) :: sol
+
         integer, dimension(ndim) :: ipiv
 
         integer :: nrhs, lda, ldb, info
@@ -380,17 +381,17 @@ contains
         !!  @param q_sf Vorticity component
     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
-        integer, intent(IN) :: i
+        integer, intent(in) :: i
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
 
@@ -483,13 +484,13 @@ contains
     subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         real(kind(0d0)), &
             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
@@ -573,13 +574,13 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_cons_vf
+            intent(in) :: q_cons_vf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(INOUT) :: q_sf
+            intent(inout) :: q_sf
 
         real(kind(0d0)) :: drho_dx, drho_dy, drho_dz !<
             !! Spatial derivatives of the density in the x-, y- and z-directions

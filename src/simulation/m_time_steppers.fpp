@@ -291,8 +291,8 @@ contains
         !! @param t_step Current time step
     subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: nR3bar
@@ -405,8 +405,8 @@ contains
         !! @param t_step Current time-step
     subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -592,9 +592,9 @@ contains
         !! @param t_step Current time-step
     subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
+        real(kind(0d0)), intent(in) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -863,8 +863,8 @@ contains
         !! @param t_step Current time-step
     subroutine s_strang_splitting(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -893,10 +893,10 @@ contains
     end subroutine s_strang_splitting
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param q_cons_vf conservative variables
+        !! @param t_step Current time-step
     subroutine s_adaptive_dt_bubble(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp
@@ -919,8 +919,11 @@ contains
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
 
-        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
-        real(kind(0d0)) :: ldt !< local dt
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
+
+        real(kind(0d0)), intent(in) :: ldt !< local dt
 
         integer :: i, j, k, l
 
@@ -945,7 +948,7 @@ contains
         !! @param t_step current time-step
     subroutine s_time_step_cycling(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i !< Generic loop iterator
 
