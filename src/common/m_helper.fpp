@@ -40,12 +40,6 @@ module m_helper
               f_approx_equal, &
               f_is_default
 
-    !> Checks if a variable is the default value
-    interface f_is_default
-        module procedure f_is_default_int
-        module procedure f_is_default_real
-    end interface
-
 contains
 
     !>  The purpose of this subroutine is to compute the finite-
@@ -572,18 +566,10 @@ contains
 
     !> Checks if a real(kind(0d0)) variable is of default value.
     !! @param var Variable to check.
-    logical function f_is_default_real(var) result(res)
+    logical function f_is_default(var) result(res)
         real(kind(0d0)), intent(in) :: var
 
         res = f_approx_equal(var, dflt_real)
-    end function f_is_default_real
-
-    !> Checks if a integer variable is of default value.
-    !! @param var Variable to check.
-    logical function f_is_default_int(var) result(res)
-        integer, intent(in) :: var
-
-        res = (var == dflt_int)
-    end function f_is_default_int
+    end function f_is_default
 
 end module m_helper
