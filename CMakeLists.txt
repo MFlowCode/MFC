@@ -377,7 +377,10 @@ function(MFC_SETUP_TARGET)
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (NVHPC_USE_TWO_PASS_IPO)
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET}_lib PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>)
+        target_compile_options(${ARGS_TARGET}_lib PRIVATE 
+		$<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
+	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
+	)
         message(STATUS "Current target = ${ARGS_TARGET}_lib")
 
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
