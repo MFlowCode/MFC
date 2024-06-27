@@ -181,7 +181,7 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
@@ -191,12 +191,6 @@ contains
         end if
 
         if (hyperelasticity) then
-            do i = stress_idx%beg, stress_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
-                @:ACC_SETUP_SFs(q_prim_vf(i))
-            end do
             do i = xibeg, xiend + 1
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
@@ -1030,16 +1024,13 @@ contains
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
 
         if (hyperelasticity) then
-            do i = stress_idx%beg, stress_idx%end
-                @:DEALLOCATE(q_prim_vf(i)%sf)
-            end do
             do i = xibeg, xiend + 1
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do

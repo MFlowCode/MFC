@@ -94,6 +94,7 @@ module m_global_parameters
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
     logical :: hyperelasticity !< Turn hyperelasticity on
+    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     !> @}
@@ -292,6 +293,7 @@ contains
 
         hypoelasticity = .false.
         hyperelasticity = .false.
+        elasticity = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -496,6 +498,7 @@ contains
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 sys_size = stress_idx%end
+	        elasticity = .true.
             end if
 
             if (hyperelasticity) then
@@ -507,6 +510,7 @@ contains
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
                 tensor_size = num_dims**2 + 1
+	        elasticity = .true.
             end if
 
             if (sigma /= dflt_real) then

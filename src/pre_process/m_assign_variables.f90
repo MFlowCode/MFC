@@ -457,6 +457,7 @@ contains
 
         ! Elastic Shear Stress
         if (hyperelasticity) then
+
             if (pre_stress) then ! pre stressed initial condition in spatial domain
                 rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
                 theta = atan2(y_cc(k), x_cc(j))
@@ -473,13 +474,10 @@ contains
             end if
 
             do i = 1, num_dims
-                q_prim_vf(i+xibeg-1)%sf(j,k,l) = xi_cart(i)
+                q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
+                    (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
             end do
-                !(eta*xi_cart(i) + (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1))
-                !if (proc_rank == 0) then
-                !       write(*,*) 'q(',i,') :: ',q_prim_vf(i+stress_idx%end)%sf(j, k, l), &
-                !      ', xi_cart :: ',xi_cart(i)
-                !end if
+
         end if
 
         if (mpp_lim .and. bubbles) then

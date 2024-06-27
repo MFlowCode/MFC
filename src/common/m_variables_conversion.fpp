@@ -149,7 +149,7 @@ contains
                     )**(1/gamma + 1) - pi_inf
         end if
 
-        if ( (hypoelasticity .or. hyperelasticity) .and. present(G)) then
+        if ( hypoelasticity .and. present(G)) then
         !if ( hypoelasticity .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
@@ -929,7 +929,7 @@ contains
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (hypoelasticity) then ! .or. hyperelasticity) then
+                        if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                                                             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                         else if (bubbles) then
@@ -941,7 +941,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity) then !.or. hyperelasticity) then
+                        if (elasticity) then 
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1034,8 +1034,7 @@ contains
                     if ( hyperelasticity ) then 
                          !$acc loop seq
                          do i = xibeg, xiend
-                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                         / rho_K
+                         !    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                           !print *, 'i ::',i,',j,k,l ::',j,k,l,', qprim ::',qK_prim_vf(i)%sf(j,k,l)
                          end do
                     end if
@@ -1053,17 +1052,17 @@ contains
         end do
         !$acc end parallel loop
 
-        ! going through hyperelasticity to calculate btensor
-        ! s_calculate_btensor has its own triple nested for loop with openacc
-#ifdef MFC_SIMULATION
-        if (hyperelasticity) then 
-           ! MAURO HERE
-           call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
+	!print *, 'I got here AA'
 
+#ifdef MFC_SIMULATION
+        if ( hyperelasticity ) then 
+           ! MAURO HERE
+           !call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
+    	   !print *, 'I got here AAA'
            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-           do l = 0, p
-              do k = 0, n
-                 do j = 0, m
+           do l = izb, ize
+              do k = iyb, iye
+                 do j = ixb, ixe
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
@@ -1072,11 +1071,12 @@ contains
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    if (G_K > 1d-3) then
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                                 G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                    rho_K = max(rho_K, sgm_eps)
+                    !if (G_K > 1d-3) then
+                    !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 
+                                 !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
                         !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
-                    end if
+                    !end if
                  end do
               end do
            end do
@@ -1085,12 +1085,12 @@ contains
 #endif
 
 #ifdef MFC_POST_PROCESS
-       do l = 1, b_size
+        do l = 1, b_size
             allocate(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
         end do
 
         if (hyperelasticity) then 
-          call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+          !call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
           do l = 0, p
              do k = 0, n
                 do j = 0, m
@@ -1101,9 +1101,9 @@ contains
                     ! If pre-processing, use non acc mixture subroutines
                     call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                              rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-                    if ( G_K > 1d-3 ) then
-                       qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - & 
-                           G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
+                    if ( G_K > 1000 ) then
+                       !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) ! - & 
+                           !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     end if
                  end do
              end do
@@ -1124,14 +1124,8 @@ contains
     subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                              q_cons_vf)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(in) :: q_prim_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inout) :: q_cons_vf
-
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(b_size) :: q_btensor
 
         ! Density, specific heat ratio function, liquid stiffness function
@@ -1156,8 +1150,8 @@ contains
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
-        if (hyperelasticity ) then
-            call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+        if ( hyperelasticity ) then
+            !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if 
 
         ! Converting the primitive variables to the conservative variables
@@ -1272,11 +1266,11 @@ contains
                     if ( hyperelasticity ) then
                         ! adding the elastic contribution
                         do i = xibeg, xiend
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                            !q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-                        if (G > 1d-3) then
-                            q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
-                              G*f_elastic_energy(q_btensor, j, k, l)
+                        if (G > 1000) then
+                            !q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
+                            !  G*f_elastic_energy(q_btensor, j, k, l)
                         end if
                     end if 
 
@@ -1373,7 +1367,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, E_idx)
-                    if (hypoelasticity .or. hyperelasticity) then
+                    if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
                                                                         j, k, l, G_K, Gs)
@@ -1485,9 +1479,9 @@ contains
     subroutine s_calculate_btensor_acc(q_prim_vf, btensor, xb, xe, yb, ye, zb, ze)
 
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(OUT) :: btensor
-        integer, intent(IN) :: xb, xe, yb, ye, zb, ze
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(b_size), intent(inout) :: btensor
+        integer, intent(in) :: xb, xe, yb, ye, zb, ze
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb 
         integer :: j, k, l, i
 
@@ -1525,11 +1519,15 @@ contains
 !          !$acc end parallel loop
 !        else ! 3D 
 
+
+	!print *,'I got here AAAA'
           !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
           do l = zb, ze
              do k = yb, ye
                 do j = xb, xe
-
+	!print *, j,k,l
+	!print *,xibeg
+	!print *,xiend
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
@@ -1904,6 +1902,7 @@ contains
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
 
+	!print *, 'I got here AAAAA'
 
     ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
             tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
@@ -1950,7 +1949,7 @@ contains
         do i = 1, tensor_size - 1
            tensora(i) = tensorb(i)/tensorb(tensor_size)
         end do 
-
+	!print *, 'I got here A6'
     ! STEP 3: computing F tranpose F
         !tensorb(1) = tensora(1)**2
             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
@@ -1962,7 +1961,7 @@ contains
             tensorb(4) = tensorb(2)
             tensorb(7) = tensorb(3)
             tensorb(8) = tensorb(6)
-
+	!print *, 'I got here A7'
                    !call s_compute_gradient_xi3d_acc(q_prim_vf, ixb, ixe, iyb, &
                    !iye, izb, ize, j, k, l, tensora, tensorb)
                    !! 1: 1D, 3: 2D, 6: 3D
@@ -1972,13 +1971,14 @@ contains
                    btensor(4)%sf(j,k,l) = tensorb(5)
                    btensor(5)%sf(j,k,l) = tensorb(6)
                    btensor(6)%sf(j,k,l) = tensorb(9)
+	!print *, 'I got here A8'
                    !! store the determinant at the last entry of the btensor sf
                    btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
              end do
           end do
           !$acc end parallel loop
-       
+       !print *, 'I got here A9'
 !        end if
     end subroutine s_calculate_btensor_acc
 

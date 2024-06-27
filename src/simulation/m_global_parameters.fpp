@@ -146,7 +146,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture properties correction
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
-    logical :: elasticity      !< elasticity modeling
+    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical :: cu_tensor
 
     logical :: bodyForces
@@ -166,7 +166,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err,alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT,hypoelasticity,hyperelasticity)
+    !$acc declare create(mpp_lim, model_eqns,mixture_err,alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, elasticity)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -831,7 +831,6 @@ contains
 
                 if ( hypoelasticity ) then
                     elasticity = .true.
-                    hyperelasticity = .false.
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
@@ -840,7 +839,7 @@ contains
 
                 if ( hyperelasticity ) then
                     elasticity = .true.
-                    hypoelasticity = .false.
+		 !print *, elasticity
                     ! number of distinct stress is 1 in 1D, 2 in 2D, and 3 in 3D
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
@@ -1071,7 +1070,7 @@ contains
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref,gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim,bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids,model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord,mp_weno, weno_eps, teno_CT, hyperelasticity,elasticity)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)

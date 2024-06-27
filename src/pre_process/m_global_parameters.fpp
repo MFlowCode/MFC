@@ -84,6 +84,7 @@ module m_global_parameters
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity  !< activate hypoelasticity
     logical :: hyperelasticity !< activate hyperelasticity
+    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     logical :: pre_stress      !< activate pre_stressed domain
@@ -286,6 +287,7 @@ contains
 
         hypoelasticity = .false.
         hyperelasticity = .false.
+        elasticity = .false.
         pre_stress = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
@@ -600,6 +602,7 @@ contains
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
                 sys_size = stress_idx%end
+                elasticity = .true.
             end if
 
             if (hyperelasticity) then
@@ -611,6 +614,7 @@ contains
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
                 tensor_size = num_dims**2 + 1
+                elasticity = .true.
             end if
 
             if (sigma /= dflt_real) then

@@ -558,7 +558,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if ( hypoelasticity ) then
+                                if ( elasticity ) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -571,12 +571,11 @@ contains
                                               , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
                                                                          (((4d0*G_L)/3d0) + &
                                                                           tau_e_L(dir_idx_tau(1)))/rho_L))
-                                elseif ( hyperelasticity ) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ) &
-                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ) &
-                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ))
-
+                                !elseif ( hyperelasticity ) then
+                                !    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ) &
+                                !              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ))
+                                !    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ) &
+                                !              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ))
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -753,16 +752,16 @@ contains
                             end do
 
                             ! Xi field
-                            if ( hyperelasticity ) then 
-                                do i = 1, num_dims
-                                  flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
-                                    (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
-                                     - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
-                                     + s_M*s_P*(rho_L*xi_field_L(i) &
-                                                - rho_R*xi_field_R(i))) &
-                                    /(s_M - s_P)
-                                end do
-                            end if 
+                            !if ( hyperelasticity ) then 
+                            !    do i = 1, num_dims
+                            !      flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                            !        (s_M*rho_R*vel_R(dir_idx(1))*xi_field_R(i) &
+                            !         - s_P*rho_L*vel_L(dir_idx(1))*xi_field_L(i) &
+                            !         + s_M*s_P*(rho_L*xi_field_L(i) &
+                            !                    - rho_R*xi_field_R(i))) &
+                            !        /(s_M - s_P)
+                            !    end do
+                            !end if 
 
                             ! Div(U)?
                             !$acc loop seq

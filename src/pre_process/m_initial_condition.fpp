@@ -315,8 +315,7 @@ contains
         if (instability_wave) call s_superposition_instability_wave()
 
         ! Converting the primitive variables to the conservative ones
-        call s_convert_primitive_to_conservative_variables(q_prim_vf, &
-                                                           q_cons_vf)
+        call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
