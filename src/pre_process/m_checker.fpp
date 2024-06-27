@@ -56,11 +56,11 @@ contains
             if (t_step_old == dflt_int) then
                 call s_mpi_abort('old_grid is enabled, but t_step_old not set. '// &
                                  'Exiting ...')
-            elseif ((x_domain%beg /= dflt_real .or. x_domain%end /= dflt_real) &
+            elseif ((.not. f_is_default(x_domain%beg)) .or. (.not. f_is_default(x_domain%end)) &
                     .or. &
-                    (y_domain%beg /= dflt_real .or. y_domain%end /= dflt_real) &
+                    (.not. f_is_default(y_domain%beg)) .or. (.not. f_is_default(y_domain%end)) &
                     .or. &
-                    (z_domain%beg /= dflt_real .or. z_domain%end /= dflt_real)) then
+                    (.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))) then
                 call s_mpi_abort('x_domain, y_domain, and/or z_domain '// &
                                  'are not supported with old_grid enabled. '// &
                                  'Exiting ...')
@@ -78,16 +78,16 @@ contains
             if (.not. skip_check) then
                 #:for BOUND in ['beg', 'end']
                     if (${VAR}$ == 0) then
-                        if (${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                        if (.not. f_is_default((${DIR}$_domain%${BOUND}$))) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
                                              'be set when ${VAR}$ = 0. Exiting ...')
                         end if
                     else ! ${VAR}$ > 0
-                        if (old_grid .and. ${DIR}$_domain%${BOUND}$ /= dflt_real) then
+                        if (old_grid .and. (.not. f_is_default(${DIR}$_domain%${BOUND}$))) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
                                              'be set when ${VAR}$ > 0 and '// &
                                              'old_grid = T. Exiting ...')
-                        elseif (.not. old_grid .and. ${DIR}$_domain%${BOUND}$ == dflt_real) then
+                        elseif (.not. old_grid .and. f_is_default(${DIR}$_domain%${BOUND}$)) then
                             call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
                                              'set when ${VAR}$ > 0 and '// &
                                              'old_grid = F. Exiting ...')
@@ -107,7 +107,7 @@ contains
             if (n == 0) then
                 call s_mpi_abort('n must be positive for cylindrical '// &
                                  'coordinates. Exiting ...')
-            elseif (y_domain%beg == dflt_real .or. y_domain%end == dflt_real) then
+            elseif (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)) then
                 call s_mpi_abort('y_domain%beg and y_domain%end '// &
                                  'must be set for n = 0 '// &
                                  '(2D cylindrical coordinates). Exiting ...')
@@ -118,7 +118,9 @@ contains
             end if
 
             if (p == 0) then
-                if (z_domain%beg /= dflt_real .or. z_domain%end /= dflt_real) then
+                if ((.not. f_is_default(z_domain%beg)) &
+                    .or. &
+                    (.not. f_is_default(z_domain%end))) then
                     call s_mpi_abort('z_domain%beg and z_domain%end '// &
                                      'are not supported for p = 0 '// &
                                      '(2D cylindrical coordinates). Exiting ...')
@@ -172,13 +174,13 @@ contains
                 if (old_grid) then
                     call s_mpi_abort('old_grid and stretch_${X}$ are '// &
                                      'incompatible. Exiting ...')
-                elseif (a_${X}$ == dflt_real) then
+                elseif (f_is_default(a_${X}$)) then
                     call s_mpi_abort('a_${X}$ must be set with stretch_${X}$ '// &
                                      'enabled. Exiting ...')
-                elseif (${X}$_a == dflt_real) then
+                elseif (f_is_default(${X}$_a)) then
                     call s_mpi_abort('${X}$_a must be set with stretch_${X}$ '// &
                                      'enabled. Exiting ...')
-                elseif (${X}$_b == dflt_real) then
+                elseif (f_is_default(${X}$_b)) then
                     call s_mpi_abort('${X}$_b must be set with stretch_${X}$ '// &
                                      'enabled. Exiting ...')
                 elseif (${X}$_a >= ${X}$_b) then
@@ -220,12 +222,12 @@ contains
 
         if (perturb_flow &
             .and. &
-            (perturb_flow_fluid == dflt_int .or. perturb_flow_mag == dflt_real)) then
+            (perturb_flow_fluid == dflt_int .or. f_is_default(perturb_flow_mag))) then
             call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
                              'must be set with perturb_flow = T. Exiting ...')
         elseif ((.not. perturb_flow) &
                 .and. &
-                (perturb_flow_fluid /= dflt_int .or. perturb_flow_mag /= dflt_real)) then
+                (perturb_flow_fluid /= dflt_int .or. (.not. f_is_default(perturb_flow_mag)))) then
             call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
                              'must not be set with perturb_flow = F. Exiting ...')
         elseif ((perturb_flow_fluid > num_fluids) &
@@ -244,18 +246,18 @@ contains
                 (perturb_sph_fluid < 0 .and. perturb_sph_fluid /= dflt_int)) then
             call s_mpi_abort('perturb_sph_fluid must be between 0 and '// &
                              'num_fluids. Exiting ...')
-        elseif ((any(fluid_rho /= dflt_real)) .and. (.not. perturb_sph)) then
-            call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
-                             'Exiting ...')
-        elseif (perturb_sph) then
-            do i = 1, num_fluids
-                call s_int_to_str(i, iStr)
-                if (fluid_rho(i) == dflt_real) then
-                    call s_mpi_abort('fluid_rho('//trim(iStr)//') must be set '// &
-                                     'if perturb_sph = T. Exiting ...')
-                end if
-            end do
         end if
+
+        do i = 1, num_fluids
+            call s_int_to_str(i, iStr)
+            if ((.not. perturb_sph) .and. (.not. f_is_default(fluid_rho(i)))) then
+                call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
+                                 'Exiting ...')
+            elseif (perturb_sph .and. f_is_default(fluid_rho(i))) then
+                call s_mpi_abort('fluid_rho('//trim(iStr)//') must be set '// &
+                                 'if perturb_sph = T. Exiting ...')
+            end if
+        end do
     end subroutine s_check_inputs_perturb_density
 
     !> Checks miscellaneous constraints

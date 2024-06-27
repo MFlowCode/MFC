@@ -37,7 +37,14 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              f_approx_equal
+              f_approx_equal, &
+              f_is_default
+
+    !> Checks if a variable is the default value
+    interface f_is_default
+        module procedure f_is_default_int
+        module procedure f_is_default_real
+    end interface
 
 contains
 
@@ -562,5 +569,21 @@ contains
             res = (abs(a - b)/min(abs(a) + abs(b), huge(a)) < tol)
         end if
     end function f_approx_equal
+
+    !> Checks if a real(kind(0d0)) variable is of default value.
+    !! @param var Variable to check.
+    logical function f_is_default_real(var) result(res)
+        real(kind(0d0)), intent(in) :: var
+
+        res = f_approx_equal(var, dflt_real)
+    end function f_is_default_real
+
+    !> Checks if a integer variable is of default value.
+    !! @param var Variable to check.
+    logical function f_is_default_int(var) result(res)
+        integer, intent(in) :: var
+
+        res = (var == dflt_int)
+    end function f_is_default_int
 
 end module m_helper

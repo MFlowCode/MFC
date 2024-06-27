@@ -135,7 +135,7 @@ contains
         end if
 
         do i = 1, num_fluids
-            if (schlieren_alpha(i) /= dflt_real) then
+            if (.not. f_is_default(schlieren_alpha(i))) then
                 call s_int_to_str(i, iStr)
                 if (schlieren_alpha(i) <= 0d0) then
                     call s_mpi_abort('schlieren_alpha('//trim(iStr)//') must be '// &
@@ -153,7 +153,7 @@ contains
 
     !> Checks constraints on surface tension parameters (cf_wrt and sigma)
     subroutine s_check_inputs_surface_tension
-        if (sigma == dflt_real .and. cf_wrt) then
+        if (f_is_default(sigma) .and. cf_wrt) then
             call s_mpi_abort('cf_wrt can only be anabled if the surface'// &
                              'coefficient is set')
         end if

@@ -72,7 +72,7 @@ contains
             call s_mpi_abort('For 3D simulation, p must be greater than or '// &
                              'equal to (num_stcls_min*weno_order - 1), '// &
                              'whose value is '//trim(numStr)//'. Exiting ...')
-        elseif (weno_order /= 1 .and. f_approx_equal(weno_eps, dflt_real)) then
+        elseif (weno_order /= 1 .and. f_is_default(weno_eps)) then
             call s_mpi_abort('weno_order != 1, but weno_eps is not set. '// &
                              'A typical value of weno_eps is 1e-6. '// &
                              'Exiting ...')
@@ -80,7 +80,7 @@ contains
             call s_mpi_abort('weno_eps must be positive. '// &
                              'A typical value of weno_eps is 1e-6. '// &
                              'Exiting ...')
-        elseif (teno .and. f_approx_equal(teno_CT, dflt_real)) then
+        elseif (teno .and. f_is_default(teno_CT)) then
             call s_mpi_abort('teno is used, but teno_CT is not set. '// &
                              'A typical value of teno_CT is 1e-6. '// &
                              'Exiting ...')
@@ -220,39 +220,34 @@ contains
 
         do i = 1, num_fluids
             do j = 1, 2
-
                 call s_int_to_str(j, jStr)
-                if ((.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real)) &
+                if ((.not. f_is_default(fluid_pp(i)%Re(j))) &
                     .and. &
                     fluid_pp(i)%Re(j) <= 0d0) then
                     call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//') must be positive. '// &
                                      'Exiting ...')
-
                 else if (model_eqns == 1 &
                          .and. &
-                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         (.not. f_is_default(fluid_pp(i)%Re(j)))) then
                     call s_mpi_abort('model_eqns = 1 does not support '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//'). Exiting ...')
-
                 else if (i > num_fluids &
                          .and. &
-                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         (.not. f_is_default(fluid_pp(i)%Re(j)))) then
                     call s_mpi_abort('First index ('//trim(iStr)//') of '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//') exceeds '// &
                                      'num_fluids. Exiting ...')
-
                 else if (weno_order == 1 .and. (.not. weno_avg) &
                          .and. &
-                         (.not. f_approx_equal(fluid_pp(i)%Re(j), dflt_real))) then
+                         (.not. f_is_default(fluid_pp(i)%Re(j)))) then
                     call s_mpi_abort('weno_order = 1 without weno_avg '// &
                                      'does not support '// &
                                      'fluid_pp('//trim(iStr)//')%'// &
                                      'Re('//trim(jStr)//'). Exiting ...')
                 end if
-
             end do
         end do
     end subroutine s_check_inputs_stiffened_eos_viscosity
@@ -260,16 +255,16 @@ contains
     !> Checks constraints on body forces parameters (bf_x[y,z], etc.)
     subroutine s_check_inputs_body_forces
         #:for DIR in ['x', 'y', 'z']
-            if (bf_${DIR}$ .and. f_approx_equal(k_${DIR}$, dflt_real)) then
+            if (bf_${DIR}$ .and. f_is_default(k_${DIR}$)) then
                 call s_mpi_abort('k_${DIR}$ must be specified if bf_${DIR}$ is true '// &
                                  'Exiting ...')
-            elseif (bf_${DIR}$ .and. f_approx_equal(w_${DIR}$, dflt_real)) then
+            elseif (bf_${DIR}$ .and. f_is_default(w_${DIR}$)) then
                 call s_mpi_abort('w_${DIR}$ must be specified if bf_${DIR}$ is true '// &
                                  'Exiting ...')
-            elseif (bf_${DIR}$ .and. f_approx_equal(p_${DIR}$, dflt_real)) then
+            elseif (bf_${DIR}$ .and. f_is_default(p_${DIR}$)) then
                 call s_mpi_abort('p_${DIR}$ must be specified if bf_${DIR}$ is true '// &
                                  'Exiting ...')
-            elseif (bf_${DIR}$ .and. f_approx_equal(g_${DIR}$, dflt_real)) then
+            elseif (bf_${DIR}$ .and. f_is_default(g_${DIR}$)) then
                 call s_mpi_abort('g_${DIR}$ must be specified if bf_${DIR}$ is true '// &
                                  'Exiting ...')
             end if

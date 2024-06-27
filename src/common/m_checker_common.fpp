@@ -105,7 +105,7 @@ contains
         elseif (polydisperse .and. (mod(nb, 2) == 0)) then
             call s_mpi_abort('nb must be odd '// &
                              'Exiting ...')
-        elseif ((.not. polytropic) .and. R0ref == dflt_real) then
+        elseif ((.not. polytropic) .and. f_is_default(R0ref)) then
             call s_mpi_abort('R0ref must be set if using bubbles with '// &
                              'polytropic = .false.. Exiting ...')
         elseif (nb == dflt_int) then
@@ -120,10 +120,10 @@ contains
             call s_mpi_abort('Bubble models untested with '// &
                              'pi-gamma model. Exiting ...')
             !TODO: Comment this out when testing riemann with hll
-        elseif (model_eqns == 4 .and. rhoref == dflt_real) then
+        elseif (model_eqns == 4 .and. f_is_default(rhoref)) then
             call s_mpi_abort('rhoref must be set if using bubbles with '// &
                              'model_eqns = 4. Exiting ...')
-        elseif (model_eqns == 4 .and. pref == dflt_real) then
+        elseif (model_eqns == 4 .and. f_is_default(pref)) then
             call s_mpi_abort('pref must be set if using bubbles with '// &
                              'model_eqns = 4. Exiting ...')
         elseif (model_eqns == 4 .and. num_fluids > 1) then
@@ -141,7 +141,7 @@ contains
         if ((.not. bubbles) .and. polydisperse) then
             call s_mpi_abort('Polydisperse bubble modeling requires the '// &
                              'bubbles flag to be set. Exiting ...')
-        elseif (polydisperse .and. f_approx_equal(poly_sigma, dflt_real)) then
+        elseif (polydisperse .and. f_is_default(poly_sigma)) then
             call s_mpi_abort('Polydisperse bubble modeling requires '// &
                              'poly_sigma > 0. Exiting ...')
         elseif (qbmm .and. (.not. bubbles)) then
@@ -181,8 +181,8 @@ contains
             elseif ((ptgalpha_eps <= 0d0) .or. (ptgalpha_eps >= 1d0)) then
                 call s_mpi_abort('ptgalpha_eps must be in (0,1). Exiting ...')
             end if
-        elseif ((relax_model /= dflt_int) .or. (.not. f_approx_equal(palpha_eps, dflt_real)) &
-                .or. (.not. f_approx_equal(ptgalpha_eps, dflt_real))) then
+        elseif ((relax_model /= dflt_int) .or. (.not. f_is_default(palpha_eps)) &
+                .or. (.not. f_is_default(ptgalpha_eps))) then
             call s_mpi_abort('relax is not set as true, but other phase '// &
                              'change parameters have been modified. Either '// &
                              'activate phase change or set the values '// &
@@ -372,40 +372,40 @@ contains
 
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if (.not. f_approx_equal(fluid_pp(i)%gamma, dflt_real) &
+            if (.not. f_is_default(fluid_pp(i)%gamma) &
                 .and. &
                 fluid_pp(i)%gamma <= 0d0) then
                 call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
                                  'gamma must be positive. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
-                    (.not. f_approx_equal(fluid_pp(i)%gamma, dflt_real))) then
+                    (.not. f_is_default(fluid_pp(i)%gamma))) then
                 call s_mpi_abort('model_eqns = 1 does not support '// &
                                  'fluid_pp('//trim(iStr)//')%'// &
                                  'gamma. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0d0) &
                     .or. &
                     (i > num_fluids + bub_fac .and. &
-                     (.not. f_approx_equal(fluid_pp(i)%gamma, dflt_real)))) &
+                     (.not. f_is_default(fluid_pp(i)%gamma)))) &
                 then
                 call s_mpi_abort('Unsupported combination '// &
                                  'of values of num_fluids '// &
                                  'and fluid_pp('//trim(iStr)//')%'// &
                                  'gamma. Exiting ...')
-            elseif (.not. f_approx_equal(fluid_pp(i)%pi_inf, dflt_real) &
+            elseif (.not. f_is_default(fluid_pp(i)%pi_inf) &
                     .and. &
                     fluid_pp(i)%pi_inf < 0d0) then
                 call s_mpi_abort('fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf must be non-negative. Exiting ...')
             elseif (model_eqns == 1 &
                     .and. &
-                    .not. f_approx_equal(fluid_pp(i)%pi_inf, dflt_real)) then
+                    .not. f_is_default(fluid_pp(i)%pi_inf)) then
                 call s_mpi_abort('model_eqns = 1 does not support '// &
                                  'fluid_pp('//trim(iStr)//')%'// &
                                  'pi_inf. Exiting ...')
             elseif ((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0d0) &
                     .or. &
-                    (i > num_fluids + bub_fac .and. (.not. f_approx_equal(fluid_pp(i)%pi_inf, dflt_real)))) &
+                    (i > num_fluids + bub_fac .and. (.not. f_is_default(fluid_pp(i)%pi_inf)))) &
                 then
                 call s_mpi_abort('Unsupported combination '// &
                                  'of values of num_fluids '// &
@@ -450,10 +450,10 @@ contains
         #:endfor
 
         ! Constraints on the surface tension model
-        if (.not. f_approx_equal(sigma, dflt_real) .and. sigma < 0d0) then
+        if (.not. f_is_default(sigma) .and. sigma < 0d0) then
             call s_mpi_abort('The surface tension coefficient must be'// &
                              'greater than or equal to zero. Exiting ...')
-        elseif (.not. f_approx_equal(sigma, dflt_real) .and. model_eqns /= 3) then
+        elseif (.not. f_is_default(sigma) .and. model_eqns /= 3) then
             call s_mpi_abort("The surface tension model requires"// &
                              'model_eqns=3. Exiting ...')
         end if
