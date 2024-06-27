@@ -115,7 +115,7 @@ contains
     subroutine s_check_inputs_vorticity
         if (n == 0 .and. any(omega_wrt)) then
             call s_mpi_abort('omega_wrt is not supported for n = 0. Exiting ...')
-        elseif (p == 0 .and. (.not. omega_wrt(3))) then
+        elseif (p == 0 .and. (omega_wrt(1) .or. omega_wrt(2))) then
             call s_mpi_abort('omega_wrt(1) and omega_wrt(2) are not supported '// &
                              'for p = 0. Exiting ...')
         elseif (any(omega_wrt) .and. fd_order == dflt_int) then
