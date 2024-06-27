@@ -94,24 +94,24 @@ module m_riemann_solvers
 
             import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
 
-            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-            type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+            type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-            type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+            type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
             type(scalar_field), &
                 allocatable, dimension(:), &
-                intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                                  dqL_prim_dy_vf, dqR_prim_dy_vf, &
                                  dqL_prim_dz_vf, dqR_prim_dz_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+                intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-            integer, intent(IN) :: norm_dir
+            integer, intent(in) :: norm_dir
 
-            type(int_bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(in) :: ix, iy, iz
 
         end subroutine s_abstract_riemann_solver
 
@@ -120,7 +120,7 @@ module m_riemann_solvers
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-        subroutine s_compute_abstract_viscous_source_flux(velL_vf, & ! -------------
+        subroutine s_compute_abstract_viscous_source_flux(velL_vf, &
                                                           dvelL_dx_vf, &
                                                           dvelL_dy_vf, &
                                                           dvelL_dz_vf, &
@@ -136,18 +136,18 @@ module m_riemann_solvers
 
             type(scalar_field), &
                 dimension(num_dims), &
-                intent(IN) :: velL_vf, velR_vf, &
+                intent(in) :: velL_vf, velR_vf, &
                               dvelL_dx_vf, dvelR_dx_vf, &
                               dvelL_dy_vf, dvelR_dy_vf, &
                               dvelL_dz_vf, dvelR_dz_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: flux_src_vf
+                intent(inout) :: flux_src_vf
 
-            integer, intent(IN) :: norm_dir
+            integer, intent(in) :: norm_dir
 
-            type(int_bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(in) :: ix, iy, iz
 
         end subroutine s_compute_abstract_viscous_source_flux
 
@@ -266,7 +266,7 @@ contains
 
     @:s_compute_speed_of_sound()
 
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
@@ -279,24 +279,24 @@ contains
                                     flux_gsrc_vf, &
                                     norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(kind(0d0)) :: rho_L, rho_R
@@ -855,7 +855,7 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
+    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
                                      qL_prim_vf, &
@@ -868,24 +868,24 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(kind(0d0)) :: rho_L, rho_R
@@ -2376,7 +2376,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_riemann_solvers_module() ! ---------------------
+    subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the
         ! left, right, and average states of the Riemann problem, as well
@@ -2502,7 +2502,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-    end subroutine s_initialize_riemann_solvers_module ! -------------------
+    end subroutine s_initialize_riemann_solvers_module
 
     !>  The purpose of this subroutine is to populate the buffers
         !!      of the left and right Riemann states variables, depending
@@ -2529,7 +2529,7 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-    subroutine s_populate_riemann_states_variables_buffers( & ! ------------
+    subroutine s_populate_riemann_states_variables_buffers( &
         qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
@@ -2540,18 +2540,17 @@ contains
         qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
                              qL_prim_vf, qR_prim_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterator
 
@@ -2894,7 +2893,7 @@ contains
         end if
         ! END: Population of Buffers in z-direction ========================
 
-    end subroutine s_populate_riemann_states_variables_buffers ! -----------
+    end subroutine s_populate_riemann_states_variables_buffers
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -2918,15 +2917,13 @@ contains
         flux_gsrc_vf, &
         norm_dir, ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l ! Generic loop iterators
 
@@ -3028,7 +3025,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_riemann_solver ! ---------------------------
+    end subroutine s_initialize_riemann_solver
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -3046,7 +3043,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                          dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
                                                          dvelL_dz_vf, &
@@ -3060,18 +3057,18 @@ contains
 
         type(scalar_field), &
             dimension(num_dims), &
-            intent(IN) :: velL_vf, velR_vf, &
+            intent(in) :: velL_vf, velR_vf, &
                           dvelL_dx_vf, dvelR_dx_vf, &
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
-        integer, intent(IN) :: norm_dir
+        integer, intent(in) :: norm_dir
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -3555,7 +3552,7 @@ contains
         end if
         ! END: Viscous Stresses in theta-direction =============================
 
-    end subroutine s_compute_cylindrical_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cylindrical_viscous_source_flux
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -3573,7 +3570,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                        dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
                                                        dvelL_dz_vf, &
@@ -3587,18 +3584,17 @@ contains
 
         type(scalar_field), &
             dimension(num_dims), &
-            intent(IN) :: velL_vf, velR_vf, &
+            intent(in) :: velL_vf, velR_vf, &
                           dvelL_dx_vf, dvelR_dx_vf, &
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -4048,7 +4044,7 @@ contains
         end if
         ! END: Viscous Stresses in z-direction =============================
 
-    end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cartesian_viscous_source_flux
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
@@ -4059,17 +4055,16 @@ contains
         !!  @param ix   Index bounds in  first coordinate direction
         !!  @param iy   Index bounds in second coordinate direction
         !!  @param iz   Index bounds in  third coordinate direction
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, & ! --------
+    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
                                          norm_dir, ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -4221,10 +4216,10 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_finalize_riemann_solver ! -----------------------------
+    end subroutine s_finalize_riemann_solver
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_riemann_solvers_module() ! -----------------------
+    subroutine s_finalize_riemann_solvers_module
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
@@ -4275,6 +4270,6 @@ contains
             @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
         end if
 
-    end subroutine s_finalize_riemann_solvers_module ! ---------------------
+    end subroutine s_finalize_riemann_solvers_module
 
 end module m_riemann_solvers

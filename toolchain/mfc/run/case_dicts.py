@@ -49,6 +49,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -177,7 +178,10 @@ SIMULATION.update({
     't_step_print': ParamType.INT,
     'time_stepper': ParamType.INT,
     'weno_eps': ParamType.REAL,
+    'teno_CT': ParamType.REAL,
     'mapped_weno': ParamType.LOG,
+    'wenoz': ParamType.LOG,
+    'teno': ParamType.LOG,
     'mp_weno': ParamType.LOG,
     'weno_avg': ParamType.LOG,
     'weno_Re_flux': ParamType.LOG,
@@ -341,7 +345,7 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "nb", "weno_order", "num_fluids" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 
