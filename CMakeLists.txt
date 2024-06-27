@@ -177,7 +177,9 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
 
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(
-            $<$<COMPILE_LANGUAGE:Fortran:-minline>
+	    # $<$<COMPILE_LANGUAGE:Fortran:-Minline>
+	    # $<$<COMPILE_LANGUAGE:Fortran:-cuda=inline>
+	    -Minfo=inline
         )
     elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
