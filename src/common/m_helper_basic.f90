@@ -31,10 +31,6 @@ contains
         real(kind(0d0)) :: tol
 
         if (present(tol_input)) then
-            if (tol_input <= 0d0) then
-                call exit(1)
-                ! Not using s_mpi_abort to prevent circular dependency
-            end if
             tol = tol_input
         else
             tol = 1d-6
@@ -52,6 +48,7 @@ contains
     !> Checks if a real(kind(0d0)) variable is of default value.
     !! @param var Variable to check.
     logical function f_is_default(var) result(res)
+        !$acc routine seq
         real(kind(0d0)), intent(in) :: var
 
         res = f_approx_equal(var, dflt_real)
