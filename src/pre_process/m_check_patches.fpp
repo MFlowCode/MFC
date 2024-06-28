@@ -18,6 +18,8 @@ module m_check_patches
 
     use m_compile_specific
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use m_helper
     ! ==========================================================================
 

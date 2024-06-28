@@ -256,7 +256,7 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             ! This assumes that the color function advection equation is
             ! the last equation. If this changes then this logic will
             ! need updated
@@ -284,7 +284,7 @@ contains
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             q_prim_qp%vf(c_idx)%sf => &
                 q_cons_qp%vf(c_idx)%sf
             !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
@@ -578,7 +578,7 @@ contains
                             & iz%beg:iz%end))
                 end do
 
-                if (any(Re_size > 0) .or. (sigma /= dflt_real)) then
+                if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
@@ -807,7 +807,7 @@ contains
         call nvtxEndRange()
 
         call nvtxStartRange("Surface_Tension")
-        if (sigma /= dflt_real) call s_get_capilary(q_prim_qp%vf)
+        if (.not. f_is_default(sigma)) call s_get_capilary(q_prim_qp%vf)
         call nvtxEndRange
 
         ! Dimensional Splitting Loop =======================================
@@ -825,7 +825,7 @@ contains
 
             call nvtxStartRange("RHS-WENO")
 
-            if (sigma == dflt_real) then
+            if (f_is_default(sigma)) then
                 ! Reconstruct densitiess
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
@@ -941,7 +941,7 @@ contains
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
-            if (any(Re_size > 0d0) .or. (sigma /= dflt_real)) then
+            if (any(Re_size > 0d0) .or. (.not. f_is_default(sigma))) then
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
@@ -1609,7 +1609,7 @@ contains
 
         if (idir == 1) then ! x-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1641,7 +1641,7 @@ contains
 
         elseif (idir == 2) then ! y-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1776,7 +1776,7 @@ contains
 
         elseif (idir == 3) then ! z-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n

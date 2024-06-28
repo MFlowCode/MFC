@@ -19,6 +19,8 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_helper
     ! ==========================================================================
 
@@ -1005,7 +1007,7 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (sigma /= dflt_real) then
+                    if (.not. f_is_default(sigma)) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
                     end if
 
@@ -1159,7 +1161,7 @@ contains
                         end do
                     end if
 
-                    if (sigma /= dflt_real) then
+                    if (.not. f_is_default(sigma)) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
 

@@ -14,6 +14,7 @@ module m_global_parameters
 
     use m_derived_types         ! Definitions of the derived types
 
+    use m_helper_basic          ! Functions to compare floating point numbers
     ! ==========================================================================
 
     implicit none
@@ -565,7 +566,7 @@ contains
                 if (qbmm) then
                     if (polytropic) then
                         allocate (pb0(nb))
-                        if (Web == dflt_real) then
+                        if ((f_is_default(Web))) then
                             pb0 = pref
                             pb0 = pb0/pref
                             pref = 1d0
@@ -582,7 +583,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -606,7 +607,7 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if

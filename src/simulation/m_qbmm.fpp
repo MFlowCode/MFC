@@ -18,6 +18,8 @@ module m_qbmm
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use m_helper
 
     ! ==========================================================================
@@ -101,14 +103,14 @@ contains
                                 momrhs(2, i1, i2, 4, q) = 1.d0 + i2
                                 momrhs(3, i1, i2, 4, q) = 0d0
 
-                                if (Re_inv /= dflt_real) then
+                                if (.not. f_is_default(Re_inv)) then
                                     ! add viscosity
                                     momrhs(1, i1, i2, 5, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 5, q) = i2
                                     momrhs(3, i1, i2, 5, q) = 0d0
                                 end if
 
-                                if (Web /= dflt_real) then
+                                if (.not. f_is_default(Web)) then
                                     ! add surface tension
                                     momrhs(1, i1, i2, 6, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 6, q) = -1.d0 + i2
@@ -274,14 +276,14 @@ contains
                                 momrhs(2, i1, i2, 4, q) = 1.d0 + i2
                                 momrhs(3, i1, i2, 4, q) = 0d0
 
-                                if (Re_inv /= dflt_real) then
+                                if (.not. f_is_default(Re_inv)) then
                                     ! add viscosity
                                     momrhs(1, i1, i2, 5, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 5, q) = i2
                                     momrhs(3, i1, i2, 5, q) = 0d0
                                 end if
 
-                                if (Web /= dflt_real) then
+                                if (.not. f_is_default(Web)) then
                                     ! add surface tension
                                     momrhs(1, i1, i2, 6, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 6, q) = -1.d0 + i2
@@ -712,8 +714,8 @@ contains
                         coeffs(2, i1, i2) = -3d0*i2/2d0
                         coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
-                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2d0*i2/Web/rho
                         coeffs(7, i1, i2) = 0d0
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
@@ -732,9 +734,9 @@ contains
                         coeffs(13, i1, i2) = 0d0
                         coeffs(14, i1, i2) = 0d0
                         coeffs(15, i1, i2) = 0d0
-                        if (Re_inv /= dflt_real) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(17, i1, i2) = -i2*2d0/Web/rho
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2d0/Web/rho
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(18, i1, i2) = i2*6d0*Re_inv/(rho*c)
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
@@ -742,19 +744,19 @@ contains
                             coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
                             coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
-                            if (Web /= dflt_real) then
+                            if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
                             coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                         coeffs(27, i1, i2) = 3d0*i2*gam*R_v*Tw/(c*rho)
                         coeffs(28, i1, i2) = 3d0*i2*gam*R_v*Tw/(c*c*rho)
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(29, i1, i2) = 12d0*i2*gam*R_v*Tw*Re_inv/(rho*rho*c*c)
                         end if
                         coeffs(30, i1, i2) = 3d0*i2*gam/(c*rho)
                         coeffs(31, i1, i2) = 3d0*i2*gam/(c*c*rho)
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(32, i1, i2) = 12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                     end if
@@ -786,8 +788,8 @@ contains
                         coeffs(2, i1, i2) = -3d0*i2/2d0
                         coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
-                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2d0*i2/Web/rho
                         coeffs(7, i1, i2) = i2*pv/rho
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
@@ -806,9 +808,9 @@ contains
                         coeffs(13, i1, i2) = i2*(pv)/rho
                         coeffs(14, i1, i2) = 2d0*i2*(pv)/(c*rho)
                         coeffs(15, i1, i2) = i2*(pv)/(c*c*rho)
-                        if (Re_inv /= dflt_real) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(17, i1, i2) = -i2*2d0/Web/rho
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2d0/Web/rho
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(18, i1, i2) = i2*6d0*Re_inv/(rho*c)
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
@@ -816,7 +818,7 @@ contains
                             coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
                             coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
-                            if (Web /= dflt_real) then
+                            if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
                             coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)

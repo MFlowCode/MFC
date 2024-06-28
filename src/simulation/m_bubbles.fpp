@@ -717,14 +717,14 @@ contains
 
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
-            if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                                              (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+            if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + &
+                                                     (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
+        if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
+        if (.not. f_is_default(Re_inv)) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
@@ -747,21 +747,21 @@ contains
 
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
-            if (Web /= dflt_real) cdot_star = cdot_star - &
-                                              3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
+            if (.not. f_is_default(Web)) cdot_star = cdot_star - &
+                                                     3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
         else
             cdot_star = fpbdot
         end if
 
-        if (Web /= dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
-        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
+        if (.not. f_is_default(Web)) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
+        if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
 
         tmp1 = fV/fC
         tmp2 = 1.5d0*(fV**2d0)*(tmp1/3d0 - 1d0) + &
                (1d0 + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
-        if (Re_inv == dflt_real) then
+        if (f_is_default(Re_inv)) then
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
         else
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv/(fRho*fC))

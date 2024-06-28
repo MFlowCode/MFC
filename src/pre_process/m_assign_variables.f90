@@ -9,6 +9,9 @@ module m_assign_variables
     use m_global_parameters     ! Global parameters for the code
 
     use m_variables_conversion  ! Subroutines to change the state variables from
+
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     ! one form to another
     ! ==========================================================================
 
@@ -577,17 +580,17 @@ contains
 
         if (bubbles .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
+                if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
                     ! print *, 'setting to pb0'
                 end if
-                if (q_prim_vf(bub_idx%ms(i))%sf(j, k, l) == dflt_real) then
+                if (f_is_default(q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
                                            (1d0 - eta)*patch_icpp(smooth_patch_id)%cf_val
         end if

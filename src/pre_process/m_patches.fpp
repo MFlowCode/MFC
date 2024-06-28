@@ -15,7 +15,9 @@ module m_patches
 
     use m_derived_types         ! Definitions of the derived types
 
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_global_parameters     !< Definitions of the global parameters
+
+    use m_helper_basic          !< Functions to compare floating point numbers
 
     use m_helper
 
@@ -376,7 +378,7 @@ contains
         do j = 0, n
             do i = 0, m
 
-                if (patch_ib(patch_id)%theta /= dflt_real) then
+                if (.not. f_is_default(patch_ib(patch_id)%theta)) then
                     x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
                     y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
                 else
@@ -441,7 +443,7 @@ contains
             end do
         end do
 
-        if (patch_ib(patch_id)%theta /= dflt_real) then
+        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
             do i = 1, Np
                 airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
                 airfoil_grid_l(i)%y = -1d0*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
@@ -545,7 +547,7 @@ contains
                 do j = 0, n
                     do i = 0, m
 
-                        if (patch_ib(patch_id)%theta /= dflt_real) then
+                        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
                             x_act = (x_cc(i) - x0)*cos(theta) - (y_cc(j) - y0)*sin(theta) + x0
                             y_act = (x_cc(i) - x0)*sin(theta) + (y_cc(j) - y0)*cos(theta) + y0
                         else
@@ -612,7 +614,7 @@ contains
             end if
         end do
 
-        if (patch_ib(patch_id)%theta /= dflt_real) then
+        if (.not. f_is_default(patch_ib(patch_id)%theta)) then
             do i = 1, Np
                 airfoil_grid_l(i)%x = (airfoil_grid_l(i)%x - x0)*cos(theta) + (airfoil_grid_l(i)%y - y0)*sin(theta) + x0
                 airfoil_grid_l(i)%y = -1d0*(airfoil_grid_l(i)%x - x0)*sin(theta) + (airfoil_grid_l(i)%y - y0)*cos(theta) + y0
@@ -1801,12 +1803,12 @@ contains
 
                     if (.not. ib .and. patch_icpp(patch_id)%smoothen) then
 
-                        if (length_x /= dflt_real) then
+                        if (.not. f_is_default(length_x)) then
                             eta = tanh(smooth_coeff/min(dy, dz)* &
                                        (sqrt((cart_y - y_centroid)**2 &
                                              + (cart_z - z_centroid)**2) &
                                         - radius))*(-0.5d0) + 0.5d0
-                        elseif (length_y /= dflt_real) then
+                        elseif (.not. f_is_default(length_y)) then
                             eta = tanh(smooth_coeff/min(dx, dz)* &
                                        (sqrt((x_cc(i) - x_centroid)**2 &
                                              + (cart_z - z_centroid)**2) &
@@ -1821,19 +1823,19 @@ contains
                     end if
 
                     if (.not. ib) then
-                        if ((((length_x /= dflt_real .and. &
+                        if ((((.not. f_is_default(length_x) .and. &
                                (cart_y - y_centroid)**2 &
                                + (cart_z - z_centroid)**2 <= radius**2 .and. &
                                x_boundary%beg <= x_cc(i) .and. &
                                x_boundary%end >= x_cc(i)) &
                               .or. &
-                              (length_y /= dflt_real .and. &
+                              (.not. f_is_default(length_y) .and. &
                                (x_cc(i) - x_centroid)**2 &
                                + (cart_z - z_centroid)**2 <= radius**2 .and. &
                                y_boundary%beg <= cart_y .and. &
                                y_boundary%end >= cart_y) &
                               .or. &
-                              (length_z /= dflt_real .and. &
+                              (.not. f_is_default(length_z) .and. &
                                (x_cc(i) - x_centroid)**2 &
                                + (cart_y - y_centroid)**2 <= radius**2 .and. &
                                z_boundary%beg <= cart_z .and. &
@@ -1854,19 +1856,19 @@ contains
                         end if
                     end if
 
-                    if (ib .and. ((length_x /= dflt_real .and. &
+                    if (ib .and. ((.not. f_is_default(length_x) .and. &
                                    (cart_y - y_centroid)**2 &
                                    + (cart_z - z_centroid)**2 <= radius**2 .and. &
                                    x_boundary%beg <= x_cc(i) .and. &
                                    x_boundary%end >= x_cc(i)) &
                                   .or. &
-                                  (length_y /= dflt_real .and. &
+                                  (.not. f_is_default(length_y) .and. &
                                    (x_cc(i) - x_centroid)**2 &
                                    + (cart_z - z_centroid)**2 <= radius**2 .and. &
                                    y_boundary%beg <= cart_y .and. &
                                    y_boundary%end >= cart_y) &
                                   .or. &
-                                  (length_z /= dflt_real .and. &
+                                  (.not. f_is_default(length_z) .and. &
                                    (x_cc(i) - x_centroid)**2 &
                                    + (cart_y - y_centroid)**2 <= radius**2 .and. &
                                    z_boundary%beg <= cart_z .and. &
