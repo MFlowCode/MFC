@@ -16,28 +16,29 @@
 
         integer :: q
 
-        c = 0d0
         if (alt_soundspeed) then
-             !$acc loop seq
-             do q = 1, num_fluids
+             !!acc loop seq   
+             !c = 0d0
+             !do q = 1, num_fluids
               !    if (hypoelasticity) then
               !       blkmod(i) = ((gammas(i) + 1d0)*pres + &
               !                    pi_infs(i))/gammas(i)+4/3*G(i)
               !   else
-                     blkmod(q) = ((gammas(q) + 1d0)*pres + &
-                                  pi_infs(q))/gammas(q)
+              !       blkmod(q) = ((gammas(q) + 1d0)*pres + &
+              !                    pi_infs(q))/gammas(q)
               !   end if
-                 c = c + adv(q)/blkmod(q)
-             end do 
-             c = 1d0/(rho*c)
+              !   c = c + adv(q)/blkmod(q)
+             !end do 
+             !c = 1d0/(rho*c)
         !if (alt_soundspeed) then
-        !    blkmod1 = ((gammas(1) + 1d0)*pres + &
-        !               pi_infs(1))/gammas(1)
-        !    blkmod2 = ((gammas(2) + 1d0)*pres + &
-        !               pi_infs(2))/gammas(2)
-        !    c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+            blkmod1 = ((gammas(1) + 1d0)*pres + &
+                       pi_infs(1))/gammas(1)
+            blkmod2 = ((gammas(2) + 1d0)*pres + &
+                       pi_infs(2))/gammas(2)
+            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
 
         elseif (model_eqns == 3) then
+            c = 0d0
             !$acc loop seq
             do q = 1, num_fluids
                 c = c + adv(q)*(1d0/gammas(q) + 1d0)* &
