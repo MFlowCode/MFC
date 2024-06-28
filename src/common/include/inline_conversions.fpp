@@ -10,32 +10,19 @@
         real(kind(0d0)), intent(IN) :: H
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
         real(kind(0d0)), intent(IN) :: vel_sum
+        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
         real(kind(0d0)), intent(OUT) :: c
-        real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
 
-        real(kind(0d0)), dimension(num_fluids) :: blkmod
+        real(kind(0d0)) :: blkmod1, blkmod2, blkmod3
 
-        integer :: q, i
+        integer :: q
 
         if (alt_soundspeed) then
-             c = 0d0
-             !$acc loop seq
-             do i = 1, num_fluids
-             !    if (hypoelasticity) then
-                     blkmod(i) = ((gammas(i) + 1d0)*pres + &
-                                  pi_infs(i))/gammas(i)+4/3*G(i)
-              !   else
-              !       blkmod(i) = ((gammas(i) + 1d0)*pres + &
-              !                    pi_infs(i))/gammas(i)
-              !   end if
-                 c = c + adv(i)/blkmod(i)
-             end do 
-             c = 1d0/(rho*c)
-!            blkmod1 = ((gammas(1) + 1d0)*pres + &
-!                       pi_infs(1))/gammas(1)
-!            blkmod2 = ((gammas(2) + 1d0)*pres + &
-!                       pi_infs(2))/gammas(2)
-!            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+            blkmod1 = ((gammas(1) + 1d0)*pres + &
+                       pi_infs(1))/gammas(1)
+            blkmod2 = ((gammas(2) + 1d0)*pres + &
+                       pi_infs(2))/gammas(2)
+            c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
         elseif (model_eqns == 3) then
             c = 0d0
             !$acc loop seq
@@ -57,6 +44,7 @@
                     (pres + pi_inf/(gamma + 1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
+
         else
             c = ((H - 5d-1*vel_sum)/gamma)
         end if
