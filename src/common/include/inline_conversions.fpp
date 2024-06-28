@@ -10,11 +10,12 @@
         real(kind(0d0)), intent(IN) :: H
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
         real(kind(0d0)), intent(IN) :: vel_sum
+        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
         real(kind(0d0)), intent(OUT) :: c
-        real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
-        real(kind(0d0)), dimension(num_fluids) :: blkmod
+        real(kind(0d0)) :: blkmod1, blkmod2
 
         integer :: q
+
         c = 0d0
         if (alt_soundspeed) then
              !$acc loop seq
@@ -29,6 +30,13 @@
                  c = c + adv(q)/blkmod(q)
              end do 
              c = 1d0/(rho*c)
+        !if (alt_soundspeed) then
+        !    blkmod1 = ((gammas(1) + 1d0)*pres + &
+        !               pi_infs(1))/gammas(1)
+        !    blkmod2 = ((gammas(2) + 1d0)*pres + &
+        !               pi_infs(2))/gammas(2)
+        !    c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+
         elseif (model_eqns == 3) then
             !$acc loop seq
             do q = 1, num_fluids
@@ -49,6 +57,7 @@
                     (pres + pi_inf/(gamma + 1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
+
         else
             c = ((H - 5d-1*vel_sum)/gamma)
         end if
