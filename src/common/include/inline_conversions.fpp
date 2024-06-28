@@ -14,24 +14,22 @@
         real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
         real(kind(0d0)), dimension(num_fluids) :: blkmod
 
-        integer :: q, i
-
+        integer :: q
+        c = 0d0
         if (alt_soundspeed) then
-             c = 0d0
              !$acc loop seq
-             do i = 1, num_fluids
+             do q = 1, num_fluids
               !    if (hypoelasticity) then
               !       blkmod(i) = ((gammas(i) + 1d0)*pres + &
               !                    pi_infs(i))/gammas(i)+4/3*G(i)
               !   else
-                     blkmod(i) = ((gammas(i) + 1d0)*pres + &
-                                  pi_infs(i))/gammas(i)
+                     blkmod(q) = ((gammas(q) + 1d0)*pres + &
+                                  pi_infs(q))/gammas(q)
               !   end if
-                 c = c + adv(i)/blkmod(i)
+                 c = c + adv(q)/blkmod(q)
              end do 
              c = 1d0/(rho*c)
         elseif (model_eqns == 3) then
-            c = 0d0
             !$acc loop seq
             do q = 1, num_fluids
                 c = c + adv(q)*(1d0/gammas(q) + 1d0)* &
