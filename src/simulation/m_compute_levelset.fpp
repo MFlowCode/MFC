@@ -41,9 +41,9 @@ contains
     !>  Initialize IBM module
     subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid
@@ -77,9 +77,9 @@ contains
 
     subroutine s_compute_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist, global_dist
         integer :: global_id
@@ -160,9 +160,9 @@ contains
 
     subroutine s_compute_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist, dist_surf, dist_side, global_dist
         integer :: global_id
@@ -262,10 +262,10 @@ contains
     !>  Initialize IBM module
     subroutine s_compute_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
-        integer :: ib_patch_id
         real(kind(0d0)) :: top_right(2), bottom_left(2)
         real(kind(0d0)) :: x, y, min_dist
         real(kind(0d0)) :: side_dists(4)
@@ -347,9 +347,9 @@ contains
 
     subroutine s_compute_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
@@ -384,9 +384,9 @@ contains
 
     subroutine s_compute_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        integer, intent(in) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid, z_centroid

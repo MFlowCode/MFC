@@ -11,7 +11,11 @@
 !!              while WENOM, see Henrick et al. (2005), recovers the formal order
 !!              of accuracy of the reconstruction at critical points. Please note
 !!              that the basic WENO approach is implemented according to the work
-!!              of Jiang and Shu (1996).
+!!              of Jiang and Shu (1996). WENO-Z, which is less dissipative than
+!!              WENO-JS and WENO-M, is implemented according to the work of
+!!              Borges, et al. (2008). TENO, which is even less dissipative than
+!!              WENO-Z but is less robust, is implemented according to the work
+!!              of Fu et al. (2016).
 module m_weno
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
@@ -154,7 +158,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_weno_module() ! --------------------------------
+    subroutine s_initialize_weno_module
 
         integer :: i, j
         if (weno_order == 1) return
@@ -252,7 +256,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_weno_module ! ------------------------------
+    end subroutine s_initialize_weno_module
 
     !>  The purpose of this subroutine is to compute the grid
         !!      dependent coefficients of the WENO polynomials, ideal
@@ -261,10 +265,10 @@ contains
         !!      reconstruction.
         !! @param weno_dir Coordinate direction of the WENO reconstruction
         !! @param is Index bounds in the s-direction
-    subroutine s_compute_weno_coefficients(weno_dir, is) ! -------
+    subroutine s_compute_weno_coefficients(weno_dir, is)
 
-        integer, intent(IN) :: weno_dir
-        type(int_bounds_info), intent(IN) :: is
+        integer, intent(in) :: weno_dir
+        type(int_bounds_info), intent(in) :: is
         integer :: s
 
         real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
@@ -496,23 +500,26 @@ contains
 
         nullify (s_cb)
 
-    end subroutine s_compute_weno_coefficients ! ---------------------------
+    end subroutine s_compute_weno_coefficients
 
-    subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & ! -------------------
+    subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                       norm_dir, weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
-        type(scalar_field), dimension(1:), intent(IN) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(IN) :: norm_dir
-        integer, intent(IN) :: weno_dir
-        type(int_bounds_info), intent(IN) :: is1_weno_d, is2_weno_d, is3_weno_d
+        type(scalar_field), dimension(1:), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        integer, intent(in) :: norm_dir
+        integer, intent(in) :: weno_dir
+        type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
         real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(kind(0d0)), dimension(0:weno_polyn) :: poly
         real(kind(0d0)), dimension(0:weno_polyn) :: alpha
         real(kind(0d0)), dimension(0:weno_polyn) :: omega
         real(kind(0d0)), dimension(0:weno_polyn) :: beta
+        real(kind(0d0)), dimension(0:weno_polyn) :: delta
+        real(kind(0d0)) :: tau5
         real(kind(0d0)), pointer :: beta_p(:)
 
         real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
@@ -576,7 +583,7 @@ contains
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha,tau5)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -598,18 +605,23 @@ contains
                                     beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(-1)*dvd(-1) &
                                               + weno_eps
 
-                                    alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                    if (wenojs) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
 
-                                    omega = alpha/sum(alpha)
-
-                                    if (mapped_weno) then
-
+                                    elseif (mapped_weno) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                        omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
-                                        omega = alpha/sum(alpha)
+                                    elseif (wenoz) then
+                                        ! Borges, et al. (2008)
+                                        tau5 = abs(beta(1) - beta(0))
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
 
                                     end if
+
+                                    omega = alpha/sum(alpha)
 
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -620,18 +632,21 @@ contains
                                     poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
                                               + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(-1)
 
-                                    alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                    if (wenojs) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
 
-                                    omega = alpha/sum(alpha)
-
-                                    if (mapped_weno) then
-
+                                    elseif (mapped_weno) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                        omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
-                                        omega = alpha/sum(alpha)
+                                    elseif (wenoz) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
 
                                     end if
+
+                                    omega = alpha/sum(alpha)
 
                                     vR_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
@@ -642,15 +657,17 @@ contains
                     !$acc end parallel loop
                 end if
             #:endfor
-        else
+        elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega)
+                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau5, delta)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
                                 !$acc loop seq
                                 do i = 1, v_size
+                                    ! reconstruct from left side
+
                                     dvd(1) = v_rs_ws_${XYZ}$ (j + 2, k, l, i) &
                                              - v_rs_ws_${XYZ}$ (j + 1, k, l, i)
                                     dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
@@ -683,20 +700,36 @@ contains
                                               + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) &
                                               + weno_eps
 
-                                    alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                    if (wenojs) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
 
-                                    omega = alpha/sum(alpha)
-
-                                    if (mapped_weno) then
-
+                                    elseif (mapped_weno) then
+                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                        omega = alpha/sum(alpha)
                                         alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
 
-                                        omega = alpha/sum(alpha)
+                                    elseif (wenoz) then
+                                        ! Borges, et al. (2008)
+                                        tau5 = abs(beta(2) - beta(0))                   ! Equation 25
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
+
+                                    elseif (teno) then
+                                        ! Fu, et al. (2016)
+                                        ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
+                                        tau5 = abs(beta(2) - beta(0))
+                                        alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
+                                        delta = merge(0d0, 1d0, omega < teno_CT)    ! Equation 26
+                                        alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
 
                                     end if
 
+                                    omega = alpha/sum(alpha)
+
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = sum(omega*poly)
+
+                                    ! reconstruct from right side
 
                                     poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
                                               + poly_coef_cbR_${XYZ}$ (j, 0, 0)*dvd(1) &
@@ -708,18 +741,24 @@ contains
                                               + poly_coef_cbR_${XYZ}$ (j, 2, 0)*dvd(-1) &
                                               + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                    alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                    if (wenojs) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
 
-                                    omega = alpha/sum(alpha)
-
-                                    if (mapped_weno) then
-
+                                    elseif (mapped_weno) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                        omega = alpha/sum(alpha)
                                         alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
-                                        omega = alpha/sum(alpha)
+                                    elseif (wenoz) then
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+
+                                    elseif (teno) then
+                                        alpha = delta*d_cbR_${XYZ}$ (:, j)
 
                                     end if
+
+                                    omega = alpha/sum(alpha)
 
                                     vR_rs_vf_${XYZ}$ (j, k, l, i) = sum(omega*poly)
 
@@ -751,7 +790,7 @@ contains
         !! @param is1_weno Index bounds in first coordinate direction
         !! @param is2_weno Index bounds in second coordinate direction
         !! @param is3_weno Index bounds in third coordinate direction
-    subroutine s_initialize_weno(v_vf, & ! ---------
+    subroutine s_initialize_weno(v_vf, &
                                  norm_dir, weno_dir)
 
         type(scalar_field), dimension(:), intent(IN) :: v_vf
@@ -859,7 +898,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_weno ! -------------------------------------
+    end subroutine s_initialize_weno
 
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by
@@ -872,7 +911,7 @@ contains
         !!  @param j First-coordinate cell index
         !!  @param k Second-coordinate cell index
         !!  @param l Third-coordinate cell index
-    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf) ! --------------------------
+    subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
@@ -1033,10 +1072,10 @@ contains
         end do
         !$acc end parallel loop
 
-    end subroutine s_preserve_monotonicity ! -------------------------------
+    end subroutine s_preserve_monotonicity
 
     !>  Module deallocation and/or disassociation procedures
-    subroutine s_finalize_weno_module() ! ----------------------------------
+    subroutine s_finalize_weno_module()
 
         integer :: i, j
 
@@ -1075,6 +1114,6 @@ contains
         @:DEALLOCATE_GLOBAL(beta_coef_z)
         ! ==================================================================
 
-    end subroutine s_finalize_weno_module ! --------------------------------
+    end subroutine s_finalize_weno_module
 
 end module m_weno

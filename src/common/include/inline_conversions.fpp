@@ -12,8 +12,8 @@
         real(kind(0d0)), intent(IN) :: vel_sum
         real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
         real(kind(0d0)), intent(OUT) :: c
-
-        real(kind(0d0)) :: blkmod1, blkmod2, blkmod3
+        real(kind(0d0)), dimension(num_fluids), intent(IN), optional :: G
+        real(kind(0d0)), dimension(num_fluids) :: blkmod
 
         integer :: q
 
@@ -23,6 +23,7 @@
             blkmod2 = ((gammas(2) + 1d0)*pres + &
                        pi_infs(2))/gammas(2)
             c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+
         elseif (model_eqns == 3) then
             c = 0d0
             !$acc loop seq
