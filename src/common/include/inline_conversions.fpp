@@ -1,4 +1,5 @@
 #:def s_compute_speed_of_sound()
+#ifndef MFC_PRE_PROCESS
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
@@ -53,5 +54,6 @@
             c = sqrt(c)
         end if
     end subroutine s_compute_speed_of_sound
+#endif
 #:enddef
 

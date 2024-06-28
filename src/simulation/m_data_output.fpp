@@ -101,7 +101,7 @@ module m_data_output
 
 contains
 
-    @:s_compute_speed_of_sound()
+    ! @:s_compute_speed_of_sound()
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the

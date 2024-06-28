@@ -561,7 +561,7 @@ contains
 
     end subroutine s_derive_qm
 
-    @:s_compute_speed_of_sound()
+    ! @:s_compute_speed_of_sound()
 
     !>  This subroutine gets as inputs the conservative variables
         !!      and density. From those inputs, it proceeds to calculate

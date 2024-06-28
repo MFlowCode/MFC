@@ -264,7 +264,7 @@ module m_riemann_solvers
 
 contains
 
-    @:s_compute_speed_of_sound()
+    ! @:s_compute_speed_of_sound()
 
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &

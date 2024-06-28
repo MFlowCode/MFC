@@ -144,7 +144,7 @@ module m_cbc
 
 contains
 
-    @:s_compute_speed_of_sound()
+    ! @:s_compute_speed_of_sound()
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
