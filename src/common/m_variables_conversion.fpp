@@ -1520,14 +1520,14 @@ contains
 !        else ! 3D 
 
 
-	!print *,'I got here AAAA'
+        !print *,'I got here AAAA'
           !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
           do l = zb, ze
              do k = yb, ye
                 do j = xb, xe
-	!print *, j,k,l
-	!print *,xibeg
-	!print *,xiend
+        !print *, j,k,l
+        !print *,xibeg
+        !print *,xiend
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
@@ -1902,7 +1902,7 @@ contains
                      /(12d0*(z_cb(l) - z_cb(l - 1)))
           end if  
 
-	!print *, 'I got here AAAAA'
+        !print *, 'I got here AAAAA'
 
     ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
             tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
@@ -1949,7 +1949,7 @@ contains
         do i = 1, tensor_size - 1
            tensora(i) = tensorb(i)/tensorb(tensor_size)
         end do 
-	!print *, 'I got here A6'
+    !print *, 'I got here A6'
     ! STEP 3: computing F tranpose F
         !tensorb(1) = tensora(1)**2
             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
@@ -1961,7 +1961,7 @@ contains
             tensorb(4) = tensorb(2)
             tensorb(7) = tensorb(3)
             tensorb(8) = tensorb(6)
-	!print *, 'I got here A7'
+          !print *, 'I got here A7'
                    !call s_compute_gradient_xi3d_acc(q_prim_vf, ixb, ixe, iyb, &
                    !iye, izb, ize, j, k, l, tensora, tensorb)
                    !! 1: 1D, 3: 2D, 6: 3D
@@ -1971,7 +1971,7 @@ contains
                    btensor(4)%sf(j,k,l) = tensorb(5)
                    btensor(5)%sf(j,k,l) = tensorb(6)
                    btensor(6)%sf(j,k,l) = tensorb(9)
-	!print *, 'I got here A8'
+         !print *, 'I got here A8'
                    !! store the determinant at the last entry of the btensor sf
                    btensor(b_size)%sf(j,k,l) = tensorb(tensor_size)
                 end do
