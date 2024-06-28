@@ -101,6 +101,7 @@ module m_global_parameters
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
+    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
@@ -609,8 +610,10 @@ contains
             end if
 
             if (hyperelasticity) then
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
                 ! adding three more equations for the \xi field and the elastic energy
-                sys_size = stress_idx%end + num_dims + 1
+                sys_size = xi_idx%end + 1
                 ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
                 tensor_size = num_dims**2 + 1
@@ -716,8 +719,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
-        xibeg = stress_idx%end+1
-        xiend = stress_idx%end+num_dims
+        xibeg = xi_idx%beg
+        xiend = xi_idx%end
 
         ! ==================================================================
 

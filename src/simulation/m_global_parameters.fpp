@@ -222,6 +222,7 @@ module m_global_parameters
     integer :: gamma_idx                               !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                              !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    type(int_bounds_info) :: xi_idx                    !< Indexes of first and last reference map eqns.
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     integer :: c_idx                                   !< Index of the color function
@@ -277,7 +278,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -845,8 +846,10 @@ contains
                     b_size = (num_dims*(num_dims + 1))/2 + 1
                     ! storing the jacobian in the last entry
                     tensor_size = num_dims**2 + 1
+                    xi_idx%beg = sys_size + 1
+		    xi_idx%end = sys_size + num_dims
                     ! adding three more equations for the \xi field and the elastic energy
-                    sys_size = stress_idx%end + num_dims + 1
+                    sys_size = xi_idx%end + 1
                 end if
 
                 if (sigma /= dflt_real) then
@@ -1061,14 +1064,14 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
-        xibeg = stress_idx%end+1
-        xiend = stress_idx%end+num_dims
+        xibeg = xi_idx%beg
+        xiend = xi_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, b_size, xibeg, xiend, tensor_size)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref,gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim,bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids,model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord,mp_weno, weno_eps, teno_CT, hyperelasticity,elasticity)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref,gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim,bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids,model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord,mp_weno, weno_eps, teno_CT, hyperelasticity, elasticity, xi_idx)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)

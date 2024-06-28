@@ -164,8 +164,8 @@ print(json.dumps({
     # Simulation Algorithm Parameters ==========================
     'num_patches'                  : 3,
     'model_eqns'                   : 2,
-    'hypoelasticity'               : 'T', 
-    'hyperelasticity'              : 'F',
+    'hypoelasticity'               : 'F', 
+    'hyperelasticity'              : 'T',
     'pre_stress'                   : 'F',
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 3,
