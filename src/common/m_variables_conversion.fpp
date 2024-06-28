@@ -1031,13 +1031,13 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity ) then 
-                         !$acc loop seq
-                         do i = xibeg, xiend
-                         !    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                          !print *, 'i ::',i,',j,k,l ::',j,k,l,', qprim ::',qK_prim_vf(i)%sf(j,k,l)
-                         end do
-                    end if
+                    !if ( hyperelasticity ) then 
+                    !     !$acc loop seq
+                    !     do i = xibeg, xiend
+                    !     !    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                    !      !print *, 'i ::',i,',j,k,l ::',j,k,l,', qprim ::',qK_prim_vf(i)%sf(j,k,l)
+                    !     end do
+                    !end if
                     !$acc loop seq
                     do i = advxb, advxe
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -1069,9 +1069,9 @@ contains
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
                     ! If in simulation, use acc mixture subroutines
-                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                 alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    rho_K = max(rho_K, sgm_eps)
+                    !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                    !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    !rho_K = max(rho_K, sgm_eps)
                     !if (G_K > 1d-3) then
                     !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- & 
                                  !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
@@ -1099,12 +1099,12 @@ contains
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
                     ! If pre-processing, use non acc mixture subroutines
-                    call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                             rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-                    if ( G_K > 1000 ) then
-                       !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) ! - & 
-                           !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
-                    end if
+                    !call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                    !         rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
+                    !if ( G_K > 1000 ) then
+                    !   !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) ! - & 
+                    !       !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
+                    !end if
                  end do
              end do
           end do
