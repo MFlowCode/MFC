@@ -1,6 +1,4 @@
-# Papers & Posters
-
-## Papers
+# Papers
 
 MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver. [S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications **266**, 107396](https://doi.org/10.1016/j.cpc.2020.107396)
 
@@ -31,6 +29,16 @@ Method for scalable and performant GPU-accelerated simulation of multiphase comp
 }
 ```
 
-## Posters
+<br/>
 
 Supercomputing 22 (SC'22): Scalable GPU Accelerated Simulation of Multiphase Compressible Flow (A. Radhakrishnan, H. Le Berre, and S. H. Bryngelson). [Archive](https://sc22.supercomputing.org/proceedings/tech_poster/tech_poster_pages/rpost122.html) and [PDF](https://sc22.supercomputing.org/proceedings/tech_poster/poster_files/rpost122s3-file2.pdf).
+```bibtex
+@inproceedings{radhakrishnan22,
+    title        = {Scalable {GPU} accelerated simulation of multiphase compressible flow},
+    author       = {A. Radhakrishnan and H. {Le Berre} and S. H. Bryngelson},
+    year         = {2022},
+    booktitle    = {The International Conference for High Performance Computing, Networking, Storage, and Analysis (SC)},
+    address      = {Dallas, TX, USA},
+    pages        = {1--3}
+}
+```
