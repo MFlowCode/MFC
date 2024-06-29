@@ -151,7 +151,7 @@ contains
                     do q = 1, num_mono
 
                         the_time = t_step*dt
-                        if ((the_time >= delay(q)) .or. (.not. f_is_default(delay(q)))) then
+                        if ((the_time >= delay(q)) .or. f_is_default(delay(q))) then
                             !$acc loop seq
                             do ii = 1, num_fluids
                                 myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
