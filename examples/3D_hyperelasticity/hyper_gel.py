@@ -170,7 +170,7 @@ print(json.dumps({
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 3,
     'adv_alphan'                   : 'T',
-    'mpp_lim'                      : 'T',
+    'mpp_lim'                      : 'F',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'weno_order'                   : 5,

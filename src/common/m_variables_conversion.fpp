@@ -1011,7 +1011,7 @@ contains
                         end if
                     end if
 
-                    if ( hypoelasticity ) then
+                    if (hypoelasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1055,19 +1055,18 @@ contains
 	!print *, 'I got here AA'
 
 #ifdef MFC_SIMULATION
-        if ( hyperelasticity ) then 
-           ! MAURO HERE
+        if  (hyperelasticity) then 
            !call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
     	   !print *, 'I got here AAA'
            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-           do l = izb, ize
-              do k = iyb, iye
-                 do j = ixb, ixe
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    end do
+           !do l = izb, ize
+           !   do k = iyb, iye
+           !      do j = ixb, ixe
+                    !!$acc loop seq
+                    !do i = 1, num_fluids
+                    !    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                    !    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    !end do
                     ! If in simulation, use acc mixture subroutines
                     !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                     !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
@@ -1077,9 +1076,9 @@ contains
                                  !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
                         !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
                     !end if
-                 end do
-              end do
-           end do
+           !      end do
+           !   end do
+           !end do
            !$acc end parallel loop
         end if
 #endif
@@ -1090,7 +1089,7 @@ contains
         end do
 
         if (hyperelasticity) then 
-          !call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+          call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
           do l = 0, p
              do k = 0, n
                 do j = 0, m
@@ -1150,7 +1149,7 @@ contains
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
-        if ( hyperelasticity ) then
+        if (hyperelasticity) then
             !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if 
 
@@ -1263,16 +1262,16 @@ contains
                     end if
 
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
-                    if ( hyperelasticity ) then
+                    !if (hyperelasticity) then
                         ! adding the elastic contribution
-                        do i = xibeg, xiend
+                        !do i = xibeg, xiend
                             !q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                        end do
-                        if (G > 1000) then
+                        !end do
+                        !if (G > 1000) then
                             !q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + & 
                             !  G*f_elastic_energy(q_btensor, j, k, l)
-                        end if
-                    end if 
+                        !end if
+                    !end if 
 
                     if (sigma /= dflt_real) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
