@@ -1058,7 +1058,7 @@ contains
         if  (hyperelasticity) then 
            !call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
     	   !print *, 'I got here AAA'
-           !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
+           !!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
            !do l = izb, ize
            !   do k = iyb, iye
            !      do j = ixb, ixe
@@ -1079,7 +1079,7 @@ contains
            !      end do
            !   end do
            !end do
-           !$acc end parallel loop
+           !!$acc end parallel loop
         end if
 #endif
 
