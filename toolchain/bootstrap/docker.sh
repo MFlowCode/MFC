@@ -15,7 +15,7 @@ fi
 __docker_run() {
     docker run $dockerintopts --rm --workdir /home/me/MFC            \
                --mount type=bind,source="$(pwd)",target=/home/me/MFC \
-               #sbryngelson/mfc:latest $@
+               sbryngelson/mfc:latest $@
 }
 
 __docker_run sudo chown -R me:me /home/me/MFC
