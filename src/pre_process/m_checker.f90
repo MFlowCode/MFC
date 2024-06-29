@@ -98,10 +98,10 @@ contains
             call s_mpi_abort('R0 type must be set if using Polydisperse. Exiting ...')
         end if
 
-        if (hypoelasticity .and. (model_eqns /= 2)) then
-            call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
-                             'exiting ...')
-        end if
+        !if (hypoelasticity .and. (model_eqns /= 2)) then
+        !    call s_mpi_abort('hypoelasticity requires model_eqns = 2'// &
+        !                     'exiting ...')
+        !end if
         ! phase change checkers.
         if (relax) then
             if (model_eqns /= 3) then
