@@ -152,7 +152,7 @@ module m_global_parameters
     !< amplitude, frequency, and phase shift sinusoid in each direction
     #:for dir in {'x', 'y', 'z'}
         #:for param in {'k','w','p','g'}
-            real :: ${param}$_${dir}$
+            real(kind(0d0)) :: ${param}$_${dir}$
         #:endfor
     #:endfor
     real(kind(0d0)), dimension(3) :: accel_bf
