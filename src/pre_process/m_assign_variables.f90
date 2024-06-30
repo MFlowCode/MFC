@@ -447,7 +447,7 @@ contains
         end do
 
         ! Elastic Shear Stress
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, l) = &
                     (eta*patch_icpp(patch_id)%tau_e(i) &
@@ -473,10 +473,10 @@ contains
                 xi_cart(3) = z_cc(l)
             end if
 
-            do i = 1, num_dims
-                q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
-                    (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
-            end do
+            !do i = 1, num_dims
+            !    q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
+            !        (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
+            !end do
 
         end if
 

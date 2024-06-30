@@ -190,14 +190,14 @@ contains
             end do
         end if
 
-        if (hyperelasticity) then
-            do i = xibeg, xiend + 1
-                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
-                @:ACC_SETUP_SFs(q_prim_vf(i))
-            end do
-        end if
+        !if (hyperelasticity) then
+            !do i = xibeg, xiend + 1
+            !    @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+            !        iy_t%beg:iy_t%end, &
+            !        iz_t%beg:iz_t%end))
+            !    @:ACC_SETUP_SFs(q_prim_vf(i))
+            !end do
+        !end if
 
         if (model_eqns == 3) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
@@ -862,7 +862,6 @@ contains
             time = time + (finish - start)
         end if
         ! ==================================================================
-
     end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
@@ -990,6 +989,7 @@ contains
         end if
 
     end subroutine s_time_step_cycling
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
@@ -1030,11 +1030,11 @@ contains
             end do
         end if
 
-        if (hyperelasticity) then
-            do i = xibeg, xiend + 1
-                @:DEALLOCATE(q_prim_vf(i)%sf)
-            end do
-        end if
+        !if (hyperelasticity) then
+        !    do i = xibeg, xiend + 1
+        !        @:DEALLOCATE(q_prim_vf(i)%sf)
+        !    end do
+        !end if
 
         if (bubbles) then
             do i = bub_idx%beg, bub_idx%end

@@ -145,8 +145,8 @@ contains
         else
             pres = (pref + pi_inf)* &
                    (energy/ &
-                    (rhoref*(1 - alf)) &
-                    )**(1/gamma + 1) - pi_inf
+                    (rhoref*(1.d0 - alf)) &
+                    )**(1.d0/gamma + 1.d0) - pi_inf
         end if
 
         if ( hypoelasticity .and. present(G)) then
@@ -169,27 +169,12 @@ contains
 
         end if
 
-        !if (hyperelasticity .and. present(G)) then
-        !     ! calculate elastic contribution to Energy
-        !    E_e = 0d0
-        !    do s = stress_idx%beg, stress_idx%end
-        !        if (G > 0) then
-        !            E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
-        !            ! Additional terms in 2D and 3D
-        !            if ((s == stress_idx%beg + 1) .or. &
-        !                (s == stress_idx%beg + 3) .or. &
-        !                (s == stress_idx%beg + 4)) then
-        !                E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
-        !            end if
-        !        end if
-        !    end do
-        !
-        !    pres = ( &
-        !           energy - &
-        !           0.5d0*(mom**2.d0)/rho - &
-        !           pi_inf - qv - E_e &
-        !           )/gamma
-        !end if
+        if (hyperelasticity .and. present(G)) then
+             ! calculate elastic contribution to Energy
+            E_e = 0d0
+            pres = (energy - 0.5d0*(mom**2.d0)/rho - pi_inf - qv - E_e )/gamma
+
+        end if
 
     end subroutine s_compute_pressure
 
@@ -1143,15 +1128,15 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
 
 #ifndef MFC_SIMULATION
-        do l = 1, b_size
-            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
-        end do
+        !do l = 1, b_size
+        !    @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+        !end do
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
-        if (hyperelasticity) then
+        !if (hyperelasticity) then
             !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-        end if 
+        !end if 
 
         ! Converting the primitive variables to the conservative variables
         do l = 0, p

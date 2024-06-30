@@ -254,7 +254,7 @@ contains
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
-        @:ALLOCATE(q_btensor%vf(1:b_size))
+        !@:ALLOCATE(q_btensor%vf(1:b_size))
 
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -278,9 +278,9 @@ contains
 
         end if
 
-        do l = 1, b_size
-            @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        end do
+        !do l = 1, b_size
+        !    @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        !end do
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp, q_btensor)
 
@@ -797,11 +797,11 @@ contains
         call nvtxEndRange
         !print *, "I got here B"
 
-        call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
+        !call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
           !if ( hyperelasticity ) then
           !   call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
           !end if
-        call nvtxEndRange
+        !call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
@@ -920,7 +920,7 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
-        !print *, "I got here d"
+            !print *, "I got here d"
 
             ! Computing Riemann Solver Flux and Source Flux =================
             call nvtxStartRange("RHS_riemann_solver")
@@ -940,7 +940,7 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-        !print *, "I got here e"
+            !print *, "I got here e"
 
             ! ===============================================================
             ! Additional physics and source terms ===========================
@@ -959,6 +959,7 @@ contains
                                                                q_prim_qp%vf, &
                                                                rhs_vf)
             call nvtxEndRange
+            !print *, "I got here f"
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
@@ -1031,6 +1032,7 @@ contains
             rhs_vf)
         call nvtxEndRange
         ! END: Additional pphysics and source terms ============================
+        !print *, "I got here g"
 
         if (run_time_info .or. probe_wrt .or. ib) then
 
@@ -1058,6 +1060,7 @@ contains
             time_avg = 0d0
         end if
         ! ==================================================================
+        !print *, "I got here h"
 
     end subroutine s_compute_rhs
 

@@ -474,7 +474,8 @@ contains
                             E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                             ! elastic energy update
-                            if (hypoelasticity) then
+	                    ! MAURO HERE IS THE ISSUE
+                            if ( hypoelasticity ) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
                                     tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
@@ -506,7 +507,7 @@ contains
                             end if
 
                             ! elastic energy update
-                            !if ( hyperelasticity ) then
+                            if ( hyperelasticity ) then
                             !    G_L = 0d0 
                             !    G_R = 0d0
                             ! 
@@ -530,9 +531,9 @@ contains
                             !        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                             !    end do
                             !    end if
-                            !end if
+                            end if
       
-                            ! moving this down to account for the elasticity
+                            ! moving this down 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
 

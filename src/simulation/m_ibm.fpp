@@ -206,7 +206,7 @@ contains
 
             if (model_eqns /= 4) then
                 ! If in simulation, use acc mixture subroutines
-                if (hypoelasticity) then
+                if (elasticity) then
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
                                                                     alpha_rho_IP, Re_K, j, k, l, G_K, Gs)
                 else if (bubbles) then

@@ -832,13 +832,11 @@ contains
 
                 if (hypoelasticity .or. hyperelasticity) then
                     elasticity = .true.
-                end if 
-
-                if (elasticity) then 
                     stress_idx%beg = sys_size + 1
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
+		    !print *, 'I was here yeah',proc_rank
                 end if
 
                 if (hyperelasticity) then
@@ -849,7 +847,7 @@ contains
                     xi_idx%beg = sys_size + 1
                     xi_idx%end = sys_size + num_dims
                     ! adding three more equations for the \xi field and the elastic energy
-                    sys_size = xi_idx%end + 1
+                    !sys_size = xi_idx%end + 1
                 end if
 
                 if (sigma /= dflt_real) then
