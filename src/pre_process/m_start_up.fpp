@@ -45,6 +45,8 @@ module m_start_up
 
     use m_helper
 
+    use m_checker_common
+
     use m_checker
     ! ==========================================================================
 
@@ -195,6 +197,7 @@ contains
                              'Exiting ...')
         end if
 
+        call s_check_inputs_common()
         call s_check_inputs()
 
         ! Check all the patch properties
