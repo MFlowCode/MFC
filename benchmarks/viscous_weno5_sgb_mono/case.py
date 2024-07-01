@@ -231,7 +231,7 @@ print(json.dumps({
     'Monopole'                     : 'T',
     'num_mono'                     : 1,
     'Mono(1)%support'              : 4,
-    'Mono(1)%loc(1)'               : -5.E-03/x0,
+    'Mono(1)%loc(3)'               : -5.E-03/x0,
     'Mono(1)%npulse'               : 1,
     'Mono(1)%dir'                  : 1.,
     'Mono(1)%pulse'                : 1,

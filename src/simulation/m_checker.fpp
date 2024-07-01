@@ -175,61 +175,61 @@ contains
             call s_int_to_str(j, jStr)
             if (mono(j)%support == dflt_int) then
                 call s_mpi_abort('mono('//trim(jStr)//')%support must be '// &
-                                'specified. Exiting ...')
+                                 'specified. Exiting ...')
             elseif (f_is_default(mono(j)%mag)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
-                                'specified. Exiting ...')
+                                 'specified. Exiting ...')
             elseif (mono(j)%mag <= 0d0) then
                 call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
-                                'positive. Exiting ...')
+                                 'positive. Exiting ...')
             end if
 
             if (n == 0) then ! 1D
                 if (.not. any(mono(j)%support == (/0, 1/))) then ! undocumented support 0
                     call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
-                                    '1D simulations. Exiting ...')
+                                     '1D simulations. Exiting ...')
                 end if
                 if (mono(j)%support == 1 .and. f_is_default(mono(j)%loc(1))) then
                     call s_mpi_abort('mono_loc(1) must be specified for '// &
-                                    'Mono(i)support = 1. Exiting ...')
+                                     'Mono(i)support = 1. Exiting ...')
                 end if
             elseif (p == 0) then ! 2D
                 if (.not. any(mono(j)%support == (/1, 2, 3, 4, 5/))) then
                     call s_mpi_abort('Only Mono(i)support = 1, 2, 3, 4, or 5 is '// &
-                                    'allowed for 2D simulations. Exiting ...')
+                                     'allowed for 2D simulations. Exiting ...')
                 end if
                 if (any(mono(j)%support == (/1, 2, 3, 5/)) .and. &
                     (f_is_default(mono(j)%loc(1)) .or. &
-                    f_is_default(mono(j)%loc(2)))) then
+                     f_is_default(mono(j)%loc(2)))) then
                     call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
-                                    'specified for Mono(i)support = 1, 3, or 5. '// &
-                                    'Exiting ...')
+                                     'specified for Mono(i)support = 1, 3, or 5. '// &
+                                     'Exiting ...')
                 elseif (mono(j)%support == 4 .and. f_is_default(mono(j)%loc(1))) then
                     call s_mpi_abort('mono('//trim(jStr)//')%loc(1) must be '// &
-                                    'specified for Mono(i)support = 4. Exiting ...')
+                                     'specified for Mono(i)support = 4. Exiting ...')
                 end if
             else ! 3D
                 if (.not. any(mono(j)%support == (/3, 4, 5, 6/))) then
                     call s_mpi_abort('Only Mono(i)support = 3, 4, 5, or 6 is '// &
-                                    'allowed for 3D simulations. Exiting ...')
+                                     'allowed for 3D simulations. Exiting ...')
                 elseif (mono(j)%support == 6 .and. (.not. cyl_coord)) then
                     call s_mpi_abort('Mono(i)support = 6 requires cyl_coord = true. '// &
-                                    'Exiting ...')
+                                     'Exiting ...')
                 elseif (cyl_coord .and. mono(j)%support /= 6) then
                     call s_mpi_abort('cyl_coord = true requires Mono(i)support = 6. '// &
-                                    'Exiting ...')
+                                     'Exiting ...')
                 end if
                 if (any(mono(j)%support == (/3, 5, 6/)) .and. &
                     (f_is_default(mono(j)%loc(1)) .or. &
-                    f_is_default(mono(j)%loc(2)) .or. &
-                    f_is_default(mono(j)%loc(3)))) then
+                     f_is_default(mono(j)%loc(2)) .or. &
+                     f_is_default(mono(j)%loc(3)))) then
                     call s_mpi_abort('mono('//trim(jStr)//')%loc(1:3) must be '// &
-                                    'specified for Mono(i)support = 3, 5, or 6. '// &
-                                    'Exiting ...')
+                                     'specified for Mono(i)support = 3, 5, or 6. '// &
+                                     'Exiting ...')
                 elseif (mono(j)%support == 4 .and. &
-                    (f_is_default(mono(j)%loc(3)))) then
+                        (f_is_default(mono(j)%loc(3)))) then
                     call s_mpi_abort('mono('//trim(jStr)//')%loc(3) must be '// &
-                                    'specified for Mono(i)support = 4. Exiting ...')
+                                     'specified for Mono(i)support = 4. Exiting ...')
                 end if
             end if
         end do

@@ -627,7 +627,7 @@ contains
             mono(j)%aperture = dflt_real
             mono(j)%support_width = dflt_real
             ! The author suggested the support width is typically on the order of
-            ! the width of the characteristic cells. 
+            ! the width of the characteristic cells.
             ! The default value of support_width is 2.5 cell widths.
         end do
 
