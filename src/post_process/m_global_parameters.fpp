@@ -128,6 +128,7 @@ module m_global_parameters
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
+    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
 
 #endif
 
@@ -191,6 +192,7 @@ module m_global_parameters
     logical :: qm_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
+    logical :: ib
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -334,6 +336,7 @@ contains
         qm_wrt = .false.
         schlieren_wrt = .false.
         cf_wrt = .false.
+        ib = .false.
 
         schlieren_alpha = dflt_real
 
@@ -598,6 +601,8 @@ contains
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
+
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing
@@ -752,6 +757,7 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 
+        if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
 
     end subroutine s_finalize_global_parameters_module
