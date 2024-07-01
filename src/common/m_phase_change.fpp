@@ -360,7 +360,6 @@ contains
         do while ((DABS(pS - pO) > palpha_eps) .and. & 
 		 (DABS((pS - pO)/pO) > palpha_eps/1d4) .or. & 
 		 (ns == 0))
-
             ! increasing counter
             ns = ns + 1
 
@@ -448,9 +447,10 @@ contains
         ! improve this initial condition
         R2D(1) = 0.0d0; R2D(2) = 0.0d0
         DeltamP(1) = 0.0d0; DeltamP(2) = 0.0d0
-        do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) .and. & 
-        ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) .or. &
-          (ns == 0))
+        do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
+                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) & 
+                   > (ptgalpha_eps/1d6))) &
+                  .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
             ns = ns + 1
