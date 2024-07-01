@@ -51,6 +51,9 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
+    ! type(scalar_field), public :: ib_markers !<
+    type(integer_field), public :: ib_markers
+
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
 contains
@@ -75,6 +78,11 @@ contains
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
+        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir !<
+        !! Location of the time-step directory associated with t_step
+
+        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc_ib !<
+
         logical :: dir_check !<
             !! Generic logical used to test the existence of a particular folder
 
@@ -87,14 +95,27 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir)//trim(t_step_dir)
 
+        write (t_step_ib_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', 0
+        t_step_ib_dir = trim(case_dir)//trim(t_step_ib_dir)
+
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'
+
+        file_loc_ib = trim(t_step_ib_dir)//'/.'
 
         call my_inquire(file_loc, dir_check)
 
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
+                             ' is missing. Exiting ...')
+        end if
+
+        call my_inquire(file_loc_ib, dir_check)
+
+        ! If the time-step directory is missing, the post-process exits.
+        if (dir_check .neqv. .true.) then
+            call s_mpi_abort('Time-step folder '//trim(t_step_ib_dir)// &
                              ' is missing. Exiting ...')
         end if
 
@@ -204,6 +225,19 @@ contains
             end if
 
         end do
+
+        if (ib) then
+            write (file_loc_ib, '(A,I0,A)') &
+                trim(t_step_ib_dir)//'/ib.dat'
+            inquire (FILE=trim(file_loc_ib), EXIST=file_check)
+            if (file_check) then
+                open (2, FILE=trim(file_loc_ib), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+            end if
+        end if
 
         ! ==================================================================
 
@@ -317,7 +351,11 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -351,6 +389,29 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
@@ -364,7 +425,11 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -408,6 +473,28 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+                end if
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
@@ -1079,6 +1166,12 @@ contains
                                               -buff_size:p + buff_size))
                 end do
 
+                if (ib) then
+                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
+                                            -buff_size:n + buff_size, &
+                                            -buff_size:p + buff_size))
+                end if
+
                 ! Simulation is 2D
             else
 
@@ -1091,6 +1184,11 @@ contains
                                               0:0))
                 end do
 
+                if (ib) then
+                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
+                                            -buff_size:n + buff_size, &
+                                            0:0))
+                end if
             end if
 
             ! Simulation is 1D
@@ -1104,6 +1202,10 @@ contains
                                           0:0, &
                                           0:0))
             end do
+
+            if (ib) then
+                allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
+            end if
 
         end if
 
@@ -1128,6 +1230,10 @@ contains
 
         deallocate (q_cons_vf)
         deallocate (q_prim_vf)
+
+        if (ib) then
+            deallocate (ib_markers%sf)
+        end if
 
         s_read_data_files => null()
 
