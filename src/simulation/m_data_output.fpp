@@ -280,7 +280,6 @@ contains
         real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
         real(kind(0d0)) :: pres       !< Cell-avg. pressure
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0)), dimension(num_fluids) :: G_K
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
