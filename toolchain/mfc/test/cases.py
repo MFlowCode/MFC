@@ -1,4 +1,4 @@
-import typing, itertools, math
+import typing, itertools
 
 from mfc   import common
 from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
