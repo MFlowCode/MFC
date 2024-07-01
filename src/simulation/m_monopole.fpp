@@ -97,7 +97,7 @@ contains
             else
                 delay(i) = mono(i)%delay
             end if
-            if (f_is_default(mono(i)%delay)) then
+            if (f_is_default(mono(i)%support_width)) then
                 support_width(i) = 2.5d0
             else
                 support_width(i) = mono(i)%support_width
