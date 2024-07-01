@@ -172,6 +172,7 @@ contains
         end if
 
         do j = 1, num_mono
+            call s_int_to_str(j, jStr)
             if (mono(j)%support == dflt_int) then
                 call s_mpi_abort('mono('//trim(jStr)//')%support must be '// &
                                 'specified. Exiting ...')
@@ -213,6 +214,9 @@ contains
                                     'allowed for 3D simulations. Exiting ...')
                 elseif (mono(j)%support == 6 .and. (.not. cyl_coord)) then
                     call s_mpi_abort('Mono(i)support = 6 requires cyl_coord = true. '// &
+                                    'Exiting ...')
+                elseif (cyl_coord .and. mono(j)%support /= 6) then
+                    call s_mpi_abort('cyl_coord = true requires Mono(i)support = 6. '// &
                                     'Exiting ...')
                 end if
                 if (any(mono(j)%support == (/3, 5, 6/)) .and. &
