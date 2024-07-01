@@ -150,17 +150,16 @@ contains
         end if
 
         if ( hypoelasticity .and. present(G)) then
-        !if ( hypoelasticity .and. present(G)) then
             ! calculate elastic contribution to Energy
             E_e = 0d0
             do s = stress_idx%beg, stress_idx%end
-                if (G > 1d-3) then
-                    !E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                if (G > 0) then
+                    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
                     ! Additional terms in 2D and 3D
                     if ((s == stress_idx%beg + 1) .or. &
                         (s == stress_idx%beg + 3) .or. &
                         (s == stress_idx%beg + 4)) then
-                    !    E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
                     end if
                 end if
             end do
@@ -893,8 +892,9 @@ contains
             end if
         #:endif
 
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
+        !$acc parallel loop collapse(3) gang vector default(present) 
+        !$acc private(alpha_K, alpha_rho_K, Re_K, nRtmp, 
+        !$acc rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -1003,14 +1003,14 @@ contains
                                                         /rho_K
                             ! subtracting elastic contribution for pressure calculation
                             if (G_K > 1000) then !TODO: check if stable for >0
-                                !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                !      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
                                 if ((i == strxb + 1) .or. &
                                     (i == strxb + 3) .or. &
                                     (i == strxb + 4)) then
-                                !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                !      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
+                                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                      ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 end if
                             end if
                         end do
@@ -1233,14 +1233,14 @@ contains
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                             ! adding elastic contribution
                             if (G > 1000) then
-                            !    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                            !                                   (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
+                                q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                 (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
                                 ! extra terms in 2 and 3D
                                 if ((i == stress_idx%beg + 1) .or. &
                                     (i == stress_idx%beg + 3) .or. &
                                     (i == stress_idx%beg + 4)) then
-                            !        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                            !                                       (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
+                                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                 (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
                                 end if
                             end if
                         end do
@@ -1509,9 +1509,6 @@ contains
           do l = zb, ze
              do k = yb, ye
                 do j = xb, xe
-        !print *, j,k,l
-        !print *,xibeg
-        !print *,xiend
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
         ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx

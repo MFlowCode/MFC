@@ -477,12 +477,8 @@ contains
                             E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
                             E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
-                            ! Enthalpy with elastic energy 
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
-
                             ! elastic energy update
-                            if ( hypoelasticity ) then
+                            if (hypoelasticity) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
                                     tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
@@ -544,7 +540,10 @@ contains
                             !    end do
                             !    end if
                             !end if
-      
+
+                            ! Enthalpy with elastic energy 
+                            H_L = (E_L + pres_L)/rho_L
+                            H_R = (E_R + pres_R)/rho_R
 
                             @:compute_average_state()
 
