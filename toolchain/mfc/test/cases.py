@@ -263,7 +263,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
-    
+
     def alter_monopole(dimInfo):
         stack.push("Monopole", {"Monopole": 'T'})
 
