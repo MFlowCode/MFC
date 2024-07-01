@@ -166,7 +166,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns,mixture_err,alt_soundspeed, &
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, &
     !$acc avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, elasticity)
 
     logical :: relax          !< activate phase change
@@ -841,7 +841,6 @@ contains
                     stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                     ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
                     sys_size = stress_idx%end
-		    !print *, 'I was here yeah',proc_rank
                 end if
 
                 if (hyperelasticity) then
@@ -1009,7 +1008,7 @@ contains
         ! the next one
         if (any(Re_size > 0)) then
             buff_size = 2*weno_polyn + 2
-!        else if (hypoelasticity) then !TODO: check if necessary
+!        else if (elasticity) then !TODO: check if necessary
 !            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2

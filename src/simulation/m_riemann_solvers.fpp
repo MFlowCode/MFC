@@ -876,9 +876,9 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, & 
+             qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
@@ -908,6 +908,7 @@ contains
         real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
+        real(kind(0d0)), dimension(3) :: xi_field_L, xi_field_R
 
         real(kind(0d0)) :: rho_avg
         real(kind(0d0)), dimension(num_dims) :: vel_avg
