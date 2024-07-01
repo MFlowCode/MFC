@@ -280,6 +280,7 @@ contains
         real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
         real(kind(0d0)) :: pres       !< Cell-avg. pressure
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)), dimension(num_fluids) :: G_K
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
@@ -305,7 +306,6 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -1300,7 +1300,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1375,7 +1375,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     end if
                 end if
@@ -1427,7 +1427,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if

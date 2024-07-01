@@ -161,10 +161,10 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        if (riemann_solver /= 1 .or. riemann_solver /= 2) then
-            call s_mpi_abort('hypoelasticity requires HLL Riemann solver '// &
-                             '(riemann_solver = 1 or 2). Exiting ...')
-        end if
+        !if (riemann_solver /= 1 .or. riemann_solver /= 2) then
+        !    call s_mpi_abort('hypoelasticity requires HLL Riemann solver '// &
+        !                     '(riemann_solver = 1 or 2). Exiting ...')
+        !end if
     end subroutine
 
     !> Checks constraints on bubble parameters
