@@ -166,7 +166,8 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns,mixture_err,alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, elasticity)
+    !$acc declare create(mpp_lim, model_eqns,mixture_err,alt_soundspeed, &
+    !$acc avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, elasticity)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -278,7 +279,8 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, & 
+    !$acc E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -387,7 +389,9 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
+    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, & 
+    !$acc polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, & 
+    !$acc thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
@@ -403,7 +407,7 @@ module m_global_parameters
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-!$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
+    !$acc declare create(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v)
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), k_n, k_v, pb0, mass_n0, mass_v0, Pe_T)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN)
@@ -441,8 +445,9 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: xibeg, xiend
-!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
-!$acc declare create(xibeg,xiend)
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, & 
+    !$acc contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
+    !$acc declare create(xibeg,xiend)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -847,7 +852,7 @@ contains
                     xi_idx%beg = sys_size + 1
                     xi_idx%end = sys_size + num_dims
                     ! adding three more equations for the \xi field and the elastic energy
-                    !sys_size = xi_idx%end + 1
+                    sys_size = xi_idx%end + 1
                 end if
 
                 if (sigma /= dflt_real) then
@@ -1065,18 +1070,34 @@ contains
         xibeg = xi_idx%beg
         xiend = xi_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, b_size, xibeg, xiend, tensor_size)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe,& 
+        !$acc bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, & 
+        !$acc alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe,  & 
+        !$acc b_size, xibeg, xiend, tensor_size)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref,gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim,bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids,model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord,mp_weno, weno_eps, teno_CT, hyperelasticity, elasticity, xi_idx)
+
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, & 
+        !$acc gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, &
+        !$acc mpp_lim,bubbles, hypoelasticity, alt_soundspeed,  & 
+        !$acc avg_state, num_fluids,model_eqns, num_dims, mixture_err, & 
+        !$acc grid_geometry, cyl_coord,mp_weno, weno_eps, teno_CT, & 
+        !$acc hyperelasticity, elasticity, xi_idx)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
         #:endif
 
-        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
-        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+        !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, & 
+        !$acc R0, V0, bubbles, polytropic, polydisperse, qbmm,  & 
+        !$acc R0_type, ptil, bubble_model, thermal, poly_sigma)
+
+        !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, & 
+        !$acc pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, & 
+        !$acc Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN, &
+        !$acc mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
+
         !$acc enter data copyin(dir_idx, dir_flg, dir_idx_tau)
 
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)

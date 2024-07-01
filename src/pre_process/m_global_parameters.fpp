@@ -607,16 +607,13 @@ contains
             end if
 
             if (hyperelasticity) then
-                elasticity = .false.
-                hypoelasticity = .false.
-                hyperelasticity = .false.
-                !xi_idx%beg = sys_size + 1
-                !xi_idx%end = sys_size + num_dims
-                ! adding three more equations for the \xi field and the elastic energy
-                !sys_size = xi_idx%end + 1
                 ! number of entries in the symmetric btensor plus the jacobian
-                !b_size = (num_dims*(num_dims + 1))/2 + 1
-                !tensor_size = num_dims**2 + 1
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
             end if
 
             if (sigma /= dflt_real) then

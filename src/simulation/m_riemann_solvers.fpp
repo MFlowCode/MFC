@@ -357,8 +357,12 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, xi_field_L, xi_field_R)
+                !$acc parallel loop collapse(3) gang vector & 
+                !$acc default(present) private(alpha_rho_L, alpha_rho_R, &
+                !$acc vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L,& 
+                !$acc tau_e_R, G_L, G_R, Re_L, Re_R, &
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
+                !$acc xi_field_L, xi_field_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -474,7 +478,6 @@ contains
                             E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                             ! elastic energy update
-	                    ! MAURO HERE IS THE ISSUE
                             if ( hypoelasticity ) then
                                 !$acc loop seq
                                 do i = 1, strxe - strxb + 1
@@ -507,7 +510,7 @@ contains
                             end if
 
                             ! elastic energy update
-                            if ( hyperelasticity ) then
+                            !if ( hyperelasticity ) then
                             !    G_L = 0d0 
                             !    G_R = 0d0
                             ! 
@@ -526,14 +529,19 @@ contains
                             !        tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                             !    end do
                             !    !$acc loop seq
+                            !    do i = 1, b_size-1
+                            !        tau_e_L(i) = 0d0 
+                            !        tau_e_R(i) = 0d0 
+                            !    end do
+                            !    !$acc loop seq
                             !    do i = 1, num_dims
                             !        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                             !        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                             !    end do
                             !    end if
-                            end if
+                            !end if
       
-                            ! moving this down 
+                            ! Enthalpy with elastic energy 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
 
@@ -559,7 +567,7 @@ contains
                             end if
 
                             if (wave_speeds == 1) then
-                                if ( elasticity ) then
+                                if ( hypoelasticity ) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                        (((4d0*G_L)/3d0) + &
                                                                         tau_e_L(dir_idx_tau(1)))/rho_L) &
@@ -572,11 +580,11 @@ contains
                                               , vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
                                                                          (((4d0*G_L)/3d0) + &
                                                                           tau_e_L(dir_idx_tau(1)))/rho_L))
-                                !elseif ( hyperelasticity ) then
-                                !    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ) &
-                                !              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ))
-                                !    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ) &
-                                !              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ))
+                                else if ( hyperelasticity ) then
+                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ) &
+                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ))
+                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4d0*G_R/3d0)/rho_R ) &
+                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4d0*G_L/3d0)/rho_L ))
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -645,7 +653,7 @@ contains
                                                     - rho_R*vel_R(dir_idx(i)))) &
                                         /(s_M - s_P)
                                 end do
-                            else if ( elasticity ) then
+                            else if ( hypoelasticity ) then
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
@@ -684,7 +692,7 @@ contains
                                      - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) &
                                      + s_M*s_P*(E_L - E_R)) &
                                     /(s_M - s_P)
-                            else if ( elasticity ) then 
+                            else if ( hypoelasticity ) then 
                                 !TODO: simplify this so it's not split into 3
                                 if (num_dims == 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
@@ -961,8 +969,10 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector & 
+		    !$acc default(present) private(vel_L, vel_R, Re_L, Re_R, &
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
+                    !$acc vel_avg_rms, alpha_L, alpha_R)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1311,8 +1321,11 @@ contains
                     end do
                 elseif (model_eqns == 4) then
                     !ME4
-                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
+                    !$acc parallel loop collapse(3) gang vector & 
+                    !$acc default(present) private(alpha_rho_L, & 
+                    !$acc alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
+                    !$acc vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1560,8 +1573,12 @@ contains
                     end do
 
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
+                    !$acc parallel loop collapse(3) gang vector & 
+                    !$acc default(present) private(R0_L, R0_R, V0_L, & 
+                    !$acc V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, & 
+                    !$acc s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, & 
+                    !$acc ptilde_R, vel_avg_rms, Re_L, Re_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2015,8 +2032,10 @@ contains
                     end do
                     !$acc end parallel loop
                 else
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc parallel loop collapse(3) gang vector & 
+                    !$acc default(present) private(vel_L, vel_R, Re_L, Re_R, &
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, & 
+                    !$acc s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end

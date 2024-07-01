@@ -62,7 +62,7 @@ d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 o     Brown Oscar
 o-all python
-o-cpu openmpi/4.1.4s
+o-cpu hpcx-mpi
 o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
 

@@ -472,11 +472,12 @@ contains
                 xi_cart(2) = y_cc(k)
                 xi_cart(3) = z_cc(l)
             end if
-
-            !do i = 1, num_dims
-            !    q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
-            !        (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
-            !end do
+            
+            ! assigning the reference map to the q_prim vector field
+            do i = 1, num_dims
+                q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
+                    (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
+            end do
 
         end if
 
