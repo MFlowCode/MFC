@@ -595,7 +595,7 @@ contains
 
         ! Monopole source
         monopole = .false.
-        num_mono = 1
+        num_mono = dflt_real
 
         ! Surface tension
         sigma = dflt_real
@@ -619,16 +619,16 @@ contains
             mono(j)%mag = dflt_real
             mono(j)%length = dflt_real
             mono(j)%delay = dflt_real
-            mono(j)%dir = 1.d0
-            mono(j)%npulse = 1.d0
-            mono(j)%pulse = 1
-            mono(j)%support = 1
+            mono(j)%dir = dflt_real
+            mono(j)%npulse = dflt_int
+            mono(j)%pulse = dflt_int
+            mono(j)%support = dflt_int
             mono(j)%foc_length = dflt_real
             mono(j)%aperture = dflt_real
+            mono(j)%support_width = dflt_real
             ! The author suggested the support width is typically on the order of
-            ! the width of the characteristic cells. Here, we choose 2.5 cell width
-            ! as the default value.
-            mono(j)%support_width = 2.5d0
+            ! the width of the characteristic cells.
+            ! The default value of support_width is 2.5 cell widths.
         end do
 
         fd_order = dflt_int

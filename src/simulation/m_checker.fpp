@@ -29,6 +29,7 @@ contains
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
+        if (monopole) call s_check_inputs_monopole
         if (hypoelasticity) call s_check_inputs_hypoelasticity
         if (bubbles) call s_check_inputs_bubbles
         if (adap_dt) call s_check_inputs_adapt_dt
@@ -158,6 +159,82 @@ contains
             end if
         end if
     end subroutine s_check_inputs_model_eqns
+
+    !> Checks constraints on monopole parameters
+    subroutine s_check_inputs_monopole
+        integer :: j
+        character(len=5) :: jStr
+
+        if (num_mono == dflt_int) then
+            call s_mpi_abort('num_mono must be specified for monopole. Exiting ...')
+        elseif (num_mono < 0) then
+            call s_mpi_abort('num_mono must be non-negative. Exiting ...')
+        end if
+
+        do j = 1, num_mono
+            call s_int_to_str(j, jStr)
+            if (mono(j)%support == dflt_int) then
+                call s_mpi_abort('mono('//trim(jStr)//')%support must be '// &
+                                 'specified. Exiting ...')
+            elseif (f_is_default(mono(j)%mag)) then
+                call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
+                                 'specified. Exiting ...')
+            elseif (mono(j)%mag <= 0d0) then
+                call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
+                                 'positive. Exiting ...')
+            end if
+
+            if (n == 0) then ! 1D
+                if (.not. any(mono(j)%support == (/0, 1/))) then ! undocumented support 0
+                    call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
+                                     '1D simulations. Exiting ...')
+                end if
+                if (mono(j)%support == 1 .and. f_is_default(mono(j)%loc(1))) then
+                    call s_mpi_abort('mono_loc(1) must be specified for '// &
+                                     'Mono(i)support = 1. Exiting ...')
+                end if
+            elseif (p == 0) then ! 2D
+                if (.not. any(mono(j)%support == (/1, 2, 3, 4, 5/))) then
+                    call s_mpi_abort('Only Mono(i)support = 1, 2, 3, 4, or 5 is '// &
+                                     'allowed for 2D simulations. Exiting ...')
+                end if
+                if (any(mono(j)%support == (/1, 2, 3, 5/)) .and. &
+                    (f_is_default(mono(j)%loc(1)) .or. &
+                     f_is_default(mono(j)%loc(2)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
+                                     'specified for Mono(i)support = 1, 3, or 5. '// &
+                                     'Exiting ...')
+                elseif (mono(j)%support == 4 .and. f_is_default(mono(j)%loc(1))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1) must be '// &
+                                     'specified for Mono(i)support = 4. Exiting ...')
+                end if
+            else ! 3D
+                if (.not. any(mono(j)%support == (/3, 4, 5, 6/))) then
+                    call s_mpi_abort('Only Mono(i)support = 3, 4, 5, or 6 is '// &
+                                     'allowed for 3D simulations. Exiting ...')
+                elseif (mono(j)%support == 6 .and. (.not. cyl_coord)) then
+                    call s_mpi_abort('Mono(i)support = 6 requires cyl_coord = true. '// &
+                                     'Exiting ...')
+                elseif (cyl_coord .and. mono(j)%support /= 6) then
+                    call s_mpi_abort('cyl_coord = true requires Mono(i)support = 6. '// &
+                                     'Exiting ...')
+                end if
+                if (any(mono(j)%support == (/3, 5, 6/)) .and. &
+                    (f_is_default(mono(j)%loc(1)) .or. &
+                     f_is_default(mono(j)%loc(2)) .or. &
+                     f_is_default(mono(j)%loc(3)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:3) must be '// &
+                                     'specified for Mono(i)support = 3, 5, or 6. '// &
+                                     'Exiting ...')
+                elseif (mono(j)%support == 4 .and. &
+                        (f_is_default(mono(j)%loc(3)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(3) must be '// &
+                                     'specified for Mono(i)support = 4. Exiting ...')
+                end if
+            end if
+        end do
+
+    end subroutine s_check_inputs_monopole
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
