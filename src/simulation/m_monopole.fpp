@@ -15,6 +15,8 @@ module m_monopole
     use m_bubbles              !< Bubble dynamic routines
 
     use m_variables_conversion !< State variables type conversion procedures
+
+    use m_helper_basic           !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations, &
@@ -69,19 +71,39 @@ contains
         @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
         do i = 1, num_mono
-            mag(i) = mono(i)%mag
-            support(i) = mono(i)%support
-            length(i) = mono(i)%length
-            npulse(i) = mono(i)%npulse
-            pulse(i) = mono(i)%pulse
-            dir(i) = mono(i)%dir
-            delay(i) = mono(i)%delay
-            foc_length(i) = mono(i)%foc_length
-            aperture(i) = mono(i)%aperture
-            support_width(i) = mono(i)%support_width
             do j = 1, 3
                 loc_mono(j, i) = mono(i)%loc(j)
             end do
+            mag(i) = mono(i)%mag
+            support(i) = mono(i)%support
+            length(i) = mono(i)%length
+            foc_length(i) = mono(i)%foc_length
+            aperture(i) = mono(i)%aperture
+            if (mono(i)%npulse == dflt_int) then
+                npulse(i) = 1
+            else
+                npulse(i) = mono(i)%npulse
+            end if
+            if (mono(i)%pulse == dflt_int) then
+                pulse(i) = 1
+            else
+                pulse(i) = mono(i)%pulse
+            end if
+            if (f_is_default(mono(i)%dir)) then
+                dir(i) = 1d0
+            else
+                dir(i) = mono(i)%dir
+            end if
+            if (f_is_default(mono(i)%delay)) then
+                delay(i) = 0d0
+            else
+                delay(i) = mono(i)%delay
+            end if
+            if (f_is_default(mono(i)%support_width)) then
+                support_width(i) = 2.5d0
+            else
+                support_width(i) = mono(i)%support_width
+            end if
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono, support_width)
 
@@ -149,7 +171,7 @@ contains
                     do q = 1, num_mono
 
                         the_time = t_step*dt
-                        if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
+                        if ((the_time >= delay(q)) .or. f_is_default(delay(q))) then
                             !$acc loop seq
                             do ii = 1, num_fluids
                                 myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
@@ -228,7 +250,7 @@ contains
                             else if (p == 0) then
                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                 !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     ! 2d
                                     !mono_mom_src(1,j,k,l) = s2
                                     !mono_mom_src(2,j,k,l) = s2
@@ -242,7 +264,7 @@ contains
                                 end if
                             else
                                 ! 3D
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     if (support(q) == 5) then
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
@@ -306,7 +328,7 @@ contains
         real(kind(0d0)) :: f_g
 
         offset = 0d0
-        if (delay(nm) /= dflt_real) offset = delay(nm)
+        if (.not. f_is_default(delay(nm))) offset = delay(nm)
 
         if (pulse(nm) == 1) then
             ! Sine wave
@@ -332,7 +354,6 @@ contains
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
-        else
         end if
 
     end function f_g
