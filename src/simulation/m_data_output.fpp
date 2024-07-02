@@ -980,7 +980,11 @@ contains
         else
             ! Initialize MPI data I/O
 
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step, '.dat'
