@@ -1,6 +1,6 @@
 name: Coverage Check
 
-on: [push, pull_request, workflow_dispatch]
+on: [push, pull_request]
 
 jobs:
   file-changes:
@@ -45,4 +45,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           verbose: true
+        env:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
