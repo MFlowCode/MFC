@@ -15,6 +15,8 @@ module m_monopole
     use m_bubbles              !< Bubble dynamic routines
 
     use m_variables_conversion !< State variables type conversion procedures
+
+    use m_helper_basic           !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
     private; public :: s_initialize_monopole_module, s_monopole_calculations, &
@@ -169,7 +171,7 @@ contains
                     do q = 1, num_mono
 
                         the_time = t_step*dt
-                        if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
+                        if ((the_time >= delay(q)) .or. f_is_default(delay(q))) then
                             !$acc loop seq
                             do ii = 1, num_fluids
                                 myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
@@ -248,7 +250,7 @@ contains
                             else if (p == 0) then
                                 ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
                                 !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     ! 2d
                                     !mono_mom_src(1,j,k,l) = s2
                                     !mono_mom_src(2,j,k,l) = s2
@@ -262,7 +264,7 @@ contains
                                 end if
                             else
                                 ! 3D
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     if (support(q) == 5) then
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
@@ -326,7 +328,7 @@ contains
         real(kind(0d0)) :: f_g
 
         offset = 0d0
-        if (delay(nm) /= dflt_real) offset = delay(nm)
+        if (.not. f_is_default(delay(nm))) offset = delay(nm)
 
         if (pulse(nm) == 1) then
             ! Sine wave
