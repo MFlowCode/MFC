@@ -28,7 +28,7 @@ ppg    = 8000000 / 16.0
 procs  = DICT["nodes"] * DICT["tasks_per_node"]
 ncells = math.floor(ppg * procs * ARGS["gbpp"])
 s      = math.floor((ncells / 2.0) ** (1/3))
-Nx, Ny, Nz = 2*s, s, s
+Nx, Ny, Nz = s, s, 2*s
 
 x0      = 10.E-04
 y0      = 10.E-04
@@ -86,8 +86,8 @@ myr0     = R0ref
 cfl     = 0.01
 Ldomain = 20.E-03
 L       = Ldomain/x0
-dx      = L/float(Nx)
-dt      = cfl*dx*c0/cact
+dz      = L/float(Nz)
+dt      = cfl*dz*c0/cact
 Lpulse  = 0.3*Ldomain
 Tpulse  = Lpulse/cact
 
@@ -98,12 +98,12 @@ print(json.dumps({
     # ==========================================================
     
     # Computational Domain Parameters ==========================
-    'x_domain%beg'                 : -10.E-03/x0,
-    'x_domain%end'                 :  10.E-03/x0,
+    'x_domain%beg'                 : -5.E-03/x0,
+    'x_domain%end'                 :  5.E-03/x0,
     'y_domain%beg'                 : -5.E-03/y0,
-    'y_domain%end'                 : 5.E-03/y0,
-    'z_domain%beg'                 : -5.E-03/z0,
-    'z_domain%end'                 : 5.E-03/z0,
+    'y_domain%end'                 :  5.E-03/y0,
+    'z_domain%beg'                 : -10.E-03/z0,
+    'z_domain%end'                 :  10.E-03/z0,
     'stretch_x'                    : 'F',
     'cyl_coord'                    : 'F',
     'm'                            : Nx,
@@ -154,9 +154,9 @@ print(json.dumps({
     'patch_icpp(1)%x_centroid'     : 0.,
     'patch_icpp(1)%y_centroid'     : 0.,
     'patch_icpp(1)%z_centroid'     : 0.,
-    'patch_icpp(1)%length_x'       : 20.E-03/x0,
+    'patch_icpp(1)%length_x'       : 10.E-03/x0,
     'patch_icpp(1)%length_y'       : 10.E-03/y0,
-    'patch_icpp(1)%length_z'       : 10.E-03/z0,
+    'patch_icpp(1)%length_z'       : 20.E-03/z0,
     'patch_icpp(1)%vel(1)'         : 0.0,
     'patch_icpp(1)%vel(2)'         : 0.0,
     'patch_icpp(1)%vel(3)'         : 0.0,
@@ -172,9 +172,9 @@ print(json.dumps({
     'patch_icpp(2)%x_centroid'     : 0.,
     'patch_icpp(2)%y_centroid'     : 0.,
     'patch_icpp(2)%z_centroid'     : 0.,
-    'patch_icpp(2)%length_x'       : 5.E-03/x0,
+    'patch_icpp(2)%length_x'       : 10.E-03/x0,
     'patch_icpp(2)%length_y'       : 10.E-03/y0,
-    'patch_icpp(2)%length_z'       : 10.E-03/z0,
+    'patch_icpp(2)%length_z'       : 5.E-03/z0,
     'patch_icpp(2)%alter_patch(1)' : 'T',
     'patch_icpp(2)%vel(1)'         : 0.0,
     'patch_icpp(2)%vel(2)'         : 0.0,
@@ -230,7 +230,8 @@ print(json.dumps({
     # Acoustic source ==========================================
     'Monopole'                     : 'T',
     'num_mono'                     : 1,
-    'Mono(1)%loc(1)'               : -5.E-03/x0,
+    'Mono(1)%support'              : 4,
+    'Mono(1)%loc(3)'               : -5.E-03/x0,
     'Mono(1)%npulse'               : 1,
     'Mono(1)%dir'                  : 1.,
     'Mono(1)%pulse'                : 1,

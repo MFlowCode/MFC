@@ -198,9 +198,9 @@ contains
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
             & 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',                    &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles',   &
-            & 'polytropic', 'polydisperse', 'file_per_process', 'relax',       &
-            & 'adv_n', 'qbmm','hyperelasticity', 'cf_wrt']
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
+            & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
+            & 'adv_n', 'ib', 'hyperelasticity' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

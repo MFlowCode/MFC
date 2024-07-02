@@ -20,6 +20,8 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -611,7 +613,7 @@ contains
 
         ! Monopole source
         monopole = .false.
-        num_mono = 1
+        num_mono = dflt_real
 
         ! Surface tension
         sigma = dflt_real
@@ -635,16 +637,16 @@ contains
             mono(j)%mag = dflt_real
             mono(j)%length = dflt_real
             mono(j)%delay = dflt_real
-            mono(j)%dir = 1.d0
-            mono(j)%npulse = 1.d0
-            mono(j)%pulse = 1
-            mono(j)%support = 1
+            mono(j)%dir = dflt_real
+            mono(j)%npulse = dflt_int
+            mono(j)%pulse = dflt_int
+            mono(j)%support = dflt_int
             mono(j)%foc_length = dflt_real
             mono(j)%aperture = dflt_real
+            mono(j)%support_width = dflt_real
             ! The author suggested the support width is typically on the order of
-            ! the width of the characteristic cells. Here, we choose 2.5 cell width
-            ! as the default value.
-            mono(j)%support_width = 2.5d0
+            ! the width of the characteristic cells.
+            ! The default value of support_width is 2.5 cell widths.
         end do
 
         fd_order = dflt_int
@@ -825,7 +827,7 @@ contains
                             pv = fluid_pp(1)%pv
                             pv = pv/pref
                             @:ALLOCATE_GLOBAL(pb0(nb))
-                            if (Web == dflt_real) then
+                            if ((f_is_default(Web))) then
                                 pb0 = pref
                                 pb0 = pb0/pref
                                 pref = 1d0
@@ -854,7 +856,7 @@ contains
                     sys_size = xi_idx%end + 1
                 end if
 
-                if (sigma /= dflt_real) then
+                if (.not. f_is_default(sigma)) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
@@ -872,7 +874,7 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
 
-                if (sigma /= dflt_real) then
+                if (.not. f_is_default(sigma)) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if

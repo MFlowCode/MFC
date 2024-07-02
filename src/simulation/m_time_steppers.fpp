@@ -208,7 +208,7 @@ contains
             end do
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end))
