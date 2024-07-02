@@ -133,7 +133,6 @@ contains
         end if
 #endif
 
-#ifndef MFC_POST_PROCESS
         if (present(ib_markers)) then
 
 #ifdef MFC_PRE_PROCESS
@@ -146,7 +145,6 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
 
         end if
-#endif
 
 #ifndef MFC_POST_PROCESS
         if (present(ib_markers)) then
