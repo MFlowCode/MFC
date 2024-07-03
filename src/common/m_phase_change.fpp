@@ -448,8 +448,7 @@ contains
         R2D(1) = 0.0d0; R2D(2) = 0.0d0
         DeltamP(1) = 0.0d0; DeltamP(2) = 0.0d0
         do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
-                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) & 
-                   > (ptgalpha_eps/1d6))) &
+                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) &
                   .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
