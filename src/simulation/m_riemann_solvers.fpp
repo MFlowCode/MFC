@@ -1118,7 +1118,6 @@ contains
                                                               vel_L_rms, c_L)
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
                                                               vel_R_rms, c_R)
-
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
@@ -1176,17 +1175,46 @@ contains
                                                 (rho_avg*c_avg))
                                 end if
 
+                                ! follows Einfeldt et al.
+                                ! s_M/P = min/max(0.,s_L/R)
+                                s_M = min(0d0, s_L); s_P = max(0d0, s_R)
+
+                                ! goes with q_star_L/R = xi_L/R * (variable)
+                                ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
+                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+
+                                ! goes with numerical velocity in x/y/z directions
+                                ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
+                                xi_M = (5d-1 + sign(5d-1, s_S))
+                                xi_P = (5d-1 - sign(5d-1, s_S))
+
                                 ! COMPUTING FLUXES
+
+                                ! MASS.
+                                !$acc loop seq
+                                do i = 1, contxe
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*alpha_rho_L(i) &
+                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*alpha_rho_R(i) &
+                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                end do
+
+                                ! Volume fraction flux
+                                !$acc loop seq
+                                do i = advxb, advxe
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                end do
+
                                 if (s_L >= 0d0) then
                                     p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*s_S
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*vel_L(dir_idx(1))
-
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
                                              (gammas(i)*pres_L + pi_infs(i)) + &
@@ -1215,12 +1243,6 @@ contains
                                     ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
                                     do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*s_S
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*vel_R(dir_idx(1))
-
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
                                              (gammas(i)*pres_R + pi_infs(i)) + &
@@ -1254,12 +1276,6 @@ contains
                                     do i = 1, num_fluids
                                         p_K_Star = (pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
                                                    xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*s_S
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)*xi_L*s_S
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
@@ -1299,12 +1315,6 @@ contains
                                         p_K_Star = (pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
                                                    xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
 
-                                        flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*s_S
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + contxb - 1) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)*xi_R*s_S
-
                                         flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
                                             (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
                                              (gammas(i)*p_K_Star + pi_infs(i)) + &
@@ -1314,11 +1324,11 @@ contains
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
-                                                                                             (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
+                                            (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
                                                                                              dir_flg(dir_idx(i))*p_Star
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
+                                            dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
@@ -1357,6 +1367,7 @@ contains
                             end do
                         end do
                     end do
+
                 elseif (model_eqns == 4) then
                     !ME4
                     !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
@@ -2300,6 +2311,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                ! COMPUTING THE HLLC FLUXES
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2316,8 +2328,7 @@ contains
                                     idxi = dir_idx(i)
                                     if (hypoelasticity) then
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        xi_M*(rho_L*(vel_L(idx1)* &
-                                                     vel_L(idxi) + &
+                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + &
                                                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
                                                                 (1d0 - dir_flg(idxi))* &
                                                                 vel_L(idxi)) - vel_L(idxi))) + &
@@ -2328,7 +2339,7 @@ contains
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
                                                 dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
-                                    else  !SGR added this if statement for hypo
+                                    else  
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                             xi_M*(rho_L*(vel_L(idx1)* &
                                                           vel_L(idxi) + &
@@ -2343,7 +2354,6 @@ contains
                                                                       vel_R(idxi)) - vel_R(idxi)))+ &
                                                    dir_flg(idxi)*(pres_R))
                                     end if
-                  ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
                                 ! Energy flux.
@@ -2377,6 +2387,7 @@ contains
                                                            (rho_R*s_S + pres_R/ &
                                                            (s_R - vel_R(idx1)))) - E_R))
                                 end if
+
                                 ! Volume fraction flux
                                 !$acc loop seq
                                 do i = advxb, advxe
