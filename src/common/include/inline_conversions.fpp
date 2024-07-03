@@ -17,20 +17,6 @@
         integer :: q
 
         if (alt_soundspeed) then
-             !!acc loop seq   
-             !c = 0d0
-             !do q = 1, num_fluids
-              !    if (hypoelasticity) then
-              !       blkmod(i) = ((gammas(i) + 1d0)*pres + &
-              !                    pi_infs(i))/gammas(i)+4/3*G(i)
-              !   else
-              !       blkmod(q) = ((gammas(q) + 1d0)*pres + &
-              !                    pi_infs(q))/gammas(q)
-              !   end if
-              !   c = c + adv(q)/blkmod(q)
-             !end do 
-             !c = 1d0/(rho*c)
-        !if (alt_soundspeed) then
             blkmod1 = ((gammas(1) + 1d0)*pres + &
                        pi_infs(1))/gammas(1)
             blkmod2 = ((gammas(2) + 1d0)*pres + &
