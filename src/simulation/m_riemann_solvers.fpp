@@ -871,8 +871,7 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, & 
-             qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
@@ -968,7 +967,7 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1075,7 +1074,6 @@ contains
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
@@ -1681,7 +1679,6 @@ contains
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
-
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
 
                                 H_L = (E_L + pres_L)/rho_L
@@ -2019,7 +2016,7 @@ contains
                     !$acc end parallel loop
                 else
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2132,7 +2129,6 @@ contains
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
