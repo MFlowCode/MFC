@@ -162,14 +162,12 @@ module m_riemann_solvers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-    !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
-    !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
 #endif
     !> @}
 
@@ -357,12 +355,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector & 
-                !$acc default(present) private(alpha_rho_L, alpha_rho_R, &
-                !$acc vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L,& 
-                !$acc tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
-                !$acc xi_field_L, xi_field_R)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, xi_field_L, xi_field_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -975,10 +968,7 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector & 
-		    !$acc default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
-                    !$acc vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1326,11 +1316,7 @@ contains
                     end do
                 elseif (model_eqns == 4) then
                     !ME4
-                    !$acc parallel loop collapse(3) gang vector & 
-                    !$acc default(present) private(alpha_rho_L, & 
-                    !$acc alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
-                    !$acc vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1578,12 +1564,7 @@ contains
                     end do
 
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector & 
-                    !$acc default(present) private(R0_L, R0_R, V0_L, & 
-                    !$acc V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, & 
-                    !$acc s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, & 
-                    !$acc ptilde_R, vel_avg_rms, Re_L, Re_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2038,10 +2019,7 @@ contains
                     !$acc end parallel loop
                 else
 
-                    !$acc parallel loop collapse(3) gang vector & 
-                    !$acc default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, & 
-                    !$acc s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
