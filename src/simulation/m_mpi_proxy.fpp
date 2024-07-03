@@ -17,6 +17,8 @@ module m_mpi_proxy
     use mpi                    !< Message passing interface (MPI) module
 #endif
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_helper
 
     use m_derived_types        !< Definitions of the derived types
@@ -141,7 +143,7 @@ contains
             v_size = sys_size
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
@@ -2282,7 +2284,7 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 

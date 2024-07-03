@@ -10,6 +10,8 @@ module m_checker_common
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_helper
 
     implicit none

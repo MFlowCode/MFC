@@ -57,6 +57,8 @@ module m_start_up
 
     use ieee_arithmetic
 
+    use m_helper_basic          !< Functions to compare floating point numbers
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -1233,7 +1235,7 @@ contains
             call s_initialize_nonpoly()
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
-        if (qbmm .and. polytropic .and. Web /= dflt_real) then
+        if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
             pb0 = pref + 2d0*fluid_pp(1)%ss/(R0*R0ref)
             pb0 = pb0/pref
             pref = 1d0
@@ -1266,7 +1268,7 @@ contains
 
         call s_initialize_rhs_module()
 
-        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
+        if (.not. f_is_default(sigma)) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1438,7 +1440,7 @@ contains
             call s_finalize_viscous_module()
         end if
 
-        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
+        if (.not. f_is_default(sigma)) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment

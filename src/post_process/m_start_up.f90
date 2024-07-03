@@ -74,7 +74,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, sim_data
+            relax_model, cf_wrt, sigma, adv_n, ib, sim_data
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -505,6 +505,12 @@ contains
             end do
         end if
         ! ----------------------------------------------------------------------
+
+        if (ib) then
+            q_sf = real(ib_markers%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
+            varname = 'ib_markers'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+        end if
 
         ! Adding Q_M to the formatted database file ------------------
         if (p > 0 .and. qm_wrt) then
