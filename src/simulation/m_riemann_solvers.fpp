@@ -1201,7 +1201,42 @@ contains
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
                                 end do
 
-                                ! Volume fraction flux
+                                ! MOMENTUM FLUX.
+                                ! f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    idxi = dir_idx(i)
+                                    if (hypoelasticity) then
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + &
+                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                                                (1d0 - dir_flg(idxi))* &
+                                                                vel_L(idxi)) - vel_L(idxi))) + &
+                                              dir_flg(idxi)*(pres_L) - tau_e_L(dir_idx_tau(i))) &
+                                        + xi_P*(rho_R*(vel_R(idx1)* &
+                                                       vel_R(idxi) + &
+                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                                                  (1d0 - dir_flg(idxi))* &
+                                                                  vel_R(idxi)) - vel_R(idxi))) + &
+                                                dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
+                                    else  
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                            xi_M*(rho_L*(vel_L(idx1)* &
+                                                          vel_L(idxi) + &
+                                                         s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                                                    (1d0 - dir_flg(idxi))* &
+                                                                    vel_L(idxi)) - vel_L(idxi))) + &
+                                                  dir_flg(idxi)*(pres_L)) &
+                                            + xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idxi) + &
+                                                           s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                                                      (1d0 - dir_flg(idxi))* &
+                                                                      vel_R(idxi)) - vel_R(idxi)))+ &
+                                                   dir_flg(idxi)*(pres_R))
+                                    end if
+                                end do
+
+                                ! VOLUME FRACTION.
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1223,9 +1258,6 @@ contains
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
-                                            rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
-
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
                                                                                     dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
@@ -1251,9 +1283,6 @@ contains
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
-                                            rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
-
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
                                                                                     dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
@@ -1285,10 +1314,6 @@ contains
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
-                                            rho_Star*s_S*(s_S*dir_flg(dir_idx(i)) + vel_L(dir_idx(i))* &
-                                                          (1d0 - dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
-
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
                                                                                     dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
@@ -1323,10 +1348,6 @@ contains
                                     end do
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
-                                            (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
-                                                                                             dir_flg(dir_idx(i))*p_Star
-
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
                                             dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
@@ -2069,7 +2090,7 @@ contains
                     end do
                     !$acc end parallel loop
                 else 
-                    ! 5-EQUATION MODEL WITH HLLC, INTERFACE CAPTURING ONLY
+                    ! TODO 5-EQUATION MODEL WITH HLLC, INTERFACE CAPTURING ONLY
 
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
@@ -2312,6 +2333,8 @@ contains
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
                                 ! COMPUTING THE HLLC FLUXES
+
+                                ! Mass flux.
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
