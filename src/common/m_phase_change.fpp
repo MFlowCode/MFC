@@ -357,7 +357,8 @@ contains
         ! Newton Solver for the pT-equilibrium
         ns = 0
         ! change this relative error metric. 1E4 is arbitrary
-        do while ((DABS(pS - pO) > palpha_eps) .and. (DABS((pS - pO)/pO) > palpha_eps/1d4) .or. (ns == 0))
+        do while ((DABS(pS - pO) > palpha_eps) .and. &
+             (DABS((pS - pO)/pO) > palpha_eps/1d4) .or. (ns == 0))
 
             ! increasing counter
             ns = ns + 1
