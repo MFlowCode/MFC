@@ -641,7 +641,14 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
 
-            if (.not. f_is_default(sigma)) then
+            if (hypoelasticity) then
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                sys_size = stress_idx%end
+            end if
+
+            if (sigma /= dflt_real) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if

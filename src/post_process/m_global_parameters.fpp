@@ -545,6 +545,12 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
+    
+            if (hypoelasticity) then
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                sys_size = stress_idx%end
+            end if
 
             if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
