@@ -649,7 +649,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
