@@ -964,10 +964,12 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
+
+                ! 6-EQUATION MODEL WITH HLLC 
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1100,6 +1102,7 @@ contains
                                     end do
                                 end if
 
+                                ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -1132,6 +1135,7 @@ contains
                                                 (rho_avg*c_avg))
                                 end if
 
+                                ! COMPUTING FLUXES
                                 if (s_L >= 0d0) then
                                     p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
@@ -1909,7 +1913,6 @@ contains
                                                         (s_R - vel_R(dir_idx(1))))) - E_R))
 
                                 ! Volume fraction flux
-
                                 !$acc loop seq
                                 do i = advxb, advxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2014,7 +2017,8 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                else
+                else 
+                    ! 5-EQUATION MODEL WITH HLLC, INTERFACE CAPTURING ONLY
 
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
