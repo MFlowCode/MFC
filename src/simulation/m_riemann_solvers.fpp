@@ -1200,10 +1200,10 @@ contains
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*alpha_rho_L(i) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*alpha_rho_R(i) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
                                 ! MOMENTUM FLUX.
@@ -1243,9 +1243,9 @@ contains
                                    do i = 1, num_dims
                                      idxi = dir_idx(i)
                                      flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
-                                       xi_M*( vel_L(idxi(i))*tau_e_L(dir_idx_tau(i)) + & 
+                                       xi_M*( vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + & 
                                           s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                       xi_P*( vel_R(idxi(i))*tau_e_R(dir_idx_tau(i)) + &
+                                       xi_P*( vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
                                           s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                    end do 
                                 end if
