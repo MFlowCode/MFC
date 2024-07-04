@@ -913,6 +913,7 @@ contains
         real(kind(0d0)) :: s_L, s_R, s_M, s_P, s_S
         real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
         real(kind(0d0)) :: xi_M, xi_P
+        real(kind(0d0)) :: xi_MP, xi_PP
 
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
         real(kind(0d0)) :: G_L, G_R
@@ -933,7 +934,7 @@ contains
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(kind(0d0)) :: blkmod1, blkmod2
-        real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
+        real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
         integer :: i, j, k, l, q !< Generic loop iterators
@@ -1184,10 +1185,15 @@ contains
                                 xi_L = (s_L - vel_L(idx1))/(s_L - s_S)
                                 xi_R = (s_R - vel_R(idx1))/(s_R - s_S)
 
-                                ! goes with numerical velocity in x/y/z directions
+                                ! goes with numerical star velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
+
+                                ! goes with the numerical velocity in x/y/z directions
+                                ! xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
+                                xi_MP = max(0d0, sign(1d0, s_L))
+                                xi_PP = min(0d0, sign(1d0, s_R))
 
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
@@ -1207,31 +1213,20 @@ contains
                                     idxi = dir_idx(i)
                                     if (elasticity) then
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + &
-                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                (1d0 - dir_flg(idxi))* &
-                                                                vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L) - tau_e_L(dir_idx_tau(i))) &
-                                        + xi_P*(rho_R*(vel_R(idx1)* &
-                                                       vel_R(idxi) + &
-                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                  (1d0 - dir_flg(idxi))* &
-                                                                  vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
+                                          xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                            (1d0 - dir_flg(idxi))*vel_L(idxi)) - vel_L(idxi))) + &
+                                              dir_flg(idxi)*(pres_L) - tau_e_L(dir_idx_tau(i))) + &
+                                          xi_P*(rho_R*(vel_R(idx1)*vel_R(idxi) + s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                            (1d0 - dir_flg(idxi))*vel_R(idxi)) - vel_R(idxi))) + &
+                                              dir_flg(idxi)*(pres_R) - tau_e_R(dir_idx_tau(i)))
                                     else  
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                            xi_M*(rho_L*(vel_L(idx1)* &
-                                                          vel_L(idxi) + &
-                                                         s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                    (1d0 - dir_flg(idxi))* &
-                                                                    vel_L(idxi)) - vel_L(idxi))) + &
-                                                  dir_flg(idxi)*(pres_L)) &
-                                            + xi_P*(rho_R*(vel_R(idx1)* &
-                                                           vel_R(idxi) + &
-                                                           s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                      (1d0 - dir_flg(idxi))* &
-                                                                      vel_R(idxi)) - vel_R(idxi)))+ &
-                                                   dir_flg(idxi)*(pres_R))
+                                          xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                            (1d0 - dir_flg(idxi))*vel_L(idxi)) - vel_L(idxi))) + &
+                                              dir_flg(idxi)*(pres_L)) + &
+                                          xi_P*(rho_R*(vel_R(idx1)*vel_R(idxi) + s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                            (1d0 - dir_flg(idxi))*vel_R(idxi)) - vel_R(idxi)))+ &
+                                              dir_flg(idxi)*(pres_R))
                                     end if
                                 end do
 
@@ -1272,7 +1267,7 @@ contains
                                        xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
                                 end if
 
-                                ! Source for volume fraction advection equation
+                                ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
@@ -1281,58 +1276,22 @@ contains
                                         xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
                                 end do
 
-                                ! OLD SCHOOL HLLC 
-                                if (s_L >= 0d0) then
-                                    p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                             (gammas(i)*pres_L + pi_infs(i)) + &
-                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
-                                             qvs(i))*vel_L(dir_idx(1))
-                                    end do
-                                    ! Compute right solution state
-                                else if (s_R <= 0d0) then
-                                    p_Star = pres_R
-                                    ! Only useful to recalculate the radial momentum geometric source flux
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                             (gammas(i)*pres_R + pi_infs(i)) + &
-                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
-                                             qvs(i))*vel_R(dir_idx(1))
-                                    end do
-                                    ! Compute left star solution state
-                                else if (s_S >= 0d0) then
-                                    p_Star = rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))) + pres_L
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                        p_K_Star = (pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
-                                                   xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                             (gammas(i)*p_K_Star + pi_infs(i)) + &
-                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
-                                             qvs(i))*s_S
-                                    end do
-                                    ! Compute right star solution state
-                                else
-                                    p_Star = rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))) + pres_R
-                                    !$acc loop seq
-                                    do i = 1, num_fluids
-                                        p_K_Star = (pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
-                                                   xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
-
-                                        flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                            (qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)* &
-                                             (gammas(i)*p_K_Star + pi_infs(i)) + &
-                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
-                                             qvs(i))*s_S
-                                    end do
-                               end if
+                                ! K-th pressure and velocity in preparation for the internal energy
+                                p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
+                                           xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_L)+pres_L)+ & 
+                                           xi_P*(xi_PP*((pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
+                                           xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_R)+pres_R)
+                                vel_K_Star = xi_M*(xi_MP*(vel_L(dir_idx(1))-s_S) + s_S) + & 
+                                             xi_R*(xi_PP*(vel_R(dir_idx(1))-s_S) + s_S)
+                                ! INTERNAL ENERGIES ADVECTION FLUX.
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                        (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
+                                        (gammas(i)*p_K_Star + pi_infs(i)) + &
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
+                                        qvs(i))*vel_K_Star
+                                end do
 
                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
@@ -1361,7 +1320,6 @@ contains
                                        end do
                                    end if
                                #:endif
-
                                #:if (NORM_DIR == 3)
                                     if (grid_geometry == 3) then
                                         !$acc loop seq
@@ -1375,7 +1333,6 @@ contains
                                                (1d0 - dir_flg(idx1))*vel_R(idx1)) - vel_R(idx1))))
 
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
-
                                     end if
                                #:endif
 
