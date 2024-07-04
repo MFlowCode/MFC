@@ -974,6 +974,8 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
+                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
 
                                 !$acc loop seq
@@ -1190,8 +1192,7 @@ contains
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
                                 ! COMPUTING FLUXES
-
-                                ! MASS.
+                                ! MASS FLUX.
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1206,7 +1207,7 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    if (hypoelasticity) then
+                                    if (elasticity) then
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + &
                                                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
@@ -1240,11 +1241,20 @@ contains
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                    xi_M*( vel_L(idx1)*(E_L + pres_L) + & 
-                                     s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) + &
+                                      s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) + &
                                    xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                     s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
-
-
+                                      s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
+                                ! Additional elastic shear stress terms for the energy flux
+                                if (elasticity) then
+                                   !$acc loop seq
+                                   do i = 1, num_dims
+                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
+                                       xi_M*( vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + & 
+                                          s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
+                                       xi_P*( vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) + &
+                                          s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                   end do 
+                                end if
 
                                 ! VOLUME FRACTION FLUX.
                                 !$acc loop seq
@@ -1256,6 +1266,14 @@ contains
                                         *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
+                                ! SURFACE TENSION FLUX. need to check
+                                if (.not. f_is_default(sigma)) then
+                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = & 
+                                      (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
+                                       xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
+                                end if
+
+                                ! OLD SCHOOL HLLC 
                                 if (s_L >= 0d0) then
                                     p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
                                     !$acc loop seq
@@ -1272,12 +1290,6 @@ contains
                                                                                     dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
-
-                                    if (.not. f_is_default(sigma)) then
-                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
-                                    end if
 
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
@@ -1297,12 +1309,6 @@ contains
                                                                                     dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
-
-                                    if (.not. f_is_default(sigma)) then
-                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
-                                    end if
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1328,13 +1334,6 @@ contains
                                                                                     dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
-
-                                    if (.not. f_is_default(sigma)) then
-                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
-                                    end if
-
                                     ! Compute right star solution state
                                 else
                                     xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
@@ -1362,15 +1361,7 @@ contains
                                             dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
-
-                                    if (.not. f_is_default(sigma)) then
-                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
-                                    end if
-
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
-
-                                end if
+                               end if
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
@@ -2352,7 +2343,7 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    if (hypoelasticity) then
+                                    if (elasticity) then
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + &
                                                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
@@ -2393,10 +2384,10 @@ contains
                                 if (hypoelasticity) then                         
                                    do i = 1, num_dims
                                      flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
-                                       xi_M*( vel_L(idx1)*tau_e_L(dir_idx_tau(i)) + & 
-                                          s_M*(xi_L*((s_S - vel_L(idx1))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(idx1)))) - E_L)) - &
-                                       xi_P*(vel_R(idx1)*tau_e_R(dir_idx_tau(i)) + &
-                                          s_P*(xi_R*((s_S - vel_R(idx1))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(idx1)))) - E_R))
+                                       xi_M*( vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + & 
+                                          s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
+                                       xi_P*( vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) + &
+                                          s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                    end do 
                                 end if
 
@@ -2435,11 +2426,9 @@ contains
                                     end do
                                 end if
 
-
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
                                 ! Geometrical source flux for cylindrical coordinates
-
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         !Substituting the advective flux into the inviscid geometrical source flux
