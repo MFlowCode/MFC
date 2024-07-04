@@ -961,20 +961,18 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
+        idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-
                 ! 6-EQUATION MODEL WITH HLLC 
                 if (model_eqns == 3) then
                     !ME3
-
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-
-                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
 
@@ -1183,8 +1181,8 @@ contains
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(idx1))/(s_L - s_S)
+                                xi_R = (s_R - vel_R(idx1))/(s_R - s_S)
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
@@ -1248,10 +1246,11 @@ contains
                                 if (elasticity) then
                                    !$acc loop seq
                                    do i = 1, num_dims
+                                     idxi = dir_idx(i)
                                      flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
-                                       xi_M*( vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + & 
+                                       xi_M*( vel_L(idxi(i))*tau_e_L(dir_idx_tau(i)) + & 
                                           s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                       xi_P*( vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) + &
+                                       xi_P*( vel_R(idxi(i))*tau_e_R(dir_idx_tau(i)) + &
                                           s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                    end do 
                                 end if
@@ -1273,6 +1272,15 @@ contains
                                        xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
                                 end if
 
+                                ! Source for volume fraction advection equation
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    idxi = dir_idx(i)
+                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
+                                        xi_M*(vel_L(idxi) + dir_flg(idxi)*s_M*(xi_L - 1d0)) + &
+                                        xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
+                                end do
+
                                 ! OLD SCHOOL HLLC 
                                 if (s_L >= 0d0) then
                                     p_Star = pres_L ! Only useful to recalculate the radial momentum geometric source flux
@@ -1284,13 +1292,6 @@ contains
                                              qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
                                              qvs(i))*vel_L(dir_idx(1))
                                     end do
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
-                                        ! Compute the star velocities for the non-conservative terms
-                                    end do
-
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
@@ -1303,19 +1304,9 @@ contains
                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
                                              qvs(i))*vel_R(dir_idx(1))
                                     end do
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
-                                        ! Compute the star velocities for the non-conservative terms
-                                    end do
-
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
                                     xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                    rho_Star = rho_L*xi_L
-                                    E_Star = xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                   (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))
                                     p_Star = rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))) + pres_L
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -1328,21 +1319,9 @@ contains
                                              qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
                                              qvs(i))*s_S
                                     end do
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
-                                        ! Compute the star velocities for the non-conservative terms
-                                    end do
                                     ! Compute right star solution state
                                 else
                                     xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
-
-                                    rho_Star = rho_R*xi_R
-
-                                    E_Star = xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                   (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))
-
                                     p_Star = rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))) + pres_R
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -1355,36 +1334,49 @@ contains
                                              qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)* &
                                              qvs(i))*s_S
                                     end do
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                            dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
-                                        ! Compute the star velocities for the non-conservative terms
-                                    end do
                                end if
 
-                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
+                               flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
-                                ! Geometrical source flux for cylindrical coordinates
-                                if (cyl_coord .and. norm_dir == 2) then
-                                    ! Substituting the advective flux into the inviscid geometrical source flux
-                                    !$acc loop seq
-                                    do i = 1, E_idx
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                                    end do
-                                    !$acc loop seq
-                                    do i = intxb, intxe
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                                    end do
-                                    ! Recalculating the radial momentum geometric source flux (subtracting the pressure part)
-                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
-                                    ! Geometrical source of the void fraction(s) is zero
-                                    !$acc loop seq
-                                    do i = advxb, advxe
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
-                                    end do
-                                end if
+                               ! Geometrical source flux for cylindrical coordinates
+                               #:if (NORM_DIR == 2)
+                                   if (cyl_coord) then
+                                       !Substituting the advective flux into the inviscid geometrical source flux
+                                       !$acc loop seq
+                                       do i = 1, E_idx
+                                           flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                       end do
+                                       !$acc loop seq
+                                       do i = intxb, intxe
+                                           flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                       end do
+                                       ! Recalculating the radial momentum geometric source flux (subtracting the pressure part)
+                                       flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + idx1) = &
+                                          flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + idx1) - p_Star
+                                       ! Geometrical source of the void fraction(s) is zero
+                                       !$acc loop seq
+                                       do i = advxb, advxe
+                                           flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                       end do
+                                   end if
+                               #:endif
+
+                               #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                        end do
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
+                                            -xi_M*(rho_L*(vel_L(idx1)*vel_L(idx1) + s_M*(xi_L*(dir_flg(idx1)*s_S + & 
+                                               (1d0 - dir_flg(idx1))*vel_L(idx1)) - vel_L(idx1)))) &
+                                            -xi_P*(rho_R*(vel_R(idx1)*vel_R(idx1) + s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                               (1d0 - dir_flg(idx1))*vel_R(idx1)) - vel_R(idx1))))
+
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
+
+                                    end if
+                               #:endif
 
                             end do
                         end do
@@ -2091,14 +2083,10 @@ contains
                     !$acc end parallel loop
                 else 
                     ! TODO 5-EQUATION MODEL WITH HLLC, INTERFACE CAPTURING ONLY
-
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-
-                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
-
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -2381,7 +2369,8 @@ contains
                                    xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                       s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
                                 ! Additional elastic shear stress terms for the energy flux.
-                                if (hypoelasticity) then                         
+                                if (hypoelasticity) then
+                                   !$acc loop seq
                                    do i = 1, num_dims
                                      flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
                                        xi_M*( vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + & 
