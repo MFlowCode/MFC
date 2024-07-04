@@ -1306,7 +1306,6 @@ contains
                                     end do
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
-                                    xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
                                     p_Star = rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))) + pres_L
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -1321,7 +1320,6 @@ contains
                                     end do
                                     ! Compute right star solution state
                                 else
-                                    xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
                                     p_Star = rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))) + pres_R
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -1336,7 +1334,7 @@ contains
                                     end do
                                end if
 
-                               flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
+                               flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
                                ! Geometrical source flux for cylindrical coordinates
                                #:if (NORM_DIR == 2)
@@ -1350,9 +1348,12 @@ contains
                                        do i = intxb, intxe
                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                        end do
-                                       ! Recalculating the radial momentum geometric source flux (subtracting the pressure part)
+                                       ! Recalculating the radial momentum geometric source flux
                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + idx1) = &
-                                          flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + idx1) - p_Star
+                                            xi_M*(rho_L*(vel_L(idx1)*vel_L(idx1) + s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                              (1d0 - dir_flg(idx1))*vel_L(idx1)) - vel_L(idx1)))) + &
+                                            xi_P*(rho_R*(vel_R(idx1)*vel_R(idx1) + s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                              (1d0 - dir_flg(idx1))*vel_R(idx1)) - vel_R(idx1))))
                                        ! Geometrical source of the void fraction(s) is zero
                                        !$acc loop seq
                                        do i = advxb, advxe
