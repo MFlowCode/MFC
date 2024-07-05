@@ -547,11 +547,11 @@ Details of the acoustic source model can be found in [Maeda and Colonius (2017)]
 
   - `Mono(i)%support = 2` specifies a semi-infinite source plane in 2-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`)] that consists of this point. 
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`mymono_length`/2, `mymono_length`/2].
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`Mono(i)%length`/2, `Mono(i)%length`/2].
 
   - `Mono(i)%support = 3` specifies a semi-infinite source plane in 3-D simulation.
 The $i$-th source plane is determined by the point at [`Mono(i)%loc(1)`, `Mono(i)%loc(2)`, `Mono(i)%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%dir`), $\mathrm{sin}$(`Mono(i)%dir`), 1] that consists of this point.
-The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`mymono_length`/2, `mymono_length`/2].
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`Mono(i)%length`/2, `Mono(i)%length`/2].
 There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
 
 - `Mono(i)%support_width` defines how many cell width the monopole support function extended by.
@@ -734,16 +734,16 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 
 | #    | Name               | Dim.  | Smooth | Description |
 | ---: | :----:             | :---: |  :---: | :--- |
-| 1    | Line segment 	    | 1     | N      | Requires `x_centroid` and `x_length`. |
+| 1    | Line segment 	    | 1     | N      | Requires `x_centroid` and `length_x`. |
 | 2    | Circle 		    | 2     | Y      | Requires `[x,y]_centroid` and `radius`. |
-| 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `[x,y]_length`. |
+| 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
 | 6    | N/A 		    | 2     | N      | No longer exists. Empty. |
 | 7    | 2D analytical 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
-| 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `[x,y,z]_length`. |
-| 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `[x,y,z]_length`. |
+| 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
+| 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 3D analytical 	    | 3     | N      | Assigns the primitive variables as analytical functions |
