@@ -118,7 +118,7 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 
 The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
-- `[x,y,z]_domain%%[beg,end]` define the spatial domain in $x$, $y$, and $z$ Cartesian coordinates:
+- `[x,y,z]_domain%[beg,end]` define the spatial domain in $x$, $y$, and $z$ Cartesian coordinates:
 
 $$ x \in \left[ x \\_ domain \\% beg, x \\_ domain \\% end \right], y \in \left[ y \\_ domain \\% beg, y \\_ domain \\% end \right], z \in \left[ z \\_ domain \\% beg, z \\_ domain \\% end \right] $$
 
@@ -184,7 +184,7 @@ Ensure the data for the $k$-th time step is stored in the `restart_data/` direct
 | `model%%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
 | `model%%threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
 
-*: These parameters should be prepended with `patch_icpp(j)%%` where $j$ is the patch index. 
+*: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
 
 The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
@@ -262,20 +262,20 @@ Requisite combinations of the parameters for each type can be found in is listed
 For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a rectangular `patch(1)`:
   - `patch_icpp(1)%%geometry = 3`
   - `patch_icpp(2)%%geometry = 2`
-  - `patch_icpp(2)%%alter_patch(1)`=TRUE
+  - ``patch_icpp(2)%%alter_patch(1) = 'T'``
 
 - `smoothen` activates smoothening of the boundary of the patch that alters the existing patch.
 When smoothening occurs, fluids of the two patches are mixed in the region of the boundary.
-For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when `patch_icpp(2)smoothen`=TRUE.
+For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when ``patch_icpp(2)smoothen = 'T'``.
 `smooth_coeff` controls the thickness of the region of smoothening (sharpness of the mixture region).
 The default value of `smooth_coeff` is unity. The region of smoothening is thickened with decreasing the value.
 Optimal choice of the value of `smooth_coeff` is case-dependent and left to the user.
 
-- `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `texttt{patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
+- `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-algorithm).
 
-- 'model%%scale', 'model%%rotate` and `model%%translate` define how the model should be transformed to domain-space by first scaling by `model%%scale`, then rotating about the Z, X, and Y axes (using `model%%rotate`), and finally translating by `model%%translate`.
+- `model%%scale`, `model%%rotate` and `model%%translate` define how the model should be transformed to domain-space by first scaling by `model%%scale`, then rotating about the Z, X, and Y axes (using `model%%rotate`), and finally translating by `model%%translate`.
 
 ### 4. Immersed Boundary Patches
 
@@ -292,7 +292,7 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 | `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
 
-These parameters should be prepended with `patch_ib(j)%%` where $j$ is the patch index. 
+These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
 
 #### Parameter Descriptions
 
@@ -349,8 +349,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `bc_[x,y,z]%%beg[end]` | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
-| `bc_[x,y,z]%%vb[1,2,3]` ‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
-| `bc_[x,y,z]%%ve[1,2,3]` ‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
+| `bc_[x,y,z]%%vb[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
+| `bc_[x,y,z]%%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
@@ -375,14 +375,14 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
-- ‡ Options that work only with `bc_[x,y,z]%%[beg,end] = -15` and/or `bc_[x,y,z]%%[beg,end] = -16`
+- ‡ Options that work only with `bc_[x,y,z]%[beg,end] = -15` and/or `bc_[x,y,z]%[beg,end] = -16`.
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
 Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](references.md#Bryngelson19).
 Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](references.md#Coralic15).
 
-- `bc_[x,y,z]%%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
+- `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -12.
 See table [Boundary Conditions](#boundary-conditions) for details.
 
 - `bc_[x,y,z]%%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%beg = -16`.
@@ -480,7 +480,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
 | `num_probes`         | Integer | Number of probes	|
-| `probe(i)%%[x,y,z]`   | Real	 | Coordinates of probe $i$	|
+| `probe(i)%[x,y,z]`   | Real	 | Coordinates of probe $i$	|
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -506,7 +506,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `fd_order` specifies the order of the finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4.
 `fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes, respectively.
 
-- `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%%[x;y,z]`.
+- `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
 
 ### 8. Acoustic Source
@@ -589,8 +589,8 @@ Large `Mono(i)%%support_width` is preferred when `Mono(i)%%mag` is large.
 These options work only for gas-liquid two component flows.
 Component indexes are required to be 1 for liquid and 2 for gas.
 
-- \* These parameters should be pretended with patch index $1$ that is filled with liquid: `fluid_pp(1)%%`.
-- †  These parameters should be pretended with patch indexes that are respectively filled with liquid and gas: `fluid_pp(1)%%` and `fluid_pp(2)%%`.
+- \* These parameters should be pretended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
+- †  These parameters should be pretended with patch indexes that are respectively filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
 
 This table lists the ensemble-averaged bubble model parameters.
 
@@ -660,7 +660,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%%[beg,end] = -5`, and ``vel_profile = 'T'``.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and ``vel_profile = 'T'``.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -727,7 +727,7 @@ Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]
 *: This boundary condition is only used for `bc_y%%beg` when using cylindrical coordinates (``cyl_coord = 'T'`` and 3D). For axisymmetric problems, use `bc_y%%beg = -2` with ``cyl_coord = 'T'`` in 2D.
 
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
-Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
+Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
 
 ### Patch types
@@ -774,7 +774,7 @@ Each patch requires a different set of parameters, which are also listed in this
 
 
 
-### Monopole supports
+### Monopole Supports
 
 | #    | Description |
 | ---- | ----        |
