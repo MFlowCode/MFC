@@ -76,6 +76,8 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'cfl_dt': ParamType.LOG,
+    'n_start': ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):
@@ -204,6 +206,11 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'n_start': ParamType.INT,
+    't_stop': ParamType.REAL,
+    'n_save': ParamType.INT,
+    'cfl_dt': ParamType.LOG,
+    'cfl': ParamType.REAL
 })
 
 # NOTE: Not currently present
@@ -309,7 +316,10 @@ POST_PROCESS.update({
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
-    'ib': ParamType.LOG
+    'ib': ParamType.LOG,
+    'cfl_dt': ParamType.LOG,
+    'n_save': ParamType.INT,
+    'n_start': ParamType.INT,
 })
 
 for cmp_id in range(1,3+1):

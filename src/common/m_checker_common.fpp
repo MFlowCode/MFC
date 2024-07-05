@@ -58,14 +58,18 @@ contains
     !> Checks constraints on the time-stepping parameters.
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_time_stepping
-        if (t_step_start < 0) then
-            call s_mpi_abort('t_step_start must be non-negative. Exiting ...')
-        elseif (t_step_stop <= t_step_start) then
-            call s_mpi_abort('t_step_stop must be greater than t_step_start. '// &
-                             'Exiting ...')
-        elseif (t_step_save > t_step_stop - t_step_start) then
-            call s_mpi_abort('t_step_save must be less or equal to '// &
-                             '(t_step_stop - t_step_start). Exiting ...')
+        if (cfl_dt) then
+
+        else
+            if (t_step_start < 0) then
+                call s_mpi_abort('t_step_start must be non-negative. Exiting ...')
+            elseif (t_step_stop <= t_step_start) then
+                call s_mpi_abort('t_step_stop must be greater than t_step_start. '// &
+                                 'Exiting ...')
+            elseif (t_step_save > t_step_stop - t_step_start) then
+                call s_mpi_abort('t_step_save must be less or equal to '// &
+                                 '(t_step_stop - t_step_start). Exiting ...')
+            end if
         end if
     end subroutine s_check_inputs_time_stepping
 

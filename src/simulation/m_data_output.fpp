@@ -159,12 +159,22 @@ contains
         write (1, '(A)') ''; write (1, '(A)') ''
 
         ! Generating table header for the stability criteria to be outputted
-        if (any(Re_size > 0)) then
-            write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
-                'Max ==== VCFL Max ====== Rc Min ======='
+        if (cfl_dt) then
+            if (any(Re_size > 0)) then
+                write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== dt ===== Time '// &
+                    '============== ICFL Max ============='
+            end if
         else
-            write (1, '(A)') '=========== Time-steps ============== Time '// &
-                '============== ICFL Max ============='
+            if (any(Re_size > 0)) then
+                write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== Time '// &
+                    '============== ICFL Max ============='
+            end if
         end if
 
     end subroutine s_open_run_time_information_file
@@ -426,13 +436,13 @@ contains
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             if (any(Re_size > 0)) then
-                write (1, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
-                    t_step, t_step*dt, icfl_max_glb, &
+                    write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
-                    t_step, t_step*dt, icfl_max_glb
+                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
@@ -854,7 +864,11 @@ contains
 
         if (file_per_process) then
 
-            call s_int_to_str(t_step, t_step_string)
+            if (cfl_dt) then
+                call s_int_to_str(int(mytime/t_save), t_step_string)
+            else
+                call s_int_to_str(t_step, t_step_string)
+            end if
 
             ! Initialize MPI data I/O
 
@@ -880,7 +894,11 @@ contains
             call s_initialize_mpi_data(q_cons_vf)
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A,i7.7,A)') int(mytime/t_save), '_', proc_rank, '.dat'
+            else
+                write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -938,7 +956,11 @@ contains
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A)') t_step, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A)') int(mytime/t_save), '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -1002,8 +1024,6 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
-
-        call MPI_FILE_CLOSE(ifile, ierr)
 
 #endif
 

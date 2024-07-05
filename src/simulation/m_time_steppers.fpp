@@ -3,6 +3,7 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
+#:include 'inline_conversions.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
@@ -57,10 +58,12 @@ module m_time_steppers
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
 
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
+
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -78,13 +81,17 @@ module m_time_steppers
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: max_dt
+
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #endif
 
 contains
+
+    @:s_compute_speed_of_sound()
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -285,6 +292,10 @@ contains
             call s_open_run_time_information_file()
         end if
 
+        if (cfl_dt) then
+            @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+        end if
+
     end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
@@ -327,7 +338,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -436,7 +451,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -626,7 +645,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -914,6 +937,133 @@ contains
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
     end subroutine s_adaptive_dt_bubble
+
+    subroutine s_compute_dt()
+
+        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
+        real(kind(0d0)) :: rho        !< Cell-avg. density
+        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
+        real(kind(0d0)) :: pres       !< Cell-avg. pressure
+        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
+        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
+        real(kind(0d0)) :: c          !< Cell-avg. sound speed
+        real(kind(0d0)) :: E          !< Cell-avg. energy
+        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
+        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        real(kind(0d0)) :: blkmod1, blkmod2 !<
+            !! Fluid bulk modulus for Woods mixture sound speed
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp
+
+        integer :: i, j, k, l, q !< Generic loop iterators
+
+        real(kind(0d0)) :: dt_local
+
+        integer :: Nfq
+        real(kind(0d0)) :: fltr_dtheta   !<
+         !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        ! Computing Stability Criteria at Current Time-step ================
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+
+                    do i = 1, num_fluids
+                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                    end do
+
+                    if (bubbles) then
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    else
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    end if
+
+                    do i = 1, num_dims
+                        vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+                    end do
+
+                    vel_sum = 0d0
+                    do i = 1, num_dims
+                        vel_sum = vel_sum + vel(i)**2d0
+                    end do
+
+                    pres = q_prim_vf(E_idx)%sf(j, k, l)
+
+                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
+
+                    H = (E + pres)/rho
+
+                    ! Compute mixture sound speed
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+
+                    if (grid_geometry == 3) then
+                        if (k == 0) then
+                            fltr_dtheta = 2d0*pi*y_cb(0)/3d0
+                        elseif (k <= fourier_rings) then
+                            Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
+                            fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
+                        else
+                            fltr_dtheta = y_cb(k - 1)*dz(l)
+                        end if
+                    end if
+
+                    if (p > 0) then
+                        !3D
+                        if (grid_geometry == 3) then
+                            max_dt(j, k, l) = cfl*min(dx(j)/(abs(vel(1)) + c), &
+                                                      dy(k)/(abs(vel(2)) + c), &
+                                                      fltr_dtheta/(abs(vel(3)) + c))
+                        else
+                            max_dt(j, k, l) = cfl*min(dx(j)/(abs(vel(1)) + c), &
+                                                      dy(k)/(abs(vel(2)) + c), &
+                                                      dz(l)/(abs(vel(3)) + c))
+                        end if
+
+                    elseif (n > 0) then
+                        !2D
+                        max_dt(j, k, l) = cfl*min(dx(j)/(abs(vel(1)) + c), &
+                                                  dy(k)/(abs(vel(2)) + c))
+                    else
+                        !1D
+                        max_dt(j, k, l) = cfl*(dx(j)/(abs(vel(1)) + c))
+
+                    end if
+                end do
+            end do
+        end do
+        ! END: Computing Stability Criteria at Current Time-step ===========
+
+#ifdef CRAY_ACC_WAR
+        !$acc update host(max_dt)
+        dt_local = minval(max_dt)
+#else
+        !$acc kernels
+        dt_local = minval(max_dt)
+        !$acc end kernels
+#endif
+
+        if (num_procs == 1) then
+            dt = dt_local
+        else
+            call s_mpi_allreduce_min(dt_local, dt)
+        end if
+
+        !$acc update device(dt)
+
+    end subroutine s_compute_dt
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage

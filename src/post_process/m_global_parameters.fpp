@@ -76,6 +76,13 @@ module m_global_parameters
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
 
+    !> @name IO options for adaptive time-stepping
+    !> @{
+    logical :: cfl_dt
+    integer :: n_save
+    integer :: n_start
+    !> @}
+
     ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data
     ! of the defragmented computational domain. They are only used in 1D. For
     ! serial simulations, they are equal to m, x_cb and x_cc, respectively.
@@ -278,6 +285,10 @@ contains
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
+
+        cfl_dt = .false.
+        n_save = dflt_int
+        n_start = dflt_int
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

@@ -27,6 +27,9 @@ module m_global_parameters
     integer :: t_step_old, t_step_start  !< Existing IC/grid folder
     ! ==========================================================================
 
+    logical :: cfl_dt
+    integer :: n_start
+
     ! Computational Domain Parameters ==========================================
 
     integer :: proc_rank !< Rank of the local processor
@@ -239,6 +242,9 @@ contains
         old_ic = .false.
         t_step_old = dflt_int
         t_step_start = dflt_int
+
+        cfl_dt = .false.
+        n_start = dflt_int
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0

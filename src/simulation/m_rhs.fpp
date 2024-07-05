@@ -789,7 +789,12 @@ contains
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
+
         ! ==================================================================
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub)

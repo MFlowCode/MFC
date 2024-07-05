@@ -74,7 +74,8 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, ib
+            relax_model, cf_wrt, sigma, adv_n, ib, &
+            cfl_dt, n_save, n_start
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -100,6 +101,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            n_save = n_save + 1
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else
@@ -142,11 +145,17 @@ contains
 
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
-                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                (t_step - t_step_start)/t_step_save + 1, &
-                (t_step_stop - t_step_start)/t_step_save + 1, &
-                t_step
+            if (cfl_dt) then
+                print '(" ["I3"%]  Saving "I8" of "I0"")', &
+                    int(ceiling(100d0*(real(t_step - n_start)/(n_save)))), &
+                    t_step, n_save
+            else
+                print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                    int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    (t_step - t_step_start)/t_step_save + 1, &
+                    (t_step_stop - t_step_start)/t_step_save + 1, &
+                    t_step
+            end if
         end if
 
         ! Populating the grid and conservative variables

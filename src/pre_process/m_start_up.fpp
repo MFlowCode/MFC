@@ -141,7 +141,7 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n
+            sigma, adv_n, cfl_dt, n_start
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -666,7 +666,11 @@ contains
         integer :: i
 
         ! Open the file to read
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
+        if (cfl_dt) then
+            write (file_loc, '(I0,A)') n_start, '.dat'
+        else
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+        end if
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
