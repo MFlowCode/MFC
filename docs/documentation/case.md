@@ -279,17 +279,17 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 
 ### 4. Immersed Boundary Patches
 
-| Parameter            | Type    | Analytical Definition Description |
-| ---:                 | :----:  | :----:                | 
+| Parameter            | Type    | Description |
+| ---:                 | :----:  | :---                | 
 | `geometry`             | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`      | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`        | Real    | Length, if applicable, in the [x,y,z]-direction. |
 | `radius`               | Real    | Radius, if applicable, of the applied geometry. |
 | `theta`                | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                    | Real    | 
-| `t`                    | Real    |
-| `m`                    | Real    | 
-| `p`                    | Real    |
+| `c`                    | Real    | NACA airfoil parameters (see below) | 
+| `t`                    | Real    | NACA airfoil parameters (see below) |
+| `m`                    | Real    | NACA airfoil parameters (see below) |
+| `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
@@ -374,7 +374,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 
 - \* Options that work only with `model_eqns =2`.
-- † Options that work only with `cyl_coord = 'F'`.
+- † Options that work only with ``cyl_coord = 'F'``.
 - ‡ Options that work only with `bc_[x,y,z]%[beg,end] = -15` and/or `bc_[x,y,z]%[beg,end] = -16`
 
 The table lists simulation algorithm parameters.
@@ -405,7 +405,7 @@ If this parameter is set false, the void fraction of $N$-th component is compute
 $$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
 
 where $\alpha_i$ is the void fraction of $i$-th component.
-When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
+When a single-component flow is simulated, it requires that ``adv_alphan = 'T'``.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
@@ -416,7 +416,7 @@ When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires `bubbles = 'T'`, `polytropic = 'T'`, `adv_n = 'T'` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
@@ -657,7 +657,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and `vel_profile = 'T'`.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and ``vel_profile = 'T'``.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -721,7 +721,7 @@ Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]
 |  -15 | Normal         | Slip wall |
 |  -16 | Normal         | No-slip wall |
 
-*: This boundary condition is only used for `bc_y%beg` when using cylindrical coordinates (`cyl_coord = 'T'` and 3D). For axisymmetric problems, use `bc_y%beg = -2` with `cyl_coord = 'T'` in 2D.
+*: This boundary condition is only used for `bc_y%beg` when using cylindrical coordinates (``cyl_coord = 'T'`` and 3D). For axisymmetric problems, use `bc_y%beg = -2` with ``cyl_coord = 'T'`` in 2D.
 
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).

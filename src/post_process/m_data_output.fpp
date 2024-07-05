@@ -442,7 +442,7 @@ contains
             ! Creating formatted database slave file at the above location
             ! and setting up the structure of the file and its header info
             ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                            DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
+                            DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
                             DB_HDF5, dbfile)
 
             ! Verifying that the creation and setup process of the formatted
@@ -463,7 +463,7 @@ contains
                 file_loc = trim(rootdir)//trim(file_loc)
 
                 ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                                DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
+                                DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
                                 DB_HDF5, dbroot)
 
                 if (dbroot == -1) then

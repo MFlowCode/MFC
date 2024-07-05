@@ -49,7 +49,6 @@ t_step_stop     = int(Nt)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================================
-    # 'case_dir'                      : '\'.\'',
     'run_time_info'                 : 'T',
     # ==========================================================================
 
