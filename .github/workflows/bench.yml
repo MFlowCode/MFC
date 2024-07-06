@@ -3,6 +3,21 @@ name: 'Benchmark'
 on: pull_request
 
 jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
   self:
     name: Georgia Tech | Phoenix (NVHPC)
     if: github.repository == 'MFlowCode/MFC'
