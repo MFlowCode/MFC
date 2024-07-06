@@ -948,11 +948,13 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
-        idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
+
+              idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
                 ! 6-EQUATION MODEL WITH HLLC 
                 if (model_eqns == 3) then
                     !ME3
@@ -1186,8 +1188,8 @@ contains
 
                                 ! goes with the numerical velocity in x/y/z directions
                                 ! xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
-                                xi_MP = max(0d0, sign(1d0, s_L))
-                                xi_PP = min(0d0, sign(1d0, s_R))
+                                xi_MP = -min(0d0,sign(1d0,s_L))
+                                xi_PP = max(0d0,sign(1d0,s_R));
 
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
@@ -1213,10 +1215,11 @@ contains
                                 ! ENERGY FLUX.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                   xi_M*( vel_L(idx1)*(E_L + pres_L) + & 
-                                      s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) + &
-                                   xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                      s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
+                                   xi_M*(vel_L(idx1)*(E_L + pres_L) + &
+                                    s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) &
+                                 + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
+                                    s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
+
 
                                 ! ELASTICITY. Elastic shear stress terms for the momentum and energy flux
                                 if (elasticity) then
@@ -1249,11 +1252,9 @@ contains
                                 ! VOLUME FRACTION FLUX.
                                 !$acc loop seq
                                 do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                  flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                    xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*s_S + &
+                                    xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*s_S
                                 end do
 
                                 ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
@@ -1274,19 +1275,20 @@ contains
 
                                 ! INTERNAL ENERGIES ADVECTION FLUX.
                                 ! K-th pressure and velocity in preparation for the internal energy flux
-                                p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
-                                           xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_L)+pres_L)+ & 
-                                           xi_P*(xi_PP*((pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
-                                           xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_R)+pres_R)
-                                vel_K_Star = xi_M*(xi_MP*(vel_L(dir_idx(1))-s_S) + s_S) + & 
-                                             xi_R*(xi_PP*(vel_R(dir_idx(1))-s_S) + s_S)
+                                vel_K_Star = vel_L(idx1)*(1d0-xi_MP) + xi_MP*vel_R(idx1) + &  
+                                             xi_MP*xi_PP*(s_S-vel_R(idx1))
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                        (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
-                                        (gammas(i)*p_K_Star + pi_infs(i)) + &
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
-                                        qvs(i))*vel_K_Star
+                                  p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
+                                    xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_L)+pres_L)+ & 
+                                    xi_P*(xi_PP*((pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
+                                    xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))-pres_R)+pres_R)
+
+                                  flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
+                                    (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
+                                    (gammas(i)*p_K_Star + pi_infs(i)) + &
+                                    qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
+                                    qvs(i))*vel_K_Star
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
