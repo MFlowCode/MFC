@@ -57,7 +57,7 @@ contains
     subroutine s_generate_serial_grid
 
         ! Generic loop iterator
-        integer :: i, j             !< generic loop operatorss
+        integer :: i, j             !< generic loop operators
         real(kind(0d0)) :: length   !< domain lengths
 
         ! Grid Generation in the x-direction ===============================
