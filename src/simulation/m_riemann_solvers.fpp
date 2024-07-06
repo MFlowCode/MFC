@@ -1135,7 +1135,7 @@ contains
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
-                                    if (hypoelasticity) then
+                                    if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                            (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
                                            (((4d0*G_R)/3d0) + tau_e_R(dir_idx_tau(1)))/rho_R))
@@ -1189,7 +1189,7 @@ contains
                                 ! goes with the numerical velocity in x/y/z directions
                                 ! xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
                                 xi_MP = -min(0d0,sign(1d0,s_L))
-                                xi_PP = max(0d0,sign(1d0,s_R));
+                                xi_PP = max(0d0,sign(1d0,s_R))
 
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
@@ -1262,8 +1262,8 @@ contains
                                 do i = 1, num_dims
                                    idxi = dir_idx(i)
                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
-                                      xi_M*(vel_L(idxi) + dir_flg(idxi)*s_M*(xi_L - 1d0)) + &
-                                      xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
+                                     xi_M*(vel_L(idxi)+dir_flg(idxi)*(s_S*(xi_MP*(xi_L-1) + 1)-vel_L(idxi))) + &
+                                     xi_P*(vel_R(idxi)+dir_flg(idxi)*(s_S*(xi_PP*(xi_R-1) + 1)-vel_R(idxi))) 
                                 end do
 
                                 ! SURFACE TENSION FLUX. need to check
@@ -1293,6 +1293,12 @@ contains
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
+                                ! correction pressure for the cylindrical terms
+                                p_Star = xi_M*( pres_L + xi_MP*rho_L*(s_L - & 
+                                           vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
+                                         xi_P*( pres_R + xi_PP*rho_R*(s_R - & 
+                                           vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
+
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                    if (cyl_coord) then
@@ -1306,11 +1312,8 @@ contains
                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                        end do
                                        ! Recalculating the radial momentum geometric source flux
-                                       flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + idx1) = &
-                                            xi_M*(rho_L*(vel_L(idx1)*vel_L(idx1) + s_M*(xi_L*(dir_flg(idx1)*s_S + &
-                                              (1d0 - dir_flg(idx1))*vel_L(idx1)) - vel_L(idx1)))) + &
-                                            xi_P*(rho_R*(vel_R(idx1)*vel_R(idx1) + s_P*(xi_R*(dir_flg(idx1)*s_S + &
-                                              (1d0 - dir_flg(idx1))*vel_R(idx1)) - vel_R(idx1))))
+                                       flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
+                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
                                        ! Geometrical source of the void fraction(s) is zero
                                        !$acc loop seq
                                        do i = advxb, advxe
@@ -1324,11 +1327,8 @@ contains
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                         end do
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
-                                            -xi_M*(rho_L*(vel_L(idx1)*vel_L(idx1) + s_M*(xi_L*(dir_flg(idx1)*s_S + & 
-                                               (1d0 - dir_flg(idx1))*vel_L(idx1)) - vel_L(idx1)))) &
-                                            -xi_P*(rho_R*(vel_R(idx1)*vel_R(idx1) + s_P*(xi_R*(dir_flg(idx1)*s_S + &
-                                               (1d0 - dir_flg(idx1))*vel_R(idx1)) - vel_R(idx1))))
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) = &
+                                          flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(1)) - p_Star
 
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
                                     end if
