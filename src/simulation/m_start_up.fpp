@@ -195,7 +195,7 @@ contains
             n_glb = n
             p_glb = p
 
-            n_save = n_save + 1
+            if (cfl_dt) n_save = n_save + 1
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1138,6 +1138,8 @@ contains
 
         if (cfl_dt) call s_compute_dt()
 
+        mytime = mytime + dt
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -1152,7 +1154,6 @@ contains
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
 
-        mytime = mytime + dt
         t_step = t_step + 1
 
     end subroutine s_perform_time_step

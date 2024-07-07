@@ -102,7 +102,7 @@ contains
             n_glb = n
             p_glb = p
 
-            n_save = n_save + 1
+            if (cfl_dt) n_save = n_save + 1
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else
