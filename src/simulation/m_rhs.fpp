@@ -798,9 +798,9 @@ contains
         !print *, "I got here B"
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-        if (hyperelasticity) then
+        !if (hyperelasticity) then
             !   call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-        end if
+        !end if
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")

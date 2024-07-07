@@ -1274,7 +1274,7 @@ contains
         call acc_present_dump()
 #endif
 
-        if (elasticity) call s_initialize_hypoelastic_module()
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1425,7 +1425,7 @@ contains
         s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
-        if (elasticity) call s_finalize_hypoelastic_module() 
+        if (hypoelasticity) call s_finalize_hypoelastic_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()

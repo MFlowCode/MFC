@@ -923,6 +923,8 @@ contains
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: flux_ene_e
+
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -957,7 +959,7 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R) copyin(is1,is2,is3)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1072,6 +1074,7 @@ contains
                                         G_L = G_L + alpha_L(i)*Gs(i)
                                         G_R = G_R + alpha_R(i)*Gs(i)
                                     end do
+                                    !$acc loop seq
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
@@ -1089,7 +1092,7 @@ contains
                                 ! ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
                                     G_L = 0d0; G_R = 0d0; 
-                                    !$acc loop seq
+                                    !$acc loop seq reduction(+:G_L,G_R)
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -1201,7 +1204,7 @@ contains
 
                                 ! MOMENTUM FLUX.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq
+                                !$acc loop seq private(idxi)
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
@@ -1221,20 +1224,26 @@ contains
 
                                 ! ELASTICITY. Elastic shear stress terms for the momentum and energy flux
                                 if (elasticity) then
-                                    !$acc loop seq
+                                  flux_ene_e = 0d0;
+                                    !$acc loop seq private(idxi) 
                                     do i = 1, num_dims
                                         idxi = dir_idx(i)
                                         ! MOMENTUM ELASTIC FLUX.
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
                                             - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
-                                        ! ENERGY ELASTIC FLUX.
-                                        flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) - &
-                                                                            xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
-                                                                                  s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                                                            xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
-                                                                                  s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                     end do
+                                    ! ENERGY ELASTIC FLUX.
+                                    !$acc loop seq private(idxi) reduction(+:flux_ene_e)
+                                    do i = 1, num_dims
+                                        idxi = dir_idx(i)
+                                        flux_ene_e = flux_ene_e - &
+                                          xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
+                                          s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
+                                          xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
+                                          s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                    end do
+                                  flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
                                 end if
 
                                 ! HYPOELASTIC STRESS EVOLUTION FLUX.
@@ -1256,7 +1265,7 @@ contains
                                 end do
 
                                 ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
-                                !$acc loop seq
+                                !$acc loop seq private(idxi)
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
