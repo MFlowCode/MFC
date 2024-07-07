@@ -1,20 +1,6 @@
 name: 'Test Suite'
 
-on:
-  push:
-    paths:
-      - '**.f90'
-      - '**.fpp'
-      - '**.py'
-      - '**.yml'
-      - 'mfc.sh'
-      - 'golden.txt'
-      - 'CMakeLists.txt'
-      - 'requirements.txt'
-
-  pull_request:
-
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
     
 jobs:
   file-changes:
