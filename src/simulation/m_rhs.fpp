@@ -254,7 +254,7 @@ contains
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
-        !@:ALLOCATE(q_btensor%vf(1:b_size))
+        @:ALLOCATE(q_btensor%vf(1:b_size))
 
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -278,11 +278,14 @@ contains
 
         end if
 
-        !do l = 1, b_size
-        !    @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        !end do
+        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
-        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp, q_btensor)
+        if (hyperelasticity) then 
+          do l = 1, b_size
+            @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+          end do
+          @:ACC_SETUP_VFs(q_btensor)
+        end if
 
         do l = 1, cont_idx%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
@@ -792,8 +795,13 @@ contains
             q_cons_qp%vf, &
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
-            ix, iy, iz, &
-            q_btensor%vf)
+            ix, iy, iz)
+!        call s_convert_conservative_to_primitive_variables( &
+!            q_cons_qp%vf, &
+!            q_prim_qp%vf, &
+!            gm_alpha_qp%vf, &
+!            ix, iy, iz, &
+!            q_btensor%vf)
         call nvtxEndRange
         !print *, "I got here B"
 

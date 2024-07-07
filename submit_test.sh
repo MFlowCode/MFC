@@ -8,7 +8,7 @@
 #./mfc.sh run ./examples/3D_ctr_test/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t simulation -c delta
 #./mfc.sh run ./examples/3D_ctr_test/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t post_process -c delta
 
-#./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test4/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t pre_process -c delta
+./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test4/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t pre_process -c delta
 ./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test4/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t simulation -c delta
 #./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test4/case.py -p batch -N 1 -n 2 -g 0 -w 01:00:00 -# test1 -t post_process -c delta
 
