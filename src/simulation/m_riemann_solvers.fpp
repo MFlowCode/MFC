@@ -959,7 +959,7 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R, flux_ene_e)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1092,7 +1092,7 @@ contains
                                 ! ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
                                     G_L = 0d0; G_R = 0d0; 
-                                    !$acc loop seq reduction(+:G_L,G_R)
+                                    !$acc loop seq 
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
                                         G_L = G_L + alpha_L(i)*Gs(i)
@@ -1139,11 +1139,11 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                        (((4d0*G_R)/3d0) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                        (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                        (((4d0*G_R)/3d0) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4d0*G_R)/3d0) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                        (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                        (((4d0*G_R)/3d0) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                        (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -1204,14 +1204,14 @@ contains
 
                                 ! MOMENTUM FLUX.
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                !$acc loop seq private(idxi)
+                                !$acc loop seq 
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                                          (1d0 - dir_flg(idxi))*vel_L(idxi)) - vel_L(idxi))) + dir_flg(idxi)*(pres_L)) + &
-                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(idxi) + s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                                          (1d0 - dir_flg(idxi))*vel_R(idxi)) - vel_R(idxi))) + dir_flg(idxi)*(pres_R))
+                                    !idxi = dir_idx(i)
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(dir_idx(i)) + s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+             (1d0 - dir_flg(dir_idx(i)))*vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_L)) + &
+                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(dir_idx(i)) + s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+             (1d0 - dir_flg(dir_idx(i)))*vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_R))
                                 end do
 
                                 ! ENERGY FLUX.
@@ -1223,37 +1223,29 @@ contains
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
 
                                 ! ELASTICITY. Elastic shear stress terms for the momentum and energy flux
-                                if (elasticity) then
-                                  flux_ene_e = 0d0;
-                                    !$acc loop seq private(idxi) 
-                                    do i = 1, num_dims
-                                        idxi = dir_idx(i)
-                                        ! MOMENTUM ELASTIC FLUX.
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                            flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
-                                            - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
-                                    end do
-                                    ! ENERGY ELASTIC FLUX.
-                                    !$acc loop seq private(idxi) reduction(+:flux_ene_e)
-                                    do i = 1, num_dims
-                                        idxi = dir_idx(i)
-                                        flux_ene_e = flux_ene_e - &
-                                          xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
-                                          s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                          xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
-                                          s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
-                                    end do
-                                  flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
-                                end if
-
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
                                 if (hypoelasticity) then
-                                    !$acc loop seq
-                                    do i = 1, strxe - strxb + 1
-                                        flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
-                                            xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
-                                            xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
-                                    end do
+                                  flux_ene_e = 0d0;
+                                  !$acc loop seq
+                                  do i = 1, num_dims
+                                    ! MOMENTUM ELASTIC FLUX.
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                      flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) &
+                                      - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
+                                    ! ENERGY ELASTIC FLUX.
+                                    flux_ene_e = flux_ene_e - &
+                                      xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + &
+                                      s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
+                                      xi_P*(vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) + &
+                                      s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                  end do
+                                  flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
+                                  ! HYPOELASTIC STRESS EVOLUTION FLUX.
+                                  !$acc loop seq
+                                  do i = 1, strxe - strxb + 1
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
+                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
+                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
+                                  end do
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
@@ -1265,12 +1257,12 @@ contains
                                 end do
 
                                 ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
-                                !$acc loop seq private(idxi)
+                                !$acc loop seq 
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
-                                        xi_M*(vel_L(idxi) + dir_flg(idxi)*(s_S*(xi_MP*(xi_L - 1) + 1) - vel_L(idxi))) + &
-                                        xi_P*(vel_R(idxi) + dir_flg(idxi)*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(idxi)))
+                                    !idxi = dir_idx(i)
+                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
+                              xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_MP*(xi_L - 1) + 1) - vel_L(dir_idx(i)))) + &
+                              xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(dir_idx(i))))
                                 end do
 
                                 ! SURFACE TENSION FLUX. need to check
