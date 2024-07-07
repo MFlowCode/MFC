@@ -131,28 +131,28 @@ Ms = math.sqrt( ( gamwa + 1. ) / ( 2. * gamwa ) * ( p02Op01 - 1. ) * ( p02 / ( p
 ss = Ms * c_a1
 
 ### volume fractions for each of the patches ###
-C0 = 0.5 # vapor concentration for IMR
+C0 = 0.1 # vapor concentration for IMR
 
 # patch 1: liquid water
 liq_wv = 1.00E-15
-liq_wg = 0.
+liq_wg = 1.00E-15
 liq_wa = 1.00E-15
 liq_wl = 1.00E00 - liq_wv - liq_wa - liq_wg
 # water vapor
 vap_wl = 1.00E-15
 vap_wv = 1 / ( ( 1 - C0 ) / C0 * rho0wv2 / rho0wa2 + 1 )
-vap_wg = 0.
+vap_wg = 1.00E-15
 vap_wa = 1.00E-15
 vap_tot = vap_wl + vap_wv + vap_wa + vap_wg
 # bub
 bub_wl = 1.00E-15
 bub_wv = vap_tot
-bub_wg = 0.
+bub_wg = 1.00E-15
 bub_wa = 1.00E00 - bub_wl - bub_wv - bub_wg
 # gel
-gel_wv = 0.
-gel_wl = 0.
-gel_wa = 0.
+gel_wv = 1.00E-15
+gel_wl = 1.00E-15
+gel_wa = 1.00E-15
 gel_wg = 1.00E00 - gel_wl - gel_wv - gel_wa
 
 ## SIMULATION PARAMETERS
@@ -165,7 +165,7 @@ R0 = 230.4E-06
 
 # number of elements
 Nx0 = 400
-Nx = 399
+Nx = 199*2
 Ny = 199
 Nz = 199
 
