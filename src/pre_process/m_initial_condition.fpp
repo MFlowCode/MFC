@@ -257,7 +257,7 @@ contains
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
-             
+
                 end if
                 !> @}
             end do

@@ -599,7 +599,7 @@ contains
                 end if
             end if
 
-            if (hypoelasticity .or. hyperelasticity) then 
+            if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2

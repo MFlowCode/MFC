@@ -240,9 +240,9 @@ contains
     subroutine s_check_inputs_hypoelasticity
         if (riemann_solver == 3) then
             call s_mpi_abort('hypoelasticity requires HLL '// &
-                            '(riemann_solver = 1) or HLLC '// &
-                            '(riemann_solver = 2) Riemann solver. '// &
-                            'Exiting ...')
+                             '(riemann_solver = 1) or HLLC '// &
+                             '(riemann_solver = 2) Riemann solver. '// &
+                             'Exiting ...')
         end if
     end subroutine
 

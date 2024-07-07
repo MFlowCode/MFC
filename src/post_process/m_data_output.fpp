@@ -988,7 +988,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
         real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb 
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
@@ -998,7 +998,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                            maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1006,7 +1006,7 @@ contains
 
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         do l = 0, p
-            if (z_cc(l) .lt. dz(l) .and. z_cc(l) .gt. 0) then
+            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
                 cent = l
             end if
         end do
@@ -1017,8 +1017,8 @@ contains
                 axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
                 ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
                 aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
-                if ((axp .gt. thres .and. axm .lt. thres) .or. (axp .lt. thres .and. axm .gt. thres) &
-                    .or. (ayp .gt. thres .and. aym .lt. thres) .or. (ayp .lt. thres .and. aym .gt. thres)) then
+                if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
+                    .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
@@ -1029,7 +1029,7 @@ contains
                         euc_d = dsqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                         tgp = dsqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
-                            if (euc_d .lt. tgp) then
+                            if (euc_d < tgp) then
                                 cycle OLoop
                             elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
                                 !artificial bounding on the interface for bubble at a centroid.
@@ -1044,7 +1044,6 @@ contains
                 end if
             end do OLoop
         end do
-
 
         allocate (y_d(counter))
         allocate (x_d(counter))
@@ -1066,9 +1065,7 @@ contains
                         x_td(i), y_td(i), 0d0
                 end if
             end do
-         end if
-
-        
+        end if
 
     end subroutine s_write_intf_data_file ! -----------------------------------
 
@@ -1094,48 +1091,48 @@ contains
         dV = 0d0
         pres_av = 0d0
         pres = 0d0
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        pres = 0d0
-                        dV = dx(i)*dy(j)*dz(k)
-                        rho = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
-                        pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
-                        do s = 1, num_dims
-                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            if (dabs(vel(s)) > maxvel) then
-                                maxvel = dabs(vel(s))
-                            end if
-                        end do
-                        do l = 1, adv_idx%end - E_idx
-                            adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
-                            gamma = gamma + adv(l)*fluid_pp(l)%gamma
-                            pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
-                            rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        end do
-
-                        H = ((gamma + 1d0)*pres + pi_inf)/rho
-
-                        call s_compute_speed_of_sound(pres, rho, &
-                                                      gamma, pi_inf, &
-                                                      H, adv, 0d0, c)
-
-                        Ma = maxvel/c
-                        if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
-                            MaxMa = Ma
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    pres = 0d0
+                    dV = dx(i)*dy(j)*dz(k)
+                    rho = 0d0
+                    gamma = 0d0
+                    pi_inf = 0d0
+                    pres = q_prim_vf(E_idx)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                    do s = 1, num_dims
+                        vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                        Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        if (dabs(vel(s)) > maxvel) then
+                            maxvel = dabs(vel(s))
                         end if
-                        Vl = Vl + adv(1)*dV
-                        Vb = Vb + adv(2)*dV
-                        pres_av = pres_av + adv(1)*pres*dV
-                        Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
                     end do
+                    do l = 1, adv_idx%end - E_idx
+                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                        gamma = gamma + adv(l)*fluid_pp(l)%gamma
+                        pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
+                        rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
+                    end do
+
+                    H = ((gamma + 1d0)*pres + pi_inf)/rho
+
+                    call s_compute_speed_of_sound(pres, rho, &
+                                                  gamma, pi_inf, &
+                                                  H, adv, 0d0, c)
+
+                    Ma = maxvel/c
+                    if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
+                        MaxMa = Ma
+                    end if
+                    Vl = Vl + adv(1)*dV
+                    Vb = Vb + adv(2)*dV
+                    pres_av = pres_av + adv(1)*pres*dV
+                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
                 end do
             end do
+        end do
 
         tmp = pres_av
         call s_mpi_allreduce_sum(tmp, pres_av)

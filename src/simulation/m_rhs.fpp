@@ -77,7 +77,7 @@ module m_rhs
     type(vector_field) :: q_prim_qp !<
     !$acc declare create(q_prim_qp)
 
-    !! The btensor at the cell-interior Gaussian quadrature points. 
+    !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: q_btensor !<
     !$acc declare create(q_btensor)
@@ -798,9 +798,9 @@ contains
         !print *, "I got here B"
 
         call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-          if ( hyperelasticity ) then
-          !   call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-          end if
+        if (hyperelasticity) then
+            !   call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
+        end if
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")

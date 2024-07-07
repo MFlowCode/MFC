@@ -335,10 +335,10 @@ contains
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
 
                     if (c /= c) then
-                        print *, 'crashed at processor: ', proc_rank,', at j :: ',j,', k :: ',k,' l :: ',l
-                        print *, 'alpha1 ::', alpha(1),'and alpha2 ::',alpha(2), ' alpha3 :: ',alpha(3)
-                        print *, 'alpha_rho1 ::', alpha_rho(1),', alpha_rho2 ::',alpha_rho(2), ' alpha_rho3 :: ',alpha_rho(3)
-			print *, 'E :: ',E,', pres :: ',pres,', rho :: ',rho
+                        print *, 'crashed at processor: ', proc_rank, ', at j :: ', j, ', k :: ', k, ' l :: ', l
+                        print *, 'alpha1 ::', alpha(1), 'and alpha2 ::', alpha(2), ' alpha3 :: ', alpha(3)
+                        print *, 'alpha_rho1 ::', alpha_rho(1), ', alpha_rho2 ::', alpha_rho(2), ' alpha_rho3 :: ', alpha_rho(3)
+                        print *, 'E :: ', E, ', pres :: ', pres, ', rho :: ', rho
                         call s_mpi_abort('Exiting ...')
                     end if
 

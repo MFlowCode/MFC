@@ -466,20 +466,20 @@ contains
                 theta = atan2(y_cc(k), x_cc(j))
                 phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
                 !spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1d0)**(1d0/3d0)                 
+                xi_sph = (rcoord**3 - R0ref**3 + 1d0)**(1d0/3d0)
                 xi_cart(1) = xi_sph*sin(phi)*cos(theta)
                 xi_cart(2) = xi_sph*sin(phi)*sin(theta)
                 xi_cart(3) = xi_sph*cos(phi)
-            else 
+            else
                 xi_cart(1) = x_cc(j)
                 xi_cart(2) = y_cc(k)
                 xi_cart(3) = z_cc(l)
             end if
-            
+
             ! assigning the reference map to the q_prim vector field
             do i = 1, num_dims
-                q_prim_vf(i+xibeg-1)%sf(j,k,l) = eta*xi_cart(i) + &
-                    (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
+                q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
+                                                       (1d0 - eta)*orig_prim_vf(i + stress_idx%beg - 1)
             end do
 
         end if

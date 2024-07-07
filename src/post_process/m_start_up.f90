@@ -74,7 +74,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, ib, sim_data, & 
+            relax_model, cf_wrt, sigma, adv_n, ib, sim_data, &
             hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
@@ -324,7 +324,7 @@ contains
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-                        write (varname, '(A,I0)') 'tau', i
+                    write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
@@ -337,7 +337,7 @@ contains
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-                        write (varname, '(A,I0)') 'xi', i
+                    write (varname, '(A,I0)') 'xi', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
@@ -658,7 +658,6 @@ contains
             call s_close_intf_data_file()
             call s_close_energy_data_file()
         end if
-
 
         ! Closing the formatted database file
         call s_close_formatted_database_file()
