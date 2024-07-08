@@ -5,12 +5,12 @@
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), intent(IN) :: pres
-        real(kind(0d0)), intent(IN) :: rho, gamma, pi_inf
-        real(kind(0d0)), intent(IN) :: H
-        real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
-        real(kind(0d0)), intent(IN) :: vel_sum
-        real(kind(0d0)), intent(OUT) :: c
+        real(kind(0d0)), intent(in) :: pres
+        real(kind(0d0)), intent(in) :: rho, gamma, pi_inf
+        real(kind(0d0)), intent(in) :: H
+        real(kind(0d0)), dimension(num_fluids), intent(in) :: adv
+        real(kind(0d0)), intent(in) :: vel_sum
+        real(kind(0d0)), intent(out) :: c
 
         real(kind(0d0)) :: blkmod1, blkmod2
 

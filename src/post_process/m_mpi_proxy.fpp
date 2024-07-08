@@ -50,7 +50,7 @@ contains
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_mpi_proxy_module() ! ------------------------------
+    subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -139,14 +139,14 @@ contains
 
 #endif
 
-    end subroutine s_initialize_mpi_proxy_module ! ----------------------------
+    end subroutine s_initialize_mpi_proxy_module
 
     !>  Since only processor with rank 0 is in charge of reading
         !!      and checking the consistency of the user provided inputs,
         !!      these are not available to the remaining processors. This
         !!      subroutine is then in charge of broadcasting the required
         !!      information.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
         integer :: i !< Generic loop iterator
@@ -168,7 +168,7 @@ contains
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
-            & 'adv_n' ]
+            & 'adv_n', 'ib' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -195,14 +195,14 @@ contains
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !>  This subroutine takes care of efficiently distributing
         !!      the computational domain among the available processors
         !!      as well as recomputing some of the global parameters so
         !!      that they reflect the configuration of sub-domain that
         !!      is overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -638,7 +638,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
     !>  Communicates the buffer regions associated with the grid
         !!      variables with processors in charge of the neighboring
@@ -649,8 +649,8 @@ contains
         !!  @param sweep_coord Coordinate direction normal to the processor boundary
     subroutine s_mpi_sendrecv_grid_vars_buffer_regions(pbc_loc, sweep_coord)
 
-        character(LEN=3), intent(IN) :: pbc_loc
-        character, intent(IN) :: sweep_coord
+        character(LEN=3), intent(in) :: pbc_loc
+        character, intent(in) :: sweep_coord
 
 #ifdef MFC_MPI
 
@@ -838,7 +838,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_grid_vars_buffer_regions ! ---------------
+    end subroutine s_mpi_sendrecv_grid_vars_buffer_regions
 
     !>  Communicates buffer regions associated with conservative
         !!      variables with processors in charge of the neighboring
@@ -851,11 +851,11 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf
+            intent(inout) :: q_cons_vf
 
-        character(LEN=3), intent(IN) :: pbc_loc
+        character(LEN=3), intent(in) :: pbc_loc
 
-        character, intent(IN) :: sweep_coord
+        character, intent(in) :: sweep_coord
 
 #ifdef MFC_MPI
 
@@ -1403,7 +1403,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_cons_vars_buffer_regions ! ---------------
+    end subroutine s_mpi_sendrecv_cons_vars_buffer_regions
 
     !>  This subroutine gathers the Silo database metadata for
         !!      the spatial extents in order to boost the performance of
@@ -1411,9 +1411,9 @@ contains
         !!  @param spatial_extents Spatial extents for each processor's sub-domain. First dimension
         !!  corresponds to the minimum and maximum values, respectively, while
         !!  the second dimension corresponds to the processor rank.
-    subroutine s_mpi_gather_spatial_extents(spatial_extents) ! -------------
+    subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
+        real(kind(0d0)), dimension(1:, 0:), intent(inout) :: spatial_extents
 
 #ifdef MFC_MPI
 
@@ -1523,14 +1523,14 @@ contains
 
 #endif
 
-    end subroutine s_mpi_gather_spatial_extents ! --------------------------
+    end subroutine s_mpi_gather_spatial_extents
 
     !>  This subroutine collects the sub-domain cell-boundary or
         !!      cell-center locations data from all of the processors and
         !!      puts back together the grid of the entire computational
         !!      domain on the rank 0 processor. This is only done for 1D
         !!      simulations.
-    subroutine s_mpi_defragment_1d_grid_variable() ! -----------------------
+    subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
 
@@ -1556,7 +1556,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_defragment_1d_grid_variable ! ---------------------
+    end subroutine s_mpi_defragment_1d_grid_variable
 
     !>  This subroutine gathers the Silo database metadata for
         !!      the flow variable's extents as to boost performance of
@@ -1566,13 +1566,13 @@ contains
         !!   First dimension of array corresponds to the former's minimum and
         !!  maximum values, respectively, while second dimension corresponds
         !!  to each processor's rank.
-    subroutine s_mpi_gather_data_extents(q_sf, data_extents) ! -------------
+    subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
-        real(kind(0d0)), dimension(:, :, :), intent(IN) :: q_sf
+        real(kind(0d0)), dimension(:, :, :), intent(in) :: q_sf
 
         real(kind(0d0)), &
             dimension(1:2, 0:num_procs - 1), &
-            intent(INOUT) :: data_extents
+            intent(inout) :: data_extents
 
 #ifdef MFC_MPI
 
@@ -1588,7 +1588,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_gather_data_extents ! -----------------------------
+    end subroutine s_mpi_gather_data_extents
 
     !>  This subroutine gathers the sub-domain flow variable data
         !!      from all of the processors and puts it back together for
@@ -1596,15 +1596,15 @@ contains
         !!      This is only done for 1D simulations.
         !!  @param q_sf Flow variable defined on a single computational sub-domain
         !!  @param q_root_sf Flow variable defined on the entire computational domain
-    subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf) ! --------
+    subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(kind(0d0)), &
             dimension(0:m, 0:0, 0:0), &
-            intent(IN) :: q_sf
+            intent(in) :: q_sf
 
         real(kind(0d0)), &
             dimension(0:m_root, 0:0, 0:0), &
-            intent(INOUT) :: q_root_sf
+            intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
 
@@ -1617,10 +1617,10 @@ contains
 
 #endif
 
-    end subroutine s_mpi_defragment_1d_flow_variable ! ---------------------
+    end subroutine s_mpi_defragment_1d_flow_variable
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_mpi_proxy_module() ! ---------------------------
+    subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -1639,6 +1639,6 @@ contains
 
 #endif
 
-    end subroutine s_finalize_mpi_proxy_module ! -------------------------
+    end subroutine s_finalize_mpi_proxy_module
 
 end module m_mpi_proxy

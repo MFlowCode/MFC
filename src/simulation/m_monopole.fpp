@@ -1,6 +1,6 @@
 !>
-!! @file m_viscous.f90
-!! @brief Contains module m_viscous
+!! @file m_monopole.f90
+!! @brief Contains module m_monopole
 
 #:include 'macros.fpp'
 
@@ -15,10 +15,11 @@ module m_monopole
     use m_bubbles              !< Bubble dynamic routines
 
     use m_variables_conversion !< State variables type conversion procedures
+
+    use m_helper_basic           !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_monopole_module, s_monopole_calculations, &
- s_compute_monopole_rhs
+    private; public :: s_initialize_monopole_module, s_monopole_calculations
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
@@ -63,25 +64,45 @@ module m_monopole
 
 contains
 
-    subroutine s_initialize_monopole_module()
+    subroutine s_initialize_monopole_module
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE_GLOBAL(mag(1:num_mono), support(1:num_mono), length(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), loc_mono(1:3, 1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), support_width(1:num_mono))
 
         do i = 1, num_mono
-            mag(i) = mono(i)%mag
-            support(i) = mono(i)%support
-            length(i) = mono(i)%length
-            npulse(i) = mono(i)%npulse
-            pulse(i) = mono(i)%pulse
-            dir(i) = mono(i)%dir
-            delay(i) = mono(i)%delay
-            foc_length(i) = mono(i)%foc_length
-            aperture(i) = mono(i)%aperture
-            support_width(i) = mono(i)%support_width
             do j = 1, 3
                 loc_mono(j, i) = mono(i)%loc(j)
             end do
+            mag(i) = mono(i)%mag
+            support(i) = mono(i)%support
+            length(i) = mono(i)%length
+            foc_length(i) = mono(i)%foc_length
+            aperture(i) = mono(i)%aperture
+            if (mono(i)%npulse == dflt_int) then
+                npulse(i) = 1
+            else
+                npulse(i) = mono(i)%npulse
+            end if
+            if (mono(i)%pulse == dflt_int) then
+                pulse(i) = 1
+            else
+                pulse(i) = mono(i)%pulse
+            end if
+            if (f_is_default(mono(i)%dir)) then
+                dir(i) = 1d0
+            else
+                dir(i) = mono(i)%dir
+            end if
+            if (f_is_default(mono(i)%delay)) then
+                delay(i) = 0d0
+            else
+                delay(i) = mono(i)%delay
+            end if
+            if (f_is_default(mono(i)%support_width)) then
+                support_width(i) = 2.5d0
+            else
+                support_width(i) = mono(i)%support_width
+            end if
         end do
         !$acc update device(mag, support, length, npulse, pulse, dir, delay, foc_length, aperture, loc_mono, support_width)
 
@@ -90,10 +111,6 @@ contains
         @:ALLOCATE_GLOBAL(mono_E_src(0:m, 0:n, 0:p))
 
     end subroutine
-
-    subroutine s_compute_monopole_rhs()
-
-    end subroutine s_compute_monopole_rhs
 
     subroutine s_monopole_calculations(q_cons_vf, &
                                        q_prim_vf, t_step, id, rhs_vf)
@@ -108,9 +125,9 @@ contains
         !! are calculated from the conservative variables and gradient magnitude (GM)
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer, intent(in) :: t_step, id
 
-        integer, intent(IN) :: t_step, id
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
 
@@ -149,7 +166,7 @@ contains
                     do q = 1, num_mono
 
                         the_time = t_step*dt
-                        if ((the_time >= delay(q)) .or. (delay(q) == dflt_real)) then
+                        if ((the_time >= delay(q)) .or. f_is_default(delay(q))) then
                             !$acc loop seq
                             do ii = 1, num_fluids
                                 myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
@@ -192,10 +209,9 @@ contains
 
                             sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                             sound = dsqrt(sound)
-!                                            const_sos = dsqrt(n_tait)
+
                             const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                             const_sos = dsqrt(const_sos)
-                            !TODO: does const_sos need to be changed?
 
                             term_index = 2
 
@@ -213,10 +229,8 @@ contains
                             end if
 
                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
-!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
 
                             if (n == 0) then
-
                                 ! 1D
                                 if (dir(q) < -0.1d0) then
                                     !left-going wave
@@ -226,9 +240,7 @@ contains
                                     mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
                                 end if
                             else if (p == 0) then
-                                ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                                !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     ! 2d
                                     !mono_mom_src(1,j,k,l) = s2
                                     !mono_mom_src(2,j,k,l) = s2
@@ -242,7 +254,7 @@ contains
                                 end if
                             else
                                 ! 3D
-                                if (dir(q) /= dflt_real) then
+                                if (.not. f_is_default(dir(q))) then
                                     if (support(q) == 5) then
                                         mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2*cos(angle)
                                         mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + s2*sin(angle)
@@ -259,7 +271,6 @@ contains
 
                             if (model_eqns /= 4) then
                                 if (support(q) == 5) then
-!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
                                     mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
                                 else
                                     mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
@@ -297,15 +308,16 @@ contains
         !! @param mysos Alternative speed of sound for testing
     function f_g(the_time, sos, mysos, nm, term_index)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: the_time, sos, mysos
-        integer, intent(IN) :: nm
+        real(kind(0d0)), intent(in) :: the_time, sos, mysos
+        integer, intent(in) :: nm
+        integer, intent(in) :: term_index
+
         real(kind(0d0)) :: period, t0, sigt, pa
         real(kind(0d0)) :: offset
         real(kind(0d0)) :: f_g
-        integer :: term_index
 
         offset = 0d0
-        if (delay(nm) /= dflt_real) offset = delay(nm)
+        if (.not. f_is_default(delay(nm))) offset = delay(nm)
 
         if (pulse(nm) == 1) then
             ! Sine wave
@@ -331,7 +343,6 @@ contains
             if (the_time > t0 .and. the_time < sigt) then
                 f_g = mag(nm)
             end if
-        else
         end if
 
     end function f_g
@@ -345,10 +356,12 @@ contains
     function f_delta(j, k, l, mono_loc, mono_leng, nm, angle, angle_z)
 
         !$acc routine seq
-        real(kind(0d0)), dimension(3), intent(IN) :: mono_loc
-        integer, intent(IN) :: nm
-        real(kind(0d0)), intent(IN) :: mono_leng
         integer, intent(in) :: j, k, l
+        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        real(kind(0d0)), intent(in) :: mono_leng
+        integer, intent(in) :: nm
+        real(kind(0d0)), intent(out) :: angle
+        real(kind(0d0)), intent(out) :: angle_z
 
         integer :: q
         real(kind(0d0)) :: h, hx, hy, hz
@@ -357,8 +370,6 @@ contains
         real(kind(0d0)) :: hxnew_cyl, hynew_cyl
         real(kind(0d0)) :: sig
         real(kind(0d0)) :: f_delta
-        real(kind(0d0)) :: angle
-        real(kind(0d0)) :: angle_z
 
         if (n == 0) then
             sig = dx(j)
@@ -498,4 +509,4 @@ contains
 
     end function f_delta
 
-end module
+end module m_monopole

@@ -34,22 +34,24 @@ module m_data_output
 
     implicit none
 
-    private; public :: s_initialize_data_output_module, &
- s_open_run_time_information_file, &
- s_open_probe_files, &
- s_write_run_time_information, &
- s_write_data_files, &
- s_write_serial_data_files, &
- s_write_parallel_data_files, &
- s_write_probe_files, &
- s_close_run_time_information_file, &
- s_close_probe_files, &
- s_finalize_data_output_module
+    private; 
+    public :: s_initialize_data_output_module, &
+              s_open_run_time_information_file, &
+              s_open_probe_files, &
+              s_write_run_time_information, &
+              s_write_data_files, &
+              s_write_serial_data_files, &
+              s_write_parallel_data_files, &
+              s_write_probe_files, &
+              s_close_run_time_information_file, &
+              s_close_probe_files, &
+              s_finalize_data_output_module
 
     abstract interface ! ===================================================
 
         !> Write data files
         !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
         subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
@@ -57,15 +59,15 @@ module m_data_output
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(IN) :: q_cons_vf
+                intent(in) :: q_cons_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_prim_vf
+                intent(inout) :: q_prim_vf
 
-            integer, intent(IN) :: t_step
+            integer, intent(in) :: t_step
 
-        end subroutine s_write_abstract_data_files ! -------------------
+        end subroutine s_write_abstract_data_files
     end interface ! ========================================================
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
@@ -107,7 +109,7 @@ contains
         !!      In general, this requires generating a table header for
         !!      those stability criteria which will be written at every
         !!      time-step.
-    subroutine s_open_run_time_information_file() ! ------------------------
+    subroutine s_open_run_time_information_file
 
         character(LEN=name_len) :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
@@ -165,11 +167,11 @@ contains
                 '============== ICFL Max ============='
         end if
 
-    end subroutine s_open_run_time_information_file ! ----------------------
+    end subroutine s_open_run_time_information_file
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
-    subroutine s_open_probe_files() ! --------------------------------------
+    subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
@@ -214,7 +216,7 @@ contains
             end do
         end if
 
-    end subroutine s_open_probe_files ! ------------------------------------
+    end subroutine s_open_probe_files
 
     !>  The goal of the procedure is to output to the run-time
         !!      information file the stability criteria extrema in the
@@ -223,7 +225,7 @@ contains
         !!      these stability criteria extrema over all time-steps.
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time step
-    subroutine s_write_run_time_information(q_prim_vf, t_step) ! -----------
+    subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
@@ -450,18 +452,18 @@ contains
 
         call s_mpi_barrier()
 
-    end subroutine s_write_run_time_information ! --------------------------
+    end subroutine s_write_run_time_information
 
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -821,23 +823,18 @@ contains
             end if
         end if
 
-    end subroutine s_write_serial_data_files ! ------------------------------------
+    end subroutine s_write_serial_data_files
 
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf
-
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
 
@@ -934,7 +931,11 @@ contains
         else
             ! Initialize MPI data I/O
 
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step, '.dat'
@@ -1006,17 +1007,17 @@ contains
 
 #endif
 
-    end subroutine s_write_parallel_data_files ! ---------------------------
+    end subroutine s_write_parallel_data_files
 
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
         !!  @param q_cons_vf Conservative variables
         !!  @param accel_mag Acceleration magnitude information
-    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag) ! -----------
+    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
-        integer, intent(IN) :: t_step
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(IN) :: accel_mag
+        integer, intent(in) :: t_step
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(kind(0d0)), dimension(-1:m) :: distx
         real(kind(0d0)), dimension(-1:n) :: disty
@@ -1628,14 +1629,14 @@ contains
             end if
         end if
 
-    end subroutine s_write_probe_files ! -----------------------------------
+    end subroutine s_write_probe_files
 
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
         !!      The footer contains the stability criteria extrema over
         !!      all of the time-steps and the simulation run-time.
-    subroutine s_close_run_time_information_file() ! -----------------------
+    subroutine s_close_run_time_information_file
 
         real(kind(0d0)) :: run_time !< Run-time of the simulation
 
@@ -1656,10 +1657,10 @@ contains
             '========================================'
         close (1)
 
-    end subroutine s_close_run_time_information_file ! ---------------------
+    end subroutine s_close_run_time_information_file
 
     !> Closes probe files
-    subroutine s_close_probe_files() ! -------------------------------------
+    subroutine s_close_probe_files
 
         integer :: i !< Generic loop iterator
 
@@ -1667,12 +1668,12 @@ contains
             close (i + 30)
         end do
 
-    end subroutine s_close_probe_files ! -----------------------------------
+    end subroutine s_close_probe_files
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_data_output_module() ! -------------------------
+    subroutine s_initialize_data_output_module
 
         type(int_bounds_info) :: ix, iy, iz
 
@@ -1710,10 +1711,10 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
 
-    end subroutine s_initialize_data_output_module ! -----------------------
+    end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_data_output_module() ! ---------------------------
+    subroutine s_finalize_data_output_module
 
         integer :: i !< Generic loop iterator
 
@@ -1728,6 +1729,6 @@ contains
         s_convert_to_mixture_variables => null()
         s_write_data_files => null()
 
-    end subroutine s_finalize_data_output_module ! -------------------------
+    end subroutine s_finalize_data_output_module
 
 end module m_data_output

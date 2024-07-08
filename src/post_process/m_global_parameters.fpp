@@ -13,6 +13,8 @@ module m_global_parameters
 #endif
 
     use m_derived_types         !< Definitions of the derived types
+
+    use m_helper_basic          !< Functions to compare floating point numbers
     ! ==========================================================================
 
     implicit none
@@ -128,6 +130,7 @@ module m_global_parameters
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
+    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
 
 #endif
 
@@ -191,6 +194,7 @@ module m_global_parameters
     logical :: qm_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
+    logical :: ib
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -259,7 +263,7 @@ contains
     !> Assigns default values to user inputs prior to reading
         !!      them in. This allows for an easier consistency check of
         !!      these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs() ! ------------------
+    subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop iterator
 
@@ -334,6 +338,7 @@ contains
         qm_wrt = .false.
         schlieren_wrt = .false.
         cf_wrt = .false.
+        ib = .false.
 
         schlieren_alpha = dflt_real
 
@@ -354,11 +359,11 @@ contains
         sigma = dflt_real
         adv_n = .false.
 
-    end subroutine s_assign_default_values_to_user_inputs ! ----------------
+    end subroutine s_assign_default_values_to_user_inputs
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module() ! ----------------------
+    subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
@@ -489,7 +494,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -515,7 +520,7 @@ contains
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -598,6 +603,8 @@ contains
             allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
             MPI_IO_DATA%var(i)%sf => null()
         end do
+
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing
@@ -683,10 +690,10 @@ contains
             grid_geometry = 3
         end if
 
-    end subroutine s_initialize_global_parameters_module ! --------------------
+    end subroutine s_initialize_global_parameters_module
 
     !> Subroutine to initialize parallel infrastructure
-    subroutine s_initialize_parallel_io() ! --------------------------------
+    subroutine s_initialize_parallel_io
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -711,10 +718,10 @@ contains
 
 #endif
 
-    end subroutine s_initialize_parallel_io ! ------------------------------
+    end subroutine s_initialize_parallel_io
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_global_parameters_module() ! -------------------
+    subroutine s_finalize_global_parameters_module
 
         integer :: i
 
@@ -752,8 +759,9 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 
+        if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
 
-    end subroutine s_finalize_global_parameters_module ! -----------------
+    end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

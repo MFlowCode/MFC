@@ -37,11 +37,11 @@ module m_data_input
 
         !> Subroutine for reading data files
         !!  @param t_step Current time-step to input
-        subroutine s_read_abstract_data_files(t_step) ! ------------
+        subroutine s_read_abstract_data_files(t_step)
 
-            integer, intent(IN) :: t_step
+            integer, intent(in) :: t_step
 
-        end subroutine s_read_abstract_data_files ! ----------------
+        end subroutine s_read_abstract_data_files
 
     end interface ! ========================================================
 
@@ -50,6 +50,9 @@ module m_data_input
 
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
+
+    ! type(scalar_field), public :: ib_markers !<
+    type(integer_field), public :: ib_markers
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -60,9 +63,9 @@ contains
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_serial_data_files(t_step) ! -----------------------------
+    subroutine s_read_serial_data_files(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !<
             !! Location of the time-step directory associated with t_step
@@ -74,6 +77,11 @@ contains
                   int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
+
+        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir !<
+        !! Location of the time-step directory associated with t_step
+
+        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc_ib !<
 
         logical :: dir_check !<
             !! Generic logical used to test the existence of a particular folder
@@ -87,14 +95,27 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir)//trim(t_step_dir)
 
+        write (t_step_ib_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', 0
+        t_step_ib_dir = trim(case_dir)//trim(t_step_ib_dir)
+
         ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir)//'/.'
+
+        file_loc_ib = trim(t_step_ib_dir)//'/.'
 
         call my_inquire(file_loc, dir_check)
 
         ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder '//trim(t_step_dir)// &
+                             ' is missing. Exiting ...')
+        end if
+
+        call my_inquire(file_loc_ib, dir_check)
+
+        ! If the time-step directory is missing, the post-process exits.
+        if (dir_check .neqv. .true.) then
+            call s_mpi_abort('Time-step folder '//trim(t_step_ib_dir)// &
                              ' is missing. Exiting ...')
         end if
 
@@ -205,18 +226,31 @@ contains
 
         end do
 
+        if (ib) then
+            write (file_loc_ib, '(A,I0,A)') &
+                trim(t_step_ib_dir)//'/ib.dat'
+            inquire (FILE=trim(file_loc_ib), EXIST=file_check)
+            if (file_check) then
+                open (2, FILE=trim(file_loc_ib), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+            end if
+        end if
+
         ! ==================================================================
 
-    end subroutine s_read_serial_data_files ! ---------------------------------
+    end subroutine s_read_serial_data_files
 
     !>  This subroutine is called at each time-step that has to
         !!      be post-processed in order to parallel-read the raw data files
         !!      present in the corresponding time-step directory and to
         !!      populate the associated grid and conservative variables.
         !!  @param t_step Current time-step
-    subroutine s_read_parallel_data_files(t_step) ! ---------------------------
+    subroutine s_read_parallel_data_files(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
 
@@ -317,7 +351,11 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -351,6 +389,29 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
@@ -364,7 +425,11 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
 
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -408,6 +473,28 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+                end if
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
@@ -417,7 +504,7 @@ contains
 
 #endif
 
-    end subroutine s_read_parallel_data_files ! -------------------------------
+    end subroutine s_read_parallel_data_files
 
     !>  The following subroutine populates the buffer regions of
         !!      the cell-width spacings, the cell-boundary locations and
@@ -427,7 +514,7 @@ contains
         !!      are used in aiding the multidimensional visualization of
         !!      Silo database files, in VisIt, when processor boundary
         !!      conditions are present.
-    subroutine s_populate_grid_variables_buffer_regions() ! ----------------
+    subroutine s_populate_grid_variables_buffer_regions
 
         integer :: i !< Generic loop iterator
 
@@ -667,12 +754,12 @@ contains
 
         ! END: Populating Buffer Regions in the z-direction ================
 
-    end subroutine s_populate_grid_variables_buffer_regions ! --------------
+    end subroutine s_populate_grid_variables_buffer_regions
 
     !>  The purpose of this procedure is to populate the buffers
         !!      of the cell-average conservative variables, depending on
         !!      the boundary conditions.
-    subroutine s_populate_conservative_variables_buffer_regions() ! --------
+    subroutine s_populate_conservative_variables_buffer_regions
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1046,11 +1133,11 @@ contains
 
         ! END: Populating Buffer Regions in the z-direction ================
 
-    end subroutine s_populate_conservative_variables_buffer_regions ! ------
+    end subroutine s_populate_conservative_variables_buffer_regions
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
-    subroutine s_initialize_data_input_module() ! -----------------------------
+    subroutine s_initialize_data_input_module
 
         integer :: i !< Generic loop iterator
 
@@ -1079,6 +1166,12 @@ contains
                                               -buff_size:p + buff_size))
                 end do
 
+                if (ib) then
+                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
+                                            -buff_size:n + buff_size, &
+                                            -buff_size:p + buff_size))
+                end if
+
                 ! Simulation is 2D
             else
 
@@ -1091,6 +1184,11 @@ contains
                                               0:0))
                 end do
 
+                if (ib) then
+                    allocate (ib_markers%sf(-buff_size:m + buff_size, &
+                                            -buff_size:n + buff_size, &
+                                            0:0))
+                end if
             end if
 
             ! Simulation is 1D
@@ -1105,6 +1203,10 @@ contains
                                           0:0))
             end do
 
+            if (ib) then
+                allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
+            end if
+
         end if
 
         if (parallel_io .neqv. .true.) then
@@ -1113,10 +1215,10 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
-    end subroutine s_initialize_data_input_module ! ---------------------------
+    end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_data_input_module() ! --------------------------
+    subroutine s_finalize_data_input_module
 
         integer :: i !< Generic loop iterator
 
@@ -1129,8 +1231,12 @@ contains
         deallocate (q_cons_vf)
         deallocate (q_prim_vf)
 
+        if (ib) then
+            deallocate (ib_markers%sf)
+        end if
+
         s_read_data_files => null()
 
-    end subroutine s_finalize_data_input_module ! ------------------------
+    end subroutine s_finalize_data_input_module
 
 end module m_data_input

@@ -228,7 +228,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_rhs_module() ! ---------------------------------
+    subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -256,7 +256,7 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             ! This assumes that the color function advection equation is
             ! the last equation. If this changes then this logic will
             ! need updated
@@ -284,7 +284,7 @@ contains
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             q_prim_qp%vf(c_idx)%sf => &
                 q_cons_qp%vf(c_idx)%sf
             !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
@@ -578,7 +578,7 @@ contains
                             & iz%beg:iz%end))
                 end do
 
-                if (any(Re_size > 0) .or. (sigma /= dflt_real)) then
+                if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
@@ -694,19 +694,20 @@ contains
             @:ALLOCATE_GLOBAL(nbub(0:m, 0:n, 0:p))
         end if
 
-    end subroutine s_initialize_rhs_module ! -------------------------------
+    end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
+
         real(kind(0d0)) :: t_start, t_finish
         real(kind(0d0)) :: gp_sum
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
-        integer, intent(IN) :: t_step
 
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
@@ -806,7 +807,7 @@ contains
         call nvtxEndRange()
 
         call nvtxStartRange("Surface_Tension")
-        if (sigma /= dflt_real) call s_get_capilary(q_prim_qp%vf)
+        if (.not. f_is_default(sigma)) call s_get_capilary(q_prim_qp%vf)
         call nvtxEndRange
 
         ! Dimensional Splitting Loop =======================================
@@ -824,7 +825,7 @@ contains
 
             call nvtxStartRange("RHS-WENO")
 
-            if (sigma == dflt_real) then
+            if (f_is_default(sigma)) then
                 ! Reconstruct densitiess
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
@@ -940,7 +941,7 @@ contains
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
-            if (any(Re_size > 0d0) .or. (sigma /= dflt_real)) then
+            if (any(Re_size > 0d0) .or. (.not. f_is_default(sigma))) then
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
@@ -1037,16 +1038,16 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_compute_rhs ! -----------------------------------------
+    end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
-        type(vector_field), intent(INOUT) :: q_cons_vf
-        type(vector_field), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(vector_field), intent(INOUT) :: flux_src_n_vf
-
         integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(vector_field), intent(inout) :: q_cons_vf
+        type(vector_field), intent(inout) :: q_prim_vf
+        type(vector_field), intent(inout) :: flux_src_n_vf
+
         integer :: i, j, k, l, q
 
         if (alt_soundspeed) then
@@ -1597,19 +1598,18 @@ contains
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
-                                                               flux_src_n, &
-                                                               dq_prim_dx_vf, &
-                                                               dq_prim_dy_vf, &
-                                                               dq_prim_dz_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(int_bounds_info) :: ixt, iyt, izt
-        integer, intent(IN) :: idir
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
+        type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
+        type(int_bounds_info), intent(in) :: ixt, iyt, izt
+
         integer :: i, j, k, l, q
 
         if (idir == 1) then ! x-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1641,7 +1641,7 @@ contains
 
         elseif (idir == 2) then ! y-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1776,7 +1776,7 @@ contains
 
         elseif (idir == 3) then ! z-direction
 
-            if (sigma /= dflt_real) then
+            if (.not. f_is_default(sigma)) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
@@ -1835,9 +1835,9 @@ contains
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_pressure_relaxation_procedure(q_cons_vf) ! ----------------
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
             !! derivative df(p), isentropic partial density, sum of volume fractions,
@@ -2079,7 +2079,7 @@ contains
             end do
         end do
 
-    end subroutine s_pressure_relaxation_procedure ! -----------------------
+    end subroutine s_pressure_relaxation_procedure
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
@@ -2091,14 +2091,13 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
@@ -2144,16 +2143,15 @@ contains
         end if
 
         ! ==================================================================
-    end subroutine s_reconstruct_cell_boundary_values ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values
 
-    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                               norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
@@ -2225,7 +2223,7 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_first_order
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_rhs_module() ! -----------------------------------
+    subroutine s_finalize_rhs_module
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -2381,6 +2379,6 @@ contains
         s_riemann_solver => null()
         s_convert_to_mixture_variables => null()
 
-    end subroutine s_finalize_rhs_module ! ---------------------------------
+    end subroutine s_finalize_rhs_module
 
 end module m_rhs

@@ -1,4 +1,4 @@
-import typing
+import typing, itertools
 
 from mfc   import common
 from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
@@ -82,22 +82,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_weno():
         for weno_order in [3, 5]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
+            for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
-            for mapped_weno, mp_weno in [('F', 'F'), ('T', 'F'), ('F', 'T')]:
-                trace = []
-                if mapped_weno == 'T':
-                    trace.append("mapped_weno")
-                if mp_weno:
-                    trace.append("mp_weno")
+                if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
+                    continue
+                if mp_weno == 'T' and weno_order == 3:
+                    continue
+                if teno == 'T' and weno_order == 3:
+                    continue
 
-                if not (mp_weno == 'T' and weno_order != 5):
-                    cases.append(define_case_d(stack, [
-                        f"mapped_weno={mapped_weno}",
-                        f"mp_weno={mp_weno}"
-                    ], {
-                        'mapped_weno': mapped_weno,
-                        'mp_weno':     mp_weno
-                    }))
+                trace = [f"{var}={val}" for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T']
+                data = {var: 'T' for var, val in zip(["mapped_weno", "wenoz", "teno", "mp_weno"], [mapped_weno, wenoz, teno, mp_weno]) if val == 'T'}
+
+                if "teno" in data:
+                    data["teno_CT"] = 1e-6
+
+                cases.append(define_case_d(stack, trace, data))
 
             stack.pop()
 
@@ -264,6 +264,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_monopole(dimInfo):
+        stack.push("Monopole", {"Monopole": 'T'})
+
+        if len(dimInfo[0]) == 1:
+            cases.append(define_case_d(stack, 'Delay', {'Mono(1)%support': 1, 'Mono(1)%delay': 0.1}))
+
+        if len(dimInfo[0]) == 2:
+            stack.push('', {'Mono(1)%loc(2)': 0.5})
+            cases.append(define_case_d(stack, 'support=1', {'Mono(1)%support': 1}))
+            cases.append(define_case_d(stack, 'support=2', {'Mono(1)%support': 2}))
+            cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
+            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
+            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+            stack.pop()
+
+        if len(dimInfo[0]) == 3:
+            stack.push('', {'Mono(1)%loc(2)': 0.5, 'Mono(1)%loc(3)': 0.5})
+            cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
+            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
+            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+            stack.pop()
+
+        stack.pop()
+
     def alter_bubbles(dimInfo):
         if len(dimInfo[0]) > 0:
             stack.push("Bubbles", {"bubbles": 'T'})
@@ -277,13 +301,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)':
                 4e-02, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
                 'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
-                'patch_icpp(3)%pres': 1.0
+                'patch_icpp(3)%pres': 1.0, 'Mono(1)%support': 1
             })
 
             stack.push("Monopole", {"Monopole": 'T'})
 
             if len(dimInfo[0]) >= 2:
-                stack.push("", {'Mono(1)%loc(2)': 0.5})
+                stack.push("", {'Mono(1)%loc(2)': 0.5, 'Mono(1)%support': 1})
 
             if len(dimInfo[0]) >= 3:
                 stack.push("", {'Mono(1)%loc(3)': 0.5, 'Mono(1)%support': 3})
@@ -543,6 +567,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
+            alter_monopole(dimInfo)
             alter_bubbles(dimInfo)
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)

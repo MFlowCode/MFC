@@ -117,9 +117,9 @@ module m_cbc
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
     !$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynominal interpolant coefficients in z-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
 #endif
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
@@ -149,7 +149,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_cbc_module() ! ---------------------------------
+    subroutine s_initialize_cbc_module
 
         integer :: i
         logical :: is_cbc
@@ -429,18 +429,18 @@ contains
             !$acc update device(bczb, bcze)
         end if
 
-    end subroutine s_initialize_cbc_module ! -------------------------------
+    end subroutine s_initialize_cbc_module
 
     !>  Compute CBC coefficients
         !!  @param cbc_dir_in CBC coordinate direction
         !!  @param cbc_loc_in CBC coordinate location
-    subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in) ! --------------
+    subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in)
         ! Description: The purpose of this subroutine is to compute the grid
         !              dependent FD and PI coefficients, or CBC coefficients,
         !              provided the CBC coordinate direction and location.
 
         ! CBC coordinate direction and location
-        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
+        integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
         real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
@@ -534,7 +534,7 @@ contains
 
         ! Nullifying CBC coefficients
 
-    end subroutine s_compute_cbc_coefficients ! ----------------------------
+    end subroutine s_compute_cbc_coefficients
 
     !!  The goal of the procedure is to associate the FD and PI
     !!      coefficients, or CBC coefficients, with the appropriate
@@ -542,9 +542,9 @@ contains
     !!      of the CBC.
     !!  @param cbc_dir_in CBC coordinate direction
     !!  @param cbc_loc_in CBC coordinate location
-    subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in) ! ---
+    subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
-        integer, intent(IN) :: cbc_dir_in, cbc_loc_in
+        integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         integer :: i !< Generic loop iterator
 
@@ -601,7 +601,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_associate_cbc_coefficients_pointers ! -----------------
+    end subroutine s_associate_cbc_coefficients_pointers
 
     !>  The following is the implementation of the CBC based on
         !!      the work of Thompson (1987, 1990) on hyperbolic systems.
@@ -616,21 +616,21 @@ contains
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
-    subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, & ! -----------------
+    subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                      cbc_dir_norm, cbc_loc_norm, &
                      ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf
+            intent(inout) :: flux_vf, flux_src_vf
 
-        integer, intent(IN) :: cbc_dir_norm, cbc_loc_norm
+        integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
@@ -865,21 +865,21 @@ contains
                         lambda(3) = vel(dir_idx(1)) + c
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
-                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
-                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
-                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
-                            call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
-                            call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -11) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -11)) then
-                            call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else
-                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
@@ -1007,7 +1007,7 @@ contains
         ! CBC coordinate direction.
         call s_finalize_cbc(flux_vf, flux_src_vf, &
                             ix, iy, iz)
-    end subroutine s_cbc ! -------------------------------------------------
+    end subroutine s_cbc
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -1019,18 +1019,18 @@ contains
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
-    subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, & ! ------
+    subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                                 ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: q_prim_vf
+            intent(in) :: q_prim_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(IN) :: flux_vf, flux_src_vf
+            intent(in) :: flux_vf, flux_src_vf
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 
@@ -1291,7 +1291,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_cbc ! --------------------------------------
+    end subroutine s_initialize_cbc
 
     !>  Deallocation and/or the disassociation procedures that
         !!      are necessary in order to finalize the CBC application
@@ -1300,14 +1300,14 @@ contains
         !!  @param ix Index bound in the first coordinate direction
         !!  @param iy Index bound in the second coordinate direction
         !!  @param iz Index bound in the third coordinate direction
-    subroutine s_finalize_cbc(flux_vf, flux_src_vf, & ! -------------------
+    subroutine s_finalize_cbc(flux_vf, flux_src_vf, &
                               ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf
+            intent(inout) :: flux_vf, flux_src_vf
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, r !< Generic loop iterators
 
@@ -1479,7 +1479,7 @@ contains
 
         ! Nullifying procedural pointer used in evaluation of L for the CBC
 
-    end subroutine s_finalize_cbc ! ----------------------------------------
+    end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
     subroutine s_any_cbc_boundaries(toggle)
@@ -1497,7 +1497,7 @@ contains
     end subroutine
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_cbc_module() ! -----------------------------------
+    subroutine s_finalize_cbc_module
 
         logical :: is_cbc
 
@@ -1561,6 +1561,6 @@ contains
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
 
-    end subroutine s_finalize_cbc_module ! ---------------------------------
+    end subroutine s_finalize_cbc_module
 
 end module m_cbc

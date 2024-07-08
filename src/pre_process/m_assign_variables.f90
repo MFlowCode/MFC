@@ -9,6 +9,9 @@ module m_assign_variables
     use m_global_parameters     ! Global parameters for the code
 
     use m_variables_conversion  ! Subroutines to change the state variables from
+
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     ! one form to another
     ! ==========================================================================
 
@@ -35,30 +38,34 @@ module m_assign_variables
         !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                             eta, q_prim_vf, patch_id_fp)
 
             import :: scalar_field, sys_size, n, m, p
 
-            integer, intent(IN) :: patch_id
-            integer, intent(IN) :: j, k, l
-            integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-            type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-            real(kind(0d0)) :: eta !<
+            integer, intent(in) :: patch_id
+            integer, intent(in) :: j, k, l
+            real(kind(0d0)), intent(in) :: eta
+            type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+            integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
     end interface
 
-    private; public :: s_initialize_assign_variables_module, &
- s_assign_patch_primitive_variables, &
- s_assign_patch_mixture_primitive_variables, &
- s_assign_patch_species_primitive_variables, &
- s_finalize_assign_variables_module
+    private; 
+    public :: s_initialize_assign_variables_module, &
+              s_assign_patch_primitive_variables, &
+              s_assign_patch_mixture_primitive_variables, &
+              s_assign_patch_species_primitive_variables, &
+              s_finalize_assign_variables_module
 
 contains
 
-    subroutine s_initialize_assign_variables_module()
+    subroutine s_initialize_assign_variables_module
 
         allocate (alf_sum%sf(0:m, 0:n, 0:p))
 
@@ -87,19 +94,21 @@ contains
         !!              with those of the smoothing patch. The specific details
         !!              of the combination may be found in Shyue's work (1998).
         !! @param patch_id the patch identifier
-        !! @param j  the x-dir node index
-        !! @param k  the y-dir node index
-        !! @param l  the z-dir node index
+        !! @param j the x-dir node index
+        !! @param k the y-dir node index
+        !! @param l the z-dir node index
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
-
         !$acc routine seq
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
 
-        integer, intent(IN) :: j, k, l
+        integer, intent(in) :: patch_id
+        integer, intent(in) :: j, k, l
+        real(kind(0d0)), intent(in) :: eta
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         real(kind(0d0)) :: rho    !< density
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
@@ -152,13 +161,17 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
 
-    end subroutine s_assign_patch_mixture_primitive_variables ! ------------
+    end subroutine s_assign_patch_mixture_primitive_variables
 
     !Stable perturbation in pressure (Ando)
+    !! @param j the x-dir node index
+    !! @param k the y-dir node index
+    !! @param l the z-dir node index
+    !! @param q_prim_vf Primitive variables
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
-        type(scalar_field), dimension(1:sys_size), intent(INOUT) :: q_prim_vf
-        integer, intent(IN) :: j, k, l
+        integer, intent(in) :: j, k, l
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i
         real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
@@ -233,27 +246,30 @@ contains
         !!  s_assign_patch_species_primitive_variables with adaptation for
         !!  ensemble-averaged bubble modeling
         !! @param patch_id the patch identifier
-        !! @param j  the x-dir node index
-        !! @param k  the y-dir node index
-        !! @param l  the z-dir node index
+        !! @param j the x-dir node index
+        !! @param k the y-dir node index
+        !! @param l the z-dir node index
+        !! @param eta pseudo volume fraction
+        !! @param q_prim_vf Primitive variables
+        !! @param patch_id_fp Array to track patch ids
     subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
                                                           eta, q_prim_vf, patch_id_fp)
-
         !$acc routine seq
-        integer, intent(IN) :: patch_id
-        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
-        real(kind(0d0)) :: eta !<
-        integer, intent(IN) :: j, k, l
+
+        integer, intent(in) :: patch_id
+        integer, intent(in) :: j, k, l
+        real(kind(0d0)), intent(in) :: eta
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
-        real(kind(0d0)) :: rho          !< density
+        real(kind(0d0)) :: rho         !< density
         real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: lit_gamma    !< specific heat ratio
-        real(kind(0d0)) :: pi_inf       !< stiffness from SEOS
-        real(kind(0d0)) :: qv       !< reference energy from SEOS
+        real(kind(0d0)) :: lit_gamma   !< specific heat ratio
+        real(kind(0d0)) :: pi_inf      !< stiffness from SEOS
+        real(kind(0d0)) :: qv          !< reference energy from SEOS
         real(kind(0d0)) :: orig_rho
         real(kind(0d0)) :: orig_gamma
         real(kind(0d0)) :: orig_pi_inf
@@ -564,17 +580,17 @@ contains
 
         if (bubbles .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (q_prim_vf(bub_idx%ps(i))%sf(j, k, l) == dflt_real) then
+                if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
                     ! print *, 'setting to pb0'
                 end if
-                if (q_prim_vf(bub_idx%ms(i))%sf(j, k, l) == dflt_real) then
+                if (f_is_default(q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
                                            (1d0 - eta)*patch_icpp(smooth_patch_id)%cf_val
         end if
@@ -582,7 +598,7 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
 
-    end subroutine s_assign_patch_species_primitive_variables! ------------
+    end subroutine s_assign_patch_species_primitive_variables
 
     subroutine s_finalize_assign_variables_module
 

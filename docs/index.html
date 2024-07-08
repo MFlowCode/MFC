@@ -197,17 +197,16 @@
                 this.computer     = computer;
             }
         };
-    
+
         scalings = [
-            new FScale("res/weakScaling/frontier.svg", "Oak Ridge Frontier"),
-            new FScale("res/weakScaling/summit.svg", "Oak Ridge Summit")
-            ]
+            new FScale("res/weakScaling/frontier.svg", "Oak Ridge Frontier (AMD MI250X GPUs)"),
+            new FScale("res/weakScaling/summit.svg", "Oak Ridge Summit (NVIDIA V100 GPUs)")
+        ];
 
-
-         onHTML(() => {
+        onHTML(() => {
             for (let scl of scalings) {
                 let container = document.createElement("div");
-                container.classList.add("flex", "flex-col", "text-white", "rounded", "bg-slate-900", "rounded-b-lg");
+                container.classList.add("flex", "md:w-2/6", "flex-col", "text-white", "rounded", "bg-slate-900", "rounded-b-lg");
 
                 let topdiv = document.createElement("div");
                 topdiv.classList.add("flex-1", "grid", "bg-white", "pb-2");
@@ -241,7 +240,6 @@
                 document.getElementById("ft-scaling").appendChild(container);
             }
         });
-
     </script>
 </head>
 <body class="flex flex-col min-h-screen bg-slate-900">
@@ -282,9 +280,9 @@
                         <i class="pr-4 fa-solid fa-book"></i>
                         <span class="flex-1">Documentation</span>
                     </a>
-                    <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="https://doi.org/10.1016/j.cpc.2020.107396">
+                    <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/md_papers.html">
                         <i class="pr-4 fa-solid fa-newspaper"></i>
-                        <span class="flex-1">Primary Paper</span>
+                        <span class="flex-1">Papers</span>
                     </a>
                 </div>
             </div>
@@ -297,7 +295,7 @@
                     <div class="text-xl md:text-2xl font-extrabold">
                         Featured Simulations
                     </div>
-                  
+
                     <!--
                     <div class="text-sm md:text-md text-justify">
                         A small collection of visualizations of simulations completed using MFC.
@@ -308,13 +306,13 @@
                     <!-- ... -->
                 </div>
             </div> 
-            <div class="weak-scaling flex-col gap-4">
+            <div class="weak-scaling flex flex-col gap-4">
                 <h1 class="flex-1 flex flex-col justify-center gap-y-4">
                     <div class="text-xl md:text-2xl font-extrabold">
                         Weak Scaling Results
                     </div>
                 </h1>
-                <div id="ft-scaling" class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8"> 
+                <div id="ft-scaling" class="flex-1 flex flex-col md:flex-row gap-8 md:justify-around">
                     <!-- ... -->
                 </div>
             </div>
@@ -324,7 +322,7 @@
                         Contributors
                     </div>
                 </h1>
-                    
+
                 <div id="ft-contrib" class="rounded">
                     <!-- ... -->
                 </div>

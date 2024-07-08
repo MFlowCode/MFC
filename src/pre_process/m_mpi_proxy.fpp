@@ -33,7 +33,7 @@ contains
         !!       these are not available to the remaining processors. This
         !!       subroutine is then in charge of broadcasting the required
         !!       information.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -112,14 +112,14 @@ contains
         end do
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !> Description: This subroutine takes care of efficiently distributing
         !!              the computational domain among the available processors
         !!             as well as recomputing some of the global parameters so
         !!              that they reflect the configuration of sub-domain that is
         !!              overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -529,6 +529,6 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
 end module m_mpi_proxy

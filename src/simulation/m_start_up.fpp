@@ -57,6 +57,8 @@ module m_start_up
 
     use ieee_arithmetic
 
+    use m_helper_basic          !< Functions to compare floating point numbers
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -66,6 +68,8 @@ module m_start_up
     use m_ibm
 
     use m_compile_specific
+
+    use m_checker_common
 
     use m_checker
 
@@ -91,15 +95,15 @@ module m_start_up
     abstract interface ! ===================================================
 
         !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf) ! -----------
+        subroutine s_read_abstract_data_files(q_cons_vf)
 
             import :: scalar_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: q_cons_vf
+                intent(inout) :: q_cons_vf
 
-        end subroutine s_read_abstract_data_files ! -----------------
+        end subroutine s_read_abstract_data_files
 
     end interface ! ========================================================
 
@@ -112,7 +116,7 @@ contains
     !>  The purpose of this procedure is to first verify that an
         !!      input file has been made available by the user. Provided
         !!      that this is so, the input file is then read in.
-    subroutine s_read_input_file() ! ---------------------------------------
+    subroutine s_read_input_file
 
         ! Relative path to the input file provided by the user
         character(LEN=name_len) :: file_path = './simulation.inp'
@@ -133,7 +137,7 @@ contains
             model_eqns, adv_alphan, &
             mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
-            mapped_weno, mp_weno, weno_avg, &
+            teno_CT, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             x_domain, y_domain, z_domain, &
@@ -146,7 +150,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
@@ -204,12 +208,12 @@ contains
 #endif
 #endif
 
-    end subroutine s_read_input_file ! -------------------------------------
+    end subroutine s_read_input_file
 
     !> The goal of this procedure is to verify that each of the
     !!      user provided inputs is valid and that their combination
     !!      constitutes a meaningful configuration for the simulation.
-    subroutine s_check_input_file() ! --------------------------------------
+    subroutine s_check_input_file
 
         ! Relative path to the current directory file in the case directory
         character(LEN=path_len) :: file_path
@@ -230,9 +234,10 @@ contains
         end if
         ! ==================================================================
 
+        call s_check_inputs_common()
         call s_check_inputs()
 
-    end subroutine s_check_input_file ! ------------------------------------
+    end subroutine s_check_input_file
 
         !!              initial condition and grid data files. The cell-average
         !!              conservative variables constitute the former, while the
@@ -240,7 +245,7 @@ contains
         !!              up the latter. This procedure also calculates the cell-
         !!              width distributions from the cell-boundary locations.
         !! @param q_cons_vf Cell-averaged conservative variables
-    subroutine s_read_serial_data_files(q_cons_vf) ! ------------------------------
+    subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
@@ -447,10 +452,10 @@ contains
 
         end if
 
-    end subroutine s_read_serial_data_files ! -------------------------------------
+    end subroutine s_read_serial_data_files
 
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_data_files(q_cons_vf) ! ---------------------------
+    subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -809,13 +814,13 @@ contains
 
 #endif
 
-    end subroutine s_read_parallel_data_files ! -------------------------------
+    end subroutine s_read_parallel_data_files
 
     !> The purpose of this subroutine is to populate the buffers
         !!          of the grid variables, which are constituted of the cell-
         !!          boundary locations and cell-width distributions, based on
         !!          the boundary conditions.
-    subroutine s_populate_grid_variables_buffers() ! -----------------------
+    subroutine s_populate_grid_variables_buffers
 
         integer :: i !< Generic loop iterator
 
@@ -1021,16 +1026,17 @@ contains
 
         ! END: Population of Buffers in z-direction ========================
 
-    end subroutine s_populate_grid_variables_buffers ! ---------------------
+    end subroutine s_populate_grid_variables_buffers
 
     !> The purpose of this procedure is to initialize the
         !!      values of the internal-energy equations of each phase
         !!      from the mass of each phase, the mixture momentum and
         !!      mixture-total-energy equations.
         !! @param v_vf conservative variables
-    subroutine s_initialize_internal_energy_equations(v_vf) !---------------
+    subroutine s_initialize_internal_energy_equations(v_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: v_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
+
         real(kind(0d0)) :: rho
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: gamma
@@ -1066,17 +1072,17 @@ contains
             end do
         end do
 
-    end subroutine s_initialize_internal_energy_equations !-----------------
+    end subroutine s_initialize_internal_energy_equations
 
     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
-        integer, intent(INOUT) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
-        real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: start, finish
-        integer, intent(INOUT) :: nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        logical, intent(inout) :: file_exists
+        real(kind(0d0)), intent(inout) :: start, finish
+        integer, intent(inout) :: nt
 
         integer :: i, j, k, l
 
@@ -1120,14 +1126,14 @@ contains
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 
-        integer, intent(INOUT) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg, time_final
-        real(kind(0d0)), intent(INOUT) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(INOUT) :: proc_time
-        real(kind(0d0)), dimension(:), intent(INOUT) :: io_proc_time
-        logical, intent(INOUT) :: file_exists
-        real(kind(0d0)), intent(INOUT) :: start, finish
-        integer, intent(INOUT) :: nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
+        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
+        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        logical, intent(inout) :: file_exists
+        real(kind(0d0)), intent(inout) :: start, finish
+        integer, intent(inout) :: nt
 
         call s_mpi_barrier()
 
@@ -1175,8 +1181,10 @@ contains
     end subroutine s_save_performance_metrics
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
-        real(kind(0d0)), intent(INOUT) :: start, finish, io_time_avg
-        integer, intent(INOUT) :: t_step, nt
+        integer, intent(inout) :: t_step
+        real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
+        integer, intent(inout) :: nt
+        
         integer :: i, j, k, l
 
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
@@ -1215,7 +1223,7 @@ contains
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules()
+    subroutine s_initialize_modules
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
@@ -1226,7 +1234,7 @@ contains
             call s_initialize_nonpoly()
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
-        if (qbmm .and. polytropic .and. Web /= dflt_real) then
+        if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
             pb0 = pref + 2d0*fluid_pp(1)%ss/(R0*R0ref)
             pb0 = pb0/pref
             pref = 1d0
@@ -1259,7 +1267,7 @@ contains
 
         call s_initialize_rhs_module()
 
-        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
+        if (.not. f_is_default(sigma)) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1310,7 +1318,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain()
+    subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_OpenACC
         real(kind(0d0)) :: starttime, endtime
@@ -1382,7 +1390,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_initialize_gpu_vars()
+    subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
         do i = 1, sys_size
@@ -1411,7 +1419,7 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
-    subroutine s_finalize_modules()
+    subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
         s_write_data_files => null()
@@ -1432,7 +1440,7 @@ contains
             call s_finalize_viscous_module()
         end if
 
-        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
+        if (.not. f_is_default(sigma)) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment

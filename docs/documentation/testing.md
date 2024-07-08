@@ -5,18 +5,25 @@ To run MFC's test suite, run
 ./mfc.sh test -j <thread count>
 ```
 
-It will generate and run test cases, comparing their output to that of previous runs from versions of MFC considered to be accurate.
-*golden files*, stored in the `tests/` directory contain this data, by aggregating `.dat` files generated when running MFC.
-A test is considered passing when our error tolerances are met, in order to maintain a high level of stability and accuracy.
+It will generate and run test cases, comparing their output to previous runs from versions of MFC considered accurate.
+*golden files*, stored in the `tests/` directory contain this data, aggregating `.dat` files generated when running MFC.
+A test is considered passing when our error tolerances are met in order to maintain a high level of stability and accuracy.
 Run `./mfc.sh test -h` for a full list of accepted arguments.
 
 Most notably, you can consult the full list of tests by running
-```
+```shell
 ./mfc.sh test -l
 ```
 
 To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
 To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
+To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
+```shell
+./mfc.sh test -j <thread count> -- -c <computer name>
+```
+where `<computer name>` could be `phoenix` or any of the others in the [templates](https://github.com/MFlowCode/MFC/tree/master/toolchain/templates)).
+You can create new templates with the appropriate run commands or omit this option.
+The use of `--` in the above command passes options to the `./mfc.sh run` command underlying the `./mfc.sh test`.
 
 ### Creating Tests
 
@@ -74,7 +81,7 @@ for weno_order in [3, 5]:
   stack.pop()
 ```
 
-When pushing to the stack, or creating a new case with the `define_case_d` function, you must specify:
+When pushing to the stack or creating a new case with the `define_case_d` function, you must specify:
 - `stack`: The current stack.
 - `trace`: A human-readable string describing what you are currently varying.
 - `variations`: A Python dictionary with case parameter variations.
@@ -86,13 +93,13 @@ Finally, the case is appended to the `cases` list, which will be returned by the
 
 ### Testing Post Process
 
-To test updated post process code, append the `-a` or `--test-all` option: 
+To test the post-processing code, append the `-a` or `--test-all` option: 
 ```shell
 ./mfc.sh test -a -j 8
 ```
 
-This argument will re-run the test stack with `parallel_io=True`, which generates silo_hdf5 files.
+This argument will re-run the test stack with `parallel_io='T'`, which generates silo_hdf5 files.
 It will also turn most write parameters (`*_wrt`) on.
-Then, it searches through the silo files using `h5dump` to ensure that there are no NaNs or Infinitys.
-Although adding this option does not guarantee that accurate silo files are generated, it does ensure that post process does not fail or produce malformed data. 
+Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
+Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data. 
 
