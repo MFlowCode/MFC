@@ -205,10 +205,10 @@ contains
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
-        real(kind(0d0)) :: err1, err2, err3 !< Error estimates for adaptive time stepping
+        real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
         real(kind(0d0)) :: h !< Time step size
-        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3!< Bubble radius, radial velocity, and radial acceleration for the inner loop
+        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -227,7 +227,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -350,19 +350,25 @@ contains
                                                            bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
                                                            myR_tmp2, myV_tmp2, err3)
 
+                                    err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
+                                    err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
+                                    if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
+
                                     ! Determine acceptance/rejection and update step size
                                     !   Rule 1: err1, err2, err3 < tol
                                     !   Rule 2: myR_tmp1(4) > 0d0
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                        .and. myR_tmp1(4) > 0d0 &
-                                        .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
-                                        .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
+                                        .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
+                                        .and. myR_tmp1(4) > 0d0) then
+
                                         ! Accepted. Finalize the sub-step
+                                        t_new = t_new + h
+
+                                        ! Update R and V
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
-                                        t_new = t_new + h
 
                                         ! Update step size for the next sub-step
                                         h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
@@ -432,6 +438,22 @@ contains
         end if
     end subroutine s_compute_bubble_source
 
+    !> Choose the initial time step size for the adaptive time stepping routine
+        !!  (See Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary
+        !!  Differential Equations I, Chapter II.4)
+        !!  @param fRho Current density
+        !!  @param fP Current driving pressure
+        !!  @param fR Current bubble radius
+        !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
+        !!  @param fpb Internal bubble pressure
+        !!  @param fpbdot Time-derivative of internal bubble pressure
+        !!  @param alf bubble volume fraction
+        !!  @param fntait Tait EOS parameter
+        !!  @param fBtait Tait EOS parameter
+        !!  @param f_bub_adv_src Source for bubble volume fraction
+        !!  @param f_divu Divergence of velocity
+        !!  @param h Time step size
     subroutine s_initialize_adap_dt(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                     fntait, fBtait, f_bub_adv_src, f_divu, h)
         !$acc routine seq
@@ -483,6 +505,23 @@ contains
 
     end subroutine s_initialize_adap_dt
 
+    !>  Integrate bubble variables over the given time step size, h
+        !!  @param fRho Current density
+        !!  @param fP Current driving pressure
+        !!  @param fR Current bubble radius
+        !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
+        !!  @param fpb Internal bubble pressure
+        !!  @param fpbdot Time-derivative of internal bubble pressure
+        !!  @param alf bubble volume fraction
+        !!  @param fntait Tait EOS parameter
+        !!  @param fBtait Tait EOS parameter
+        !!  @param f_bub_adv_src Source for bubble volume fraction
+        !!  @param f_divu Divergence of velocity
+        !!  @param h Time step size
+        !!  @param myR_tmp Bubble radius at each stage
+        !!  @param myV_tmp Bubble radial velocity at each stage
+        !!  @param err Estimated error
     subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                  fntait, fBtait, f_bub_adv_src, f_divu, h, &
                                  myR_tmp, myV_tmp, err)

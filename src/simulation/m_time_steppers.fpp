@@ -923,7 +923,6 @@ contains
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
-
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
