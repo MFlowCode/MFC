@@ -1,7 +1,7 @@
 import os, typing, hashlib, dataclasses, shutil
 
 from .printer import cons
-from .common  import MFCException, system, delete_directory, create_directory, \
+from .common  import MFC_ROOTDIR, MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
@@ -289,4 +289,4 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
 
 
 def clean():
-    shutil.rmtree('build')
+    shutil.rmtree(os.path.join(MFC_ROOTDIR, 'build'))
