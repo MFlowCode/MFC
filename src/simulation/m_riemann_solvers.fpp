@@ -950,11 +950,11 @@ contains
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
 
+        idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-
-                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
@@ -1294,9 +1294,9 @@ contains
 
                                 ! correction pressure for the cylindrical terms
                                 p_Star = xi_M*(pres_L + xi_MP*rho_L*(s_L - &
-                                                                     vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
+                                         vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
                                          xi_P*(pres_R + xi_PP*rho_R*(s_R - &
-                                                                     vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
+                                         vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
