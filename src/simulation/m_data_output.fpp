@@ -499,7 +499,7 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
 
         ! Creating or overwriting the current time-step directory
-        write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all/p', &
+        write (t_step_dir, '(a,i0,a,i0)') trim(case_dir)//'/p_all/p', &
             proc_rank, '/', t_step
 
         file_path = trim(t_step_dir)//'/.'
@@ -864,11 +864,7 @@ contains
 
         if (file_per_process) then
 
-            if (cfl_dt) then
-                call s_int_to_str(int(mytime/t_save), t_step_string)
-            else
-                call s_int_to_str(t_step, t_step_string)
-            end if
+            call s_int_to_str(t_step, t_step_string)
 
             ! Initialize MPI data I/O
 
@@ -894,11 +890,7 @@ contains
             call s_initialize_mpi_data(q_cons_vf)
 
             ! Open the file to write all flow variables
-            if (cfl_dt) then
-                write (file_loc, '(I0,A,i7.7,A)') int(mytime/t_save), '_', proc_rank, '.dat'
-            else
-                write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
-            end if
+            write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -955,12 +947,7 @@ contains
                 call s_initialize_mpi_data(q_cons_vf)
             end if
 
-            ! Open the file to write all flow variables
-            if (cfl_dt) then
-                write (file_loc, '(I0,A)') int(mytime/t_save), '.dat'
-            else
-                write (file_loc, '(I0,A)') t_step, '.dat'
-            end if
+            write (file_loc, '(I0,A)') t_step, '.dat'
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then

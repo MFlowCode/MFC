@@ -64,7 +64,7 @@ program p_main
     do
 
         if (cfl_dt) then
-            if (abs(mytime - t_stop) <= dt) then
+            if (mytime >= t_stop) then
                 call s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, &
                                                 io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
                 exit

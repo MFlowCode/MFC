@@ -232,6 +232,8 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
+        if (cfl_dt) t_step = n_start
+
         !1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2) then

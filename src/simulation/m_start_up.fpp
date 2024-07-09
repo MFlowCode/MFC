@@ -265,8 +265,13 @@ contains
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
-        write (t_step_dir, '(A,I0,A,I0)') &
-            trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        if (cfl_dt) then
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
+        else
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        end if
 
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
@@ -571,9 +576,6 @@ contains
                 write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
             end if
 
-            call s_int_to_str(t_step_start, t_step_start_string)
-            ! Open the file to read conservative variables
-            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -1100,6 +1102,9 @@ contains
 
         integer :: i, j, k, l
 
+
+        if (cfl_dt) call s_compute_dt()
+
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) dt = t_stop - mytime
         else
@@ -1135,8 +1140,6 @@ contains
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
-
-        if (cfl_dt) call s_compute_dt()
 
         mytime = mytime + dt
 
@@ -1221,6 +1224,8 @@ contains
 
         integer :: i, j, k, l
 
+        integer :: save_count
+
         call cpu_time(start)
         !  call nvtxStartRange("I/O")
         do i = 1, sys_size
@@ -1242,10 +1247,20 @@ contains
             !$acc update host(mv_ts(1)%sf)
         end if
 
-        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
+        if (cfl_dt) then
+            save_count = int(mytime/t_save)
+        else
+            save_count = t_step
+        end if
+
+        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
         !  call nvtxEndRange
         call cpu_time(finish)
-        nt = int((t_step - t_step_start)/(t_step_save))
+        if (cfl_dt) then
+            nt = n_save
+        else
+            nt = int((t_step - t_step_start)/(t_step_save))
+        end if
         if (nt == 1) then
             io_time_avg = abs(finish - start)
         else
