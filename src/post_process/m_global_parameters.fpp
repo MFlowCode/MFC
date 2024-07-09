@@ -79,6 +79,8 @@ module m_global_parameters
     !> @name IO options for adaptive time-stepping
     !> @{
     logical :: cfl_dt
+    real(kind(0d0)) :: t_save
+    real(kind(0d0)) :: t_stop
     integer :: n_save
     integer :: n_start
     !> @}
@@ -287,8 +289,9 @@ contains
         t_step_save = dflt_int
 
         cfl_dt = .false.
-        n_save = dflt_int
+        t_save = dflt_real
         n_start = dflt_int
+        t_stop = dflt_real
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

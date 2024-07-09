@@ -36,6 +36,7 @@ program p_main
 
     if (cfl_dt) then
         t_step = n_start
+        n_save = int(t_stop/t_save) + 1
     else
         ! Setting the time-step iterator to the first time step to be post-processed
         t_step = t_step_start

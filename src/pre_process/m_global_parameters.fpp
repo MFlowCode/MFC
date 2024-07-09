@@ -28,7 +28,7 @@ module m_global_parameters
     ! ==========================================================================
 
     logical :: cfl_dt
-    integer :: n_start
+    integer :: n_start, n_start_old
 
     ! Computational Domain Parameters ==========================================
 

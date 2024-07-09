@@ -110,11 +110,6 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
 | `n`                      | Integer | Number of grid cells in the $y$-coordinate direction |
 | `p`                      | Integer | Number of grid cells in the $z$-coordinate direction |
-| `dt`                     | Real    | Time step size |
-| `t_step_start`           | Integer | Simulation starting time step |
-| `t_step_stop`            | Integer | Simulation stopping time step |
-| `t_step_save`            | Integer | Frequency to output data |
-| `t_step_print`           | Integer | Frequency to print the current step number to standard output (default 1) |
 
 The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
@@ -148,15 +143,6 @@ Domain discretization is accordingly conducted along the axes of cylindrical coo
 When $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates.
 In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes.
 MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
-
-- `dt` specifies the constant time step size that is used in simulation.
-The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
-
-- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
-`t_step_save` is the time step interval for data output during simulation.
-To newly start the simulation, set `t_step_start = 0`.
-To restart simulation from $k$-th time step, set `t_step_start = k`, do not run `pre_process`, and run `simulation` directly (`./mfc.sh run [...] -t simulation`).
-Ensure the data for the $k$-th time step is stored in the `restart_data/` directory within the case repository.
 
 ### 3. Patches
 
@@ -372,6 +358,16 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
 | `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
+| `dt`                   | Real    | Time step size |
+| `t_step_start`         | Integer | Simulation starting time step |
+| `t_step_stop`          | Integer | Simulation stopping time step |
+| `t_step_save`          | Integer | Frequency to output data |
+| `t_step_print`         | Integer | Frequency to print the current step number to standard output (default 1) |
+| `cfl_dt`               | Logical | CFL based adaptive time-stepping |
+| `cfl`                  | Real    | Specified CFL value |
+| `n_start`              | Integer | Simulation starting save file |
+| `t_save`               | Integer | Time duration between data output |
+| `t_stop`               | Real    | Simulation stop time |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -450,6 +446,29 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
+#### Constant Time-Stepping
+
+- `dt` specifies the constant time step size that is used in simulation.
+The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
+
+- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
+
+`t_step_save` is the time step interval for data output during simulation.
+To newly start the simulation, set `t_step_start = 0`.
+To restart simulation from $k$-th time step, set `t_step_start = k`, do not run `pre_process`, and run `simulation` directly (`./mfc.sh run [...] -t simulation`).
+Ensure the data for the $k$-th time step is stored in the `restart_data/` directory within the case repository.
+
+##### Adaptive Time-Stepping
+
+- `cfl_dt` enables adaptive time stepping with true
+
+- `cfl` specifies the constant cfl value the time-stepping is to maintain
+
+- `n_start` specifies the save file to start at
+
+- `t_save` specifies the time interval between data output during simulation
+
+- `t_stop` specifies at what time the simulation should stop
 
 ### 7. Formatted Output
 

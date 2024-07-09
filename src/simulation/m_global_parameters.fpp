@@ -106,7 +106,7 @@ module m_global_parameters
     !! and prescribed cfl respectively
     !> @{
     real(kind(0d0)) :: t_stop, t_save, cfl
-    integer :: n_start, n_save
+    integer :: n_start
     !> @}
     !$acc declare create(cfl)
 
@@ -508,7 +508,6 @@ contains
         n_start = dflt_int
         t_stop = dflt_real
         t_save = dflt_real
-        n_save = dflt_int
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

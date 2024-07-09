@@ -159,7 +159,7 @@ contains
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
             & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
-            & 'n_start', 'n_save' ]
+            & 'n_start' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -190,7 +190,7 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'sigma' ]
+            & 'Re_inv', 'sigma', 't_save', 't_stop' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

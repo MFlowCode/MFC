@@ -162,7 +162,7 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z, n_start, n_save, t_stop, &
+            g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_dt, cfl
 
         ! Checking that an input file has been provided by the user. If it
@@ -194,8 +194,6 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
-
-            if (cfl_dt) n_save = n_save + 1
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1254,13 +1252,15 @@ contains
         end if
 
         call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+
         !  call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
-            nt = n_save
+            nt = mytime/t_save
         else
             nt = int((t_step - t_step_start)/(t_step_save))
         end if
+
         if (nt == 1) then
             io_time_avg = abs(finish - start)
         else

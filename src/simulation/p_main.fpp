@@ -48,7 +48,6 @@ program p_main
     ! Setting the time-step iterator to the first time-step
     if (cfl_dt) then
         t_step = 0
-        t_save = t_stop/(n_save)
         mytime = t_save*n_start
     else
         t_step = t_step_start

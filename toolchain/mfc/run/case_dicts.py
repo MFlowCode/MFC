@@ -78,6 +78,7 @@ PRE_PROCESS.update({
     'num_ibs': ParamType.INT,
     'cfl_dt': ParamType.LOG,
     'n_start': ParamType.INT,
+    'n_start_old': ParamType.INT
 })
 
 for ib_id in range(1, 10+1):
@@ -208,7 +209,7 @@ SIMULATION.update({
     'num_ibs': ParamType.INT,
     'n_start': ParamType.INT,
     't_stop': ParamType.REAL,
-    'n_save': ParamType.INT,
+    't_save': ParamType.REAL,
     'cfl_dt': ParamType.LOG,
     'cfl': ParamType.REAL
 })
@@ -318,7 +319,8 @@ POST_PROCESS.update({
     'cf_wrt': ParamType.LOG,
     'ib': ParamType.LOG,
     'cfl_dt': ParamType.LOG,
-    'n_save': ParamType.INT,
+    't_save': ParamType.REAL,
+    't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
 })
 

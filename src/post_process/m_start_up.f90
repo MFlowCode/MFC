@@ -75,7 +75,7 @@ contains
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, &
-            cfl_dt, n_save, n_start
+            cfl_dt, t_save, t_stop, n_start
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -101,8 +101,6 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
-
-            if (cfl_dt) n_save = n_save + 1
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
         else

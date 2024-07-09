@@ -55,8 +55,11 @@ contains
         end if
 
         if (old_grid) then
-            if (t_step_old == dflt_int) then
+            if (t_step_old == dflt_int .and. .not. cfl_dt) then
                 call s_mpi_abort('old_grid is enabled, but t_step_old not set. '// &
+                                 'Exiting ...')
+            else if (n_start_old == dflt_int .and. cfl_dt) then
+                 call s_mpi_abort('old_grid is enabled, but n_start_old not set. '// &
                                  'Exiting ...')
             elseif ((.not. f_is_default(x_domain%beg)) .or. (.not. f_is_default(x_domain%end)) &
                     .or. &
@@ -67,77 +70,78 @@ contains
                                  'are not supported with old_grid enabled. '// &
                                  'Exiting ...')
             end if
-        end if
+        else
+            #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
+                ! For cylindrical coordinates, the y and z directions use a different check
+                #:if (DIR == 'y') or (DIR == 'z')
+                    skip_check = cyl_coord
+                #:else
+                    skip_check = .false.
+                #:endif
 
-        #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
-            ! For cylindrical coordinates, the y and z directions use a different check
-            #:if (DIR == 'y') or (DIR == 'z')
-                skip_check = cyl_coord
-            #:else
-                skip_check = .false.
-            #:endif
-
-            if (.not. skip_check) then
-                #:for BOUND in ['beg', 'end']
-                    if (${VAR}$ == 0) then
-                        if (.not. f_is_default((${DIR}$_domain%${BOUND}$))) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                             'be set when ${VAR}$ = 0. Exiting ...')
+                if (.not. skip_check) then
+                    #:for BOUND in ['beg', 'end']
+                        if (${VAR}$ == 0) then
+                            if (.not. f_is_default((${DIR}$_domain%${BOUND}$))) then
+                                call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                                 'be set when ${VAR}$ = 0. Exiting ...')
+                            end if
+                        else ! ${VAR}$ > 0
+                            if (old_grid .and. (.not. f_is_default(${DIR}$_domain%${BOUND}$))) then
+                                call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
+                                                 'be set when ${VAR}$ > 0 and '// &
+                                                 'old_grid = T. Exiting ...')
+                            elseif (.not. old_grid .and. f_is_default(${DIR}$_domain%${BOUND}$)) then
+                                call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
+                                                 'set when ${VAR}$ > 0 and '// &
+                                                 'old_grid = F. Exiting ...')
+                            elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
+                                call s_mpi_abort('${DIR}$_domain%beg must be less '// &
+                                                 'than ${DIR}$_domain%end when '// &
+                                                 'both are set. Exiting ...')
+                            end if
                         end if
-                    else ! ${VAR}$ > 0
-                        if (old_grid .and. (.not. f_is_default(${DIR}$_domain%${BOUND}$))) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                             'be set when ${VAR}$ > 0 and '// &
-                                             'old_grid = T. Exiting ...')
-                        elseif (.not. old_grid .and. f_is_default(${DIR}$_domain%${BOUND}$)) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
-                                             'set when ${VAR}$ > 0 and '// &
-                                             'old_grid = F. Exiting ...')
-                        elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
-                            call s_mpi_abort('${DIR}$_domain%beg must be less '// &
-                                             'than ${DIR}$_domain%end when '// &
-                                             'both are set. Exiting ...')
-                        end if
-                    end if
-                #:endfor
-            end if
-
-        #:endfor
-
-        ! Check for y and z directions for cylindrical coordinates
-        if (cyl_coord) then
-            if (n == 0) then
-                call s_mpi_abort('n must be positive for cylindrical '// &
-                                 'coordinates. Exiting ...')
-            elseif (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)) then
-                call s_mpi_abort('y_domain%beg and y_domain%end '// &
-                                 'must be set for n = 0 '// &
-                                 '(2D cylindrical coordinates). Exiting ...')
-            elseif (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0) then
-                call s_mpi_abort('y_domain%beg must be 0 and y_domain%end '// &
-                                 'must be positive for cylindrical '// &
-                                 'coordinates. Exiting ...')
-            end if
-
-            if (p == 0) then
-                if ((.not. f_is_default(z_domain%beg)) &
-                    .or. &
-                    (.not. f_is_default(z_domain%end))) then
-                    call s_mpi_abort('z_domain%beg and z_domain%end '// &
-                                     'are not supported for p = 0 '// &
-                                     '(2D cylindrical coordinates). Exiting ...')
+                    #:endfor
                 end if
-            else if (p > 0) then
-                if (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi) then
-                    call s_mpi_abort('z_domain%beg must be 0 and z_domain%end '// &
-                                     'must be 2*pi for 3D cylindrical '// &
+
+            #:endfor
+
+            ! Check for y and z directions for cylindrical coordinates
+            if (cyl_coord) then
+                if (n == 0) then
+                    call s_mpi_abort('n must be positive for cylindrical '// &
+                                     'coordinates. Exiting ...')
+                elseif (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)) then
+                    call s_mpi_abort('y_domain%beg and y_domain%end '// &
+                                     'must be set for n = 0 '// &
+                                     '(2D cylindrical coordinates). Exiting ...')
+                elseif (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0) then
+                    call s_mpi_abort('y_domain%beg must be 0 and y_domain%end '// &
+                                     'must be positive for cylindrical '// &
                                      'coordinates. Exiting ...')
                 end if
+
+                if (p == 0) then
+                    if ((.not. f_is_default(z_domain%beg)) &
+                        .or. &
+                        (.not. f_is_default(z_domain%end))) then
+                        call s_mpi_abort('z_domain%beg and z_domain%end '// &
+                                         'are not supported for p = 0 '// &
+                                         '(2D cylindrical coordinates). Exiting ...')
+                    end if
+                else if (p > 0) then
+                    if (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi) then
+                        call s_mpi_abort('z_domain%beg must be 0 and z_domain%end '// &
+                                         'must be 2*pi for 3D cylindrical '// &
+                                         'coordinates. Exiting ...')
+                    end if
+                end if
             end if
+
         end if
 
         if (num_patches < 0 .or. &
-            (num_patches == 0 .and. t_step_old == dflt_int)) then
+            (num_patches == 0 .and. ((t_step_old == dflt_int) .or. (n_start_old == dflt_int)))) then
             call s_mpi_abort('num_patches must be non-negative for the '// &
                              'non-restart case. Exiting ...')
         end if

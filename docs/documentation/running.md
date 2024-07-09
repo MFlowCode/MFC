@@ -116,11 +116,15 @@ The user can also choose to add new patches at the intermediate timestep.
 
 If you want to restart a simulation, 
 
-- Set up the initial simulation, with:
+- For a simulation that uses a constant time step set up the initial case file with: 
     - `t_step_start` : $t_i$
     - `t_step_stop`  : $t_f$
-    - `t_step_save`  : $SF$
-in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
+    - `t_step_save`  : $SF$ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
+    For a simulation that uses adaptive time-stepping, set up the initial case file with:
+    - `n_start` : $t_i$
+    - `t_stop`  : $t_f$
+    - `t_save`  : $SF$ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
+
 - Run `pre_process` and `simulation` on the case.
     - `./mfc.sh run case.py -t pre_process simulation `
 - As the simulation runs, it will create Lustre files for each saved timestep in `./restart_data`.
@@ -136,10 +140,15 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 			- `a_(xyz)`
 			- `(xyz)_a`
 			- `(xyz)_b`
-	- Alter the following:
+	- When using a constant time-step, alter the following:
 		- `t_step_start` : $t_s$ (the point at which the simulation will restart)
 		- `t_step_stop`  : $t_{f2}$ (new final simulation time, which can be the same as $t_f$)
 		- `t_step_save`  : ${SF}_2$ (if interested in changing the saving frequency)
+        If using an adaptive time-step, alter the following:
+		- `n_start` : $t_s$ (the save file at which the simulation will restart)
+		- `t_stop`  : $t_{f2}$ (new final simulation time, which can be the same as $t_f$)
+		- `t_save`  : ${SF}_2$ (if interested in changing the saving frequency)
+
 	- Add the following:
 		- `old_ic` : 'T' (to specify that we have initial conditions from previous simulations)
 		- `old_grid` : 'T' (to specify that we have a grid from previous simulations)
