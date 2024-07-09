@@ -287,3 +287,6 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
     if len(history) == 0:
         cons.print(no_indent=True)
 
+
+def clean():
+    shutil.rmtree('build')

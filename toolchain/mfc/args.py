@@ -21,6 +21,7 @@ started, run ./mfc.sh build -h.""",
     run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -72,6 +73,9 @@ started, run ./mfc.sh build -h.""",
     build.add_argument("-i", "--input", type=str, default=None, help="(GPU Optimization) Build a version of MFC optimized for a case.")
     build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
+    # === CLEAN ===
+    add_common_arguments(clean, "jg")
+
     # === TEST ===
     test_cases = list_cases()
 
@@ -112,7 +116,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
     run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
     run.add_argument("-o", "--output-summary",     metavar="OUTPUT",             type=str, default=None,       help="Output file (YAML) for summary.")
-    # run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
+    run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
     run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
     run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
     run.add_argument("--omni",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM omniperf.")
@@ -144,7 +148,7 @@ started, run ./mfc.sh build -h.""",
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("count", count), ("count_diff", count_diff)]:
+                         ("clean",  clean), ("count", count), ("count_diff", count_diff)]:
         if args["command"] == name:
             continue
 
