@@ -849,8 +849,7 @@ contains
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              qK_prim_vf, &
                                                              gm_alphaK_vf, &
-                                                             ix, iy, iz, &
-                                                             qK_btensor_vf)
+                                                             ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
@@ -859,8 +858,6 @@ contains
             intent(in) :: gm_alphaK_vf
 
         type(int_bounds_info), optional, intent(in) :: ix, iy, iz
-
-        type(scalar_field), optional, dimension(b_size), intent(INOUT) :: qK_btensor_vf
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -886,9 +883,7 @@ contains
 
         real(kind(0.d0)) :: ntmp
 
-#ifdef MFC_POST_PROCESS
         type(scalar_field), dimension(b_size) :: q_btensor
-#endif
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
@@ -905,6 +900,12 @@ contains
                 allocate (nRtmp(0))
             end if
         #:endif
+
+        if (hyperelasticity) then 
+          do l = 1, b_size
+            allocate (q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
+          end do
+        end if
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
@@ -1052,9 +1053,12 @@ contains
 
         !print *, 'I got here AA'
 
-#ifdef MFC_SIMULATION
         if (hyperelasticity) then
-            call s_calculate_btensor_acc(qK_prim_vf, qK_btensor_vf, 0, m, 0, n, 0, p)
+#ifdef MFC_SIMULATION
+            call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+#else
+            call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+#endif
             !print *, 'I got here AAA'
            !!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
             !do l = izb, ize
@@ -1069,7 +1073,7 @@ contains
             !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
             !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
             !rho_K = max(rho_K, sgm_eps)
-            !if (G_K > 1d-3) then
+            !if (G_K > verysmall) then
             !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
             !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
             !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
@@ -1080,34 +1084,6 @@ contains
             !end do
            !!$acc end parallel loop
         end if
-#endif
-
-#ifdef MFC_POST_PROCESS
-        do l = 1, b_size
-            allocate (q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
-        end do
-
-        if (hyperelasticity) then
-            call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        do i = 1, num_fluids
-                            alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                            alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                        end do
-                        ! If pre-processing, use non acc mixture subroutines
-                        !call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                        !         rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-                        !if ( G_K > 1000 ) then
-                        !   !qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) ! - &
-                        !       !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
-                        !end if
-                    end do
-                end do
-            end do
-        end if
-#endif
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 

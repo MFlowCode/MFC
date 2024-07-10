@@ -39,8 +39,6 @@ module m_rhs
 
     use m_hypoelastic
 
-    !use m_hyperelastic
-
     use m_monopole
 
     use m_viscous
@@ -783,20 +781,8 @@ contains
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
             ix, iy, iz)
-        !call s_convert_conservative_to_primitive_variables( &
-        !    q_cons_qp%vf, &
-        !    q_prim_qp%vf, &
-        !    gm_alpha_qp%vf, &
-        !    ix, iy, iz, &
-        !    q_btensor%vf)
         call nvtxEndRange
         !print *, "I got here B"
-
-        !call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-        !if (hyperelasticity) then
-        !  call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-        !end if
-        !call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
