@@ -27,7 +27,7 @@ module m_global_parameters
     integer :: t_step_old, t_step_start  !< Existing IC/grid folder
     ! ==========================================================================
 
-    logical :: cfl_dt
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: n_start, n_start_old
 
     ! Computational Domain Parameters ==========================================
@@ -243,6 +243,8 @@ contains
         t_step_old = dflt_int
         t_step_start = dflt_int
 
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
         cfl_dt = .false.
         n_start = dflt_int
 

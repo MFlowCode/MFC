@@ -433,7 +433,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, '', {}))
 
-        stack.push('cfl_dt=T', {'cfl_dt': 'T', 'cfl': 0.08, 'n_save': 1, 'n_start': 0, 't_stop': 0.025})
+        stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.08, 't_save': 0.025, 'n_start': 0, 't_stop': 0.025})
         cases.append(define_case_d(stack, '', {}))
 
         stack.pop()
@@ -555,7 +555,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('bubble_model=3', {'bubble_model': 3})
             cases.append(define_case_d(stack, '', {}))
 
-            stack.push('cfl_dt=T', {'cfl_dt': 'T', 'cfl': 0.8, 'n_save': 1, 'n_start': 0, 't_stop': 0.01})
+            stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01})
+            cases.append(define_case_d(stack, '', {}))
+
+            stack.pop()
+
+            stack.push('cfl_const_dt=T', {'cfl_const_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01})
             cases.append(define_case_d(stack, '', {}))
 
             for _ in range(6):

@@ -19,6 +19,8 @@ program p_main
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_start_up
+
+    use m_time_steppers
     ! ==========================================================================
 
     implicit none
@@ -58,6 +60,8 @@ program p_main
         end if
         finaltime = t_step_stop*dt
     end if
+
+    if (cfl_const_dt) call s_compute_dt()
 
     ! Time-stepping Loop =======================================================
     do

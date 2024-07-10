@@ -78,9 +78,10 @@ module m_global_parameters
 
     !> @name IO options for adaptive time-stepping
     !> @{
-    logical :: cfl_dt
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     real(kind(0d0)) :: t_save
     real(kind(0d0)) :: t_stop
+    real(kind(0d0)) :: cfl_target
     integer :: n_save
     integer :: n_start
     !> @}
@@ -288,7 +289,10 @@ contains
         t_step_stop = dflt_int
         t_step_save = dflt_int
 
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
         cfl_dt = .false.
+        cfl_target = dflt_real
         t_save = dflt_real
         n_start = dflt_int
         t_stop = dflt_real

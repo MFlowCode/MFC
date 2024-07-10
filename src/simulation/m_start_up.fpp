@@ -163,7 +163,7 @@ contains
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
-            cfl_dt, cfl
+            cfl_adap_dt, cfl_const_dt, cfl_target
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -194,6 +194,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1100,8 +1102,7 @@ contains
 
         integer :: i, j, k, l
 
-
-        if (cfl_dt) call s_compute_dt()
+        if (cfl_adap_dt) call s_compute_dt()
 
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) dt = t_stop - mytime

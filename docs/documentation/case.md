@@ -364,9 +364,9 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `t_step_save`          | Integer | Frequency to output data |
 | `t_step_print`         | Integer | Frequency to print the current step number to standard output (default 1) |
 | `cfl_dt`               | Logical | CFL based adaptive time-stepping |
-| `cfl`                  | Real    | Specified CFL value |
-| `n_start`              | Integer | Simulation starting save file |
-| `t_save`               | Integer | Time duration between data output |
+| `cfl_target`           | Real    | Specified CFL value |
+| `n_start`              | Integer | Save file from which to start simulation |
+| `t_save`               | Real    | Time duration between data output |
 | `t_stop`               | Real    | Simulation stop time |
 
 - \* Options that work only with `model_eqns = 2`.

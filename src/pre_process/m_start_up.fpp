@@ -141,7 +141,7 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n, cfl_dt, n_start, n_start_old
+            sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, n_start_old
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -167,6 +167,9 @@ contains
             p_glb = p
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .True.
+
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if
@@ -666,7 +669,7 @@ contains
         integer :: i
 
         ! Open the file to read
-        if (cfl_dt) then
+        if (cfl_adap_dt) then
             write (file_loc, '(I0,A)') n_start, '.dat'
         else
             write (file_loc, '(I0,A)') t_step_start, '.dat'

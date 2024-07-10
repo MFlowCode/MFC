@@ -59,7 +59,17 @@ contains
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_time_stepping
         if (cfl_dt) then
-
+            if (cfl_target < 0 .or. cfl_target > 1d0) then
+                call s_mpi_abort('cfl_target must be between 0 and 1. Exiting ...')
+            elseif (t_stop <= 0) then
+                call s_mpi_abort('t_stop must be positive. Exiting ...')
+            elseif (t_save <= 0) then
+                call s_mpi_abort('t_save must be positive. Exiting ...')
+            elseif (t_save > t_stop) then
+                call s_mpi_abort('t_save must be less than t_stop. Exiting ...')
+            elseif (n_start < 0) then
+                call s_mpi_abort('n_start must be greater than or equal to zero. Exiting ...')
+            end if
         else
             if (t_step_start < 0) then
                 call s_mpi_abort('t_step_start must be non-negative. Exiting ...')

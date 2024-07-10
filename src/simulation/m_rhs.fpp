@@ -789,7 +789,7 @@ contains
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
-        if (cfl_dt) then
+        if (cfl_adap_dt) then
             if (mytime >= t_stop) return
         else
             if (t_step == t_step_stop) return
