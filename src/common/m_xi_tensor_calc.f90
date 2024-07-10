@@ -33,6 +33,37 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
+        !! neo-Hookean only at this time, will need to be changed later
+    function f_elastic_energy(btensor, j, k, l)
+#ifdef MFC_SIMULATION
+        !$acc routine seq
+#endif
+        type(scalar_field), dimension(b_size), intent(IN) :: btensor
+        integer, intent(IN) :: j, k, l
+        real(kind(0d0)) :: invariant1, f_elastic_energy
+
+        f_elastic_energy = 0d0
+        invariant1 = btensor(1)%sf(j, k, l)
+        !if (num_dims == 2) then
+        !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
+        !elseif (num_dims == 3) then
+        invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
+        !end if
+
+        ! compute the invariant without the elastic modulus
+        f_elastic_energy = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)
+
+    end function f_elastic_energy
+
+
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
     subroutine s_compute_gradient_xi(q_prim_vf, xb, xe, yb, ye, & !---------
                                      zb, ze, j, k, l, tensora, tensorb)
 
@@ -496,6 +527,46 @@ contains
         tensorb(tensor_size) = determinant
 
     end subroutine s_compute_gradient_xi
+
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
+    subroutine s_calculate_btensor(q_prim_vf, btensor, xb, xe, yb, ye, zb, ze)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(b_size), intent(INOUT) :: btensor
+        integer, intent(IN) :: xb, xe, yb, ye, zb, ze
+        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
+        integer :: j, k, l
+
+        do l = zb, ze
+            do k = yb, ye
+                do j = xb, xe
+                    call s_compute_gradient_xi(q_prim_vf, xb, xe, yb, &
+                                               ye, zb, ze, j, k, l, tensora, tensorb)
+                    ! 1: 1D, 3: 2D, 6: 3D
+                    btensor(1)%sf(j, k, l) = tensorb(1)
+                    !if (num_dims > 1) then ! 2D
+                    btensor(2)%sf(j, k, l) = tensorb(2)
+                    !   btensor(3)%sf(j,k,l) = tensorb(4)
+                    !end if
+                    !if (num_dims > 2) then ! 3D
+                    btensor(3)%sf(j, k, l) = tensorb(3)
+                    btensor(4)%sf(j, k, l) = tensorb(5)
+                    btensor(5)%sf(j, k, l) = tensorb(6)
+                    btensor(6)%sf(j, k, l) = tensorb(9)
+                    !end if
+                    ! store the determinant at the last entry of the btensor sf
+                    btensor(b_size)%sf(j, k, l) = tensorb(tensor_size)
+                end do
+            end do
+        end do
+    end subroutine s_calculate_btensor
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
@@ -1196,75 +1267,6 @@ contains
 
     end subroutine s_compute_gradient_xi3d_acc
 
-    !>  The following subroutine handles the calculation of the btensor.
-        !!   The calculation of the btensor takes qprimvf.
-        !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
-        !! calculate the grad_xi, grad_xi is a nxn tensor
-        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-        !! btensor is symmetric, save the data space
-        !! neo-Hookean only at this time, will need to be changed later
-    function f_elastic_energy(btensor, j, k, l)
-#ifdef MFC_SIMULATION
-        !$acc routine seq
-#endif
-        type(scalar_field), dimension(b_size), intent(IN) :: btensor
-        integer, intent(IN) :: j, k, l
-        real(kind(0d0)) :: invariant1, f_elastic_energy
-
-        f_elastic_energy = 0d0
-        invariant1 = btensor(1)%sf(j, k, l)
-        !if (num_dims == 2) then
-        !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
-        !elseif (num_dims == 3) then
-        invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-        !end if
-
-        ! compute the invariant without the elastic modulus
-        f_elastic_energy = 0.5d0*(invariant1 - 3.0d0)/btensor(b_size)%sf(j, k, l)
-
-    end function f_elastic_energy
-
-    !>  The following subroutine handles the calculation of the btensor.
-        !!   The calculation of the btensor takes qprimvf.
-        !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
-        !! calculate the grad_xi, grad_xi is a nxn tensor
-        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-        !! btensor is symmetric, save the data space
-    subroutine s_calculate_btensor(q_prim_vf, btensor, xb, xe, yb, ye, zb, ze)
-
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(INOUT) :: btensor
-        integer, intent(IN) :: xb, xe, yb, ye, zb, ze
-        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-        integer :: j, k, l
-
-        do l = zb, ze
-            do k = yb, ye
-                do j = xb, xe
-                    call s_compute_gradient_xi(q_prim_vf, xb, xe, yb, &
-                                               ye, zb, ze, j, k, l, tensora, tensorb)
-                    ! 1: 1D, 3: 2D, 6: 3D
-                    btensor(1)%sf(j, k, l) = tensorb(1)
-                    !if (num_dims > 1) then ! 2D
-                    btensor(2)%sf(j, k, l) = tensorb(2)
-                    !   btensor(3)%sf(j,k,l) = tensorb(4)
-                    !end if
-                    !if (num_dims > 2) then ! 3D
-                    btensor(3)%sf(j, k, l) = tensorb(3)
-                    btensor(4)%sf(j, k, l) = tensorb(5)
-                    btensor(5)%sf(j, k, l) = tensorb(6)
-                    btensor(6)%sf(j, k, l) = tensorb(9)
-                    !end if
-                    ! store the determinant at the last entry of the btensor sf
-                    btensor(b_size)%sf(j, k, l) = tensorb(tensor_size)
-                end do
-            end do
-        end do
-    end subroutine s_calculate_btensor
 
     !>  The following subroutine handles the calculation of the btensor.
         !!      The calculation of the btensor takes qprimvf.

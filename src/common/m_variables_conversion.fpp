@@ -24,6 +24,7 @@ module m_variables_conversion
     use m_helper_basic         !< Functions to compare floating point numbers
 
     use m_helper
+
     ! ==========================================================================
 
     implicit none
@@ -105,6 +106,11 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
+
+    !! The btensor at the cell-interior Gaussian quadrature points.
+    !! These tensor is needed to be calculated once and make the code DRY.
+    type(vector_field) :: q_btensor !<
+    !$acc declare create(q_btensor)
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
@@ -675,6 +681,14 @@ contains
         end if
 #endif
 
+        if (hyperelasticity) then 
+          @:ALLOCATE(q_btensor%vf(1:b_size))
+          do i = 1, b_size
+            @:ALLOCATE(q_btensor%vf(i)%sf(ixb:ixe, iyb:iye, izb:ize))
+          end do
+          @:ACC_SETUP_VFs(q_btensor)
+        end if
+
         if (bubbles) then
 #ifdef MFC_SIMULATION
             @:ALLOCATE_GLOBAL(bubrs(1:nb))
@@ -685,7 +699,6 @@ contains
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
             end do
-
             !$acc update device(bubrs)
         end if
 
@@ -1061,6 +1074,7 @@ contains
             !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
             !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
             !end if
+            !TODO call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, ix, iy, iz)
             !      end do
             !   end do
             !end do
@@ -1134,9 +1148,9 @@ contains
 
         ! going through hyperelasticity again due to the btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
-        !if (hyperelasticity) then
-        !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-        !end if
+        if (hyperelasticity) then
+            call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+        end if
 
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
@@ -1232,7 +1246,7 @@ contains
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                             ! adding elastic contribution
-                            if (G > 1000) then
+                            if (G > verysmall) then
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
                                 ! extra terms in 2 and 3D
@@ -1253,9 +1267,11 @@ contains
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                        end do
                        if (G > verysmall) then
-                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                             G*f_elastic_energy(q_btensor, j, k, l)
+                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
+                             !G*f_elastic_energy(q_btensor, j, k, l)
                        end if
+                       call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, ix, iy, iz)
+                       !TODO Multiply the \tau to \rho \tau
                     end if
 
                     if (.not. f_is_default(sigma)) then
@@ -1265,6 +1281,7 @@ contains
                 end do
             end do
         end do
+
 
         ! deallocating the btensor
         do l = 1, b_size

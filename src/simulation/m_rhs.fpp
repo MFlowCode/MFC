@@ -77,11 +77,6 @@ module m_rhs
     type(vector_field) :: q_prim_qp !<
     !$acc declare create(q_prim_qp)
 
-    !! The btensor at the cell-interior Gaussian quadrature points.
-    !! These tensor is needed to be calculated once and make the code DRY.
-    type(vector_field) :: q_btensor !<
-    !$acc declare create(q_btensor)
-
     !> @name The first-order spatial derivatives of the primitive variables at cell-
     !! interior Gaussian quadrature points. These are WENO-reconstructed from
     !! their respective cell-average values, obtained through the application
@@ -254,7 +249,6 @@ contains
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
-        @:ALLOCATE(q_btensor%vf(1:b_size))
 
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -279,13 +273,6 @@ contains
         end if
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
-
-        if (hyperelasticity) then 
-          do l = 1, b_size
-            @:ALLOCATE(q_btensor%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-          end do
-          @:ACC_SETUP_VFs(q_btensor)
-        end if
 
         do l = 1, cont_idx%end
             q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
@@ -796,20 +783,20 @@ contains
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
             ix, iy, iz)
-!        call s_convert_conservative_to_primitive_variables( &
-!            q_cons_qp%vf, &
-!            q_prim_qp%vf, &
-!            gm_alpha_qp%vf, &
-!            ix, iy, iz, &
-!            q_btensor%vf)
+        !call s_convert_conservative_to_primitive_variables( &
+        !    q_cons_qp%vf, &
+        !    q_prim_qp%vf, &
+        !    gm_alpha_qp%vf, &
+        !    ix, iy, iz, &
+        !    q_btensor%vf)
         call nvtxEndRange
         !print *, "I got here B"
 
-        call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
-        if (hyperelasticity) then
-          call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
-        end if
-        call nvtxEndRange
+        !call nvtxStartRange("RHS-UPDATE CAUCHY TENSOR")
+        !if (hyperelasticity) then
+        !  call s_calculate_cauchy_from_btensor(q_btensor%vf,q_prim_qp%vf, ix, iy, iz)
+        !end if
+        !call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)

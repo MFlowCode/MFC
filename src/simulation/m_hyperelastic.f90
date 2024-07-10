@@ -25,20 +25,20 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_calculate_cauchy_from_btensor(btensor, q_prim_vf, ix, iy, iz)
+    subroutine s_calculate_cauchy_from_btensor(btensor, q_prim_vf, j, k, l)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(IN) :: btensor
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(IN) :: j, k, l
 
         real(kind(0d0)), dimension(b_size - 1) :: tensor
         real(kind(0d0)) :: trace
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i !< Generic loop iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(trace)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        !!!$acc parallel loop collapse(3) gang vector default(present) private(trace)
+        !do l = 0, p
+        !    do k = 0, n
+        !        do j = 0, m
                     ! tensor is the symmetric tensor & calculate the trace of the tensor
                     !trace = btensor(1)%sf(j,k,l)
                     !if (num_dims == 2) then
@@ -76,10 +76,10 @@ contains
                     ! else
                     !     q_prim_vf(xiend+1)%sf(j,k,l) = 1d-12
                     ! end if
-                end do
-            end do
-        end do
-        !$acc end parallel loop
+        !        end do
+        !    end do
+        !end do
+        !!$acc end parallel loop
 
     end subroutine s_calculate_cauchy_from_btensor
 
