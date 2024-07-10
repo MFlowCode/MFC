@@ -1270,7 +1270,7 @@ contains
                           q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
                              !G*f_elastic_energy(q_btensor, j, k, l)
                        end if
-                       call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, ix, iy, iz)
+                       call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, j, k, l)
                        !TODO Multiply the \tau to \rho \tau
                     end if
 

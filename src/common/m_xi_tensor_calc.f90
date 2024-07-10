@@ -1789,9 +1789,9 @@ contains
 #ifdef MFC_SIMULATION
         !$acc routine seq
 #endif
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(IN) :: btensor
-        type(int_bounds_info), intent(IN) :: j, k, l
+        integer, intent(IN) :: j, k, l
 
         real(kind(0d0)), dimension(b_size - 1) :: tensor
         real(kind(0d0)) :: trace
