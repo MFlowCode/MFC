@@ -117,9 +117,9 @@ module m_cbc
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
     !$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynominal interpolant coefficients in x-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynominal interpolant coefficients in y-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynominal interpolant coefficients in z-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
 #endif
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last

@@ -95,7 +95,7 @@ contains
         do i = 0, m
             do j = 0, n
 
-                if (patch_ib(ib_patch_id)%theta /= dflt_real) then
+                if (.not. f_is_default(patch_ib(ib_patch_id)%theta)) then
                     x_act = (x_cc(i) - x_centroid)*cos(theta) - (y_cc(j) - y_centroid)*sin(theta) + x_centroid
                     y_act = (x_cc(i) - x_centroid)*sin(theta) + (y_cc(j) - y_centroid)*cos(theta) + y_centroid
                 else
@@ -184,7 +184,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (patch_ib(ib_patch_id)%theta /= dflt_real) then
+                    if (.not. f_is_default(patch_ib(ib_patch_id)%theta)) then
                         x_act = (x_cc(i) - x_centroid)*cos(theta) - (y_cc(j) - y_centroid)*sin(theta) + x_centroid
                         y_act = (x_cc(i) - x_centroid)*sin(theta) + (y_cc(j) - y_centroid)*cos(theta) + y_centroid
                     else
