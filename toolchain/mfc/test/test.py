@@ -187,10 +187,11 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
-        for t_step in [ i*case["t_step_save"] for i in range(0, math.floor(case["t_step_stop"] / case["t_step_save"]) + 1) ]:
-            silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
-            if not os.path.exists(silo_filepath):
-                silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
+        # for t_step in [ i*case["t_step_save"] for i in range(0, math.floor(case["t_step_stop"] / case["t_step_save"]) + 1) ]:
+            # silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
+        for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
+
+            silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
 
             h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
