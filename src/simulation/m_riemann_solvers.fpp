@@ -888,7 +888,6 @@ contains
         real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
-        real(kind(0d0)), dimension(3) :: xi_field_L, xi_field_R
 
         real(kind(0d0)) :: rho_avg
         real(kind(0d0)), dimension(num_dims) :: vel_avg
@@ -1098,12 +1097,6 @@ contains
                                         G_L = G_L + alpha_L(i)*Gs(i)
                                         G_R = G_R + alpha_R(i)*Gs(i)
                                     end do
-                                    !$acc loop seq 
-                                    do i = 1, num_dims
-                                        ! Left and right \xi fields
-                                        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
-                                        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
-                                    end do
                                     ! Elastic contribution to energy if G large enough
                                     if (G_L < verysmall) G_L = 0d0; 
                                     if (G_R < verysmall) G_R = 0d0; 
@@ -1268,13 +1261,6 @@ contains
                               xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(dir_idx(i))))
                                 end do
 
-                                ! SURFACE TENSION FLUX. need to check
-                                if (.not. f_is_default(sigma)) then
-                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                        (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
-                                         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
-                                end if
-
                                 ! INTERNAL ENERGIES ADVECTION FLUX.
                                 ! K-th pressure and velocity in preparation for the internal energy flux
                                 vel_K_Star = vel_L(idx1)*(1d0 - xi_MP) + xi_MP*vel_R(idx1) + &
@@ -1295,11 +1281,28 @@ contains
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
+                                ! REFERENCE MAP FLUX.
+                                if (hyperelasticity) then
+                                  !$acc loop seq
+                                  do i = xibeg, xiend
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
+                                        xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                  end do
+                                end if
+
+                                ! SURFACE TENSION FLUX. need to check
+                                if (.not. f_is_default(sigma)) then
+                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                        (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
+                                         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
+                                end if
+
                                 ! correction pressure for the cylindrical terms
                                 p_Star = xi_M*(pres_L + xi_MP*rho_L*(s_L - &
-                                         vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
-                                         xi_P*(pres_R + xi_PP*rho_R*(s_R - &
-                                         vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
+                                  vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
+                                  xi_P*(pres_R + xi_PP*rho_R*(s_R - &
+                                  vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
