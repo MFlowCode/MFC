@@ -272,13 +272,6 @@ contains
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
-        if (adv_n) then
-            @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
-                iy_t%beg:iy_t%end, &
-                iz_t%beg:iz_t%end))
-            @:ACC_SETUP_SFs(q_prim_vf(n_idx))
-        end if
-
         ! Allocating the cell-average RHS variables
         @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
