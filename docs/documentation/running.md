@@ -107,7 +107,7 @@ When used, `--omni` will output profiling information for all subroutines, inclu
 Adding this argument will moderately slow down the simulation and run the MFC executable several times.
 For this reason it should only be used with case files that have a few timesteps.
 
-
+<a name="restarting-cases"></a>
 ### Restarting Cases
 
 When running a simulation, MFC generates a `./restart_data` folder in the case directory that contains `lustre_*.dat` files that can be used to restart a simulation from saved timesteps.
@@ -144,7 +144,8 @@ If you want to restart a simulation,
 		- `t_step_start` : $t_s$ (the point at which the simulation will restart)
 		- `t_step_stop`  : $t_{f2}$ (new final simulation time, which can be the same as $t_f$)
 		- `t_step_save`  : ${SF}_2$ (if interested in changing the saving frequency)
-        If using an adaptive time-step, alter the following:
+
+        If using a CFL-based time-step, alter the following:
 		- `n_start` : $t_s$ (the save file at which the simulation will restart)
 		- `t_stop`  : $t_{f2}$ (new final simulation time, which can be the same as $t_f$)
 		- `t_save`  : ${SF}_2$ (if interested in changing the saving frequency)

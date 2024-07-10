@@ -101,7 +101,6 @@ module m_global_parameters
     integer :: t_step_start, t_step_stop, t_step_save
     !> @}
 
-
     !> @name Starting time, stopping time, and time between backups, simulation time,
     !! and prescribed cfl respectively
     !> @{

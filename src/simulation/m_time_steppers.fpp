@@ -1024,18 +1024,18 @@ contains
                         !3D
                         if (grid_geometry == 3) then
                             max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      fltr_dtheta/(abs(vel(3)) + c))
+                                                             dy(k)/(abs(vel(2)) + c), &
+                                                             fltr_dtheta/(abs(vel(3)) + c))
                         else
                             max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      dz(l)/(abs(vel(3)) + c))
+                                                             dy(k)/(abs(vel(2)) + c), &
+                                                             dz(l)/(abs(vel(3)) + c))
                         end if
 
                     elseif (n > 0) then
                         !2D
                         max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                  dy(k)/(abs(vel(2)) + c))
+                                                         dy(k)/(abs(vel(2)) + c))
                     else
                         !1D
                         max_dt(j, k, l) = cfl_target*(dx(j)/(abs(vel(1)) + c))

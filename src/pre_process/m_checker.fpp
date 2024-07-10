@@ -59,7 +59,7 @@ contains
                 call s_mpi_abort('old_grid is enabled, but t_step_old not set. '// &
                                  'Exiting ...')
             else if (n_start_old == dflt_int .and. cfl_adap_dt) then
-                 call s_mpi_abort('old_grid is enabled, but n_start_old not set. '// &
+                call s_mpi_abort('old_grid is enabled, but n_start_old not set. '// &
                                  'Exiting ...')
             elseif ((.not. f_is_default(x_domain%beg)) .or. (.not. f_is_default(x_domain%end)) &
                     .or. &
