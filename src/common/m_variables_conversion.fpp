@@ -1031,12 +1031,11 @@ contains
                         end do
                     end if
 
-                    if ( hyperelasticity ) then
-                         !$acc loop seq
-                         do i = xibeg, xiend
-                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                          !print *, 'i ::',i,',j,k,l ::',j,k,l,', qprim ::',qK_prim_vf(i)%sf(j,k,l)
-                         end do
+                    if (hyperelasticity) then
+                       !$acc loop seq
+                       do i = xibeg, xiend
+                          qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                       end do
                     end if
 
                     !$acc loop seq
@@ -1066,20 +1065,20 @@ contains
             do l = izb, ize
                do k = iyb, iye
                   do j = ixb, ixe
-                    !!$acc loop seq
-                    !do i = 1, num_fluids
-                    !    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                    !    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    !end do
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    end do
                     ! If in simulation, use acc mixture subroutines
-                    !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                    !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    !rho_K = max(rho_K, sgm_eps)
-                    !if (G_K > verysmall) then
-                    !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
-                    !             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                 alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    rho_K = max(rho_K, sgm_eps)
+                    if (G_K > verysmall) then
+                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                 G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
-                    !end if
+                    end if
                     call s_compute_cauchy_solver(q_btensor,qK_prim_vf, j, k, l)
                   end do
                end do
@@ -1124,7 +1123,7 @@ contains
             @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
         end do
 
-        ! going through hyperelasticity again due to the btensor calculation
+        ! btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity) then
             call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
@@ -1220,6 +1219,13 @@ contains
                         end do
                     end if
 
+
+                    if (elasticity) then 
+                        do i = stress_idx%beg, stress_idx%end
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
                     if (hypoelasticity) then
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -1245,11 +1251,14 @@ contains
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                        end do
                        if (G > verysmall) then
-                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
-                             !G*f_elastic_energy(q_btensor, j, k, l)
+                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                             G*f_elastic_energy(q_btensor, j, k, l)
                        end if
                        call s_compute_cauchy_solver(q_btensor,q_prim_vf, j, k, l)
-                       !TODO Multiply the \tau to \rho \tau
+                       ! Multiply the \tau to \rho \tau
+                       do i = stress_idx%beg, stress_idx%end
+                          q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                       end do
                     end if
 
                     if (.not. f_is_default(sigma)) then
