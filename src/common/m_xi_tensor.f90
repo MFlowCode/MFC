@@ -5,7 +5,7 @@
 !> @brief This module consists of subroutines used in the calculation of matrix
 !!              operations for the reference map tensor
 
-module m_xi_tensor_calc
+module m_xi_tensor
 
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
@@ -1838,4 +1838,4 @@ contains
 
     end subroutine s_calculate_cauchy_from_btensor
 
-end module m_xi_tensor_calc
+end module m_xi_tensor

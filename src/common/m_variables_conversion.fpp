@@ -19,7 +19,9 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    use m_xi_tensor_calc       !< Using reference map matrix calculations
+    use m_xi_tensor            !< Using reference map matrix calculations
+
+    use m_hyperelastic         !< Using hyperelastic Cauchy tensor calculations
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
@@ -1060,29 +1062,29 @@ contains
             call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
 #endif
             !print *, 'I got here AAA'
-           !!$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-            !do l = izb, ize
-            !   do k = iyb, iye
-            !      do j = ixb, ixe
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
+            do l = izb, ize
+               do k = iyb, iye
+                  do j = ixb, ixe
                     !!$acc loop seq
-            !do i = 1, num_fluids
-            !    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-            !    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-            !end do
-            ! If in simulation, use acc mixture subroutines
-            !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-            !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-            !rho_K = max(rho_K, sgm_eps)
-            !if (G_K > verysmall) then
-            !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
-            !G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
-            !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
-            !end if
-            !TODO call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, ix, iy, iz)
-            !      end do
-            !   end do
-            !end do
-           !!$acc end parallel loop
+                    !do i = 1, num_fluids
+                    !    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                    !    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                    !end do
+                    ! If in simulation, use acc mixture subroutines
+                    !call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                    !             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
+                    !rho_K = max(rho_K, sgm_eps)
+                    !if (G_K > verysmall) then
+                    !    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
+                    !             G_K*f_elastic_energy(qK_btensor_vf, j, k, l)/gamma_K
+                    !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
+                    !end if
+                    call s_compute_cauchy_solver(q_btensor,qK_prim_vf, j, k, l)
+                  end do
+               end do
+            end do
+           !$acc end parallel loop
         end if
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
@@ -1246,7 +1248,7 @@ contains
                           q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
                              !G*f_elastic_energy(q_btensor, j, k, l)
                        end if
-                       call s_calculate_cauchy_from_btensor(q_btensor,q_prim_vf, j, k, l)
+                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, j, k, l)
                        !TODO Multiply the \tau to \rho \tau
                     end if
 
