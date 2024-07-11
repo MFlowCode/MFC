@@ -41,7 +41,11 @@ def __filter(cases_) -> typing.List[TestCase]:
     if len(ARG("only")) > 0:
         for case in cases[:]:
             case: TestCase
-            if (not set(ARG("only")).issubset(set(case.trace.split(" -> ")))):
+
+            checkCase = case.trace.split(" -> ")
+            checkCase.append(case.get_uuid())
+            
+            if (not set(ARG("only")).issubset(set(checkCase))):
                 cases.remove(case)
 
 
