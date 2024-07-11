@@ -115,7 +115,7 @@ jobs:
     name: Self Hosted
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       matrix:
         device: ['cpu', 'gpu']
