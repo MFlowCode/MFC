@@ -15,16 +15,16 @@ print(json.dumps({
     # domain origin. 
     # axial direction
     'x_domain%beg'                 : 0.0E+00,
-    'x_domain%end'                 : 6.0E-03,
+    'x_domain%end'                 : 8.0E-03,
     # r direction
     'y_domain%beg'                 : 0.0E+00,
-    'y_domain%end'                 : 4.0E-03,
+    'y_domain%end'                 : 6.0E-03,
     'cyl_coord'                    : 'F',
-    'm'                            : 2400,
-    'n'                            : 1600,
+    'm'                            : 799,
+    'n'                            : 599,
     'p'                            : 0,
     'cfl_adap_dt'                  : 'T',
-    'cfl_target'                   : 0.5,
+    'cfl_target'                   : 0.3,
     'n_start'                      : 0,
     't_save'                       : 8e-5,
     't_stop'                       : 8e-3,
@@ -50,7 +50,7 @@ print(json.dumps({
     # Use WENO5
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'T',
+    # 'weno_Re_flux'                 : 'T',
     'weno_avg'                     : 'T',
     'avg_state'                    : 2,
     'mapped_weno'                  : 'T',
@@ -79,11 +79,11 @@ print(json.dumps({
     # Patch: Constant Tube filled with air =====================================
     # Specify the cylindrical air tube grid geometry
     'patch_icpp(1)%geometry'       : 3,
-    'patch_icpp(1)%x_centroid'     : 3.0E-03,
+    'patch_icpp(1)%x_centroid'     : 4.0E-03,
     # Uniform medium density, centroid is at the center of the domain
-    'patch_icpp(1)%y_centroid'     : 2.0E-03,
-    'patch_icpp(1)%length_x'       : 6.0E-03,
-    'patch_icpp(1)%length_y'       : 4.0E-03,  
+    'patch_icpp(1)%y_centroid'     : 3.0E-03,
+    'patch_icpp(1)%length_x'       : 8.0E-03,
+    'patch_icpp(1)%length_y'       : 6.0E-03,  
     # Specify the patch primitive variables 
     'patch_icpp(1)%vel(1)'         : 5E+00,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
@@ -95,7 +95,7 @@ print(json.dumps({
     # Patch: Cylinder Immersed Boundary ========================================
     'patch_ib(1)%geometry'       : 2,
     'patch_ib(1)%x_centroid'     : 1.5E-03,
-    'patch_ib(1)%y_centroid'     : 2E-03,
+    'patch_ib(1)%y_centroid'     : 3E-03,
     'patch_ib(1)%radius'         : 0.4E-03,
     'patch_ib(1)%slip'           : 'F',
     # # ========================================================================
@@ -103,6 +103,6 @@ print(json.dumps({
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),  # 2.50(Not 1.40)
     'fluid_pp(1)%pi_inf'           : 0,
-    'fluid_pp(1)%Re(1)'            : 2500000,
+    # 'fluid_pp(1)%Re(1)'            : 2500000,
     # ==========================================================================
 }))
