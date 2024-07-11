@@ -25,13 +25,14 @@ module m_hyperelastic
 
         !> @name Abstract subroutine for the infinite relaxation solver
         !> @{
-        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, j, k, l)
+        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, G, j, k, l)
 
             import :: scalar_field, sys_size, b_size
             type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-            type(scalar_field), dimension(b_size), intent(IN) :: btensor
-            integer, intent(IN) :: j, k, l
-
+            type(scalar_field), dimension(b_size), intent(in) :: btensor
+            real(kind(0d0)), intent(in) :: G
+            integer, intent(in) :: j, k, l
+             
         end subroutine
         !> @}
 
@@ -62,13 +63,14 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, j, k, l)
+     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
 #ifdef MFC_SIMULATION
         !$acc routine seq
 #endif
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(IN) :: btensor
-        integer, intent(IN) :: j, k, l
+        type(scalar_field), dimension(b_size), intent(in) :: btensor
+        integer, intent(in) :: j, k, l
+        real(kind(0d0)), intent(in) :: G
 
         real(kind(0d0)), dimension(b_size - 1) :: tensor
         real(kind(0d0)) :: trace
@@ -103,7 +105,7 @@ contains
 
         !$acc loop seq
         do i = 1, b_size - 1
-           q_prim_vf(strxb + i)%sf(j, k, l) = btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+           q_prim_vf(strxb + i)%sf(j, k, l) = G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
         end do
 
         ! compute the invariant without the elastic modulus

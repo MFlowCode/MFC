@@ -1079,7 +1079,7 @@ contains
                                  G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
                     end if
-                    call s_compute_cauchy_solver(q_btensor,qK_prim_vf, j, k, l)
+                    call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
                   end do
                end do
             end do
@@ -1228,7 +1228,6 @@ contains
 
                     if (hypoelasticity) then
                         do i = stress_idx%beg, stress_idx%end
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                             ! adding elastic contribution
                             if (G > verysmall) then
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
@@ -1247,14 +1246,11 @@ contains
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if (hyperelasticity) then
                        ! adding the elastic contribution
-                       do i = xibeg, xiend
-                          q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                       end do
                        if (G > verysmall) then
                           q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                              G*f_elastic_energy(q_btensor, j, k, l)
                        end if
-                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, j, k, l)
+                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
                        ! Multiply the \tau to \rho \tau
                        do i = stress_idx%beg, stress_idx%end
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)

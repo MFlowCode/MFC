@@ -1105,8 +1105,8 @@ contains
                                     !$acc loop seq
                                     do i = 1, b_size - 1
                                         tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
-                                        !tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                                        !tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                        !tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                        !tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
                                 end if
 
