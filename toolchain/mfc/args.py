@@ -73,9 +73,6 @@ started, run ./mfc.sh build -h.""",
     build.add_argument("-i", "--input", type=str, default=None, help="(GPU Optimization) Build a version of MFC optimized for a case.")
     build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
-    # === CLEAN ===
-    add_common_arguments(clean, "jg")
-
     # === TEST ===
     test_cases = list_cases()
 

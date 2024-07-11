@@ -116,6 +116,7 @@ jobs:
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     continue-on-error: true
+    timeout-minutes: 1400
     strategy:
       matrix:
         device: ['cpu', 'gpu']
