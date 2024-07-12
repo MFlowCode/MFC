@@ -106,7 +106,11 @@ contains
 
         !$acc loop seq
         do i = 1, b_size - 1
-           q_prim_vf(strxb + i)%sf(j, k, l) = G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+           q_prim_vf(strxb + i - 1)%sf(j, k, l) = G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
+
+           if (q_prim_vf(strxb +i)%sf(j,k,l) /= q_prim_vf(strxb + i)%sf(j,k,l)) then
+             print *, 'error with the code'
+           end if 
         end do
 
         ! compute the invariant without the elastic modulus

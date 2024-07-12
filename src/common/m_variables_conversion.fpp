@@ -1060,9 +1060,9 @@ contains
 
         if (hyperelasticity) then
 #ifdef MFC_SIMULATION
-            call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+            !call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
 #else
-            call s_calculate_btensor(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+            call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
 #endif
             !print *, 'I got here AAA'
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
@@ -1083,7 +1083,7 @@ contains
                                  !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
                     end if
-                    !call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
+                    call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
                   end do
                end do
             end do
@@ -1130,7 +1130,7 @@ contains
         ! btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity) then
-            !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+          call s_calculate_btensor_acc(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if
 
         ! Converting the primitive variables to the conservative variables
@@ -1253,7 +1253,7 @@ contains
                           q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
                              !G*f_elastic_energy(q_btensor, j, k, l)
                        end if
-                       !call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
+                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
                        ! Multiply the \tau to \rho \tau
                        do i = xibeg, xiend
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
