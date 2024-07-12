@@ -1033,6 +1033,10 @@ contains
 
                     if (hyperelasticity) then
                        !$acc loop seq
+                       do i = strxb, strxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                       end do
+                       !$acc loop seq
                        do i = xibeg, xiend
                           qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                        end do
@@ -1075,11 +1079,11 @@ contains
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                     rho_K = max(rho_K, sgm_eps)
                     if (G_K > verysmall) then
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                 G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
+                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
+                                 !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
                     end if
-                    call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
+                    !call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
                   end do
                end do
             end do
@@ -1219,7 +1223,6 @@ contains
                         end do
                     end if
 
-
                     if (elasticity) then 
                         do i = stress_idx%beg, stress_idx%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -1247,12 +1250,12 @@ contains
                     if (hyperelasticity) then
                        ! adding the elastic contribution
                        if (G > verysmall) then
-                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                             G*f_elastic_energy(q_btensor, j, k, l)
+                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
+                             !G*f_elastic_energy(q_btensor, j, k, l)
                        end if
-                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
+                       !call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
                        ! Multiply the \tau to \rho \tau
-                       do i = stress_idx%beg, stress_idx%end
+                       do i = xibeg, xiend
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                        end do
                     end if

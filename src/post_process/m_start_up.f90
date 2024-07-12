@@ -319,7 +319,7 @@ contains
         end if
         ! ----------------------------------------------------------------------
         ! Adding the elastic shear stresses to the formatted database file -----
-        if (hypoelasticity .or. hyperelasticity) then
+        if (elasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then
                     q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
