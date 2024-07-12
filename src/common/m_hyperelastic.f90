@@ -74,6 +74,7 @@ contains
 
         real(kind(0d0)), dimension(b_size - 1) :: tensor
         real(kind(0d0)) :: trace
+        real(kind(0d0)) :: f13 = 1d0/3d0
         integer :: i !< Generic loop iterators
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
@@ -93,12 +94,12 @@ contains
         !end if
 
         ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - (1d0/3d0)*trace
+        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
         !if (num_dims == 2) then
         !    btensor(3)%sf(j,k,l) = btensor(3)%sf(j,k,l) - (1d0/3d0)*trace
         !else
-          btensor(4)%sf(j, k, l) = btensor(4)%sf(j, k, l) - (1d0/3d0)*trace
-          btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - (1d0/3d0)*trace
+          btensor(4)%sf(j, k, l) = btensor(4)%sf(j, k, l) - f13*trace
+          btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
         !end if
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
@@ -110,7 +111,7 @@ contains
 
         ! compute the invariant without the elastic modulus
         ! if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then
-            q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
+        !    q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
         ! else
         !     q_prim_vf(xiend+1)%sf(j,k,l) = 1d-12
         ! end if

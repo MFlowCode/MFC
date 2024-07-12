@@ -1126,7 +1126,7 @@ contains
         ! btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity) then
-            call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+            !call s_calculate_btensor(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if
 
         ! Converting the primitive variables to the conservative variables
