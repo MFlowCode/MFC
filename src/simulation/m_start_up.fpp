@@ -1417,6 +1417,10 @@ contains
             !$acc update device(palpha_eps, ptgalpha_eps)
         end if
 
+        if (ib) then
+            !$acc update device(ib_markers%sf)
+        end if
+
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
