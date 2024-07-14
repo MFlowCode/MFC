@@ -306,6 +306,7 @@ module m_global_parameters
     !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
     !! it is a measure of the half-size of the finite-difference stencil for the
     !! selected order of accuracy.
+    !$acc declare create(fd_order,fd_number)
 
     logical :: probe_wrt
     logical :: integral_wrt
@@ -1030,6 +1031,12 @@ contains
             buff_size = weno_polyn + 2
         end if
 
+        if (elasticity) then 
+          fd_order = 4
+          fd_number = max(1, fd_order/2)
+          !buff_size = buff_size + fd_number
+        end if 
+
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -1059,7 +1066,8 @@ contains
         if (p > 0) then
             startz = -buff_size
         end if
-
+ 
+        !$acc update device(fd_order,fd_number)
         !$acc update device(startx, starty, startz)
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid

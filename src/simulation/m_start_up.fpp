@@ -1274,7 +1274,6 @@ contains
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1315,6 +1314,8 @@ contains
 
         call s_initialize_cbc_module()
         call s_initialize_derived_variables()
+
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
 
     end subroutine s_initialize_modules
 
