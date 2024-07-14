@@ -1,4 +1,8 @@
-import os, glob, typing, hashlib, binascii, subprocess, itertools, dataclasses
+import os, glob, hashlib, binascii, subprocess, itertools, dataclasses
+
+from typing import List, Set, Union, Callable
+
+from ..run.input import MFCInputFile
 
 from ..      import case, common
 from ..state import ARG
@@ -98,17 +102,15 @@ def trace_to_uuid(trace: str) -> str:
 
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
-    ppn:     int
-    trace:   str
-    rebuild: bool
+    ppn:   int
+    trace: str
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None, rebuild: bool = None) -> None:
-        self.trace   = trace
-        self.ppn     = ppn or 1
-        self.rebuild = rebuild or False
+    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
+        self.trace = trace
+        self.ppn   = ppn or 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self, targets: typing.List[typing.Union[str, MFCTarget]], gpus: typing.Set[int]) -> subprocess.CompletedProcess:
+    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
             gpus_select = ["--gpus"] + [str(_) for _ in gpus]
         else:
@@ -118,14 +120,13 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
-        rebuild           = [] if self.rebuild or ARG("case_optimization") else ["--no-build"]
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
         target_names = [ get_target(t).name for t in targets ]
 
         command = [
-            mfc_script, "run", filepath, *rebuild, *tasks, *case_optimization,
+            mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization,
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
@@ -207,6 +208,9 @@ if "post_process" in ARGS["dict"]["targets"]:
 print(json.dumps({{**case, **mods}}))
 """)
 
+    def to_MFCInputFile(self) -> MFCInputFile:
+        return MFCInputFile(self.get_filepath(), self.get_dirpath(), self.params)
+
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
@@ -232,16 +236,16 @@ print(json.dumps({{**case, **mods}}))
 class TestCaseBuilder:
     trace:   str
     mods:    dict
-    path:    str
-    args:    typing.List[str]
+    path:    str | None
+    args:    List[str] | None
     ppn:     int
-    rebuild: bool
+    functor: Callable | None
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
 
     def to_case(self) -> TestCase:
-        dictionary = self.mods.copy()
+        dictionary = {}
         if self.path:
             dictionary.update(input.load(self.path, self.args).params)
 
@@ -253,9 +257,14 @@ class TestCaseBuilder:
                     path = os.path.abspath(path)
                     if os.path.exists(path):
                         dictionary[key] = path
-                        break
 
-        return TestCase(self.trace, dictionary, self.ppn, self.rebuild)
+        dictionary.update(self.mods)
+
+        if self.functor:
+            self.functor(dictionary)
+            print(dictionary)
+
+        return TestCase(self.trace, dictionary, self.ppn)
 
 
 @dataclasses.dataclass
@@ -277,11 +286,12 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-def define_case_f(trace: str, path: str, args: typing.List[str] = None, ppn: int = None, rebuild: bool = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, {}, path, args or [], ppn, rebuild)
+# pylint: disable=too-many-arguments
+def define_case_f(trace: str, path: str, args: List[str] = None, newMods: dict = None, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, newMods or {}, path, args or [], ppn, functor)
 
 
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, rebuild: bool = None) -> TestCaseBuilder:
+def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -297,4 +307,4 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn, rebuild)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, [], ppn, functor)
