@@ -130,20 +130,21 @@ contains
 
         integer, intent(in) :: t_step, id
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
-
         integer :: i, j, k, l, q !< generic loop variables
         integer :: mi !< monopole index
         integer :: term_index
 
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
-        real(kind(0d0)) :: n_tait, B_tait, angle, ratio_x_r, ratio_y_r, ratio_z_r
+        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        real(kind(0d0)) :: myRho
+        real(kind(0d0)) :: n_tait, B_tait
 
         real(kind(0d0)) :: sim_time, sos
         real(kind(0d0)) :: mass_source, mom_source
+        real(kind(0d0)) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
+
+        sim_time = t_step*dt
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -160,23 +161,24 @@ contains
             end do
         end do
 
-        sim_time = t_step*dt
+        ! Monopoles are looped through sequentially because they can have very different computational costs
+        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myRho, n_tait, B_tait, angle, ratio_x_r, ratio_y_r, ratio_z_r)
         !$acc loop seq
         do mi = 1, num_mono
-            if (sim_time < delay(mi) .and. pulse(mi) == 1) cycle ! need to explicitly set delay to 0 if default; now it hinges on the fact default is a negative value
-            !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha)
+            if (sim_time < delay(mi) .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) cycle
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
+
+                        myRho = 0d0
+                        n_tait = 0d0
+                        B_tait = 0d0
+
                         !$acc loop seq
                         do q = 1, num_fluids
                             myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
                             myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
                         end do
-
-                        myRho = 0d0
-                        n_tait = 0d0
-                        B_tait = 0d0
 
                         if (bubbles) then
                             if (mpp_lim .and. (num_fluids > 2)) then
@@ -211,11 +213,6 @@ contains
                         sos = dsqrt(n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
 
                         term_index = 2
-
-                        angle = 0d0
-                        ratio_x_r = 0d0
-                        ratio_y_r = 0d0
-                        ratio_z_r = 0d0
 
                         mom_source = f_source_temporal(sim_time, sos, mi, term_index)* &
                                      f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
@@ -351,7 +348,6 @@ contains
             omega = 2d0*pi*frequency(mi)
             g = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
         end if
-
     end function f_source_temporal
 
     !> This function give the spatial support of the acoustic source
@@ -359,7 +355,11 @@ contains
         !! @param k Second coordinate-direction location index
         !! @param l Third coordinate-direction location index
         !! @param mono_loc Nominal source term location
-
+        !! @param mi Monopole index
+        !! @param angle Angle of the source term with respect to the x-axis (2D or 2D axisymmetric)
+        !! @param ratio_x_r Ratio of the x-component of the source term to the magnitude (3D)
+        !! @param ratio_y_r Ratio of the y-component of the source term to the magnitude (3D)
+        !! @param ratio_z_r Ratio of the z-component of the source term to the magnitude (3D)
     function f_source_spatial(j, k, l, mono_loc, mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
 
         !$acc routine seq
