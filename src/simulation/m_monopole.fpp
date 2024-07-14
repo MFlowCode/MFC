@@ -330,6 +330,9 @@ contains
 
         if (pulse(nm) == 1) then
             ! Sine wave
+            if (f_is_default(frequency(nm)) .and. f_is_default(wavelength(nm))) then
+                wavelength(nm) = length(nm) ! For CI test - TODO remove, add frequency to test case files, and regenerate tests
+            end if
             if (f_is_default(frequency(nm))) then
                 frequency(nm) = sos/wavelength(nm) ! TODO CHANGE
             end if
@@ -422,6 +425,7 @@ contains
             hy = mono_loc(2) - y_cc(k)
             if (support(nm) == 1) then
                 ! 2D delta function
+                sig = mono_leng/20.d0 ! For CI test - TODO remove & regenerate tests
                 h = dsqrt(hx**2d0 + hy**2d0)
 
                 f_delta = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
