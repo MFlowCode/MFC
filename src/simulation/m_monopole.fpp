@@ -331,7 +331,7 @@ contains
         if (pulse(nm) == 1) then
             ! Sine wave
             if (f_is_default(frequency(nm))) then
-                frequency(nm) = wavelength(nm)/sos ! TODO CHANGE
+                frequency(nm) = sos/wavelength(nm) ! TODO CHANGE
             end if
             if ((the_time - delay(nm))*frequency(nm) > npulse(nm)) return
             omega = 2d0*pi*frequency(nm)
@@ -344,7 +344,7 @@ contains
         else if (pulse(nm) == 2) then
             ! Gaussian pulse
             if (f_is_default(gauss_sigma_time(nm))) then
-                gauss_sigma_time(nm) = gauss_sigma_dist(nm)/sos ! TODO CHANGE
+                gauss_sigma_time(nm) = sos/gauss_sigma_dist(nm) ! TODO CHANGE
             end if
             if (term_index == 1) then
                 f_g = mag(nm)*dexp(-0.5d0*((the_time - delay(nm))**2d0)/(gauss_sigma_time(nm)**2d0))/sos - &
@@ -356,7 +356,7 @@ contains
         else if (pulse(nm) == 3) then
             ! Square wave
             if (f_is_default(frequency(nm))) then
-                frequency(nm) = wavelength(nm)/sos ! TODO CHANGE
+                frequency(nm) = sos/wavelength(nm) ! TODO CHANGE
             end if
             if ((the_time - delay(nm))*frequency(nm) > npulse(nm)) return
             omega = 2d0*pi*frequency(nm)
