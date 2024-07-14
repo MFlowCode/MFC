@@ -46,8 +46,8 @@ jobs:
       
       - name: List
         run:  |
-          /bin/bash mfc.sh test --list --filter Example
+          /bin/bash mfc.sh test -l -o Example
 
       - name: Test
         run:  |
-          /bin/bash mfc.sh test -fl Example -j $(nproc) -r --generate
+          /bin/bash mfc.sh test -o Example -j $(nproc) -r --generate
