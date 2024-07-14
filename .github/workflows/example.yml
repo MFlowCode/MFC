@@ -1,0 +1,53 @@
+name: 'Example Suite'
+
+on: [push, pull_request, workflow_dispatch]
+    
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  github:
+    name: Github
+    if: needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
+    continue-on-error: true
+    runs-on: macos-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup MacOS
+        run: |
+          brew install wget make python make cmake coreutils gcc@14
+          echo "CC=gcc-14"      >> $GITHUB_ENV
+          echo "CXX=g++-14"     >> $GITHUB_ENV
+          echo "FC=gfortran-14" >> $GITHUB_ENV
+          
+      - name: (MacOS) Build OpenMPI
+        run: |
+          brew install mpich
+
+      - name: Build
+        run:  |
+          /bin/bash mfc.sh build -j $(nproc) --no-debug --mpi
+      
+      - name: List
+        run:  |
+          /bin/bash mfc.sh test --list --filter Example
+
+      - name: Test
+        run:  |
+          /bin/bash mfc.sh test -fl Example -j $(nproc) -r --generate
