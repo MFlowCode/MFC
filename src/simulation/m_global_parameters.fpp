@@ -420,6 +420,7 @@ module m_global_parameters
     logical :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
     integer :: num_mono !< Number of monopoles
+    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of the monopole, used in f_source_spatial
     !> @}
     !$acc declare create(monopole, mono, num_mono)
 
@@ -615,22 +616,27 @@ contains
         #:endfor
 
         do j = 1, num_probes_max
+            mono(j)%pulse = dflt_int
+            mono(j)%support = dflt_int
             do i = 1, 3
                 mono(j)%loc(i) = dflt_real
             end do
             mono(j)%mag = dflt_real
             mono(j)%length = dflt_real
-            mono(j)%delay = dflt_real
+            mono(j)%wavelength = dflt_real
+            mono(j)%frequency = dflt_real
+            mono(j)%gauss_sigma_dist = dflt_real
+            mono(j)%gauss_sigma_time = dflt_real
+            mono(j)%npulse = dflt_real
             mono(j)%dir = dflt_real
-            mono(j)%npulse = dflt_int
-            mono(j)%pulse = dflt_int
-            mono(j)%support = dflt_int
+            mono(j)%delay = dflt_real
             mono(j)%foc_length = dflt_real
             mono(j)%aperture = dflt_real
-            mono(j)%support_width = dflt_real
-            ! The author suggested the support width is typically on the order of
-            ! the width of the characteristic cells.
-            ! The default value of support_width is 2.5 cell widths.
+            mono(j)%element_spacing_angle = dflt_real
+            mono(j)%element_polygon_ratio = dflt_real
+            mono(j)%rotate_angle = dflt_real
+            mono(j)%num_elements = dflt_int
+            mono(j)%element_on = dflt_int
         end do
 
         fd_order = dflt_int

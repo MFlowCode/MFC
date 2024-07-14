@@ -246,8 +246,13 @@ contains
                 call MPI_BCAST(mono(j)%loc(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             end do
 
-            #:for VAR in [ 'mag', 'length', 'delay', 'dir', 'npulse', 'pulse',  &
-                'support', 'foc_length', 'aperture', 'support_width' ]
+            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on' ]
+                call MPI_BCAST(mono(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'mag', 'length', 'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
+                'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
+                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
                 call MPI_BCAST(mono(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

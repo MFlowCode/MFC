@@ -259,11 +259,14 @@ for f_id in range(1,10+1):
         SIMULATION[f"fluid_pp({f_id})%Re({re_id})"] = ParamType.REAL
 
     for mono_id in range(1,4+1):
-        for int_attr in ["pulse", "support"]:
+        for int_attr in ["pulse", "support", "num_elements", "element_on"]:
             SIMULATION[f"Mono({mono_id})%{int_attr}"] = ParamType.INT
 
-        for real_attr in ["mag", "length", "dir", "npulse", "delay",
-                          "foc_length", "aperture", "support_width"]:
+        for real_attr in ["mag", "length", "wavelength", "frequency",
+                          "gauss_sigma_dist", "gauss_sigma_time", "npulse",
+                          "dir", "delay", "foc_length", "aperture",
+                          "element_spacing_angle", "element_polygon_ratio",
+                          "rotate_angle"]:
             SIMULATION[f"Mono({mono_id})%{real_attr}"] = ParamType.REAL
 
         for cmp_id in range(1,3+1):
