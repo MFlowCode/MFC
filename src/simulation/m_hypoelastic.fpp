@@ -155,7 +155,7 @@ contains
 
                 ! 3D
                 if (ndirs == 3) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -192,7 +192,7 @@ contains
                         G_K_field(k, l, q) = G_K
 
                         !TODO: take this out if not needed
-                        if (G_K < 1000) then
+                        if (G_K < verysmall) then
                             G_K_field(k, l, q) = 0
                         end if
                     end do
