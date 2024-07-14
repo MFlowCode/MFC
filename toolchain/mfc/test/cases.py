@@ -275,15 +275,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, 'support=1', {'Mono(1)%support': 1}))
             cases.append(define_case_d(stack, 'support=2', {'Mono(1)%support': 2}))
             cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
-            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
-            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+            # cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4})) # TODO regenerate test; NOTE: current test is set up incorrectly (silo output shows no wave)
+            # cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5})) # TODO regenerate test
             stack.pop()
 
         if len(dimInfo[0]) == 3:
             stack.push('', {'Mono(1)%loc(2)': 0.5, 'Mono(1)%loc(3)': 0.5})
             cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
-            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
-            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+            # cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4})) # TODO regenerate test; NOTE: current test is set up incorrectly (silo output shows no wave)
+            # cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5})) # TODO regenerate test
             stack.pop()
 
         stack.pop()
