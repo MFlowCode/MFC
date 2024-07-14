@@ -182,6 +182,27 @@ contains
             elseif (mono(j)%mag <= 0d0) then
                 call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
                                  'positive. Exiting ...')
+            elseif (mono(j)%pulse == dflt_int) then
+                call s_mpi_abort('mono('//trim(jStr)//')%pulse must be '// &
+                                 'specified. Exiting ...')
+            elseif (.not. any(mono(j)%pulse == (/1, 2, 3/))) then
+                call s_mpi_abort('Only Mono(i)npulse = 1, 2, or 3 is '// &
+                                 'allowed. Exiting ...')
+            elseif (f_is_default(mono(j)%npulse)) then
+                call s_mpi_abort('mono('//trim(jStr)//')%npulse must be '// &
+                                 'specified. Exiting ...')
+            elseif (mono(j)%support > 4 .and. (.not. f_is_integer(mono(j)%npulse))) then
+                call s_mpi_abort('Mono(i)npulse must be an integer for '// &
+                                 'Mono(i)support > 4 (Cylindrical or '// &
+                                 'Spherical support). Exiting ...')
+                ! TODO correct number after changing support number
+            elseif (f_is_default(mono(j)%dir)) then
+                call s_mpi_abort('mono('//trim(jStr)//')%dir must be '// &
+                                 'specified. Exiting ...')
+            elseif (mono(j)%pulse == 2 .and. f_is_default(mono(j)%delay)) then
+                call s_mpi_abort('mono('//trim(jStr)//')%delay must be '// &
+                                 'specified for Mono(i)pulse = 2 (Gaussian). '// &
+                                 'Exiting ...')
             end if
 
             if (n == 0) then ! 1D
