@@ -883,7 +883,7 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
-        real(kind(0.d0)) :: ntmp
+        real(kind(0d0)) :: ntmp
 
         type(scalar_field), dimension(b_size) :: q_btensor
 
@@ -1017,7 +1017,7 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
                             ! subtracting elastic contribution for pressure calculation
-                            if (G_K > 1000) then !TODO: check if stable for >0
+                            if (G_K .gt. verysmall) then !TODO: check if stable for >0
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
@@ -1059,11 +1059,7 @@ contains
         !print *, 'I got here AA'
 
         if (hyperelasticity) then
-#ifdef MFC_SIMULATION
-            !call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-#else
             call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-#endif
             !print *, 'I got here AAA'
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
             do l = izb, ize
@@ -1078,12 +1074,14 @@ contains
                     call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                  alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                     rho_K = max(rho_K, sgm_eps)
-                    if (G_K > verysmall) then
-                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
+                    if (G_K .gt. verysmall) then
+                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
                                  !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
                     !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
+                      call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
+                    else 
+                      call s_compute_cauchy_solver(q_btensor, qK_prim_vf, 0d0, j, k, l)
                     end if
-                    call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
                   end do
                end do
             end do
@@ -1130,7 +1128,7 @@ contains
         ! btensor calculation
         ! s_calculate_btensor has its own triple nested for loop, with openacc
         if (hyperelasticity) then
-          call s_calculate_btensor_acc(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
+             call s_calculate_btensor_acc(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
         end if
 
         ! Converting the primitive variables to the conservative variables
@@ -1223,16 +1221,11 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then 
-                        do i = stress_idx%beg, stress_idx%end
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                        end do
-                    end if
-
                     if (hypoelasticity) then
-                        do i = stress_idx%beg, stress_idx%end
+                        do i = strxb, strxe
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                             ! adding elastic contribution
-                            if (G > verysmall) then
+                            if (G .gt. verysmall) then
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G)
                                 ! extra terms in 2 and 3D
@@ -1249,12 +1242,18 @@ contains
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if (hyperelasticity) then
                        ! adding the elastic contribution
-                       if (G > verysmall) then
-                          q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
-                             !G*f_elastic_energy(q_btensor, j, k, l)
+                       if (G .gt. verysmall) then
+                         q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
+                            !G*f_elastic_energy(q_btensor, j, k, l)
+                         !call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
+                       else 
+                         call s_compute_cauchy_solver(q_btensor,q_prim_vf, 0d0, j, k, l)
                        end if
-                       call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
-                       ! Multiply the \tau to \rho \tau
+                       ! Multiply \tau to \rho \tau
+                       do i = strxb, strxe
+                          q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                       end do
+                       ! Multiply \xi to \rho \xi
                        do i = xibeg, xiend
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                        end do
@@ -1267,22 +1266,17 @@ contains
                 end do
             end do
         end do
-
-
         ! deallocating the btensor
         do l = 1, b_size
             @:DEALLOCATE(q_btensor(l)%sf)
         end do
 #else
-
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
                              'conservative variables not '// &
                              'implemented. Exiting ...')
         end if
-
 #endif
-
     end subroutine s_convert_primitive_to_conservative_variables
 
     !>  The following subroutine handles the conversion between

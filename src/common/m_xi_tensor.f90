@@ -1282,14 +1282,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         integer, intent(in) :: xb, xe, yb, ye, zb, ze
+        integer :: j, k, l
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-        integer :: j, k, l, i
+        integer :: i
 
 !        if (num_dims == 1) then
-!!          !$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
-!         do l = izb, ize
-!            do k = iyb, iye
-!               do j = ixb, ixe
+         !!$acc parallel loop collapse(3) gang vector default(present) private(tensora,tensorb)
+         !!do l = izb, ize
+         !   do k = iyb, iye
+         !      do j = ixb, ixe
 !                  call s_compute_gradient_xi1d_acc(q_prim_vf, ixb, ixe, iyb, &
 !                  iye, izb, ize, j, k, l, tensora, tensorb)
 !                  !! 1: 1D, 3: 2D, 6: 3D

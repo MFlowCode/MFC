@@ -106,19 +106,17 @@ contains
 
         !$acc loop seq
         do i = 1, b_size - 1
-           q_prim_vf(strxb + i - 1)%sf(j, k, l) = G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
-
-           if (q_prim_vf(strxb +i)%sf(j,k,l) /= q_prim_vf(strxb + i)%sf(j,k,l)) then
-             print *, 'error with the code'
-           end if 
+          q_prim_vf(strxb + i - 1)%sf(j, k, l) =  & 
+            G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
         end do
 
         ! compute the invariant without the elastic modulus
-        ! if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then
-        !    q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
-        ! else
+         if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then
+           q_prim_vf(xiend + 1)%sf(j, k, l) =  & 
+             0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
+         else
         !     q_prim_vf(xiend+1)%sf(j,k,l) = 1d-12
-        ! end if
+         end if
      end subroutine s_neoHookean_cauchy_solver
 
      subroutine  s_finalize_hyperelastic_module()
