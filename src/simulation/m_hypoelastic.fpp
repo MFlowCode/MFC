@@ -87,25 +87,17 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                         fd_number, fd_order)
-        !!!!$acc update device(fd_coeff_x)
+        !$acc update device(fd_coeff_x)
         if (n > 0) then
           call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
                                                            fd_number, fd_order)
-        !!!$acc update device(fd_coeff_y)
+        !$acc update device(fd_coeff_y)
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
                                                           fd_number, fd_order)
-        !!!$acc update device(fd_coeff_z)
+        !$acc update device(fd_coeff_z)
         end if
-
-        !!!!$acc loop seq
-        do k = 0, m
-          print *, 'x_cc :: ',x_cc(k)
-          do r = -fd_number, fd_number
-            print *, 'fd_co :: ',fd_coeff_x(r,k)
-          end do 
-        end do
 
     end subroutine s_initialize_hypoelastic_module
 
@@ -140,19 +132,19 @@ contains
                 end do
             end do
             !$acc end parallel loop
-          
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do q = 0, p
+ 
+            do r = -fd_number, fd_number        
+            !$acc parallel loop collapse(3) gang vector default(present) 
+              do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        do r = -fd_number, fd_number
-                          du_dx(k, l, q) = du_dx(k, l, q) &
-                            + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x(r, k)
-                        end do
+                       du_dx(k, l, q) = du_dx(k, l, q) &
+                        + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x(r, k)
                     end do
                 end do
-            end do
+              end do
             !$acc end parallel loop
+            end do
 
             if (ndirs > 1) then
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -165,25 +157,26 @@ contains
                 end do
                 !$acc end parallel loop
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do q = 0, p
+                do r = -fd_number, fd_number
+                  !$acc parallel loop collapse(3) gang vector default(present)
+                  do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                          do r = -fd_number, fd_number
                             du_dy(k, l, q) = du_dy(k, l, q) &
                               + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y(r, l)
                             dv_dx(k, l, q) = dv_dx(k, l, q) &
                               + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x(r, k)
                             dv_dy(k, l, q) = dv_dy(k, l, q) &
                               + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y(r, l)
-                          end do
                         end do
-                    end do
+                     end do
+                  end do
+                  !$acc end parallel loop
                 end do
-                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
+
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do q = 0, p
                       do l = 0, n
@@ -195,11 +188,11 @@ contains
                     end do
                     !$acc end parallel loop
 
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do q = 0, p
+                    do r = -fd_number, fd_number
+                      !$acc parallel loop collapse(3) gang vector default(present)
+                      do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                              do r = -fd_number, fd_number
                                 du_dz(k, l, q) = du_dz(k, l, q) &
                                 + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z(r, q)
                                 dv_dz(k, l, q) = dv_dz(k, l, q) &
@@ -210,11 +203,11 @@ contains
                                 + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y(r, l)
                                 dw_dz(k, l, q) = dw_dz(k, l, q) &
                                 + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z(r, q)
-                              end do
                             end do
                         end do
+                      end do
+                      !$acc end parallel loop
                     end do
-                    !$acc end parallel loop
                 end if
             end if
 
