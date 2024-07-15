@@ -204,6 +204,11 @@ contains
                 call s_mpi_abort('mono('//trim(jStr)//')%delay must be '// &
                                  'specified for Mono(i)pulse = 2 (Gaussian). '// &
                                  'Exiting ...')
+            elseif (mono(j)%pulse == 3 .and. mono(j)%support > 4) then
+                call s_mpi_abort('Mono(i)support > 4 (Cylindrical or '// &
+                                 'Spherical support) is not allowed for '// &
+                                 'Mono(i)pulse = 3 (square wave). Exiting ...')
+                ! TODO correct number after changing support number
             end if
 
             if (n == 0) then ! 1D

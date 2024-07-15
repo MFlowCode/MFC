@@ -316,41 +316,25 @@ contains
 
     end function f_source_temporal
 
-    !> This function give the spatial support of the acoustic source
-        !! @param j First coordinate-direction location index
-        !! @param k Second coordinate-direction location index
-        !! @param l Third coordinate-direction location index
-        !! @param mono_loc Nominal source term location
-        !! @param mi Monopole index
-        !! @param angle Angle of the source term with respect to the x-axis (2D or 2D axisymmetric)
-        !! @param ratio_x_r Ratio of the x-component of the source term to the magnitude (3D)
-        !! @param ratio_y_r Ratio of the y-component of the source term to the magnitude (3D)
-        !! @param ratio_z_r Ratio of the z-component of the source term to the magnitude (3D)
+    !> This function gives the spatial support of the acoustic source
+    !! @param mono_loc Nominal source term location
+    !! @param mi Monopole index
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param ratio_x_r Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param ratio_y_r Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param ratio_z_r Ratio of the z-component of the source term to the magnitude (for 3D)
     function f_source_spatial(j, k, l, mono_loc, mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
-
         !$acc routine seq
         real(kind(0d0)), dimension(3), intent(in) :: mono_loc
-        integer, intent(in) :: mi
         integer, intent(in) :: j, k, l
+        integer, intent(in) :: mi
         real(kind(0d0)), intent(out) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
-
-        integer :: q
-        real(kind(0d0)) :: h, hx, hy, hz
-        real(kind(0d0)) :: hx_cyl, hy_cyl, hz_cyl
-        real(kind(0d0)) :: hxnew, hynew
-        real(kind(0d0)) :: hxnew_cyl, hynew_cyl
-        real(kind(0d0)) :: sig
         real(kind(0d0)) :: f_source_spatial
 
-        integer :: elem, elem_min, elem_max
-        real(kind(0d0)) :: current_angle, angle_per_elem, angle_half_aperture
-        real(kind(0d0)) :: angle_min, angle_max
-        real(kind(0d0)) :: aperture_element_3D, poly_side_length, angle_elem, alpha
-        real(kind(0d0)) :: dist_interp_to_elem_center
-        real(kind(0d0)) :: hy_elem_center, hz_elem_center
-        real(kind(0d0)) :: x2, y2, z2, x3, y3, z3, C, f, R, theta
-        real(kind(0d0)) :: norm
+        real(kind(0d0)) :: sig
+        real(kind(0d0)) :: hx, hy, hz
 
+        ! Calculate sig spatial support width
         if (n == 0) then
             sig = dx(j)
         elseif (p == 0) then
@@ -360,211 +344,205 @@ contains
         end if
         sig = sig*acoustic_spatial_support_width
 
+        ! Calculate displacement from monopole location
+        hx = x_cc(j) - mono_loc(1)
+        if (n /= 0) hy = y_cc(k) - mono_loc(2)
+        if (p /= 0) hz = z_cc(l) - mono_loc(3)
+
+        if (any(support(mi) == (/0, 1, 2, 4/))) then
+            f_source_spatial = f_source_spatial_planar(mono_loc, mi, sig, hx, hy, hz)
+        elseif (support(mi) == 5) then
+            f_source_spatial = f_source_spatial_transducer(mono_loc, mi, sig, hx, hy, hz, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        elseif (support(mi) == 7) then
+            f_source_spatial = f_source_spatial_transducer_array(mono_loc, mi, sig, hx, hy, hz, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        end if
+    end function f_source_spatial
+
+    !> This function calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !! @param mono_loc Nominal source term location
+    !! @param mi Monopole index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param hx Distance in x-direction from source to current point
+    !! @param hy Distance in y-direction from source to current point
+    !! @param hz Distance in z-direction from source to current point
+    function f_source_spatial_planar(mono_loc, mi, sig, hx, hy, hz)
+        !$acc routine seq
+        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        real(kind(0d0)), intent(in) :: sig, hx, hy, hz
+        integer, intent(in) :: mi
+        real(kind(0d0)) :: f_source_spatial_planar
+
+        real(kind(0d0)) :: h, hxnew, hynew
+
         if (n == 0) then ! 1D
             if (support(mi) == 1) then
                 ! 1D delta function
-                hx = abs(mono_loc(1) - x_cc(j))
-
-                f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                   dexp(-0.5d0*(hx/(sig/2d0))**2d0)
+                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(hx/(sig/2d0))**2d0)
             elseif (support(mi) == 0) then
                 ! Support for all x
-                f_source_spatial = 1d0
+                f_source_spatial_planar = 1d0
             end if
         elseif (p == 0) then ! 2D
-            hx = mono_loc(1) - x_cc(j)
-            hy = mono_loc(2) - y_cc(k)
             if (support(mi) == 1) then
                 ! 2D delta function
                 h = dsqrt(hx**2d0 + hy**2d0)
-
-                f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                   dexp(-0.5d0*((h/(sig/2d0))**2d0))
+                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*((h/(sig/2d0))**2d0))
             elseif (support(mi) == 2) then
                 !only support for y \pm some value
                 if (abs(hy) < length(mi)) then
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hx/(sig/2d0))**2d0)
+                    f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(hx/(sig/2d0))**2d0)
                 else
-                    f_source_spatial = 0d0
-                end if
-            elseif (support(mi) == 3) then
-                ! Only support along some line
-                hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
-
-                ! Rotate actual point by -theta
-                hxnew = cos(dir(mi))*hx + sin(dir(mi))*hy
-                hynew = -1d0*sin(dir(mi))*hx + cos(dir(mi))*hy
-                if (abs(hynew) < mono_loc(3)/2d0) then
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)
-                else
-                    f_source_spatial = 0d0
+                    f_source_spatial_planar = 0d0
                 end if
             elseif (support(mi) == 4) then
                 ! Support for all y
-                f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig)* &
-                                   dexp(-0.5d0*(hx/sig)**2d0)
-            elseif (support(mi) == 5) then
-                ! Support along transducer in 2D or 2D axisymmetric coordinate
-                hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
+                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(hx/sig)**2d0)
+            end if
+        else ! 3D
+            if (support(mi) == 4) then
+                ! Support for all x,y
+                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(hz/sig)**2d0)
+            end if
+        end if
+    end function f_source_spatial_planar
 
-                current_angle = -atan(hy/(foc_length(mi) - hx))
-                angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
+    !> This function calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !! @param mono_loc Nominal source term location
+    !! @param mi Monopole index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param hx Distance in x-direction from source to current point
+    !! @param hy Distance in y-direction from source to current point
+    !! @param hz Distance in z-direction from source to current point
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param ratio_x_r Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param ratio_y_r Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param ratio_z_r Ratio of the z-component of the source term to the magnitude (for 3D)
+    function f_source_spatial_transducer(mono_loc, mi, sig, hx, hy, hz, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        !$acc routine seq
+        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        real(kind(0d0)), intent(in) :: sig, hx, hy, hz
+        integer, intent(in) :: mi
+        real(kind(0d0)), intent(out) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
+        real(kind(0d0)) :: f_source_spatial_transducer
 
-                f_source_spatial = 0d0
-                if (abs(current_angle) < angle_half_aperture .and. hx < foc_length(mi)) then
-                    hxnew = foc_length(mi) - dsqrt(hy**2d0 + (foc_length(mi) - hx)**2d0)
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)
-                    angle = -atan(hy/(foc_length(mi) - hx))
-                end if
-            elseif (support(mi) == 7) then
-                ! Support along transducer array in 2D
-                hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
+        real(kind(0d0)) :: current_angle, angle_half_aperture, dist, norm
 
-                current_angle = -atan(hy/(foc_length(mi) - hx))
-                angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
-                angle_per_elem = (2d0*angle_half_aperture - (num_elements(mi) - 1d0)*element_spacing_angle(mi))/num_elements(mi)
-                hxnew = foc_length(mi) - dsqrt(hy**2d0 + (foc_length(mi) - hx)**2d0)
+        f_source_spatial_transducer = 0d0
 
-                if (element_on(mi) == 0) then ! Full transducer
-                    elem_min = 1
-                    elem_max = num_elements(mi)
-                else ! Transducer element specified
-                    elem_min = element_on(mi)
-                    elem_max = element_on(mi)
-                end if
+        if (p == 0) then ! 2D or 2D axisymmetric
+            current_angle = -atan(hy/(foc_length(mi) - hx))
+            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
 
-                f_source_spatial = 0d0 ! If not affected by any element
-                do elem = elem_min, elem_max
-                    angle_max = angle_half_aperture - (element_spacing_angle(mi) + angle_per_elem)*(elem - 1d0)
-                    angle_min = angle_max - angle_per_elem
+            if (abs(current_angle) < angle_half_aperture .and. hx < foc_length(mi)) then
+                dist = foc_length(mi) - dsqrt(hy**2d0 + (foc_length(mi) - hx)**2d0)
+                f_source_spatial_transducer = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+                angle = -atan(hy/(foc_length(mi) - hx))
+            end if
+        else ! 3D
+            current_angle = -atan(dsqrt(hy**2 + hz**2)/(foc_length(mi) - hx))
+            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
 
-                    if (current_angle > angle_min .and. current_angle < angle_max .and. hx < foc_length(mi)) then
-                        f_source_spatial = dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
-                        angle = current_angle
-                        exit ! Assume elements don't overlap
-                    end if
-                end do
+            if (abs(current_angle) < angle_half_aperture .and. hx < foc_length(mi)) then
+                dist = foc_length(mi) - dsqrt(hy**2d0 + hz**2d0 + (foc_length(mi) - hx)**2d0)
+                f_source_spatial_transducer = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+
+                norm = dsqrt(hy**2d0 + hz**2d0 + (foc_length(mi) - hx)**2d0)
+                ratio_x_r = -(hx - foc_length(mi))/norm
+                ratio_y_r = -hy/norm
+                ratio_z_r = -hz/norm
+            end if
+        end if
+    end function f_source_spatial_transducer
+
+    !> This function calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !! @param mono_loc Nominal source term location
+    !! @param mi Monopole index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param hx Distance in x-direction from source to current point
+    !! @param hy Distance in y-direction from source to current point
+    !! @param hz Distance in z-direction from source to current point
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param ratio_x_r Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param ratio_y_r Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param ratio_z_r Ratio of the z-component of the source term to the magnitude (for 3D)
+    function f_source_spatial_transducer_array(mono_loc, mi, sig, hx, hy, hz, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        !$acc routine seq
+        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        integer, intent(in) :: mi
+        real(kind(0d0)), intent(in) :: sig, hx, hy, hz
+        real(kind(0d0)), intent(out) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
+        real(kind(0d0)) :: f_source_spatial_transducer_array
+
+        integer :: elem, elem_min, elem_max
+        real(kind(0d0)) :: current_angle, angle_half_aperture, angle_per_elem, dist
+        real(kind(0d0)) :: angle_min, angle_max, norm
+        real(kind(0d0)) :: poly_side_length, aperture_element_3D, angle_elem
+        real(kind(0d0)) :: x2, y2, z2, x3, y3, z3, C, f, R, dist_interp_to_elem_center
+
+        f_source_spatial_transducer_array = 0d0
+
+        if (p == 0) then ! 2D or 2D axisymmetric
+            current_angle = -atan(hy/(foc_length(mi) - hx))
+            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
+            angle_per_elem = (2d0*angle_half_aperture - (num_elements(mi) - 1d0)*element_spacing_angle(mi))/num_elements(mi)
+            dist = foc_length(mi) - dsqrt(hy**2d0 + (foc_length(mi) - hx)**2d0)
+
+            if (element_on(mi) == 0) then
+                elem_min = 1
+                elem_max = num_elements(mi)
+            else
+                elem_min = element_on(mi)
+                elem_max = element_on(mi)
             end if
 
-        else ! 3D
-            hx = x_cc(j) - mono_loc(1)
-            hy = y_cc(k) - mono_loc(2)
-            hz = z_cc(l) - mono_loc(3)
-            if (support(mi) == 3) then
+            do elem = elem_min, elem_max
+                angle_max = angle_half_aperture - (element_spacing_angle(mi) + angle_per_elem)*(elem - 1d0)
+                angle_min = angle_max - angle_per_elem
 
-                ! Rotate actual point by -theta
-                hxnew = cos(dir(mi))*hx + sin(dir(mi))*hy
-                hynew = -1d0*sin(dir(mi))*hx + cos(dir(mi))*hy
-
-                if (abs(hynew) < length(mi)/2. .and. &
-                    abs(hz) < length(mi)/2.) then
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)
-                else
-                    f_source_spatial = 0d0
+                if (current_angle > angle_min .and. current_angle < angle_max .and. hx < foc_length(mi)) then
+                    f_source_spatial_transducer_array = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
+                    angle = current_angle
+                    exit
                 end if
-            elseif (support(mi) == 4) then
-                ! Support for all x,y
-                f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig)* &
-                                   dexp(-0.5d0*(hz/sig)**2d0)
-            elseif (support(mi) == 5) then
-                ! Support along transducer in 3D
-                hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
-                hz = z_cc(l) - mono_loc(3)
+            end do
+        else ! 3D
+            poly_side_length = aperture(mi)*sin(pi/num_elements(mi))
+            aperture_element_3D = poly_side_length*element_polygon_ratio(mi)
+            f = foc_length(mi)
+            R = aperture(mi)/2d0
 
-                current_angle = -atan(dsqrt(hy**2 + hz**2)/(foc_length(mi) - hx))
-                angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
+            if (element_on(mi) == 0) then
+                elem_min = 1
+                elem_max = num_elements(mi)
+            else
+                elem_min = element_on(mi)
+                elem_max = element_on(mi)
+            end if
 
-                f_source_spatial = 0d0
-                if (abs(current_angle) < angle_half_aperture .and. hx < foc_length(mi)) then
+            do elem = elem_min, elem_max
+                angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(mi), kind(0d0)) + rotate_angle(mi)
 
-                    hxnew = foc_length(mi) - dsqrt(hy**2d0 + hz**2d0 + (foc_length(mi) - hx)**2d0)
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)
+                x2 = f - dsqrt(f**2 - R**2)
+                y2 = R*cos(angle_elem)
+                z2 = R*sin(angle_elem)
 
+                C = f**2d0/((hx - f)*(x2 - f) + hy*y2 + hz*z2)
+                x3 = C*(hx - f) + f
+                y3 = C*hy
+                z3 = C*hz
+
+                dist_interp_to_elem_center = dsqrt((x2 - x3)**2d0 + (y2 - y3)**2d0 + (z2 - z3)**2d0)
+                if ((dist_interp_to_elem_center < aperture_element_3D/2d0) .and. (hx < f)) then
+                    dist = dsqrt((x3 - hx)**2d0 + (y3 - hy)**2d0 + (z3 - hz)**2d0)
+                    f_source_spatial_transducer_array = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
                     norm = dsqrt(hy**2d0 + hz**2d0 + (foc_length(mi) - hx)**2d0)
                     ratio_x_r = -(hx - foc_length(mi))/norm
                     ratio_y_r = -hy/norm
                     ratio_z_r = -hz/norm
                 end if
-            elseif (support(mi) == -1) then ! Not working - disabled for now
-                ! Support for transducer in 3D cylindrical coordinate
-                sig = maxval((/dx(j), dy(k)*sin(dz(l)), dz(l)*cos(dz(l))/))*acoustic_spatial_support_width
-                hx_cyl = x_cc(j) - mono_loc(1)
-                hy_cyl = y_cc(k)*sin(z_cc(l)) - mono_loc(2)
-                hz_cyl = y_cc(k)*cos(z_cc(l)) - mono_loc(3)
-
-                ! Rotate actual point by -theta
-                hxnew_cyl = cos(dir(mi))*hx_cyl + sin(dir(mi))*hy_cyl
-                hynew_cyl = -1d0*sin(dir(mi))*hx_cyl + cos(dir(mi))*hy_cyl
-
-                f_source_spatial = 0d0
-                if (abs(hynew_cyl) < length(mi)/2. .and. &
-                    abs(hz_cyl) < length(mi)/2.) then
-                    f_source_spatial = 1d0/(dsqrt(2d0*pi)*sig/2d0)* &
-                                       dexp(-0.5d0*(hxnew_cyl/(sig/2d0))**2d0)
-                end if
-            elseif (support(mi) == 7) then
-                ! Support along transducer ring in 3D
-
-                poly_side_length = aperture(mi)*sin(pi/num_elements(mi))
-                aperture_element_3D = poly_side_length*element_polygon_ratio(mi)
-
-                hx = x_cc(j) - mono_loc(1)
-                hy = y_cc(k) - mono_loc(2)
-                hz = z_cc(l) - mono_loc(3)
-
-                f = foc_length(mi)
-                R = aperture(mi)/2d0
-
-                if (element_on(mi) == 0) then ! Full transducer
-                    elem_min = 1
-                    elem_max = num_elements(mi)
-                else ! Transducer element specified
-                    elem_min = element_on(mi)
-                    elem_max = element_on(mi)
-                end if
-
-                f_source_spatial = 0d0 ! If not affected by any element
-                do elem = elem_min, elem_max
-                    angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(mi), kind(0d0)) + rotate_angle(mi)
-
-                    ! Point 2 is the elem center
-                    x2 = f - dsqrt(f**2 - R**2); 
-                    y2 = R*cos(angle_elem)
-                    z2 = R*sin(angle_elem)
-
-                    ! Construct a plane normal to the line from the focal point to the elem center,
-                    ! Point 3 is the intercept of the plane and the line from the focal point to the current location
-                    C = f**2d0/((hx - f)*(x2 - f) + hy*y2 + hz*z2) ! Intermediate step constant without much physical meaning
-                    x3 = C*(hx - f) + f
-                    y3 = C*hy
-                    z3 = C*hz
-
-                    dist_interp_to_elem_center = dsqrt((x2 - x3)**2d0 + (y2 - y3)**2d0 + (z2 - z3)**2d0)
-                    if ((dist_interp_to_elem_center < aperture_element_3D/2d0) .and. (hx < f)) then
-                        hxnew = dsqrt((x3 - hx)**2d0 + (y3 - hy)**2d0 + (z3 - hz)**2d0)
-                        ! Note: hxnew here is not related to hx
-                        !       It's the distance of the point of interest to the element plane
-                        f_source_spatial = dexp(-0.5d0*(hxnew/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
-                        norm = dsqrt(hy**2d0 + hz**2d0 + (foc_length(mi) - hx)**2d0)
-                        ratio_x_r = -(hx - foc_length(mi))/norm
-                        ratio_y_r = -hy/norm
-                        ratio_z_r = -hz/norm
-                    end if
-                end do
-
-            end if
+            end do
         end if
-
-    end function f_source_spatial
+    end function f_source_spatial_transducer_array
 
     subroutine s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, sos, n_tait)
         real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_elements
