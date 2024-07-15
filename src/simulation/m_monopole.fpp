@@ -145,6 +145,8 @@ contains
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
 
+        integer, parameter :: mass_label = 1, mom_label = 2
+
         sim_time = t_step*dt
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -163,7 +165,7 @@ contains
         end do
 
         ! Monopoles are looped through sequentially because they can have very different computational costs
-        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_elements, q_prim_element, frequency_conversion_flag, c, small_gamma, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_elements, q_prim_element, frequency_conversion_flag, sigma_time_conversion_flag, c, small_gamma, angle, ratio_x_r, ratio_y_r, ratio_z_r)
         !$acc loop seq
         do mi = 1, num_mono
             if (sim_time < delay(mi) .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) cycle
@@ -173,6 +175,7 @@ contains
                 do k = 0, n
                     do j = 0, m
 
+                        ! Compute speed of sound
                         !$acc loop seq
                         do q = 1, sys_size
                             q_cons_elements(q) = q_cons_vf(q)%sf(j, k, l)
@@ -181,8 +184,7 @@ contains
 
                         call s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, c, small_gamma)
 
-                        term_index = 2
-
+                        ! Frequency and wavelength conversion
                         if (pulse(mi) == 1 .or. pulse(mi) == 3) then
                             if (frequency_conversion_flag) then
                                 frequency_local = c/wavelength(mi)
@@ -197,53 +199,43 @@ contains
                             end if
                         end if
 
-                        mom_src_diff = f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)* &
+                        ! Update momentum source term
+                        mom_src_diff = f_source_temporal(sim_time, c, mi, mom_label, frequency_local, gauss_sigma_time_local)* &
                                        f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
 
-                        if (support(mi) == 5 .or. support(mi) == 7) then
-                            term_index = 1
-                            mass_src_diff = f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)* &
-                                            f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
-                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
-                        else
-                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mom_src_diff/c
-                        end if
-
                         if (n == 0) then ! 1D
-                            if (dir(mi) < 0d0) then ! Left-going wave
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - mom_src_diff
-                            else ! Right-going wave
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff
-                            end if
+                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(mi)) ! Left or right-going wave
+
                         elseif (p == 0) then ! 2D
-                            if (.not. f_is_default(dir(mi))) then
-                                if (support(mi) == 5 .or. support(mi) == 7) then
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(angle)
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(angle)
-                                else
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
-                                end if
+                            if (support(mi) /= 5 .and. support(mi) /= 7) then
+                                angle = dir(mi)
                             end if
+                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(angle)
+                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(angle)
+
                         else ! 3D
-                            if (.not. f_is_default(dir(mi))) then
-                                if (support(mi) == 5 .or. support(mi) == 7) then
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*ratio_x_r
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*ratio_y_r
-                                    mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_src_diff*ratio_z_r
-                                else
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
-                                end if
+                            if (support(mi) == 5 .or. support(mi) == 7) then
+                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*ratio_x_r
+                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*ratio_y_r
+                                mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_src_diff*ratio_z_r
+                            else
+                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
+                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
                             end if
                         end if
 
+                        ! Update mass source term
+                        if (support(mi) == 5 .or. support(mi) == 7) then
+                            mass_src_diff = f_source_temporal(sim_time, c, mi, mass_label, frequency_local, gauss_sigma_time_local)* &
+                                            f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+                        else
+                            mass_src_diff = mom_src_diff/c
+                        end if
+                        mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
+
+                        ! Update energy source term
                         if (model_eqns /= 4) then
-                            if (any(support(mi) == (/5, 7/))) then
-                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
-                            else
-                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mom_src_diff*c/(small_gamma - 1d0)
-                            end if
+                            mono_E_src(j, k, l) = mono_E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
                         end if
 
                     end do
@@ -274,6 +266,9 @@ contains
         !! @param sim_time Simulation time
         !! @param c Sound speed
         !! @param mi Monopole index
+        !! @param term_index Index of the term to be calculated (1: mass source, 2: momentum source)
+        !! @param frequency_local Frequency at the spatial location for sine and square waves
+        !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     function f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)
         !$acc routine seq
         real(kind(0d0)), intent(in) :: sim_time, c
@@ -285,6 +280,8 @@ contains
         real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [^-0.5 -> ^-0.85] (empirical correction)
 
+        integer, parameter :: mass_label = 1
+
         if (n == 0) then
             foc_length_factor = 1d0
         elseif (p == 0 .and. (.not. cyl_coord)) then ! 2D axisymmetric case is physically 3D
@@ -293,33 +290,28 @@ contains
             foc_length_factor = 1/foc_length(mi); 
         end if
 
-        f_source_temporal = 0d0
-
-        if (pulse(mi) == 1) then
-            ! Sine wave
+        if (pulse(mi) == 1) then ! Sine wave
             if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
             omega = 2d0*pi*frequency_local
-            if (term_index == 1) then
-                f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)/c &
-                                    + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
-            else
-                f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)
+            f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)
+            if (term_index == mass_label) then
+                f_source_temporal = f_source_temporal/c + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
             end if
-        elseif (pulse(mi) == 2) then
-            ! Gaussian pulse
-            if (term_index == 1) then
-                f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))/c - &
+
+        elseif (pulse(mi) == 2) then ! Gaussian pulse
+            f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
+            if (term_index == mass_label) then
+                f_source_temporal = f_source_temporal/c - &
                                     foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
                                     (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
-            else
-                f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
             end if
-        elseif (pulse(mi) == 3) then
-            ! Square wave
+
+        elseif (pulse(mi) == 3) then ! Square wave
             if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
             omega = 2d0*pi*frequency_local
             f_source_temporal = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
         end if
+
     end function f_source_temporal
 
     !> This function give the spatial support of the acoustic source
