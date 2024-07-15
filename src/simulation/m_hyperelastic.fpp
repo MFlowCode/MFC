@@ -136,6 +136,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
      subroutine s_hyperelastic_rmt_stress_update(q_prim_vf,q_cons_vf)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
@@ -162,15 +163,18 @@ contains
                 end do
                 !$acc loop seq 
                 do r = -fd_number, fd_number        
+                  ! derivatives in the x-direction
                   tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
                   tensora(2) = tensora(2) + q_prim_vf(xibeg+1)%sf(j + r, k, l)*fd_coeff_x(r, j)
                   tensora(3) = tensora(3) + q_prim_vf(xiend)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                  tensora(4) = tensora(4) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_x(r, k)
-                  tensora(5) = tensora(5) + q_prim_vf(xibeg+1)%sf(j, k + r, l)*fd_coeff_x(r, k)
-                  tensora(6) = tensora(6) + q_prim_vf(xiend)%sf(j, k + r, l)*fd_coeff_x(r, k)
-                  tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_x(r, l)
-                  tensora(8) = tensora(8) + q_prim_vf(xibeg+1)%sf(j, k, l + r)*fd_coeff_x(r, l)
-                  tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_x(r, l)
+                  ! derivatives in the y-direction
+                  tensora(4) = tensora(4) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                  tensora(5) = tensora(5) + q_prim_vf(xibeg+1)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                  tensora(6) = tensora(6) + q_prim_vf(xiend)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                  ! derivatives in the z-direction
+                  tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                  tensora(8) = tensora(8) + q_prim_vf(xibeg+1)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                  tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_z(r, l)
                 end do 
 
                 ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
@@ -234,7 +238,7 @@ contains
                 call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                               alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                 rho_K = max(rho_K, sgm_eps)
-                if (G_K .lt. verysmall) G_K = 0d0
+                if (G_K .le. verysmall) G_K = 0d0
                    
                 call s_compute_cauchy_solver(btensor%vf, q_prim_vf, elastic_ene, G_K, j, k, l)
                 q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) !- &

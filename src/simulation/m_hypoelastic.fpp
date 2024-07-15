@@ -137,18 +137,20 @@ contains
             end do
             !$acc end parallel loop
  
-            do r = -fd_number, fd_number        
             !$acc parallel loop collapse(3) gang vector default(present) 
               do q = 0, p
                 do l = 0, n
                     do k = 0, m
+                      !$acc loop seq
+                      do r = -fd_number, fd_number        
                        du_dx(k, l, q) = du_dx(k, l, q) &
                         + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x(r, k)
+                      end do
+
                     end do
                 end do
               end do
             !$acc end parallel loop
-            end do
 
             if (ndirs > 1) then
                 !$acc parallel loop collapse(3) gang vector default(present)
@@ -161,22 +163,23 @@ contains
                 end do
                 !$acc end parallel loop
 
-                do r = -fd_number, fd_number
-                  !$acc parallel loop collapse(3) gang vector default(present)
-                  do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do q = 0, p
+                  do l = 0, n
+                     do k = 0, m
+                        !$acc loop seq
+                        do r = -fd_number, fd_number
                             du_dy(k, l, q) = du_dy(k, l, q) &
                               + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y(r, l)
                             dv_dx(k, l, q) = dv_dx(k, l, q) &
                               + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x(r, k)
                             dv_dy(k, l, q) = dv_dy(k, l, q) &
                               + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y(r, l)
-                        end do
-                     end do
-                  end do
-                  !$acc end parallel loop
+                         end do
+                      end do
+                   end do
                 end do
+                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
@@ -192,11 +195,12 @@ contains
                     end do
                     !$acc end parallel loop
 
-                    do r = -fd_number, fd_number
-                      !$acc parallel loop collapse(3) gang vector default(present)
-                      do q = 0, p
-                        do l = 0, n
-                            do k = 0, m
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                       do l = 0, n
+                          do k = 0, m
+                             !$acc loop seq
+                             do r = -fd_number, fd_number
                                 du_dz(k, l, q) = du_dz(k, l, q) &
                                 + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z(r, q)
                                 dv_dz(k, l, q) = dv_dz(k, l, q) &
@@ -207,11 +211,11 @@ contains
                                 + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y(r, l)
                                 dw_dz(k, l, q) = dw_dz(k, l, q) &
                                 + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z(r, q)
-                            end do
-                        end do
-                      end do
-                      !$acc end parallel loop
+                             end do
+                          end do
+                       end do
                     end do
+                    !$acc end parallel loop
                 end if
             end if
 
