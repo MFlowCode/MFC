@@ -39,6 +39,8 @@ module m_rhs
 
     use m_hypoelastic
 
+    use m_hyperelastic
+
     use m_monopole
 
     use m_viscous
