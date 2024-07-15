@@ -128,20 +128,19 @@ contains
         !! are calculated from the conservative variables and gradient magnitude (GM)
         !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
+        real(kind(0d0)), dimension(sys_size) :: q_cons_elements
+        real(kind(0d0)) :: q_prim_element
+
         integer, intent(in) :: t_step, id
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: mi !< monopole index
         integer :: term_index
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
-        real(kind(0d0)) :: myRho
-        real(kind(0d0)) :: n_tait, B_tait
-
-        real(kind(0d0)) :: sim_time, sos
-        real(kind(0d0)) :: mass_source, mom_source
+        real(kind(0d0)) :: sim_time, c, small_gamma
+        real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
 
         sim_time = t_step*dt
@@ -162,7 +161,7 @@ contains
         end do
 
         ! Monopoles are looped through sequentially because they can have very different computational costs
-        !$acc parallel loop collapse(3) gang vector default(present) private(myalpha_rho, myalpha, myRho, n_tait, B_tait, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_elements, q_prim_element, c, small_gamma, angle, ratio_x_r, ratio_y_r, ratio_z_r)
         !$acc loop seq
         do mi = 1, num_mono
             if (sim_time < delay(mi) .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) cycle
@@ -170,96 +169,62 @@ contains
                 do k = 0, n
                     do j = 0, m
 
-                        myRho = 0d0
-                        n_tait = 0d0
-                        B_tait = 0d0
-
                         !$acc loop seq
-                        do q = 1, num_fluids
-                            myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
-                            myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                        do q = 1, sys_size
+                            q_cons_elements(q) = q_cons_vf(q)%sf(j, k, l)
                         end do
+                        q_prim_element = q_prim_vf(E_idx)%sf(j, k, l)
 
-                        if (bubbles) then
-                            if (mpp_lim .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do q = 1, num_fluids
-                                    myRho = myRho + myalpha_rho(q)
-                                    n_tait = n_tait + myalpha(q)*gammas(q)
-                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                end do
-                            elseif (num_fluids > 2) then
-                                !$acc loop seq
-                                do q = 1, num_fluids - 1
-                                    myRho = myRho + myalpha_rho(q)
-                                    n_tait = n_tait + myalpha(q)*gammas(q)
-                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                end do
-                            else
-                                myRho = myalpha_rho(1)
-                                n_tait = gammas(1)
-                                B_tait = pi_infs(1)
-                            end if
-                        else
-                            !$acc loop seq
-                            do q = 1, num_fluids
-                                myRho = myRho + myalpha_rho(q)
-                                n_tait = n_tait + myalpha(q)*gammas(q)
-                                B_tait = B_tait + myalpha(q)*pi_infs(q)
-                            end do
-                        end if
-                        n_tait = 1d0/n_tait + 1d0 ! The usual little 'gamma'
-
-                        sos = dsqrt(n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
+                        call s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, c, small_gamma)
 
                         term_index = 2
 
-                        mom_source = f_source_temporal(sim_time, sos, mi, term_index)* &
-                                     f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+                        mom_src_diff = f_source_temporal(sim_time, c, mi, term_index)* &
+                                       f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
 
                         if (support(mi) == 5 .or. support(mi) == 7) then
                             term_index = 1
-                            mass_source = f_source_temporal(sim_time, sos, mi, term_index)* &
-                                          f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
-                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_source
+                            mass_src_diff = f_source_temporal(sim_time, c, mi, term_index)* &
+                                            f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
                         else
-                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mom_source/sos
+                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mom_src_diff/c
                         end if
 
                         if (n == 0) then ! 1D
                             if (dir(mi) < 0d0) then ! Left-going wave
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - mom_source
+                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) - mom_src_diff
                             else ! Right-going wave
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_source
+                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff
                             end if
                         elseif (p == 0) then ! 2D
                             if (.not. f_is_default(dir(mi))) then
                                 if (support(mi) == 5 .or. support(mi) == 7) then
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_source*cos(angle)
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_source*sin(angle)
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(angle)
+                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(angle)
                                 else
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_source*cos(dir(mi))
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_source*sin(dir(mi))
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
+                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
                                 end if
                             end if
                         else ! 3D
                             if (.not. f_is_default(dir(mi))) then
                                 if (support(mi) == 5 .or. support(mi) == 7) then
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_source*ratio_x_r
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_source*ratio_y_r
-                                    mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_source*ratio_z_r
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*ratio_x_r
+                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*ratio_y_r
+                                    mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_src_diff*ratio_z_r
                                 else
-                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_source*cos(dir(mi))
-                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_source*sin(dir(mi))
+                                    mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
+                                    mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
                                 end if
                             end if
                         end if
 
                         if (model_eqns /= 4) then
                             if (any(support(mi) == (/5, 7/))) then
-                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mass_source*sos**2d0/(n_tait - 1d0)
+                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
                             else
-                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mom_source*sos/(n_tait - 1d0)
+                                mono_E_src(j, k, l) = mono_E_src(j, k, l) + mom_src_diff*c/(small_gamma - 1d0)
                             end if
                         end if
 
@@ -289,11 +254,11 @@ contains
 
     !> This function gives the temporally varying amplitude of the pulse
         !! @param sim_time Simulation time
-        !! @param sos Sound speed
+        !! @param c Sound speed
         !! @param mi Monopole index
-    function f_source_temporal(sim_time, sos, mi, term_index) result(g)
+    function f_source_temporal(sim_time, c, mi, term_index) result(g)
         !$acc routine seq
-        real(kind(0d0)), intent(in) :: sim_time, sos
+        real(kind(0d0)), intent(in) :: sim_time, c
         integer, intent(in) :: mi, term_index
         real(kind(0d0)) :: omega ! angular frequency
         real(kind(0d0)) :: g
@@ -317,12 +282,12 @@ contains
                 wavelength(mi) = length(mi) ! For CI test - TODO remove, add frequency to test case files, and regenerate tests
             end if
             if (f_is_default(frequency(mi))) then
-                frequency(mi) = sos/wavelength(mi) ! TODO CHANGE
+                frequency(mi) = c/wavelength(mi) ! TODO CHANGE
             end if
             if ((sim_time - delay(mi))*frequency(mi) > npulse(mi)) return
             omega = 2d0*pi*frequency(mi)
             if (term_index == 1) then
-                g = mag(mi)*sin((sim_time - delay(mi))*omega)/sos &
+                g = mag(mi)*sin((sim_time - delay(mi))*omega)/c &
                     + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
             else
                 g = mag(mi)*sin((sim_time - delay(mi))*omega)
@@ -330,10 +295,10 @@ contains
         elseif (pulse(mi) == 2) then
             ! Gaussian pulse
             if (f_is_default(gauss_sigma_time(mi))) then
-                gauss_sigma_time(mi) = sos/gauss_sigma_dist(mi) ! TODO CHANGE
+                gauss_sigma_time(mi) = c/gauss_sigma_dist(mi) ! TODO CHANGE
             end if
             if (term_index == 1) then
-                g = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time(mi)**2d0))/sos - &
+                g = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time(mi)**2d0))/c - &
                     foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time(mi)* &
                     (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time(mi))) + 1)
             else
@@ -342,7 +307,7 @@ contains
         elseif (pulse(mi) == 3) then
             ! Square wave
             if (f_is_default(frequency(mi))) then
-                frequency(mi) = sos/wavelength(mi) ! TODO CHANGE
+                frequency(mi) = c/wavelength(mi) ! TODO CHANGE
             end if
             if ((sim_time - delay(mi))*frequency(mi) > npulse(mi)) return
             omega = 2d0*pi*frequency(mi)
@@ -599,5 +564,59 @@ contains
         end if
 
     end function f_source_spatial
+
+    subroutine s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, sos, n_tait)
+        real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_elements
+        real(kind(0d0)), intent(in) :: q_prim_element
+        real(kind(0d0)), intent(out) :: sos, n_tait
+
+        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        real(kind(0d0)) :: myRho, B_tait
+        integer :: q
+
+        myRho = 0d0
+        n_tait = 0d0
+        B_tait = 0d0
+
+        !$acc loop seq
+        do q = 1, num_fluids
+            myalpha_rho(q) = q_cons_elements(q)
+            myalpha(q) = q_cons_elements(advxb + q - 1)
+        end do
+
+        if (bubbles) then
+            if (mpp_lim .and. (num_fluids > 2)) then
+                !$acc loop seq
+                do q = 1, num_fluids
+                    myRho = myRho + myalpha_rho(q)
+                    n_tait = n_tait + myalpha(q)*gammas(q)
+                    B_tait = B_tait + myalpha(q)*pi_infs(q)
+                end do
+            elseif (num_fluids > 2) then
+                !$acc loop seq
+                do q = 1, num_fluids - 1
+                    myRho = myRho + myalpha_rho(q)
+                    n_tait = n_tait + myalpha(q)*gammas(q)
+                    B_tait = B_tait + myalpha(q)*pi_infs(q)
+                end do
+            else
+                myRho = myalpha_rho(1)
+                n_tait = gammas(1)
+                B_tait = pi_infs(1)
+            end if
+        else
+            !$acc loop seq
+            do q = 1, num_fluids
+                myRho = myRho + myalpha_rho(q)
+                n_tait = n_tait + myalpha(q)*gammas(q)
+                B_tait = B_tait + myalpha(q)*pi_infs(q)
+            end do
+        end if
+
+        n_tait = 1d0/n_tait + 1d0
+
+        sos = dsqrt(n_tait*(q_prim_element + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
+
+    end subroutine s_compute_speed_of_sound_monopole
 
 end module m_monopole
