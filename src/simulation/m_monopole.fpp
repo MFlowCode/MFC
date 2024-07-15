@@ -115,8 +115,7 @@ contains
 
     end subroutine
 
-    subroutine s_monopole_calculations(q_cons_vf, &
-                                       q_prim_vf, t_step, id, rhs_vf)
+    subroutine s_monopole_calculations(q_cons_vf, q_prim_vf, t_step, id, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -181,7 +180,6 @@ contains
                             q_cons_elements(q) = q_cons_vf(q)%sf(j, k, l)
                         end do
                         q_prim_element = q_prim_vf(E_idx)%sf(j, k, l)
-
                         call s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, c, small_gamma)
 
                         ! Frequency and wavelength conversion
@@ -208,30 +206,30 @@ contains
                             mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(mi)) ! Left or right-going wave
 
                         elseif (p == 0) then ! 2D
-                            if (support(mi) /= 5 .and. support(mi) /= 7) then
+                            if (support(mi) < 5) then ! Planar
                                 angle = dir(mi)
                             end if
                             mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(angle)
                             mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(angle)
 
                         else ! 3D
-                            if (support(mi) == 5 .or. support(mi) == 7) then
+                            if (support(mi) < 5) then ! Planar
+                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
+                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
+                            else
                                 mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*ratios_xyz_r(1)
                                 mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*ratios_xyz_r(2)
                                 mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_src_diff*ratios_xyz_r(3)
-                            else
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
-                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
                             end if
                         end if
 
                         ! Update mass source term
-                        if (support(mi) == 5 .or. support(mi) == 7) then
+                        if (support(mi) < 5) then ! Planar
+                            mass_src_diff = mom_src_diff/c
+                        else
                             call s_source_temporal(sim_time, c, mi, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
                             call s_source_spatial(j, k, l, loc_mono(:, mi), mi, source_spatial, angle, ratios_xyz_r)
                             mass_src_diff = source_temporal*source_spatial
-                        else
-                            mass_src_diff = mom_src_diff/c
                         end if
                         mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
 
@@ -281,7 +279,7 @@ contains
 
         real(kind(0d0)) :: omega ! angular frequency
         real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
-        ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [^-0.5 -> ^-0.85] (empirical correction)
+        ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
         if (n == 0) then
@@ -306,8 +304,8 @@ contains
             source = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
             if (term_index == mass_label) then
                 source = source/c - &
-                                    foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
-                                    (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
+                         foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
+                         (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
             end if
 
         elseif (pulse(mi) == 3) then ! Square wave
@@ -350,11 +348,11 @@ contains
         if (n /= 0) r(2) = y_cc(k) - mono_loc(2)
         if (p /= 0) r(3) = z_cc(l) - mono_loc(3)
 
-        if (any(support(mi) == (/0, 1, 2, 4/))) then
+        if (any(support(mi) == (/1, 2, 3, 4/))) then
             call s_source_spatial_planar(mi, sig, r, source)
-        elseif (support(mi) == 5) then
+        elseif (any(support(mi) == (/5, 6, 7/))) then
             call s_source_spatial_transducer(mi, sig, r, source, angle, ratios_xyz_r)
-        elseif (support(mi) == 7) then
+        elseif (any(support(mi) == (/8, 9, 10/))) then
             call s_source_spatial_transducer_array(mi, sig, r, source, angle, ratios_xyz_r)
         end if
     end subroutine s_source_spatial
@@ -370,39 +368,36 @@ contains
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source
 
-        real(kind(0d0)) :: dist
+        real(kind(0d0)) :: dist, rxnew, rynew
 
-        if (n == 0) then ! 1D
-            if (support(mi) == 1) then
-                ! 1D delta function
-                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
-            elseif (support(mi) == 0) then
-                ! Support for all x
-                source = 1d0
-            end if
+        source = 0d0
+
+        if (n == 0) then ! 1D - Only support 1 is allowed
+            source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
 
         elseif (p == 0) then ! 2D
             if (support(mi) == 1) then
-                ! 2D delta function
                 dist = dsqrt(r(1)**2d0 + r(2)**2d0)
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*((dist/(sig/2d0))**2d0))
 
-            elseif (support(mi) == 2) then
-                !only support for y \pm some value
+            elseif (support(mi) == 2) then ! Only support for y \pm some value
                 if (abs(r(2)) < length(mi)) then
                     source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
-                else
-                    source = 0d0
                 end if
 
-            elseif (support(mi) == 4) then
-                ! Support for all y
+            ! elseif (support(mi) == 3) then
+            !     rxnew = cos(dir(mi))*r(1) + sin(dir(mi))*r(2)
+            !     rynew = -1d0*sin(dir(mi))*r(1) + cos(dir(mi))*r(2)
+            !     if (abs(rynew) < mono_loc(3)/2d0) then
+            !         source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(rxnew/(sig/2d0))**2d0)
+            !     end if
+
+            elseif (support(mi) == 4) then ! Support for all y
                 source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(1)/sig)**2d0)
             end if
 
         else ! 3D
-            if (support(mi) == 4) then
-                ! Support for all x,y
+            if (support(mi) == 4) then ! Support for all x and y
                 source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(3)/sig)**2d0)
             end if
 
@@ -426,7 +421,7 @@ contains
 
         source = 0d0
 
-        if (p == 0) then ! 2D or 2D axisymmetric
+        if (support(mi) == 5 .or. support(mi) == 6) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
             angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
 
@@ -436,7 +431,7 @@ contains
                 angle = -atan(r(2)/(foc_length(mi) - r(1)))
             end if
 
-        else ! 3D
+        elseif (support(mi) == 7) then ! 3D
             current_angle = -atan(dsqrt(r(2)**2 + r(3)**2)/(foc_length(mi) - r(1)))
             angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
 
@@ -474,7 +469,7 @@ contains
 
         source = 0d0 ! If not affected by any element
 
-        if (p == 0) then ! 2D or 2D axisymmetric
+        if (support(mi) == 8 .or. support(mi) == 9) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
             angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
             angle_per_elem = (2d0*angle_half_aperture - (num_elements(mi) - 1d0)*element_spacing_angle(mi))/num_elements(mi)
@@ -499,7 +494,7 @@ contains
                 end if
             end do
 
-        else ! 3D
+        elseif (support(mi) == 10) then ! 3D
             poly_side_length = aperture(mi)*sin(pi/num_elements(mi))
             aperture_element_3D = poly_side_length*element_polygon_ratio(mi)
             f = foc_length(mi)

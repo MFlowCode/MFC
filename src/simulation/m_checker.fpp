@@ -191,24 +191,21 @@ contains
             elseif (f_is_default(mono(j)%npulse)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%npulse must be '// &
                                  'specified. Exiting ...')
-            elseif (mono(j)%support > 4 .and. (.not. f_is_integer(mono(j)%npulse))) then
+            elseif (mono(j)%support >= 5 .and. (.not. f_is_integer(mono(j)%npulse))) then
                 call s_mpi_abort('Mono(i)npulse must be an integer for '// &
-                                 'Mono(i)support > 4 (Cylindrical or '// &
+                                 'Mono(i)support >= 5 (Cylindrical or '// &
                                  'Spherical support). Exiting ...')
-                ! TODO correct number after changing support number
-            elseif (mono(j)%support <= 4 .and. f_is_default(mono(j)%dir)) then
+            elseif (mono(j)%support < 5 .and. f_is_default(mono(j)%dir)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%dir must be '// &
-                                 'specified. Exiting ...')
-                ! TODO correct number after changing support number
+                                 'specified for planer support. Exiting ...')
             elseif (mono(j)%pulse == 2 .and. f_is_default(mono(j)%delay)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%delay must be '// &
                                  'specified for Mono(i)pulse = 2 (Gaussian). '// &
                                  'Exiting ...')
-            elseif (mono(j)%pulse == 3 .and. mono(j)%support > 4) then
-                call s_mpi_abort('Mono(i)support > 4 (Cylindrical or '// &
+            elseif (mono(j)%pulse == 3 .and. mono(j)%support >= 5) then
+                call s_mpi_abort('Mono(i)support >= 5 (Cylindrical or '// &
                                  'Spherical support) is not allowed for '// &
                                  'Mono(i)pulse = 3 (square wave). Exiting ...')
-                ! TODO correct number after changing support number
             end if
 
             if (n == 0) then ! 1D
