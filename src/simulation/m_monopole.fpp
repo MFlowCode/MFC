@@ -285,10 +285,12 @@ contains
         if (n == 0) then
             foc_length_factor = 1d0
         elseif (p == 0 .and. (.not. cyl_coord)) then ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(mi)**(-0.85d0); 
+            foc_length_factor = foc_length(mi)**(-0.85d0); ! Empirical correction
         else
             foc_length_factor = 1/foc_length(mi); 
         end if
+
+        f_source_temporal = 0d0
 
         if (pulse(mi) == 1) then ! Sine wave
             if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
