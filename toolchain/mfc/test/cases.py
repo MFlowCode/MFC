@@ -301,7 +301,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)':
                 4e-02, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
                 'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
-                'patch_icpp(3)%pres': 1.0, 'Mono(1)%support': 1
+                'patch_icpp(3)%pres': 1.0, 'Mono(1)%support': 1, 'Mono(1)%wavelength': 0.25
             })
 
             stack.push("Monopole", {"Monopole": 'T'})

@@ -278,9 +278,6 @@ contains
 
         if (pulse(mi) == 1) then
             ! Sine wave
-            if (f_is_default(frequency(mi)) .and. f_is_default(wavelength(mi))) then
-                wavelength(mi) = length(mi) ! For CI test - TODO remove, add frequency to test case files, and regenerate tests
-            end if
             if (f_is_default(frequency(mi))) then
                 frequency(mi) = c/wavelength(mi) ! TODO CHANGE
             end if
