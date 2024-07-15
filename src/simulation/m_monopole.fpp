@@ -137,6 +137,7 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: angle, ratios_xyz_r(3)
+        real(kind(0d0)) :: source_temporal, source_spatial
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: mi !< monopole index
@@ -199,8 +200,9 @@ contains
                         end if
 
                         ! Update momentum source term
-                        mom_src_diff = f_source_temporal(sim_time, c, mi, mom_label, frequency_local, gauss_sigma_time_local)* &
-                                       f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratios_xyz_r)
+                        call s_source_temporal(sim_time, c, mi, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                        call s_source_spatial(j, k, l, loc_mono(:, mi), mi, source_spatial, angle, ratios_xyz_r)
+                        mom_src_diff = source_temporal*source_spatial
 
                         if (n == 0) then ! 1D
                             mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(mi)) ! Left or right-going wave
@@ -225,8 +227,9 @@ contains
 
                         ! Update mass source term
                         if (support(mi) == 5 .or. support(mi) == 7) then
-                            mass_src_diff = f_source_temporal(sim_time, c, mi, mass_label, frequency_local, gauss_sigma_time_local)* &
-                                            f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratios_xyz_r)
+                            call s_source_temporal(sim_time, c, mi, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                            call s_source_spatial(j, k, l, loc_mono(:, mi), mi, source_spatial, angle, ratios_xyz_r)
+                            mass_src_diff = source_temporal*source_spatial
                         else
                             mass_src_diff = mom_src_diff/c
                         end if
@@ -261,19 +264,20 @@ contains
 
     end subroutine
 
-    !> This function gives the temporally varying amplitude of the pulse
+    !> This subroutine gives the temporally varying amplitude of the pulse
     !! @param sim_time Simulation time
     !! @param c Sound speed
     !! @param mi Monopole index
     !! @param term_index Index of the term to be calculated (1: mass source, 2: momentum source)
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
-    function f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)
+    !! @param source Source term amplitude
+    subroutine s_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local, source)
         !$acc routine seq
         integer, intent(in) :: mi, term_index
         real(kind(0d0)), intent(in) :: sim_time, c
         real(kind(0d0)), intent(in) :: frequency_local, gauss_sigma_time_local
-        real(kind(0d0)) :: f_source_temporal
+        real(kind(0d0)), intent(out) :: source
 
         real(kind(0d0)) :: omega ! angular frequency
         real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
@@ -288,20 +292,20 @@ contains
             foc_length_factor = 1/foc_length(mi); 
         end if
 
-        f_source_temporal = 0d0
+        source = 0d0
 
         if (pulse(mi) == 1) then ! Sine wave
             if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
             omega = 2d0*pi*frequency_local
-            f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)
+            source = mag(mi)*sin((sim_time - delay(mi))*omega)
             if (term_index == mass_label) then
-                f_source_temporal = f_source_temporal/c + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
+                source = source/c + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
             end if
 
         elseif (pulse(mi) == 2) then ! Gaussian pulse
-            f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
+            source = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
             if (term_index == mass_label) then
-                f_source_temporal = f_source_temporal/c - &
+                source = source/c - &
                                     foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
                                     (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
             end if
@@ -309,25 +313,25 @@ contains
         elseif (pulse(mi) == 3) then ! Square wave
             if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
             omega = 2d0*pi*frequency_local
-            f_source_temporal = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
+            source = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
 
         end if
-    end function f_source_temporal
+    end subroutine s_source_temporal
 
-    !> This function gives the spatial support of the acoustic source
+    !> This subroutine gives the spatial support of the acoustic source
     !! @param j x-index
     !! @param k y-index
     !! @param l z-index
     !! @param mono_loc Nominal source term location
     !! @param mi Monopole index
+    !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param ratios_xyz_r Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    function f_source_spatial(j, k, l, mono_loc, mi, angle, ratios_xyz_r)
+    subroutine s_source_spatial(j, k, l, mono_loc, mi, source, angle, ratios_xyz_r)
         !$acc routine seq
         integer, intent(in) :: j, k, l, mi
         real(kind(0d0)), dimension(3), intent(in) :: mono_loc
-        real(kind(0d0)), intent(out) :: angle, ratios_xyz_r(3)
-        real(kind(0d0)) :: f_source_spatial
+        real(kind(0d0)), intent(out) :: source, angle, ratios_xyz_r(3)
 
         real(kind(0d0)) :: sig, r(3)
 
@@ -347,79 +351,80 @@ contains
         if (p /= 0) r(3) = z_cc(l) - mono_loc(3)
 
         if (any(support(mi) == (/0, 1, 2, 4/))) then
-            f_source_spatial = f_source_spatial_planar(mi, sig, r)
+            call s_source_spatial_planar(mi, sig, r, source)
         elseif (support(mi) == 5) then
-            f_source_spatial = f_source_spatial_transducer(mi, sig, r, angle, ratios_xyz_r)
+            call s_source_spatial_transducer(mi, sig, r, source, angle, ratios_xyz_r)
         elseif (support(mi) == 7) then
-            f_source_spatial = f_source_spatial_transducer_array(mi, sig, r, angle, ratios_xyz_r)
+            call s_source_spatial_transducer_array(mi, sig, r, source, angle, ratios_xyz_r)
         end if
-    end function f_source_spatial
+    end subroutine s_source_spatial
 
-    !> This function calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !> This subroutine calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
     !! @param mi Monopole index
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
-    function f_source_spatial_planar(mi, sig, r)
+    !! @param source Source term amplitude
+    subroutine s_source_spatial_planar(mi, sig, r, source)
         !$acc routine seq
         integer, intent(in) :: mi
         real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)) :: f_source_spatial_planar
+        real(kind(0d0)), intent(out) :: source
 
         real(kind(0d0)) :: dist
 
         if (n == 0) then ! 1D
             if (support(mi) == 1) then
                 ! 1D delta function
-                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
             elseif (support(mi) == 0) then
                 ! Support for all x
-                f_source_spatial_planar = 1d0
+                source = 1d0
             end if
 
         elseif (p == 0) then ! 2D
             if (support(mi) == 1) then
                 ! 2D delta function
                 dist = dsqrt(r(1)**2d0 + r(2)**2d0)
-                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*((dist/(sig/2d0))**2d0))
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*((dist/(sig/2d0))**2d0))
 
             elseif (support(mi) == 2) then
                 !only support for y \pm some value
                 if (abs(r(2)) < length(mi)) then
-                    f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
+                    source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
                 else
-                    f_source_spatial_planar = 0d0
+                    source = 0d0
                 end if
 
             elseif (support(mi) == 4) then
                 ! Support for all y
-                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(1)/sig)**2d0)
+                source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(1)/sig)**2d0)
             end if
 
         else ! 3D
             if (support(mi) == 4) then
                 ! Support for all x,y
-                f_source_spatial_planar = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(3)/sig)**2d0)
+                source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(3)/sig)**2d0)
             end if
 
         end if
-    end function f_source_spatial_planar
+    end subroutine s_source_spatial_planar
 
-    !> This function calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
     !! @param mi Monopole index
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param ratios_xyz_r Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    function f_source_spatial_transducer(mi, sig, r, angle, ratios_xyz_r)
+    subroutine s_source_spatial_transducer(mi, sig, r, source, angle, ratios_xyz_r)
         !$acc routine seq
         integer, intent(in) :: mi
         real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: angle, ratios_xyz_r(3)
-        real(kind(0d0)) :: f_source_spatial_transducer
+        real(kind(0d0)), intent(out) :: source, angle, ratios_xyz_r(3)
 
         real(kind(0d0)) :: current_angle, angle_half_aperture, dist, norm
 
-        f_source_spatial_transducer = 0d0
+        source = 0d0
 
         if (p == 0) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
@@ -427,7 +432,7 @@ contains
 
             if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(mi)) then
                 dist = foc_length(mi) - dsqrt(r(2)**2d0 + (foc_length(mi) - r(1))**2d0)
-                f_source_spatial_transducer = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
                 angle = -atan(r(2)/(foc_length(mi) - r(1)))
             end if
 
@@ -437,7 +442,7 @@ contains
 
             if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(mi)) then
                 dist = foc_length(mi) - dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(mi) - r(1))**2d0)
-                f_source_spatial_transducer = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
 
                 norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(mi) - r(1))**2d0)
                 ratios_xyz_r(1) = -(r(1) - foc_length(mi))/norm
@@ -446,21 +451,20 @@ contains
             end if
 
         end if
-    end function f_source_spatial_transducer
+    end subroutine s_source_spatial_transducer
 
-    !> This function calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
     !! @param mi Monopole index
     !! @param sig Sigma value for the Gaussian distribution
-    !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param ratios_xyz_r Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    function f_source_spatial_transducer_array(mi, sig, r, angle, ratios_xyz_r)
+    subroutine s_source_spatial_transducer_array(mi, sig, r, source, angle, ratios_xyz_r)
         !$acc routine seq
         integer, intent(in) :: mi
         real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: angle, ratios_xyz_r(3)
-        real(kind(0d0)) :: f_source_spatial_transducer_array
+        real(kind(0d0)), intent(out) :: source, angle, ratios_xyz_r(3)
 
         integer :: elem, elem_min, elem_max
         real(kind(0d0)) :: current_angle, angle_half_aperture, angle_per_elem, dist
@@ -468,7 +472,7 @@ contains
         real(kind(0d0)) :: poly_side_length, aperture_element_3D, angle_elem
         real(kind(0d0)) :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
 
-        f_source_spatial_transducer_array = 0d0 ! If not affected by any element
+        source = 0d0 ! If not affected by any element
 
         if (p == 0) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
@@ -489,7 +493,7 @@ contains
                 angle_min = angle_max - angle_per_elem
 
                 if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(mi)) then
-                    f_source_spatial_transducer_array = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
+                    source = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
                     angle = current_angle
                     exit ! Assume elements don't overlap
                 end if
@@ -527,7 +531,7 @@ contains
                 dist_interp_to_elem_center = dsqrt((x2 - x3)**2d0 + (y2 - y3)**2d0 + (z2 - z3)**2d0)
                 if ((dist_interp_to_elem_center < aperture_element_3D/2d0) .and. (r(1) < f)) then
                     dist = dsqrt((x3 - r(1))**2d0 + (y3 - r(2))**2d0 + (z3 - r(3))**2d0)
-                    f_source_spatial_transducer_array = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
+                    source = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
 
                     norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (f - r(1))**2d0)
                     ratios_xyz_r(1) = -(r(1) - f)/norm
@@ -538,7 +542,7 @@ contains
             end do
 
         end if
-    end function f_source_spatial_transducer_array
+    end subroutine s_source_spatial_transducer_array
 
     subroutine s_compute_speed_of_sound_monopole(q_cons_elements, q_prim_element, sos, n_tait)
         real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_elements
