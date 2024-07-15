@@ -791,6 +791,10 @@ contains
         call nvtxEndRange
         !print *, "I got here c"
 
+        call nvtxStartRange("RHS-ELASTIC")
+        call s_hyperelastic_rmt_stress_update(q_cons_qp%vf,q_prim_qp%vf)
+        call nvtxEndRange
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 

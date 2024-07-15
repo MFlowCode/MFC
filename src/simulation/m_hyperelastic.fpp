@@ -135,7 +135,7 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-     subroutine s_hyperelastic_rmt_stress_update(q_prim_vf,q_cons_vf)
+     subroutine s_hyperelastic_rmt_stress_update(q_cons_vf,q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -226,7 +226,7 @@ contains
                 btensor%vf(4)%sf(j, k, l) = tensorb(5)
                 btensor%vf(5)%sf(j, k, l) = tensorb(6)
                 btensor%vf(6)%sf(j, k, l) = tensorb(9)
-                !!! store the determinant at the last entry of the btensor sf
+                ! store the determinant at the last entry of the btensor sf
                 btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
 
                 !$acc loop seq
