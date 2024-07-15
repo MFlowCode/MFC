@@ -25,6 +25,8 @@ module m_time_steppers
 
     use m_ibm
 
+    use m_hyperelastic
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_boundary_conditions
@@ -844,6 +846,10 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
+
+        call nvtxStartRange("RHS-ELASTIC")
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf,q_prim_vf)
+        call nvtxEndRange
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
