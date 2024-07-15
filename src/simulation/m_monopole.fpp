@@ -87,9 +87,9 @@ contains
             mag(i) = mono(i)%mag
             support(i) = mono(i)%support
             length(i) = mono(i)%length
-            wavelength(i) = mono(i)%wavelength ! TODO EITHER wavelength OR frequency
+            wavelength(i) = mono(i)%wavelength
             frequency(i) = mono(i)%frequency
-            gauss_sigma_dist(i) = mono(i)%gauss_sigma_dist ! TODO EITHER gauss_sigma_dist OR gauss_sigma_time
+            gauss_sigma_dist(i) = mono(i)%gauss_sigma_dist
             gauss_sigma_time(i) = mono(i)%gauss_sigma_time
             foc_length(i) = mono(i)%foc_length
             aperture(i) = mono(i)%aperture
@@ -139,7 +139,9 @@ contains
         integer :: mi !< monopole index
         integer :: term_index
 
+        logical :: frequency_conversion_flag, sigma_time_conversion_flag
         real(kind(0d0)) :: sim_time, c, small_gamma
+        real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: angle, ratio_x_r, ratio_y_r, ratio_z_r
 
@@ -161,10 +163,12 @@ contains
         end do
 
         ! Monopoles are looped through sequentially because they can have very different computational costs
-        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_elements, q_prim_element, c, small_gamma, angle, ratio_x_r, ratio_y_r, ratio_z_r)
+        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_elements, q_prim_element, frequency_conversion_flag, c, small_gamma, angle, ratio_x_r, ratio_y_r, ratio_z_r)
         !$acc loop seq
         do mi = 1, num_mono
             if (sim_time < delay(mi) .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) cycle
+            frequency_conversion_flag = f_is_default(frequency(mi))
+            sigma_time_conversion_flag = f_is_default(gauss_sigma_time(mi))
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -179,12 +183,26 @@ contains
 
                         term_index = 2
 
-                        mom_src_diff = f_source_temporal(sim_time, c, mi, term_index)* &
+                        if (pulse(mi) == 1 .or. pulse(mi) == 3) then
+                            if (frequency_conversion_flag) then
+                                frequency_local = c/wavelength(mi)
+                            else
+                                frequency_local = frequency(mi)
+                            end if
+                        elseif (pulse(mi) == 2) then
+                            if (sigma_time_conversion_flag) then
+                                gauss_sigma_time_local = c/gauss_sigma_dist(mi)
+                            else
+                                gauss_sigma_time_local = gauss_sigma_time(mi)
+                            end if
+                        end if
+
+                        mom_src_diff = f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)* &
                                        f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
 
                         if (support(mi) == 5 .or. support(mi) == 7) then
                             term_index = 1
-                            mass_src_diff = f_source_temporal(sim_time, c, mi, term_index)* &
+                            mass_src_diff = f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)* &
                                             f_source_spatial(j, k, l, loc_mono(:, mi), mi, angle, ratio_x_r, ratio_y_r, ratio_z_r)
                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
                         else
@@ -256,12 +274,13 @@ contains
         !! @param sim_time Simulation time
         !! @param c Sound speed
         !! @param mi Monopole index
-    function f_source_temporal(sim_time, c, mi, term_index) result(g)
+    function f_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local)
         !$acc routine seq
         real(kind(0d0)), intent(in) :: sim_time, c
+        real(kind(0d0)), intent(in) :: frequency_local, gauss_sigma_time_local
         integer, intent(in) :: mi, term_index
         real(kind(0d0)) :: omega ! angular frequency
-        real(kind(0d0)) :: g
+        real(kind(0d0)) :: f_source_temporal
 
         real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [^-0.5 -> ^-0.85] (empirical correction)
@@ -274,41 +293,32 @@ contains
             foc_length_factor = 1/foc_length(mi); 
         end if
 
-        g = 0d0
+        f_source_temporal = 0d0
 
         if (pulse(mi) == 1) then
             ! Sine wave
-            if (f_is_default(frequency(mi))) then
-                frequency(mi) = c/wavelength(mi) ! TODO CHANGE
-            end if
-            if ((sim_time - delay(mi))*frequency(mi) > npulse(mi)) return
-            omega = 2d0*pi*frequency(mi)
+            if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
+            omega = 2d0*pi*frequency_local
             if (term_index == 1) then
-                g = mag(mi)*sin((sim_time - delay(mi))*omega)/c &
-                    + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
+                f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)/c &
+                                    + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
             else
-                g = mag(mi)*sin((sim_time - delay(mi))*omega)
+                f_source_temporal = mag(mi)*sin((sim_time - delay(mi))*omega)
             end if
         elseif (pulse(mi) == 2) then
             ! Gaussian pulse
-            if (f_is_default(gauss_sigma_time(mi))) then
-                gauss_sigma_time(mi) = c/gauss_sigma_dist(mi) ! TODO CHANGE
-            end if
             if (term_index == 1) then
-                g = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time(mi)**2d0))/c - &
-                    foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time(mi)* &
-                    (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time(mi))) + 1)
+                f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))/c - &
+                                    foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
+                                    (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
             else
-                g = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time(mi)**2d0))
+                f_source_temporal = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
             end if
         elseif (pulse(mi) == 3) then
             ! Square wave
-            if (f_is_default(frequency(mi))) then
-                frequency(mi) = c/wavelength(mi) ! TODO CHANGE
-            end if
-            if ((sim_time - delay(mi))*frequency(mi) > npulse(mi)) return
-            omega = 2d0*pi*frequency(mi)
-            g = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
+            if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
+            omega = 2d0*pi*frequency_local
+            f_source_temporal = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
         end if
     end function f_source_temporal
 
