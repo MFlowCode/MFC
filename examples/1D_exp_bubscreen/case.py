@@ -241,6 +241,7 @@ print(json.dumps({
     # Acoustic source ==========================================
     'Monopole'                  : 'T',
     'num_mono'                  : 1,
+    'Mono(1)%support'           : 1,
     'Mono(1)%loc(1)'            : -0.05/x0,
     'Mono(1)%npulse'            : 1,
     'Mono(1)%dir'               : 1.,

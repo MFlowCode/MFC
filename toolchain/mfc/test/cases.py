@@ -591,6 +591,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             def modify_example_case(case: dict):
                 case['t_step_save'] = 10
+                if (case['m'] * max(case['n'], 1) * max(case['p'], 1) > 15625):
+                    # change later
+                    if (case['n'] == 0 and case['p'] == 0):
+                        case['m'] = 15625
+                    elif (case['p'] == 0):
+                        case['m'] = 125
+                        case['n'] = 125
+                    else:
+                        case['m'] = 25
+                        case['n'] = 25
+                        case['p'] = 25
+                print(case['m'] * max(case['n'], 1) * max(case['p'], 1))
+                
 
             cases.append(define_case_f(name, path, [], {
                 't_step_stop': 100,

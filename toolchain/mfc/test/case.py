@@ -262,7 +262,7 @@ class TestCaseBuilder:
 
         if self.functor:
             self.functor(dictionary)
-            print(dictionary)
+            # print(dictionary)
 
         return TestCase(self.trace, dictionary, self.ppn)
 
