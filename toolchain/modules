@@ -61,6 +61,6 @@ d-gpu nvhpc/22.11 openmpi+cuda/4.1.5+cuda cmake
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 c     DoD Carpenter
-c-all python
-c-cpu gcc/12.2.0 cmake/3.28.1-gcc-12.2.0 openmpi/4.1.6
-c-gpu nvhpc/23.7 cuda/12.2
+c-all python/3.12.1
+c-cpu openmpi/4.1.6 gcc/12.2.0 cmake/3.28.1-gcc-12.2.0
+c-cpu CXX=g++

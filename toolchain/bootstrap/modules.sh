@@ -67,7 +67,7 @@ fi
 log "Loading modules (& env variables) for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
 # Reset modules to default system configuration
-if [ "$u_c" != 'p' ]; then
+if [ "$u_c" != 'p' ] && [ "$u_c" != 'c' ]; then
     module reset > /dev/null 2>&1
     code="$?"
 
@@ -102,7 +102,7 @@ for element in ${ELEMENTS[@]}; do
     fi
 done
 
-if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ]; then
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" != 'c' ]; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
 fi
