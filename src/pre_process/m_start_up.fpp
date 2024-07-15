@@ -33,8 +33,6 @@ module m_start_up
 
     use m_phase_change          !< Phase-change module
 
-    use m_hyperelastic          !< Hyperelasticity module for RMT
-
     use m_helper_basic          !< Functions to compare floating point numbers
 
     use m_helper
@@ -782,7 +780,6 @@ contains
         call s_initialize_initial_condition_module()
         call s_initialize_assign_variables_module()
         if (relax) call s_initialize_phasechange_module()
-        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
         ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
@@ -932,7 +929,6 @@ contains
         call s_finalize_global_parameters_module()
         call s_finalize_assign_variables_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (hyperelasticity) call s_finalize_hyperelastic_module()
 
         ! Finalization of the MPI environment
         call s_mpi_finalize()

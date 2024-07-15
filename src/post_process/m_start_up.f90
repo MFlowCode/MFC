@@ -19,8 +19,6 @@ module m_start_up
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
 
-    use m_hyperelastic          !< Hyperelasticity module for RMT
- 
     use m_data_input            !< Procedures reading raw simulation data to fill
                                 !! the conservative, primitive and grid variables
 
@@ -681,7 +679,6 @@ contains
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
         call s_initialize_data_output_module()
-        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
         ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
@@ -729,7 +726,6 @@ contains
         call s_finalize_data_output_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
-        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_variables_conversion_module()
         if (num_procs > 1) call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()

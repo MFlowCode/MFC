@@ -48,6 +48,8 @@ module m_start_up
                                 !! from the conservative and primitive variables
     use m_hypoelastic
 
+    use m_hyperelastic
+
     use m_phase_change          !< Phase-change module
 
     use m_viscous
@@ -1316,6 +1318,7 @@ contains
         call s_initialize_derived_variables()
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 

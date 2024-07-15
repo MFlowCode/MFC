@@ -13,7 +13,7 @@ module m_hypoelastic
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+!    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_helper
 
@@ -36,6 +36,10 @@ module m_hypoelastic
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rho_K_field, G_K_field)
     !$acc declare link(rho_K_field, G_K_field)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), allocatable, dimension(:, :), fd_coeff_x, fd_coeff_y, fd_coeff_z)
+    !$acc declare link(fd_coeff_x,fd_coeff_y,fd_coeff_z)
+
 #else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
@@ -354,10 +358,13 @@ contains
         @:DEALLOCATE_GLOBAL(Gs)
         @:DEALLOCATE_GLOBAL(rho_K_field, G_K_field)
         @:DEALLOCATE_GLOBAL(du_dx)
+        @:DEALLOCATE_GLOBAL(fd_coeff_x)
         if (n > 0) then
             @:DEALLOCATE_GLOBAL(du_dy,dv_dx,dv_dy)
+            @:DEALLOCATE_GLOBAL(fd_coeff_y)
             if (p > 0) then
                 @:DEALLOCATE_GLOBAL(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
+                @:DEALLOCATE_GLOBAL(fd_coeff_z)
             end if
         end if
 

@@ -19,10 +19,6 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
-    use m_xi_tensor            !< Using reference map matrix calculations
-
-    use m_hyperelastic         !< Using hyperelastic Cauchy tensor calculations
-
     use m_helper_basic         !< Functions to compare floating point numbers
 
     use m_helper
@@ -109,11 +105,6 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-    !! The btensor at the cell-interior Gaussian quadrature points.
-    !! These tensor is needed to be calculated once and make the code DRY.
-    type(vector_field) :: q_btensor !<
-    !$acc declare create(q_btensor)
-
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
     !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
@@ -174,13 +165,6 @@ contains
                 end if
             end do
 
-            pres = (energy - 0.5d0*(mom**2.d0)/rho - pi_inf - qv - E_e)/gamma
-
-        end if
-
-        if (hyperelasticity .and. present(G)) then
-            ! calculate elastic contribution to Energy
-            E_e = 0d0
             pres = (energy - 0.5d0*(mom**2.d0)/rho - pi_inf - qv - E_e)/gamma
 
         end if
@@ -683,14 +667,6 @@ contains
         end if
 #endif
 
-        if (hyperelasticity) then 
-          @:ALLOCATE(q_btensor%vf(1:b_size))
-          do i = 1, b_size
-            @:ALLOCATE(q_btensor%vf(i)%sf(ixb:ixe, iyb:iye, izb:ize))
-          end do
-          @:ACC_SETUP_VFs(q_btensor)
-        end if
-
         if (bubbles) then
 #ifdef MFC_SIMULATION
             @:ALLOCATE_GLOBAL(bubrs(1:nb))
@@ -885,8 +861,6 @@ contains
 
         real(kind(0d0)) :: ntmp
 
-        type(scalar_field), dimension(b_size) :: q_btensor
-
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
             if (bubbles) then
@@ -902,12 +876,6 @@ contains
                 allocate (nRtmp(0))
             end if
         #:endif
-
-        if (hyperelasticity) then 
-          do l = 1, b_size
-            allocate (q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
-          end do
-        end if
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, G_K)
         do l = izb, ize
@@ -1058,36 +1026,6 @@ contains
 
         !print *, 'I got here AA'
 
-        if (hyperelasticity) then
-            call s_calculate_btensor_acc(qK_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-            !print *, 'I got here AAA'
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, rho_K, gamma_K, pi_inf_K, qv_K, G_K)
-            do l = izb, ize
-               do k = iyb, iye
-                  do j = ixb, ixe
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                        alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    end do
-                    ! If in simulation, use acc mixture subroutines
-                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                 alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    rho_K = max(rho_K, sgm_eps)
-                    if (G_K .gt. verysmall) then
-                      qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) !- &
-                                 !G_K*f_elastic_energy(q_btensor, j, k, l)/gamma_K
-                    !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
-                      call s_compute_cauchy_solver(q_btensor, qK_prim_vf, G_K, j, k, l)
-                    else 
-                      call s_compute_cauchy_solver(q_btensor, qK_prim_vf, 0d0, j, k, l)
-                    end if
-                  end do
-               end do
-            end do
-           !$acc end parallel loop
-        end if
-
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
     !>  The following procedure handles the conversion between
@@ -1103,7 +1041,6 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(b_size) :: q_btensor
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1121,16 +1058,6 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
 
 #ifndef MFC_SIMULATION
-        do l = 1, b_size
-            @:ALLOCATE(q_btensor(l)%sf(ixb:ixe, iyb:iye, izb:ize))
-        end do
-
-        ! btensor calculation
-        ! s_calculate_btensor has its own triple nested for loop, with openacc
-        if (hyperelasticity) then
-             call s_calculate_btensor_acc(q_prim_vf, q_btensor, 0, m, 0, n, 0, p)
-        end if
-
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
             do k = 0, n
@@ -1242,13 +1169,6 @@ contains
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if (hyperelasticity) then
                        ! adding the elastic contribution
-                       if (G .gt. verysmall) then
-                         q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) !+ &
-                            !G*f_elastic_energy(q_btensor, j, k, l)
-                         !call s_compute_cauchy_solver(q_btensor,q_prim_vf, G, j, k, l)
-                       else 
-                         call s_compute_cauchy_solver(q_btensor,q_prim_vf, 0d0, j, k, l)
-                       end if
                        ! Multiply \tau to \rho \tau
                        do i = strxb, strxe
                           q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -1265,10 +1185,6 @@ contains
 
                 end do
             end do
-        end do
-        ! deallocating the btensor
-        do l = 1, b_size
-            @:DEALLOCATE(q_btensor(l)%sf)
         end do
 #else
         if (proc_rank == 0) then
