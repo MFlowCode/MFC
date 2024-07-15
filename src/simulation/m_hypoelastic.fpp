@@ -58,7 +58,7 @@ contains
 
     subroutine s_initialize_hypoelastic_module
 
-        integer :: i
+        integer :: i, k, r
 
         @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
         @:ALLOCATE_GLOBAL(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
@@ -87,16 +87,25 @@ contains
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                         fd_number, fd_order)
-
+        !!!!$acc update device(fd_coeff_x)
         if (n > 0) then
           call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
                                                            fd_number, fd_order)
+        !!!$acc update device(fd_coeff_y)
         end if
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
                                                           fd_number, fd_order)
+        !!!$acc update device(fd_coeff_z)
         end if
-        !$acc update device(fd_coeff_x,fd_coeff_y,fd_coeff_z)
+
+        !!!!$acc loop seq
+        do k = 0, m
+          print *, 'x_cc :: ',x_cc(k)
+          do r = -fd_number, fd_number
+            print *, 'fd_co :: ',fd_coeff_x(r,k)
+          end do 
+        end do
 
     end subroutine s_initialize_hypoelastic_module
 
@@ -122,11 +131,20 @@ contains
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
 
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        du_dx(k, l, q) = 0d0;
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+          
             !$acc parallel loop collapse(4) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        du_dx(k, l, q) = 0d0
                         do r = -fd_number, fd_number
                           du_dx(k, l, q) = du_dx(k, l, q) &
                             + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x(r, k)
@@ -134,13 +152,23 @@ contains
                     end do
                 end do
             end do
+            !$acc end parallel loop
 
             if (ndirs > 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do q = 0, p
+                  do l = 0, n
+                    do k = 0, m
+                        du_dy(k, l, q) = 0d0; dv_dx(k, l, q) = 0d0; dv_dy(k, l, q) = 0d0;
+                    end do
+                  end do
+                end do
+                !$acc end parallel loop
+
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                          du_dy(k, l, q) = 0d0; dv_dx(k, l, q) = 0d0; dv_dy(k, l, q) = 0d0;
                           do r = -fd_number, fd_number
                             du_dy(k, l, q) = du_dy(k, l, q) &
                               + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y(r, l)
@@ -152,15 +180,25 @@ contains
                         end do
                     end do
                 end do
+                !$acc end parallel loop
 
                 ! 3D
                 if (ndirs == 3) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                      do l = 0, n
+                        do k = 0, m
+                          du_dz(k, l, q) = 0d0; dv_dz(k, l, q) = 0d0; dw_dx(k, l, q) = 0d0;
+                          dw_dy(k, l, q) = 0d0; dw_dz(k, l, q) = 0d0; 
+                        end do
+                      end do
+                    end do
+                    !$acc end parallel loop
+
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                              du_dz(k, l, q) = 0d0; dv_dz(k, l, q) = 0d0; dw_dx(k, l, q) = 0d0;
-                              dw_dy(k, l, q) = 0d0; dw_dz(k, l, q) = 0d0; 
                               do r = -fd_number, fd_number
                                 du_dz(k, l, q) = du_dz(k, l, q) &
                                 + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z(r, q)
@@ -176,6 +214,7 @@ contains
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
                 end if
             end if
 

@@ -28,8 +28,8 @@
 #./mfc.sh run /users/mrodrig97/scratch/ctr2024/test6/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t simulation -c oscar
 #./mfc.sh run /users/mrodri97/scratch/ctr2024/test6/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t post_process -c oscar
 
-./mfc.sh run /users/mrodri97/hMFC/tests/9EB947DB/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t pre_process -c oscar
-./mfc.sh run /users/mrodri97/hMFC/tests/9EB947DB/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t simulation -c oscar
+./mfc.sh run /u/rodrigu1/hMFC/tests/9EB947DB/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t pre_process -c delta
+./mfc.sh run /u/rodrigu1/hMFC/tests/9EB947DB/case.py -p batch -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t simulation -c delta
 
 
 
