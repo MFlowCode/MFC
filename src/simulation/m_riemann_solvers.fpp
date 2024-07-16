@@ -1060,7 +1060,7 @@ contains
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
-                                ! ADJUSTMENTS FOR HYPOELASTIC ENERGY
+                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
@@ -1088,7 +1088,7 @@ contains
                                     end do
                                 end if
 
-                                ! ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
                                     G_L = 0d0; G_R = 0d0; 
                                     !$acc loop seq 
@@ -1104,10 +1104,9 @@ contains
                                     E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                                     !$acc loop seq
                                     do i = 1, b_size - 1
-                                        !TODO MAURO
-                                        tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
-                                        !tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                                        !tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                        !tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
+                                        tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                        tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
                                 end if
 
@@ -1219,8 +1218,8 @@ contains
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
 
-                                ! ELASTICITY. Elastic shear stress terms for the momentum and energy flux
-                                if (hypoelasticity) then
+                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                if (elasticity) then
                                   flux_ene_e = 0d0;
                                   !$acc loop seq
                                   do i = 1, num_dims
@@ -1236,13 +1235,6 @@ contains
                                       s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                   end do
                                   flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
-                                  ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                  !$acc loop seq
-                                  do i = 1, strxe - strxb + 1
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
-                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
-                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
-                                  end do
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
@@ -1281,6 +1273,16 @@ contains
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
+
+                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
+                                if (hypoelasticity) then
+                                  !$acc loop seq
+                                  do i = 1, strxe - strxb + 1
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
+                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
+                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
+                                  end do
+                                end if
 
                                 ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
