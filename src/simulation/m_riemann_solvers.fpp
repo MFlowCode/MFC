@@ -901,6 +901,7 @@ contains
         real(kind(0d0)) :: xi_MP, xi_PP
 
         real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
+        real(kind(0d0)), dimension(num_dims) :: xi_field_L, xi_field_R
         real(kind(0d0)) :: G_L, G_R
 
         real(kind(0d0)) :: nbub_L, nbub_R
@@ -1090,6 +1091,11 @@ contains
 
                                 ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
+                                    !$acc loop seq
+                                    do i = 1, num_dims
+                                      xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
+                                      xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                    end do
                                     G_L = 0d0; G_R = 0d0; 
                                     !$acc loop seq 
                                     do i = 1, num_fluids
@@ -1104,9 +1110,9 @@ contains
                                     E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                                     !$acc loop seq
                                     do i = 1, b_size - 1
-                                        !tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
-                                        tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                                        tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                      !tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
+                                      tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                      tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
                                 end if
 
@@ -1287,11 +1293,17 @@ contains
                                 ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
                                   !$acc loop seq
-                                  do i = xibeg, xiend
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
-                                        xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                  do i = 1, num_dims
+                                    flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
+                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(idx1)*xi_field_L(i)) + &
+                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(idx1)*xi_field_R(i))
                                   end do
+                                  !!$acc loop seq
+                                  !do i = xibeg, xiend
+                                  !  flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                  !      xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
+                                  !      xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                  !end do
                                 end if
 
                                 ! SURFACE TENSION FLUX. need to check

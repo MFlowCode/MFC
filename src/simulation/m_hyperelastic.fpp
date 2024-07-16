@@ -136,7 +136,7 @@ contains
         !! btensor is symmetric, save the data space
      subroutine s_hyperelastic_rmt_stress_update(q_cons_vf,q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
 
@@ -144,7 +144,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K
         real(kind(0d0)) :: G_K 
-
+        logical :: flag
         integer :: j, k, l, i, r
         ! STEP 1: computing the grad_xi tensor
         ! grad_xi definition / organization
@@ -152,11 +152,11 @@ contains
         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K,tensora,tensorb)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K, tensora, tensorb, flag)
         do l = 0, p
            do k = 0, n
               do j = 0, m        
-
+                flag = .true.
                 !$acc loop seq
                 do i = 1, num_fluids
                    alpha_rho_K(i) = q_cons_vf(i)%sf(j, k, l)
@@ -168,7 +168,7 @@ contains
                 rho_K = max(rho_K, sgm_eps)
                 if ( G_K .le. verysmall ) G_K = 0d0
 
-                if ( G_K .gt. verysmall ) then
+                if ( G_K .gt. 1d0 ) then
                   !$acc loop seq 
                   do i = 1, tensor_size
                     tensora(i) = 0d0
@@ -205,12 +205,15 @@ contains
                                     + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
 
                   ! STEP 2c: computing the inverse of grad_xi tensor = F
-                  ! tensorb is the adjoint, tensora becomes the inverse
+                  ! tensorb is the adjoint, tensora becomes F
                   !$acc loop seq
                   do i = 1, tensor_size - 1
                     tensora(i) = tensorb(i)/tensorb(tensor_size)
                   end do
-
+ 
+                  ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
+                  tensorb(tensor_size) = 1d0/tensorb(tensor_size)
+ 
                   ! STEP 3: computing F tranpose F
                   tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
                   tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
@@ -218,25 +221,39 @@ contains
                   tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
                   tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
                   tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
+
+                  !if (tensorb(tensor_size) < 0d0) then 
+                  !  print *, 'idx :: ',j,' ',k,' ',l,' J :: ',tensorb(tensor_size),' ',G_K
+                  !end if
                 else
-                  tensorb(1) = 1d0; tensorb(5) = 1d0; tensorb(9) = 1d0;
-                  tensorb(2) = 0d0; tensorb(3) = 0d0; tensorb(6) = 0d0;              
-                  tensorb(tensor_size) = 1d0;
+                   flag = .false.
                 end if
 
-                ! STEP 4: update the btensor
-                btensor%vf(1)%sf(j, k, l) = tensorb(1)
-                btensor%vf(2)%sf(j, k, l) = tensorb(2)
-                btensor%vf(3)%sf(j, k, l) = tensorb(3)
-                btensor%vf(4)%sf(j, k, l) = tensorb(5)
-                btensor%vf(5)%sf(j, k, l) = tensorb(6)
-                btensor%vf(6)%sf(j, k, l) = tensorb(9)
-                ! store the determinant at the last entry of the btensor sf
-                btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
+                !if (tensorb(tensor_size) < 0.3) flag = .false.
+
+                if (flag) then
+                  ! STEP 4: update the btensor
+                  btensor%vf(1)%sf(j, k, l) = tensorb(1)
+                  btensor%vf(2)%sf(j, k, l) = tensorb(2)
+                  btensor%vf(3)%sf(j, k, l) = tensorb(3)
+                  btensor%vf(4)%sf(j, k, l) = tensorb(5)
+                  btensor%vf(5)%sf(j, k, l) = tensorb(6)
+                  btensor%vf(6)%sf(j, k, l) = tensorb(9)
+                  ! store the determinant at the last entry of the btensor 
+                  btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
    
-                call s_compute_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
-                q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
-                           G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K
+                  ! STEP 5a: updating the Cauchy stress primitive scalar field
+                  call s_compute_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
+                  ! STEP 5b: updating the pressure field
+                  q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                        G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K
+                  ! STEP 5c: updating the Cauchy stress conservative scalar field
+                  !$acc loop seq
+                  do i = 1, b_size - 1
+                    q_cons_vf(strxb + i - 1)%sf(j, k, l) =  & 
+                      rho_K*q_prim_vf(strxb + i - 1)%sf(j, k, l)
+                  end do
+                end if
             end do
           end do
         end do
@@ -258,51 +275,29 @@ contains
         real(kind(0d0)), intent(in) :: G
         integer, intent(in) :: j, k, l
 
-        real(kind(0d0)), dimension(b_size - 1) :: tensor
-        real(kind(0d0)) :: trace, invariant1
+        real(kind(0d0)) :: trace
         real(kind(0d0)) :: f13 = 1d0/3d0
         integer :: i !< Generic loop iterators
 
+        !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
-        !trace = btensor(1)%sf(j,k,l)
-        !if (num_dims == 2) then
-        !    trace = trace + btensor(3)%sf(j,k,l)
-          !else
-          trace = btensor(1)%sf(j, k, l) + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-        !end if
-
-        ! invariant calculation, saving it in the q_prim_vf field
-        !invariant1 = btensor(1)%sf(j, k, l)
-        !if (num_dims == 2) then
-        !    invariant1 = invariant1 + btensor(3)%sf(j, k, l)
-        !elseif (num_dims == 3) then
-        !    invariant1 = invariant1 + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
-        !end if
+        trace = btensor(1)%sf(j, k, l) + btensor(4)%sf(j, k, l) + btensor(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
         btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-        !if (num_dims == 2) then
-        !    btensor(3)%sf(j,k,l) = btensor(3)%sf(j,k,l) - (1d0/3d0)*trace
-        !else
-          btensor(4)%sf(j, k, l) = btensor(4)%sf(j, k, l) - f13*trace
-          btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
-        !end if
+        btensor(4)%sf(j, k, l) = btensor(4)%sf(j, k, l) - f13*trace
+        btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
+
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
-
         !$acc loop seq
         do i = 1, b_size - 1
           q_prim_vf(strxb + i - 1)%sf(j, k, l) =  & 
             G*btensor(i)%sf(j, k, l)/btensor(b_size)%sf(j, k, l)
         end do
-
         ! compute the invariant without the elastic modulus
-         if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then
-           q_prim_vf(xiend + 1)%sf(j, k, l) =  & 
-             0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
-         end if
-
-        ! compute the elastic energy without the elastic modulus
+        q_prim_vf(xiend + 1)%sf(j, k, l) =  & 
+           0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
 
      end subroutine s_neoHookean_cauchy_solver
 
