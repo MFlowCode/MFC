@@ -1,7 +1,7 @@
-import os, typing, hashlib, dataclasses
+import os, typing, hashlib, dataclasses, shutil
 
 from .printer import cons
-from .common  import MFCException, system, delete_directory, create_directory, \
+from .common  import MFC_ROOTDIR, MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
@@ -182,21 +182,7 @@ class MFCTarget:
 
         cons.print(no_indent=True)
 
-    def clean(self, case: input.MFCInputFile):
-        build_dirpath = self.get_staging_dirpath(case)
-
-        if not os.path.isdir(build_dirpath):
-            return
-
-        command = ["cmake", "--build",  build_dirpath, "--target", "clean",
-                            "--config", "Debug" if ARG("debug") else "Release" ]
-
-        if ARG("verbose"):
-            command.append("--verbose")
-
-        if system(command).returncode != 0:
-            raise MFCException(f"Failed to clean the [bold magenta]{self.name}[/bold magenta] target.")
-
+#                         name             flags                       isDep  isDef  isReq  dependencies                        run order
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 HDF5          = MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies([HDF5], [], []), -1)
@@ -302,16 +288,5 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
         cons.print(no_indent=True)
 
 
-def clean(targets = None, case: input.MFCInputFile = None):
-    targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
-    case    = case or input.load(ARG("input"), ARG("arguments"), {})
-
-    cons.print(__generate_header("Clean", targets))
-    cons.print(no_indent=True)
-
-    for target in targets:
-        if target.is_configured():
-            target.clean()
-
-    cons.print(no_indent=True)
-    cons.unindent()
+def clean():
+    shutil.rmtree(os.path.join(MFC_ROOTDIR, 'build'))

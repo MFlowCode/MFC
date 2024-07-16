@@ -303,14 +303,6 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
-
 #ifdef DEBUG
         print *, 'got rhs'
 #endif
@@ -419,14 +411,6 @@ contains
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -590,11 +574,10 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in)
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
-        integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
-        real(kind(0d0)), intent(in) :: dt_in
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -609,14 +592,6 @@ contains
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -635,7 +610,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt_in*rhs_vf(i)%sf(j, k, l)
+                            + dt*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -651,7 +626,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_pb(j, k, l, q, i)
+                                    + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -668,7 +643,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_mv(j, k, l, q, i)
+                                    + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -710,7 +685,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
                     end do
                 end do
             end do
@@ -726,7 +701,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -744,7 +719,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -785,7 +760,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
                     end do
                 end do
             end do
@@ -801,7 +776,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -819,7 +794,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -874,13 +849,13 @@ contains
         call nvtxStartRange("Time_Step")
 
         ! Stage 1 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
-
-        ! Stage 2 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
 
+        ! Stage 2 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg)
+
         ! Stage 3 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
+        call s_adaptive_dt_bubble(t_step)
 
         call nvtxEndRange
 
@@ -913,7 +888,9 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-    end subroutine s_adaptive_dt_bubble
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+    end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
