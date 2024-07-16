@@ -375,9 +375,7 @@ contains
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-        end if
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
