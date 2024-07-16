@@ -772,18 +772,20 @@ Each patch requires a different set of parameters, which are also listed in this
 | 10   | 3D Cylinder        | 3      |      
 | 11   | 3D Airfoil         | 3      |      
 
-
-
 ### Monopole Supports
 
-| #    | Description |
-| ---- | ----        |
-|    1 | 1D normal to x-axis |
-|    2 | 2D semi-infinite source plane |
-|    3 | 3D semi-infinite source plane along some lines |
-|    4 | 3D semi-infinite source plane |
-|    5 | Transducer |
-|    6 | Cyl_coord along axial-dir |
+| #    | Name                                        | Dim.      | Description                                  |
+| ---: | :----:                                      | :---:     | :---                                         |
+|  1   | normal to x-axis                            | 1D        |
+|  2   | semi-infinite source plane                  | 2D        |
+|  3   | semi-infinite source plane along some lines | 3D        |
+|  4   | semi-infinite source plane                  | 3D        |
+|  5   | Cylindrical Transducer                      | 2D        |
+|  6   | Spherical Transducer                        | 2D-Axisym |
+|  7   | Spherical Transducer                        | 3D        |
+|  9   | Arcuate Transducer Array                    | 2D        |
+| 10   | Annular Transducer Array                    | 2D-Axisym |
+| 11   | Circular Transducer Array                   | 3D        |
 
 The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports).
 This includes types exclusive to one-, two-, and three-dimensional problems with special sauce geometry like transducers as well as coordinate systems such as cylindrical coordinates.

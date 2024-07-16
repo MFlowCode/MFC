@@ -209,7 +209,7 @@ contains
             end if
 
             if (n == 0) then ! 1D
-                if (.not. any(mono(j)%support == (/0, 1/))) then ! undocumented support 0
+                if (mono(j)%support /= 1) then
                     call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
                                      '1D simulations. Exiting ...')
                 end if
@@ -218,11 +218,11 @@ contains
                                      'Mono(i)support = 1. Exiting ...')
                 end if
             elseif (p == 0) then ! 2D
-                if (.not. any(mono(j)%support == (/1, 2, 3, 4, 5, 6, 7/))) then
-                    call s_mpi_abort('Only Mono(i)support = 1 to 7 are '// &
+                if (.not. any(mono(j)%support == (/1, 2, 3, 4, 5, 6, 9, 10/))) then
+                    call s_mpi_abort('Only Mono(i)support = 1, 2, 3, 4, 5, 6, 9, 10 are '// &
                                      'allowed for 2D simulations. Exiting ...')
                 end if
-                if (any(mono(j)%support == (/1, 2, 3, 5/)) .and. &
+                if (any(mono(j)%support == (/1, 2, 3, 5, 6, 9, 10/)) .and. &
                     (f_is_default(mono(j)%loc(1)) .or. &
                      f_is_default(mono(j)%loc(2)))) then
                     call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
@@ -233,17 +233,11 @@ contains
                                      'specified for Mono(i)support = 4. Exiting ...')
                 end if
             else ! 3D
-                if (.not. any(mono(j)%support == (/3, 4, 5, 7/))) then
-                    call s_mpi_abort('Only Mono(i)support = 3, 4, 5, or 7 is '// &
+                if (.not. any(mono(j)%support == (/3, 4, 5, 7, 11/))) then
+                    call s_mpi_abort('Only Mono(i)support = 3, 4, 5, 7, or 11 is '// &
                                      'allowed for 3D simulations. Exiting ...')
-                elseif (mono(j)%support == 6 .and. (.not. cyl_coord)) then
-                    call s_mpi_abort('Mono(i)support = 6 requires cyl_coord = true. '// &
-                                     'Exiting ...')
-                elseif (cyl_coord .and. mono(j)%support /= 6) then
-                    call s_mpi_abort('cyl_coord = true requires Mono(i)support = 6. '// &
-                                     'Exiting ...')
                 end if
-                if (any(mono(j)%support == (/3, 5, 6/)) .and. &
+                if (any(mono(j)%support == (/3, 7, 11/)) .and. &
                     (f_is_default(mono(j)%loc(1)) .or. &
                      f_is_default(mono(j)%loc(2)) .or. &
                      f_is_default(mono(j)%loc(3)))) then

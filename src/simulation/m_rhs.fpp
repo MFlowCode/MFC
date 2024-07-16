@@ -994,7 +994,6 @@ contains
         if (monopole) call s_monopole_calculations(q_cons_qp%vf(1:sys_size), &
                                                    q_prim_qp%vf(1:sys_size), &
                                                    t_step, &
-                                                   num_dims, &
                                                    rhs_vf)
         call nvtxEndRange
 

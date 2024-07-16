@@ -420,7 +420,6 @@ module m_global_parameters
     logical :: monopole !< Monopole switch
     type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
     integer :: num_mono !< Number of monopoles
-    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of the monopole, used in f_source_spatial
     !> @}
     !$acc declare create(monopole, mono, num_mono)
 
