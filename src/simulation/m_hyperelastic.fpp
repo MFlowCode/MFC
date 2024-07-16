@@ -226,11 +226,11 @@ contains
                 end if
 
                 if (flag) then
-                  ! STEP 4: update the btensor
+                  ! STEP 4: update the btensor, this is consistent with Riemann solvers
                   btensor%vf(1)%sf(j, k, l) = tensorb(1)
                   btensor%vf(2)%sf(j, k, l) = tensorb(2)
-                  btensor%vf(3)%sf(j, k, l) = tensorb(3)
-                  btensor%vf(4)%sf(j, k, l) = tensorb(5)
+                  btensor%vf(3)%sf(j, k, l) = tensorb(5)
+                  btensor%vf(4)%sf(j, k, l) = tensorb(3)
                   btensor%vf(5)%sf(j, k, l) = tensorb(6)
                   btensor%vf(6)%sf(j, k, l) = tensorb(9)
                   ! store the determinant at the last entry of the btensor 
