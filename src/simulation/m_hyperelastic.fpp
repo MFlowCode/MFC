@@ -33,12 +33,11 @@ module m_hyperelastic
 
         !> @name Abstract subroutine for the infinite relaxation solver
         !> @{
-        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, elastic_ene, G, j, k, l)
+        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, G, j, k, l)
 
             import :: scalar_field, sys_size, b_size
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
             type(scalar_field), dimension(b_size), intent(inout) :: btensor
-            real(kind(0d0)), intent(out) :: elastic_ene
             real(kind(0d0)), intent(in) :: G
             integer, intent(in) :: j, k, l
              
@@ -144,7 +143,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K
-        real(kind(0d0)) :: G_K, elastic_ene
+        real(kind(0d0)) :: G_K 
 
         integer :: j, k, l, i, r
         ! STEP 1: computing the grad_xi tensor
@@ -153,7 +152,7 @@ contains
         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K,tensora,tensorb,elastic_ene)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K,tensora,tensorb)
         do l = 0, p
            do k = 0, n
               do j = 0, m        
@@ -167,9 +166,9 @@ contains
                 call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                               alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                 rho_K = max(rho_K, sgm_eps)
-                if (G_K .le. verysmall) G_K = 0d0
+                if ( G_K .le. verysmall ) G_K = 0d0
 
-                if (G_K .gt. 1d0) then
+                if ( G_K .gt. verysmall ) then
                   !$acc loop seq 
                   do i = 1, tensor_size
                     tensora(i) = 0d0
@@ -235,10 +234,9 @@ contains
                 ! store the determinant at the last entry of the btensor sf
                 btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
    
-                call s_compute_cauchy_solver(btensor%vf, q_prim_vf, elastic_ene, G_K, j, k, l)
-                !q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
-                !           G_K*elastic_ene/gamma_K
-                !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
+                call s_compute_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
+                q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                           G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K
             end do
           end do
         end do
@@ -253,11 +251,10 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, elastic_ene, G, j, k, l)
+     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
-        real(kind(0d0)), intent(out) :: elastic_ene
         real(kind(0d0)), intent(in) :: G
         integer, intent(in) :: j, k, l
 
@@ -303,12 +300,9 @@ contains
          if (btensor(b_size)%sf(j,k,l) .gt. 0d0) then
            q_prim_vf(xiend + 1)%sf(j, k, l) =  & 
              0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
-         else
-        !     q_prim_vf(xiend+1)%sf(j,k,l) = 1d-12
          end if
 
         ! compute the elastic energy without the elastic modulus
-        elastic_ene = 0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
 
      end subroutine s_neoHookean_cauchy_solver
 
