@@ -146,11 +146,6 @@ contains
         real(kind(0d0)) :: G_K 
         logical :: flag
         integer :: j, k, l, i, r
-        ! STEP 1: computing the grad_xi tensor
-        ! grad_xi definition / organization
-        ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
-        ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
-        ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K, tensora, tensorb, flag)
         do l = 0, p
@@ -168,11 +163,16 @@ contains
                 rho_K = max(rho_K, sgm_eps)
                 if ( G_K .le. verysmall ) G_K = 0d0
 
-                if ( G_K .gt. 1d0 ) then
+                if ( G_K .gt. verysmall ) then
                   !$acc loop seq 
                   do i = 1, tensor_size
                     tensora(i) = 0d0
                   end do
+                  ! STEP 1: computing the grad_xi tensor using finite differences
+                  ! grad_xi definition / organization
+                  ! number for the tensor 1-3:  dxix_dx, dxiy_dx, dxiz_dx
+                  ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
+                  ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
                   !$acc loop seq 
                   do r = -fd_number, fd_number        
                     ! derivatives in the x-direction
@@ -221,15 +221,9 @@ contains
                   tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
                   tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
                   tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
-
-                  !if (tensorb(tensor_size) < 0d0) then 
-                  !  print *, 'idx :: ',j,' ',k,' ',l,' J :: ',tensorb(tensor_size),' ',G_K
-                  !end if
                 else
                    flag = .false.
                 end if
-
-                !if (tensorb(tensor_size) < 0.3) flag = .false.
 
                 if (flag) then
                   ! STEP 4: update the btensor
