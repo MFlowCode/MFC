@@ -153,81 +153,10 @@ contains
         ! 4-6 :                       dxix_dy, dxiy_dy, dxiz_dy
         ! 7-9 :                       dxix_dz, dxiy_dz, dxiz_dz
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,tensora,tensorb,elastic_ene)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K,tensora,tensorb,elastic_ene)
         do l = 0, p
            do k = 0, n
               do j = 0, m        
-                !$acc loop seq 
-                do i = 1, tensor_size
-                  tensora(i) = 0d0
-                end do
-                !$acc loop seq 
-                do r = -fd_number, fd_number        
-                  ! derivatives in the x-direction
-                  tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                  tensora(2) = tensora(2) + q_prim_vf(xibeg+1)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                  tensora(3) = tensora(3) + q_prim_vf(xiend)%sf(j + r, k, l)*fd_coeff_x(r, j)
-                  ! derivatives in the y-direction
-                  tensora(4) = tensora(4) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
-                  tensora(5) = tensora(5) + q_prim_vf(xibeg+1)%sf(j, k + r, l)*fd_coeff_y(r, k)
-                  tensora(6) = tensora(6) + q_prim_vf(xiend)%sf(j, k + r, l)*fd_coeff_y(r, k)
-                  ! derivatives in the z-direction
-                  tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_z(r, l)
-                  tensora(8) = tensora(8) + q_prim_vf(xibeg+1)%sf(j, k, l + r)*fd_coeff_z(r, l)
-                  tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_z(r, l)
-                end do 
-
-                ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
-                tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
-                tensorb(2) = -(tensora(2)*tensora(9) - tensora(3)*tensora(8))
-                tensorb(3) = tensora(2)*tensora(6) - tensora(3)*tensora(5)
-                tensorb(4) = -(tensora(4)*tensora(9) - tensora(6)*tensora(7))
-                tensorb(5) = tensora(1)*tensora(9) - tensora(3)*tensora(7)
-                tensorb(6) = -(tensora(1)*tensora(6) - tensora(4)*tensora(3))
-                tensorb(7) = tensora(4)*tensora(8) - tensora(5)*tensora(7)
-                tensorb(8) = -(tensora(1)*tensora(8) - tensora(2)*tensora(7))
-                tensorb(9) = tensora(1)*tensora(5) - tensora(2)*tensora(4)
-
-                ! STEP 2b: computing the determinant of the grad_xi tensor
-                tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
-                                    - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
-                                    + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
-
-                !if (tensorb(tensor_size) < 0d0 .or. tensorb(tensor_size) > 2d0 ) then
-                !tensorb(tensor_size) = 1d0
-                !!!$acc loop seq
-                !do i = 1, tensor_size - 1
-                !   tensora(i) = 0d0
-                !end do
-                !tensorb(1) = 1d0
-                !tensorb(5) = 1d0
-                !tensorb(9) = 1d0
-                !end if
-
-                ! STEP 2c: computing the inverse of grad_xi tensor = F
-                ! tensorb is the adjoint, tensora becomes the inverse
-                !$acc loop seq
-                do i = 1, tensor_size - 1
-                    tensora(i) = tensorb(i)/tensorb(tensor_size)
-                end do
-
-                ! STEP 3: computing F tranpose F
-                tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
-                tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
-                tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
-                tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
-                tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
-                tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
-
-                ! STEP 4: update the btensor
-                btensor%vf(1)%sf(j, k, l) = tensorb(1)
-                btensor%vf(2)%sf(j, k, l) = tensorb(2)
-                btensor%vf(3)%sf(j, k, l) = tensorb(3)
-                btensor%vf(4)%sf(j, k, l) = tensorb(5)
-                btensor%vf(5)%sf(j, k, l) = tensorb(6)
-                btensor%vf(6)%sf(j, k, l) = tensorb(9)
-                ! store the determinant at the last entry of the btensor sf
-                btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
 
                 !$acc loop seq
                 do i = 1, num_fluids
@@ -239,10 +168,76 @@ contains
                               alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                 rho_K = max(rho_K, sgm_eps)
                 if (G_K .le. verysmall) G_K = 0d0
-                   
+
+                if (G_K .gt. 1d0) then
+                  !$acc loop seq 
+                  do i = 1, tensor_size
+                    tensora(i) = 0d0
+                  end do
+                  !$acc loop seq 
+                  do r = -fd_number, fd_number        
+                    ! derivatives in the x-direction
+                    tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x(r, j)
+                    tensora(2) = tensora(2) + q_prim_vf(xibeg+1)%sf(j + r, k, l)*fd_coeff_x(r, j)
+                    tensora(3) = tensora(3) + q_prim_vf(xiend)%sf(j + r, k, l)*fd_coeff_x(r, j)
+                    ! derivatives in the y-direction
+                    tensora(4) = tensora(4) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                    tensora(5) = tensora(5) + q_prim_vf(xibeg+1)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                    tensora(6) = tensora(6) + q_prim_vf(xiend)%sf(j, k + r, l)*fd_coeff_y(r, k)
+                    ! derivatives in the z-direction
+                    tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                    tensora(8) = tensora(8) + q_prim_vf(xibeg+1)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                    tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_z(r, l)
+                  end do 
+                  ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
+                  tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
+                  tensorb(2) = -(tensora(2)*tensora(9) - tensora(3)*tensora(8))
+                  tensorb(3) = tensora(2)*tensora(6) - tensora(3)*tensora(5)
+                  tensorb(4) = -(tensora(4)*tensora(9) - tensora(6)*tensora(7))
+                  tensorb(5) = tensora(1)*tensora(9) - tensora(3)*tensora(7)
+                  tensorb(6) = -(tensora(1)*tensora(6) - tensora(4)*tensora(3))
+                  tensorb(7) = tensora(4)*tensora(8) - tensora(5)*tensora(7)
+                  tensorb(8) = -(tensora(1)*tensora(8) - tensora(2)*tensora(7))
+                  tensorb(9) = tensora(1)*tensora(5) - tensora(2)*tensora(4)
+
+                  ! STEP 2b: computing the determinant of the grad_xi tensor
+                  tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) &
+                                    - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
+                                    + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
+
+                  ! STEP 2c: computing the inverse of grad_xi tensor = F
+                  ! tensorb is the adjoint, tensora becomes the inverse
+                  !$acc loop seq
+                  do i = 1, tensor_size - 1
+                    tensora(i) = tensorb(i)/tensorb(tensor_size)
+                  end do
+
+                  ! STEP 3: computing F tranpose F
+                  tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
+                  tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
+                  tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
+                  tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
+                  tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
+                  tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
+                else
+                  tensorb(1) = 1d0; tensorb(5) = 1d0; tensorb(9) = 1d0;
+                  tensorb(2) = 0d0; tensorb(3) = 0d0; tensorb(6) = 0d0;              
+                  tensorb(tensor_size) = 1d0;
+                end if
+
+                ! STEP 4: update the btensor
+                btensor%vf(1)%sf(j, k, l) = tensorb(1)
+                btensor%vf(2)%sf(j, k, l) = tensorb(2)
+                btensor%vf(3)%sf(j, k, l) = tensorb(3)
+                btensor%vf(4)%sf(j, k, l) = tensorb(5)
+                btensor%vf(5)%sf(j, k, l) = tensorb(6)
+                btensor%vf(6)%sf(j, k, l) = tensorb(9)
+                ! store the determinant at the last entry of the btensor sf
+                btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
+   
                 call s_compute_cauchy_solver(btensor%vf, q_prim_vf, elastic_ene, G_K, j, k, l)
-                q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) !- &
-                           !G_K*elastic_ene/gamma_K
+                !q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
+                !           G_K*elastic_ene/gamma_K
                 !print *, 'elastic energy :: ',G_K*f_elastic_energy(qK_btensor_vf, j, k, l)
             end do
           end do
