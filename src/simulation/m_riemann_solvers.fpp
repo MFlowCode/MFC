@@ -1104,13 +1104,12 @@ contains
                                         G_R = G_R + alpha_R(i)*Gs(i)
                                     end do
                                     ! Elastic contribution to energy if G large enough
-                                    if (G_L < verysmall) G_L = 0d0; 
-                                    if (G_R < verysmall) G_R = 0d0; 
-                                    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
-                                    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                    if ( G_L > verysmall .and. G_R > verysmall ) then
+                                      E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
+                                      E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                    end if
                                     !$acc loop seq
                                     do i = 1, b_size - 1
-                                      !tau_e_L(i) = 0d0; tau_e_R(i) = 0d0; 
                                       tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                       tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
@@ -1295,15 +1294,11 @@ contains
                                   !$acc loop seq
                                   do i = 1, num_dims
                                     flux_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) = &
-                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(idx1)*xi_field_L(i)) + &
-                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(idx1)*xi_field_R(i))
+                                      xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) & 
+                                         - rho_L*vel_L(idx1)*xi_field_L(i)) + &
+                                      xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) & 
+                                         - rho_R*vel_R(idx1)*xi_field_R(i))
                                   end do
-                                  !!$acc loop seq
-                                  !do i = xibeg, xiend
-                                  !  flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                  !      xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
-                                  !      xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
-                                  !end do
                                 end if
 
                                 ! SURFACE TENSION FLUX. need to check
