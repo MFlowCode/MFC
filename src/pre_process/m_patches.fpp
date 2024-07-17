@@ -969,7 +969,6 @@ contains
 
                         @:analytical()
 
-
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = &
