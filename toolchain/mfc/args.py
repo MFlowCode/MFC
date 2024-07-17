@@ -73,9 +73,6 @@ started, run ./mfc.sh build -h.""",
     build.add_argument("-i", "--input", type=str, default=None, help="(GPU Optimization) Build a version of MFC optimized for a case.")
     build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
-    # === CLEAN ===
-    add_common_arguments(clean, "jg")
-
     # === TEST ===
     test_cases = list_cases()
 
@@ -83,7 +80,7 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
-    test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with UUIDs or hashes L.")
+    test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with specified properties.")
     test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
