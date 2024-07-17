@@ -176,7 +176,54 @@ contains
             if (mono(j)%support == dflt_int) then
                 call s_mpi_abort('mono('//trim(jStr)//')%support must be '// &
                                  'specified. Exiting ...')
-            elseif (f_is_default(mono(j)%mag)) then
+            end if
+
+            if (n == 0) then ! 1D
+                if (mono(j)%support /= 1) then
+                    call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
+                                     '1D simulations. Exiting ...')
+                elseif (mono(j)%support == 1 .and. f_is_default(mono(j)%loc(1))) then
+                    call s_mpi_abort('mono_loc(1) must be specified for '// &
+                                     'Mono(i)support = 1. Exiting ...')
+                end if
+            elseif (p == 0) then ! 2D
+                if (.not. any(mono(j)%support == (/2, 5, 6, 9, 10/))) then
+                    call s_mpi_abort('Only Mono(i)support = 2, 5, 6, 9, or 10 is '// &
+                                     'allowed for 2D simulations. Exiting ...')
+                elseif (any(mono(j)%support == (/6, 10/)) .and. cyl_coord) then
+                    call s_mpi_abort('Only Mono(i)support = 6 or 10 is '// &
+                                     'allowed for 2D axisymmetric simulations. Exiting ...')
+                elseif (any(mono(j)%support == (/2, 5, 6, 9, 10/)) .and. &
+                        (f_is_default(mono(j)%loc(1)) .or. &
+                         f_is_default(mono(j)%loc(2)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
+                                     'specified for Mono(i)support = 2. '// &
+                                     'Exiting ...')
+                end if
+            else ! 3D
+                if (.not. any(mono(j)%support == (/3, 7, 11/))) then
+                    call s_mpi_abort('Only Mono(i)support = 3, 7, or 11 is '// &
+                                     'allowed for 3D simulations. Exiting ...')
+                elseif (cyl_coord) then
+                    call s_mpi_abort('Monopole is not supported in 3D '// &
+                                     'cylindrical simulations. Exiting ...')
+                elseif (mono(j)%support == 3 .and. &
+                        (f_is_default(mono(j)%loc(1)) .or. &
+                         f_is_default(mono(j)%loc(2)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
+                                     'specified for Mono(i)support = 3. '// &
+                                     'Exiting ...')
+                elseif (any(mono(j)%support == (/7, 11/)) .and. &
+                        (f_is_default(mono(j)%loc(1)) .or. &
+                         f_is_default(mono(j)%loc(2)) .or. &
+                         f_is_default(mono(j)%loc(3)))) then
+                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:3) must be '// &
+                                     'specified for Mono(i)support = 7 or 11. '// &
+                                     'Exiting ...')
+                end if
+            end if
+
+            if (f_is_default(mono(j)%mag)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
                                  'specified. Exiting ...')
             elseif (mono(j)%mag <= 0d0) then
@@ -198,6 +245,9 @@ contains
             elseif (mono(j)%support < 5 .and. f_is_default(mono(j)%dir)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%dir must be '// &
                                  'specified for planer support. Exiting ...')
+            elseif (mono(j)%support == 1 .and. f_approx_equal(mono(j)%dir, 0d0)) then
+                call s_mpi_abort('Mono(i)dir must be non-zero for '// &
+                                 'Mono(i)support = 1. Exiting ...')
             elseif (mono(j)%pulse == 2 .and. f_is_default(mono(j)%delay)) then
                 call s_mpi_abort('mono('//trim(jStr)//')%delay must be '// &
                                  'specified for Mono(i)pulse = 2 (Gaussian). '// &
@@ -208,46 +258,66 @@ contains
                                  'Mono(i)pulse = 3 (square wave). Exiting ...')
             end if
 
-            if (n == 0) then ! 1D
-                if (mono(j)%support /= 1) then
-                    call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
-                                     '1D simulations. Exiting ...')
+            if (any(mono(j)%support == (/5, 6, 7, 9, 10, 11/))) then ! Transducer or Transducer array
+                if (any(mono(j)%pulse == (/1, 3/)) .and. &
+                    xor(f_is_default(mono(j)%frequency), f_is_default(mono(j)%wavelength))) then
+                    call s_mpi_abort('One and only one of Mono(i)frequency '// &
+                                     'or Mono(i)wavelength must be specified '// &
+                                     'for Mono(i)pulse = 1 or 3. Exiting ...')
+                elseif (mono(j)%pulse == 2 .and. & ! Transducer or Transducer array
+                        xor(f_is_default(mono(j)%gauss_sigma_time), f_is_default(mono(j)%gauss_sigma_dist))) then
+                    call s_mpi_abort('One and only one of Mono(i)gauss_sigma_time '// &
+                                     'or Mono(i)gauss_sigma_dist must be specified '// &
+                                     'for Mono(i)pulse = 2. Exiting ...')
                 end if
-                if (mono(j)%support == 1 .and. f_is_default(mono(j)%loc(1))) then
-                    call s_mpi_abort('mono_loc(1) must be specified for '// &
-                                     'Mono(i)support = 1. Exiting ...')
+                if (f_is_default(mono(j)%foc_length)) then
+                    call s_mpi_abort('foc_length must be specified for '// &
+                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                elseif (mono(j)%foc_length <= 0d0) then
+                    call s_mpi_abort('foc_length must be positive for '// &
+                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
-            elseif (p == 0) then ! 2D
-                if (.not. any(mono(j)%support == (/1, 2, 3, 4, 5, 6, 9, 10/))) then
-                    call s_mpi_abort('Only Mono(i)support = 1, 2, 3, 4, 5, 6, 9, 10 are '// &
-                                     'allowed for 2D simulations. Exiting ...')
+                if (f_is_default(mono(j)%aperture)) then
+                    call s_mpi_abort('aperture must be specified for '// &
+                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                elseif (mono(j)%aperture <= 0d0) then
+                    call s_mpi_abort('aperture must be positive for '// &
+                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
-                if (any(mono(j)%support == (/1, 2, 3, 5, 6, 9, 10/)) .and. &
-                    (f_is_default(mono(j)%loc(1)) .or. &
-                     f_is_default(mono(j)%loc(2)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
-                                     'specified for Mono(i)support = 1, 3, or 5. '// &
-                                     'Exiting ...')
-                elseif (mono(j)%support == 4 .and. f_is_default(mono(j)%loc(1))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1) must be '// &
-                                     'specified for Mono(i)support = 4. Exiting ...')
+            end if
+
+            if (any(mono(j)%support == (/7, 11/))) then ! Transducer array
+                if (mono(j)%num_elements == dflt_int) then
+                    call s_mpi_abort('num_elements must be specified for '// &
+                                     'Mono(i)support = 7 or 11. Exiting ...')
+                elseif (mono(j)%num_elements <= 0) then
+                    call s_mpi_abort('num_elements must be positive for '// &
+                                     'Mono(i)support = 7 or 11. Exiting ...')
                 end if
-            else ! 3D
-                if (.not. any(mono(j)%support == (/3, 4, 5, 7, 11/))) then
-                    call s_mpi_abort('Only Mono(i)support = 3, 4, 5, 7, or 11 is '// &
-                                     'allowed for 3D simulations. Exiting ...')
+                if (mono(j)%element_on == dflt_int) then
+                    call s_mpi_abort('element_on must be specified for '// &
+                                     'Mono(i)support = 7 or 11. Exiting ...')
+                elseif (mono(j)%element_on < 0) then
+                    call s_mpi_abort('element_on must be non-negative for '// &
+                                     'Mono(i)support = 7 or 11. Exiting ...')
                 end if
-                if (any(mono(j)%support == (/3, 7, 11/)) .and. &
-                    (f_is_default(mono(j)%loc(1)) .or. &
-                     f_is_default(mono(j)%loc(2)) .or. &
-                     f_is_default(mono(j)%loc(3)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:3) must be '// &
-                                     'specified for Mono(i)support = 3, 5, or 6. '// &
-                                     'Exiting ...')
-                elseif (mono(j)%support == 4 .and. &
-                        (f_is_default(mono(j)%loc(3)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(3) must be '// &
-                                     'specified for Mono(i)support = 4. Exiting ...')
+            end if
+
+            if (mono(j)%support == 7) then ! 2D transducer array
+                if (f_is_default(mono(j)%element_spacing_angle)) then
+                    call s_mpi_abort('element_spacing_angle must be specified for '// &
+                                     'Mono(i)support = 7. Exiting ...')
+                elseif (mono(j)%element_spacing_angle < 0d0) then
+                    call s_mpi_abort('element_spacing_angle must be non-negative for '// &
+                                     'Mono(i)support = 7. Exiting ...')
+                end if
+            elseif (mono(j)%support == 11) then ! 3D transducer array
+                if (f_is_default(mono(j)%element_polygon_ratio)) then
+                    call s_mpi_abort('element_polygon_ratio must be specified for '// &
+                                     'Mono(i)support = 11. Exiting ...')
+                elseif (mono(j)%element_polygon_ratio <= 0d0) then
+                    call s_mpi_abort('element_polygon_ratio must be positive for '// &
+                                     'Mono(i)support = 11. Exiting ...')
                 end if
             end if
         end do

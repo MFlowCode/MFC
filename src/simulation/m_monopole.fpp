@@ -99,9 +99,13 @@ contains
             dir(i) = mono(i)%dir
             element_spacing_angle(i) = mono(i)%element_spacing_angle
             element_polygon_ratio(i) = mono(i)%element_polygon_ratio
-            rotate_angle(i) = mono(i)%rotate_angle
             num_elements(i) = mono(i)%num_elements
             element_on(i) = mono(i)%element_on
+            if (f_is_default(mono(i)%rotate_angle)) then
+                rotate_angle(i) = 0d0
+            else
+                rotate_angle(i) = mono(i)%rotate_angle
+            end if
             if (f_is_default(mono(i)%delay)) then ! m_checker guarantees mono(i)%delay is set for pulse = 2 (Gaussian)
                 delay(i) = 0d0 ! Defaults to zero for sine and square waves
             else
@@ -378,35 +382,20 @@ contains
 
         source = 0d0
 
-        if (n == 0) then ! 1D - Only support 1 is allowed
+        if (support(mi) == 1) then ! 1D
             source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
 
-        elseif (p == 0) then ! 2D
-            if (support(mi) == 1) then
-                dist = dsqrt(r(1)**2d0 + r(2)**2d0)
-                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*((dist/(sig/2d0))**2d0))
-
-            elseif (support(mi) == 2) then ! Only support for y \pm some value
-                if (abs(r(2)) < length(mi)) then
-                    source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
-                end if
-
-                ! elseif (support(mi) == 3) then
-                !     rxnew = cos(dir(mi))*r(1) + sin(dir(mi))*r(2)
-                !     rynew = -1d0*sin(dir(mi))*r(1) + cos(dir(mi))*r(2)
-                !     if (abs(rynew) < mono_loc(3)/2d0) then
-                !         source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(rxnew/(sig/2d0))**2d0)
-                !     end if
-
-            elseif (support(mi) == 4) then ! Support for all y
-                source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(1)/sig)**2d0)
+        elseif (support(mi) == 2) then ! 2D
+            ! If we let unit vector e = (cos(dir), sin(dir)),
+            dist = r(1)*cos(dir(mi)) + r(2)*sin(dir(mi)) ! dot(r,e)
+            if ((r(1) - dist*cos(dir(mi)))**2d0 + (r(2) - dist*sin(dir(mi)))**2d0 < 0.25d0*length(mi)**2d0) then ! |r - dist*e| < length/2
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
             end if
-
-        else ! 3D
-            if (support(mi) == 4) then ! Support for all x and y
-                source = 1d0/(dsqrt(2d0*pi)*sig)*dexp(-0.5d0*(r(3)/sig)**2d0)
+        elseif (support(mi) == 3) then ! 3D
+            dist = r(1)*cos(dir(mi)) + r(2)*sin(dir(mi)) ! dot(r,e)
+            if ((r(1) - dist*cos(dir(mi)))**2d0 + (r(2) - dist*sin(dir(mi)))**2d0 < 0.25d0*length(mi)**2d0) then ! |r - dist*e| < length/2
+                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
             end if
-
         end if
     end subroutine s_source_spatial_planar
 
