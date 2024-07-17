@@ -600,6 +600,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     elif case['p'] == 0:
                         case['m'] = 125
                         case['n'] = 125
+                    # m, n, p < 25 causes errors
                     else:
                         case['m'] = 25
                         case['n'] = 25
