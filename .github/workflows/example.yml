@@ -43,10 +43,6 @@ jobs:
       - name: Build
         run:  |
           /bin/bash mfc.sh build -j $(nproc) --no-debug --mpi
-      
-      - name: List
-        run:  |
-          /bin/bash mfc.sh test -l -o Example
 
       - name: Test
         run:  |
