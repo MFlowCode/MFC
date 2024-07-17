@@ -33,13 +33,13 @@ echo
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${profiler}  "${target.get_install_binpath(case)}")
+        (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x;                               \
-            mpirun -np ${nodes*tasks_per_node} \
-                 ${profiler} "${target.get_install_binpath(case)}")
+        (set -x; ${profiler}                              \
+            mpirun -np ${nodes*tasks_per_node}            \
+                   "${target.get_install_binpath(case)}")
     % endif
-
+            
     ${helpers.run_epilogue(target)}
 
     echo
