@@ -148,9 +148,9 @@ contains
         integer :: j, k, l, i, r
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K, tensora, tensorb, flag)
-        do l = 0, p
-           do k = 0, n
-              do j = 0, m        
+        do l = 0, p-2
+           do k = 0, n-2
+              do j = 2, m-2       
                 flag = .true.
                 !$acc loop seq
                 do i = 1, num_fluids
