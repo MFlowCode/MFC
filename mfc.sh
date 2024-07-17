@@ -36,6 +36,8 @@ elif [ "$1" '==' "docker" ]; then
     shift; . "$(pwd)/toolchain/bootstrap/docker.sh"  $@; exit 0
 elif [ "$1" '==' "venv" ]; then
     shift; . "$(pwd)/toolchain/bootstrap/python.sh"  $@; return
+elif [ "$1" '==' "clean" ]; then
+    rm -rf "$(pwd)/build"; exit 0
 fi
 
 mkdir -p "$(pwd)/build"
