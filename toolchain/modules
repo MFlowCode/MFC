@@ -62,5 +62,5 @@ d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 c     DoD Carpenter
 c-all python/3.12.1
-c-cpu openmpi/4.1.6 gcc/12.2.0 cmake/3.28.1-gcc-12.2.0
-c-cpu CXX=g++
+c-cpu compiler-rt/2024.2.0 ifort/2024.2.0 icc/2023.1.0 mpi/latest cmake/3.28.1-intel-2023.0.0
+c-cpu CC=gcc CXX=g++ FC=gfortran
