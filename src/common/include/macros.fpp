@@ -31,10 +31,10 @@
 #ifdef CRAY_ACC_WAR
     allocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
     #:for arg in args
-        ${re.sub('\(.*\)','',arg)}$ => ${ 'p_' + re.sub('\(.*\)','',arg.strip()) }$
+        ${re.sub('\\(.*\\)','',arg)}$ => ${ 'p_' + re.sub('\\(.*\\)','',arg.strip()) }$
     #:endfor
-    !$acc enter data create(${', '.join(('p_' + re.sub('\(.*\)','',arg.strip()) for arg in args))}$) &
-    !$acc& attach(${', '.join(map(lambda x: re.sub('\(.*\)','',x), args))}$)
+    !$acc enter data create(${', '.join(('p_' + re.sub('\\(.*\\)','',arg.strip()) for arg in args))}$) &
+    !$acc& attach(${', '.join(map(lambda x: re.sub('\\(.*\\)','',x), args))}$)
 #else
     allocate (${', '.join(args)}$)
     !$acc enter data create(${', '.join(args)}$)
