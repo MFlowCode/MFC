@@ -265,27 +265,79 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     def alter_acoustic_src(dimInfo):
-        stack.push("Acoustic Source", {"acoustic_source": 'T'})
+        stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1})
 
         if len(dimInfo[0]) == 1:
-            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%support': 1, 'acoustic(1)%delay': 0.1}))
+            stack.push('Sine', {'acoustic(1)%pulse': 1})
+            cases.append(define_case_d(stack, 'Frequency', {'acoustic(1)%frequency': 3000}))
+            cases.append(define_case_d(stack, 'Wavelength', {'acoustic(1)%wavelength': 0.25}))
+            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.1, 'acoustic(1)%wavelength': 0.25}))
+            cases.append(define_case_d(stack, 'Number of Pulses', {'acoustic(1)%npulse': 2, 'acoustic(1)%wavelength': 0.1}))
+            stack.pop()
+
+            stack.push('Gaussian', {'acoustic(1)%pulse': 2})
+            cases.append(define_case_d(stack, 'Sigma Time', {'acoustic(1)%gauss_sigma_time': 1000}))
+            cases.append(define_case_d(stack, 'Sigma Dist', {'acoustic(1)%gauss_sigma_dist': 0.1}))
+            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.1, 'acoustic(1)%gauss_sigma_dist': 0.1}))
+            stack.pop()
+
+            stack.push('Square', {'acoustic(1)%pulse': 3})
+            cases.append(define_case_d(stack, 'Frequency', {'acoustic(1)%frequency': 3000}))
+            cases.append(define_case_d(stack, 'Wavelength', {'acoustic(1)%wavelength': 0.25}))
+            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.1, 'acoustic(1)%wavelength': 0.25}))
+            cases.append(define_case_d(stack, 'Number of Pulses', {'acoustic(1)%npulse': 2, 'acoustic(1)%wavelength': 0.1}))
+            stack.pop()
 
         if len(dimInfo[0]) == 2:
-            stack.push('', {'acoustic(1)%loc(2)': 0.5})
-            cases.append(define_case_d(stack, 'support=1', {'acoustic(1)%support': 1}))
+            stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%wavelength': 0.25})
+
+            stack.push('Planar', {})
             cases.append(define_case_d(stack, 'support=2', {'acoustic(1)%support': 2}))
-            cases.append(define_case_d(stack, 'support=3', {'acoustic(1)%support': 3}))
-            # cases.append(define_case_d(stack, 'support=4', {'acoustic(1)%support': 4})) # TODO regenerate test; NOTE: current test is set up incorrectly (silo output shows no wave)
-            # cases.append(define_case_d(stack, 'support=5', {'acoustic(1)%support': 5})) # TODO regenerate test
+            stack.pop()
+
+            stack.push('Transducer', {'acoustic(1)%loc(1)': 0.2, 'foc_length': 0.4, 'aperture': 0.6})
+            stack.push('support=5', {'acoustic(1)%support': 5})
+            cases.append(define_case_d(stack, 'Sine', {}))
+            cases.append(define_case_d(stack, 'Gaussian', {'acoustic(1)%pulse': 2, 'acoustic(1)%gauss_sigma_dist': 0.1}))
+            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.1}))
+            stack.pop()
+            stack.push('support=6', {'acoustic(1)%support': 6, 'cyl_coord': 'T'})
+            cases.append(define_case_d(stack, 'Sine', {}))
+            cases.append(define_case_d(stack, 'Gaussian', {'acoustic(1)%pulse': 2, 'acoustic(1)%gauss_sigma_dist': 0.1}))
+            cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.1}))
+            stack.pop()
+            stack.pop()
+
+            stack.push('Transducer Array', {'acoustic(1)%loc(1)': 0.2, 'foc_length': 0.4, 'aperture': 0.6, 'acoustic(1)%num_elements': 4, 'element_spacing_angle': 0.05, 'element_on': 0})
+            stack.push('support=9', {'acoustic(1)%support': 9})
+            cases.append(define_case_d(stack, 'All Elements', {'element_on': 0}))
+            cases.append(define_case_d(stack, 'One element', {'element_on': 1}))
+            stack.pop()
+            cases.append(define_case_d(stack, 'support=10', {'acoustic(1)%support': 10, 'cyl_coord': 'T'}))
+            stack.pop()
+
             stack.pop()
 
         if len(dimInfo[0]) == 3:
-            stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%loc(3)': 0.5})
+            stack.push('', {'acoustic(1)%loc(3)': 0.5, 'acoustic(1)%wavelength': 0.25})
+            
+            stack.push('Planar', {})
             cases.append(define_case_d(stack, 'support=3', {'acoustic(1)%support': 3}))
-            # cases.append(define_case_d(stack, 'support=4', {'acoustic(1)%support': 4})) # TODO regenerate test; NOTE: current test is set up incorrectly (silo output shows no wave)
-            # cases.append(define_case_d(stack, 'support=5', {'acoustic(1)%support': 5})) # TODO regenerate test
             stack.pop()
 
+            stack.push('Transducer', {'acoustic(1)%loc(1)': 0.2, 'foc_length': 0.4, 'aperture': 0.6})
+            cases.append(define_case_d(stack, 'support=7', {'acoustic(1)%support': 7}))
+            stack.pop()
+            
+            stack.push('Transducer Array', {'acoustic(1)%num_elements': 6, 'element_polygon_ratio': 0.7, 'element_on': 0})
+            stack.push('support=11', {'acoustic(1)%support': 11})
+            cases.append(define_case_d(stack, 'All Elements', {'element_on': 0}))
+            cases.append(define_case_d(stack, 'One element', {'element_on': 1}))
+            stack.pop()
+            stack.pop()
+            
+            stack.pop()
+            
         stack.pop()
 
     def alter_bubbles(dimInfo):
@@ -307,10 +359,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push("Acoustic Source", {"acoustic_source": 'T'})
 
             if len(dimInfo[0]) >= 2:
-                stack.push("", {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%support': 1})
+                stack.push("", {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%support': 2})
 
             if len(dimInfo[0]) >= 3:
-                stack.push("", {'acoustic(1)%loc(3)': 0.5, 'acoustic(1)%support': 3})
+                stack.push("", {'acoustic(1)%support': 3})
 
             for polytropic in ['T', 'F']:
                 stack.push("Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
