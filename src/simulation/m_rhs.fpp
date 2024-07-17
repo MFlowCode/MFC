@@ -992,9 +992,9 @@ contains
         ! Additions for acoustic_source
         call nvtxStartRange("RHS_acoustic_src")
         if (acoustic_source) call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                                   q_prim_qp%vf(1:sys_size), &
-                                                   t_step, &
-                                                   rhs_vf)
+                                                              q_prim_qp%vf(1:sys_size), &
+                                                              t_step, &
+                                                              rhs_vf)
         call nvtxEndRange
 
         ! Add bubles source term

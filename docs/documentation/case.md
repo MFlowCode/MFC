@@ -530,6 +530,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%foc_length`             | Real    | Transducer - Focal length of the transducer |
 | `acoustic(i)%%aperture`               | Real    | Transducer - Aperture of the transducer |
 | `acoustic(i)%%num_elements`           | Integer | Transducer array - Number of transducer elements in a transducer array |
+| `acoustic(i)%%element_on`             | Integer | Transducer array - The element number of the transducer array that is on |
 | `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
 | `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
 | `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
@@ -565,6 +566,8 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 - `%%aperture` specifies the aperture of the transducer. It is the diameter of the projection of the transducer arc onto the y-axis (2D) or spherical cap onto the y-z plane (3D). To simulate a transducer enclosing half of the circle/sphere, set the aperture to double the focal length. For transducer array, it is the total aperture of the array.
 
 - `%%num_elements` specifies the number of transducer elements in a transducer array. 
+
+- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1.
 
 - `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radian. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
 
