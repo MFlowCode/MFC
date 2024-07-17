@@ -1,11 +1,11 @@
 !>
-!! @file m_monopole.f90
-!! @brief Contains module m_monopole
+!! @file m_acoustic_src.f90
+!! @brief Contains module m_acoustic_src
 
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to create a monopole pressure source term
-module m_monopole
+!> @brief The module contains the subroutines used to create a acoustic source pressure source term
+module m_acoustic_src
 
     ! Dependencies =============================================================
     use m_derived_types        !< Definitions of the derived types
@@ -19,14 +19,14 @@ module m_monopole
     use m_helper_basic         !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_monopole_module, s_monopole_calculations
+    private; public :: s_initialize_acoustic_src_module, s_acoustic_src_calculations
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
     !$acc declare link(pulse, support)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_mono)
-    !$acc declare link(loc_mono)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_acoustic)
+    !$acc declare link(loc_acoustic)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
     !$acc declare link(mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
@@ -40,18 +40,18 @@ module m_monopole
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), num_elements, element_on)
     !$acc declare link(num_elements, element_on)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mono_mass_src, mono_e_src)
-    !$acc declare link(mono_mass_src, mono_e_src)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mass_src, e_src)
+    !$acc declare link(mass_src, e_src)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mono_mom_src)
-    !$acc declare link(mono_mom_src)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_src)
+    !$acc declare link(mom_src)
 
 #else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
-    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_mono
-    !$acc declare create(loc_mono)
+    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_acoustic
+    !$acc declare create(loc_acoustic)
 
     real(kind(0d0)), allocatable, dimension(:) :: mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
     !$acc declare create(mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
@@ -65,58 +65,58 @@ module m_monopole
     integer, allocatable, dimension(:) :: num_elements, element_on
     !$acc declare create(num_elements, element_on)
 
-    !> @name Monopole source terms
+    !> @name Acoustic source terms
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: mono_mass_src, mono_e_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mono_mom_src
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: mass_src, e_src
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    !$acc declare create(mono_mass_src, mono_e_src, mono_mom_src)
+    !$acc declare create(mass_src, e_src, mom_src)
 
 #endif
 
 contains
 
-    !> This subroutine initializes the monopole module
-    subroutine s_initialize_monopole_module
+    !> This subroutine initializes the acoustic source module
+    subroutine s_initialize_acoustic_src_module
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE_GLOBAL(loc_mono(1:3, 1:num_mono), mag(1:num_mono), support(1:num_mono), length(1:num_mono), wavelength(1:num_mono), frequency(1:num_mono), gauss_sigma_dist(1:num_mono), gauss_sigma_time(1:num_mono), foc_length(1:num_mono), aperture(1:num_mono), npulse(1:num_mono), pulse(1:num_mono), dir(1:num_mono), delay(1:num_mono), element_polygon_ratio(1:num_mono), rotate_angle(1:num_mono), element_spacing_angle(1:num_mono), num_elements(1:num_mono), element_on(1:num_mono))
-        do i = 1, num_mono
+        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), support(1:num_source), length(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
+        do i = 1, num_source
             do j = 1, 3
-                loc_mono(j, i) = mono(i)%loc(j)
+                loc_acoustic(j, i) = acoustic(i)%loc(j)
             end do
-            mag(i) = mono(i)%mag
-            support(i) = mono(i)%support
-            length(i) = mono(i)%length
-            wavelength(i) = mono(i)%wavelength
-            frequency(i) = mono(i)%frequency
-            gauss_sigma_dist(i) = mono(i)%gauss_sigma_dist
-            gauss_sigma_time(i) = mono(i)%gauss_sigma_time
-            foc_length(i) = mono(i)%foc_length
-            aperture(i) = mono(i)%aperture
-            npulse(i) = mono(i)%npulse
-            pulse(i) = mono(i)%pulse
-            dir(i) = mono(i)%dir
-            element_spacing_angle(i) = mono(i)%element_spacing_angle
-            element_polygon_ratio(i) = mono(i)%element_polygon_ratio
-            num_elements(i) = mono(i)%num_elements
-            element_on(i) = mono(i)%element_on
-            if (f_is_default(mono(i)%rotate_angle)) then
+            mag(i) = acoustic(i)%mag
+            support(i) = acoustic(i)%support
+            length(i) = acoustic(i)%length
+            wavelength(i) = acoustic(i)%wavelength
+            frequency(i) = acoustic(i)%frequency
+            gauss_sigma_dist(i) = acoustic(i)%gauss_sigma_dist
+            gauss_sigma_time(i) = acoustic(i)%gauss_sigma_time
+            foc_length(i) = acoustic(i)%foc_length
+            aperture(i) = acoustic(i)%aperture
+            npulse(i) = acoustic(i)%npulse
+            pulse(i) = acoustic(i)%pulse
+            dir(i) = acoustic(i)%dir
+            element_spacing_angle(i) = acoustic(i)%element_spacing_angle
+            element_polygon_ratio(i) = acoustic(i)%element_polygon_ratio
+            num_elements(i) = acoustic(i)%num_elements
+            element_on(i) = acoustic(i)%element_on
+            if (f_is_default(acoustic(i)%rotate_angle)) then
                 rotate_angle(i) = 0d0
             else
-                rotate_angle(i) = mono(i)%rotate_angle
+                rotate_angle(i) = acoustic(i)%rotate_angle
             end if
-            if (f_is_default(mono(i)%delay)) then ! m_checker guarantees mono(i)%delay is set for pulse = 2 (Gaussian)
+            if (f_is_default(acoustic(i)%delay)) then ! m_checker guarantees acoustic(i)%delay is set for pulse = 2 (Gaussian)
                 delay(i) = 0d0 ! Defaults to zero for sine and square waves
             else
-                delay(i) = mono(i)%delay
+                delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_mono, mag, support, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
+        !$acc update device(loc_acoustic, mag, support, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
 
-        @:ALLOCATE_GLOBAL(mono_mass_src(0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(mono_E_src(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(mass_src(0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
+        @:ALLOCATE_GLOBAL(E_src(0:m, 0:n, 0:p))
 
     end subroutine
 
@@ -125,7 +125,7 @@ contains
     !! @param q_prim_vf Primitive variables
     !! @param t_step Current time step
     !! @param rhs_vf rhs variables
-    subroutine s_monopole_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -150,7 +150,7 @@ contains
         real(kind(0d0)) :: source_temporal, source_spatial
 
         integer :: i, j, k, l, q !< generic loop variables
-        integer :: mi !< monopole index
+        integer :: ai !< acoustic source index
 
         logical :: freq_conv_flag, gauss_conv_flag
 
@@ -162,27 +162,27 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    mono_mass_src(j, k, l) = 0d0
-                    mono_mom_src(1, j, k, l) = 0d0
-                    mono_e_src(j, k, l) = 0d0
-                    if (n > 0) mono_mom_src(2, j, k, l) = 0d0
-                    if (p > 0) mono_mom_src(3, j, k, l) = 0d0
+                    mass_src(j, k, l) = 0d0
+                    mom_src(1, j, k, l) = 0d0
+                    e_src(j, k, l) = 0d0
+                    if (n > 0) mom_src(2, j, k, l) = 0d0
+                    if (p > 0) mom_src(3, j, k, l) = 0d0
                 end do
             end do
         end do
 
-        ! Monopoles are looped through sequentially because they can have very different computational costs
+        ! Acoustic sources are looped through sequentially because they can have very different computational costs
         !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local, q_prim_local, freq_conv_flag, gauss_conv_flag, c, small_gamma, angle, xyz_to_r_ratios)
         !$acc loop seq
-        do mi = 1, num_mono
+        do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
-            if (sim_time < delay(mi) .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) cycle
+            if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
 
             ! Decide if frequency need to be converted from wavelength
-            frequency_local = frequency(mi)
-            gauss_sigma_time_local = gauss_sigma_time(mi)
-            freq_conv_flag = f_is_default(frequency(mi))
-            gauss_conv_flag = f_is_default(gauss_sigma_time(mi))
+            frequency_local = frequency(ai)
+            gauss_sigma_time_local = gauss_sigma_time(ai)
+            freq_conv_flag = f_is_default(frequency(ai))
+            gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
             do l = 0, p
                 do k = 0, n
@@ -194,54 +194,54 @@ contains
                             q_cons_local(q) = q_cons_vf(q)%sf(j, k, l)
                         end do
                         q_prim_local = q_prim_vf(E_idx)%sf(j, k, l)
-                        call s_compute_speed_of_sound_monopole(q_cons_local, q_prim_local, c, small_gamma)
+                        call s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, small_gamma)
 
                         ! Wavelength to frequency conversion
-                        if (freq_conv_flag .and. (pulse(mi) == 1 .or. pulse(mi) == 3)) then
-                            frequency_local = c/wavelength(mi)
-                        elseif (gauss_conv_flag .and. pulse(mi) == 2) then
-                            gauss_sigma_time_local = c/gauss_sigma_dist(mi)
+                        if (freq_conv_flag .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) then
+                            frequency_local = c/wavelength(ai)
+                        elseif (gauss_conv_flag .and. pulse(ai) == 2) then
+                            gauss_sigma_time_local = c/gauss_sigma_dist(ai)
                         end if
 
                         ! Update momentum source term
-                        call s_source_temporal(sim_time, c, mi, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                        call s_source_spatial(j, k, l, loc_mono(:, mi), mi, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         mom_src_diff = source_temporal*source_spatial
 
                         if (n == 0) then ! 1D
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(mi)) ! Left or right-going wave
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(ai)) ! Left or right-going wave
 
                         elseif (p == 0) then ! 2D
-                            if (support(mi) < 5) then ! Planar
-                                angle = dir(mi)
+                            if (support(ai) < 5) then ! Planar
+                                angle = dir(ai)
                             end if
-                            mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(angle)
-                            mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(angle)
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(angle)
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(angle)
 
                         else ! 3D
-                            if (support(mi) < 5) then ! Planar
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*cos(dir(mi))
-                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*sin(dir(mi))
+                            if (support(ai) < 5) then ! Planar
+                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                             else
-                                mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + mom_src_diff*xyz_to_r_ratios(1)
-                                mono_mom_src(2, j, k, l) = mono_mom_src(2, j, k, l) + mom_src_diff*xyz_to_r_ratios(2)
-                                mono_mom_src(3, j, k, l) = mono_mom_src(3, j, k, l) + mom_src_diff*xyz_to_r_ratios(3)
+                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*xyz_to_r_ratios(1)
+                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*xyz_to_r_ratios(2)
+                                mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*xyz_to_r_ratios(3)
                             end if
                         end if
 
                         ! Update mass source term
-                        if (support(mi) < 5) then ! Planar
+                        if (support(ai) < 5) then ! Planar
                             mass_src_diff = mom_src_diff/c
                         else
-                            call s_source_temporal(sim_time, c, mi, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                            call s_source_spatial(j, k, l, loc_mono(:, mi), mi, source_spatial, angle, xyz_to_r_ratios)
+                            call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                            call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                             mass_src_diff = source_temporal*source_spatial
                         end if
-                        mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + mass_src_diff
+                        mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
 
                         ! Update energy source term
                         if (model_eqns /= 4) then
-                            mono_E_src(j, k, l) = mono_E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
+                            E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
                         end if
 
                     end do
@@ -255,13 +255,13 @@ contains
                 do j = 0, m
                     !$acc loop seq
                     do q = contxb, contxe
-                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mass_src(j, k, l)
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
                     !$acc loop seq
                     do q = momxb, momxe
-                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mono_mom_src(q - contxe, j, k, l)
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
                     end do
-                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + mono_e_src(j, k, l)
+                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + e_src(j, k, l)
                 end do
             end do
         end do
@@ -271,14 +271,14 @@ contains
     !> This subroutine gives the temporally varying amplitude of the pulse
     !! @param sim_time Simulation time
     !! @param c Sound speed
-    !! @param mi Monopole index
+    !! @param ai Acoustic source index
     !! @param term_index Index of the term to be calculated (1: mass source, 2: momentum source)
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
-    subroutine s_source_temporal(sim_time, c, mi, term_index, frequency_local, gauss_sigma_time_local, source)
+    subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source)
         !$acc routine seq
-        integer, intent(in) :: mi, term_index
+        integer, intent(in) :: ai, term_index
         real(kind(0d0)), intent(in) :: sim_time, c
         real(kind(0d0)), intent(in) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)), intent(out) :: source
@@ -291,37 +291,37 @@ contains
         if (n == 0) then
             foc_length_factor = 1d0
         elseif (p == 0 .and. (.not. cyl_coord)) then ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(mi)**(-0.85d0); ! Empirical correction
+            foc_length_factor = foc_length(ai)**(-0.85d0); ! Empirical correction
         else
-            foc_length_factor = 1/foc_length(mi); 
+            foc_length_factor = 1/foc_length(ai); 
         end if
 
         source = 0d0
 
-        if (pulse(mi) == 1) then ! Sine wave
-            if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
+        if (pulse(ai) == 1) then ! Sine wave
+            if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2d0*pi*frequency_local
-            source = mag(mi)*sin((sim_time - delay(mi))*omega)
+            source = mag(ai)*sin((sim_time - delay(ai))*omega)
 
             if (term_index == mass_label) then
-                source = source/c + foc_length_factor*mag(mi)*(cos((sim_time - delay(mi))*omega) - 1d0)/omega
+                source = source/c + foc_length_factor*mag(ai)*(cos((sim_time - delay(ai))*omega) - 1d0)/omega
             end if
 
-        elseif (pulse(mi) == 2) then ! Gaussian pulse
-            source = mag(mi)*dexp(-0.5d0*((sim_time - delay(mi))**2d0)/(gauss_sigma_time_local**2d0))
+        elseif (pulse(ai) == 2) then ! Gaussian pulse
+            source = mag(ai)*dexp(-0.5d0*((sim_time - delay(ai))**2d0)/(gauss_sigma_time_local**2d0))
 
             if (term_index == mass_label) then
                 source = source/c - &
-                         foc_length_factor*mag(mi)*dsqrt(pi/2)*gauss_sigma_time_local* &
-                         (erf((sim_time - delay(mi))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
+                         foc_length_factor*mag(ai)*dsqrt(pi/2)*gauss_sigma_time_local* &
+                         (erf((sim_time - delay(ai))/(dsqrt(2d0)*gauss_sigma_time_local)) + 1)
             end if
 
-        elseif (pulse(mi) == 3) then ! Square wave
-            if ((sim_time - delay(mi))*frequency_local > npulse(mi)) return
+        elseif (pulse(ai) == 3) then ! Square wave
+            if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2d0*pi*frequency_local
-            source = mag(mi)*sign(1d0, sin((sim_time - delay(mi))*omega))
+            source = mag(ai)*sign(1d0, sin((sim_time - delay(ai))*omega))
 
         end if
     end subroutine s_source_temporal
@@ -330,15 +330,15 @@ contains
     !! @param j x-index
     !! @param k y-index
     !! @param l z-index
-    !! @param mono_loc Nominal source term location
-    !! @param mi Monopole index
+    !! @param loc Nominal source term location
+    !! @param ai Acoustic source index
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial(j, k, l, mono_loc, mi, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
         !$acc routine seq
-        integer, intent(in) :: j, k, l, mi
-        real(kind(0d0)), dimension(3), intent(in) :: mono_loc
+        integer, intent(in) :: j, k, l, ai
+        real(kind(0d0)), dimension(3), intent(in) :: loc
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
         real(kind(0d0)) :: sig, r(3)
@@ -353,28 +353,28 @@ contains
         end if
         sig = sig*acoustic_spatial_support_width
 
-        ! Calculate displacement from monopole location
-        r(1) = x_cc(j) - mono_loc(1)
-        if (n /= 0) r(2) = y_cc(k) - mono_loc(2)
-        if (p /= 0) r(3) = z_cc(l) - mono_loc(3)
+        ! Calculate displacement from acoustic source location
+        r(1) = x_cc(j) - loc(1)
+        if (n /= 0) r(2) = y_cc(k) - loc(2)
+        if (p /= 0) r(3) = z_cc(l) - loc(3)
 
-        if (any(support(mi) == (/1, 2, 3, 4/))) then
-            call s_source_spatial_planar(mi, sig, r, source)
-        elseif (any(support(mi) == (/5, 6, 7/))) then
-            call s_source_spatial_transducer(mi, sig, r, source, angle, xyz_to_r_ratios)
-        elseif (any(support(mi) == (/9, 10, 11/))) then
-            call s_source_spatial_transducer_array(mi, sig, r, source, angle, xyz_to_r_ratios)
+        if (any(support(ai) == (/1, 2, 3, 4/))) then
+            call s_source_spatial_planar(ai, sig, r, source)
+        elseif (any(support(ai) == (/5, 6, 7/))) then
+            call s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
+        elseif (any(support(ai) == (/9, 10, 11/))) then
+            call s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         end if
     end subroutine s_source_spatial
 
     !> This subroutine calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
-    !! @param mi Monopole index
+    !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
-    subroutine s_source_spatial_planar(mi, sig, r, source)
+    subroutine s_source_spatial_planar(ai, sig, r, source)
         !$acc routine seq
-        integer, intent(in) :: mi
+        integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source
 
@@ -382,33 +382,28 @@ contains
 
         source = 0d0
 
-        if (support(mi) == 1) then ! 1D
+        if (support(ai) == 1) then ! 1D
             source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(r(1)/(sig/2d0))**2d0)
 
-        elseif (support(mi) == 2) then ! 2D
+        elseif (support(ai) == 2 .or. support(ai) == 3) then ! 2D or 3D
             ! If we let unit vector e = (cos(dir), sin(dir)),
-            dist = r(1)*cos(dir(mi)) + r(2)*sin(dir(mi)) ! dot(r,e)
-            if ((r(1) - dist*cos(dir(mi)))**2d0 + (r(2) - dist*sin(dir(mi)))**2d0 < 0.25d0*length(mi)**2d0) then ! |r - dist*e| < length/2
-                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
-            end if
-        elseif (support(mi) == 3) then ! 3D
-            dist = r(1)*cos(dir(mi)) + r(2)*sin(dir(mi)) ! dot(r,e)
-            if ((r(1) - dist*cos(dir(mi)))**2d0 + (r(2) - dist*sin(dir(mi)))**2d0 < 0.25d0*length(mi)**2d0) then ! |r - dist*e| < length/2
+            dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai)) ! dot(r,e)
+            if ((r(1) - dist*cos(dir(ai)))**2d0 + (r(2) - dist*sin(dir(ai)))**2d0 < 0.25d0*length(ai)**2d0) then ! |r - dist*e| < length/2
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
             end if
         end if
     end subroutine s_source_spatial_planar
 
     !> This subroutine calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
-    !! @param mi Monopole index
+    !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer(mi, sig, r, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
         !$acc routine seq
-        integer, intent(in) :: mi
+        integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
@@ -416,26 +411,26 @@ contains
 
         source = 0d0
 
-        if (support(mi) == 5 .or. support(mi) == 6) then ! 2D or 2D axisymmetric
-            current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
-            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
+        if (support(ai) == 5 .or. support(ai) == 6) then ! 2D or 2D axisymmetric
+            current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
+            angle_half_aperture = asin((aperture(ai)/2d0)/(foc_length(ai)))
 
-            if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(mi)) then
-                dist = foc_length(mi) - dsqrt(r(2)**2d0 + (foc_length(mi) - r(1))**2d0)
+            if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(ai)) then
+                dist = foc_length(ai) - dsqrt(r(2)**2d0 + (foc_length(ai) - r(1))**2d0)
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
-                angle = -atan(r(2)/(foc_length(mi) - r(1)))
+                angle = -atan(r(2)/(foc_length(ai) - r(1)))
             end if
 
-        elseif (support(mi) == 7) then ! 3D
-            current_angle = -atan(dsqrt(r(2)**2 + r(3)**2)/(foc_length(mi) - r(1)))
-            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
+        elseif (support(ai) == 7) then ! 3D
+            current_angle = -atan(dsqrt(r(2)**2 + r(3)**2)/(foc_length(ai) - r(1)))
+            angle_half_aperture = asin((aperture(ai)/2d0)/(foc_length(ai)))
 
-            if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(mi)) then
-                dist = foc_length(mi) - dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(mi) - r(1))**2d0)
+            if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(ai)) then
+                dist = foc_length(ai) - dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(ai) - r(1))**2d0)
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
 
-                norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(mi) - r(1))**2d0)
-                xyz_to_r_ratios(1) = -(r(1) - foc_length(mi))/norm
+                norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(ai) - r(1))**2d0)
+                xyz_to_r_ratios(1) = -(r(1) - foc_length(ai))/norm
                 xyz_to_r_ratios(2) = -r(2)/norm
                 xyz_to_r_ratios(3) = -r(3)/norm
             end if
@@ -444,15 +439,15 @@ contains
     end subroutine s_source_spatial_transducer
 
     !> This subroutine calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
-    !! @param mi Monopole index
+    !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer_array(mi, sig, r, source, angle, xyz_to_r_ratios)
+    subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         !$acc routine seq
-        integer, intent(in) :: mi
+        integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
@@ -462,41 +457,41 @@ contains
         real(kind(0d0)) :: poly_side_length, aperture_element_3D, angle_elem
         real(kind(0d0)) :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
 
-        if (element_on(mi) == 0) then ! Full transducer
+        if (element_on(ai) == 0) then ! Full transducer
             elem_min = 1
-            elem_max = num_elements(mi)
+            elem_max = num_elements(ai)
         else ! Transducer element specified
-            elem_min = element_on(mi)
-            elem_max = element_on(mi)
+            elem_min = element_on(ai)
+            elem_max = element_on(ai)
         end if
 
         source = 0d0 ! If not affected by any element
 
-        if (support(mi) == 9 .or. support(mi) == 10) then ! 2D or 2D axisymmetric
-            current_angle = -atan(r(2)/(foc_length(mi) - r(1)))
-            angle_half_aperture = asin((aperture(mi)/2d0)/(foc_length(mi)))
-            angle_per_elem = (2d0*angle_half_aperture - (num_elements(mi) - 1d0)*element_spacing_angle(mi))/num_elements(mi)
-            dist = foc_length(mi) - dsqrt(r(2)**2d0 + (foc_length(mi) - r(1))**2d0)
+        if (support(ai) == 9 .or. support(ai) == 10) then ! 2D or 2D axisymmetric
+            current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
+            angle_half_aperture = asin((aperture(ai)/2d0)/(foc_length(ai)))
+            angle_per_elem = (2d0*angle_half_aperture - (num_elements(ai) - 1d0)*element_spacing_angle(ai))/num_elements(ai)
+            dist = foc_length(ai) - dsqrt(r(2)**2d0 + (foc_length(ai) - r(1))**2d0)
 
             do elem = elem_min, elem_max
-                angle_max = angle_half_aperture - (element_spacing_angle(mi) + angle_per_elem)*(elem - 1d0)
+                angle_max = angle_half_aperture - (element_spacing_angle(ai) + angle_per_elem)*(elem - 1d0)
                 angle_min = angle_max - angle_per_elem
 
-                if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(mi)) then
+                if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(ai)) then
                     source = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
                     angle = current_angle
                     exit ! Assume elements don't overlap
                 end if
             end do
 
-        elseif (support(mi) == 11) then ! 3D
-            poly_side_length = aperture(mi)*sin(pi/num_elements(mi))
-            aperture_element_3D = poly_side_length*element_polygon_ratio(mi)
-            f = foc_length(mi)
-            half_apert = aperture(mi)/2d0
+        elseif (support(ai) == 11) then ! 3D
+            poly_side_length = aperture(ai)*sin(pi/num_elements(ai))
+            aperture_element_3D = poly_side_length*element_polygon_ratio(ai)
+            f = foc_length(ai)
+            half_apert = aperture(ai)/2d0
 
             do elem = elem_min, elem_max
-                angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(mi), kind(0d0)) + rotate_angle(mi)
+                angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(ai), kind(0d0)) + rotate_angle(ai)
 
                 ! Point 2 is the elem center
                 x2 = f - dsqrt(f**2 - half_apert**2)
@@ -526,12 +521,12 @@ contains
         end if
     end subroutine s_source_spatial_transducer_array
 
-    !> This subroutine calculates the speed of sound within the monopole module
+    !> This subroutine calculates the speed of sound within the acoustic source module
     !! @param q_cons_local Conserved quantities of the elements
     !! @param q_prim_local Primitive quantity of the element
     !! @param c Speed of sound
     !! @param n_tait Gas constant (small gamma)
-    subroutine s_compute_speed_of_sound_monopole(q_cons_local, q_prim_local, c, n_tait)
+    subroutine s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, n_tait)
         real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_local
         real(kind(0d0)), intent(in) :: q_prim_local
         real(kind(0d0)), intent(out) :: c, n_tait
@@ -583,6 +578,6 @@ contains
 
         c = dsqrt(n_tait*(q_prim_local + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
 
-    end subroutine s_compute_speed_of_sound_monopole
+    end subroutine s_compute_speed_of_sound_acoustic_src
 
-end module m_monopole
+end module m_acoustic_src

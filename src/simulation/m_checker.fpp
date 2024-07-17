@@ -29,7 +29,7 @@ contains
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns
-        if (monopole) call s_check_inputs_monopole
+        if (acoustic_source) call s_check_inputs_acoustic_src
         if (hypoelasticity) call s_check_inputs_hypoelasticity
         if (bubbles) call s_check_inputs_bubbles
         if (adap_dt) call s_check_inputs_adapt_dt
@@ -160,169 +160,169 @@ contains
         end if
     end subroutine s_check_inputs_model_eqns
 
-    !> Checks constraints on monopole parameters
-    subroutine s_check_inputs_monopole
+    !> Checks constraints on acoustic_source parameters
+    subroutine s_check_inputs_acoustic_src
         integer :: j
         character(len=5) :: jStr
 
-        if (num_mono == dflt_int) then
-            call s_mpi_abort('num_mono must be specified for monopole. Exiting ...')
-        elseif (num_mono < 0) then
-            call s_mpi_abort('num_mono must be non-negative. Exiting ...')
+        if (num_source == dflt_int) then
+            call s_mpi_abort('num_source must be specified for acoustic_source. Exiting ...')
+        elseif (num_source < 0) then
+            call s_mpi_abort('num_source must be non-negative. Exiting ...')
         end if
 
-        do j = 1, num_mono
+        do j = 1, num_source
             call s_int_to_str(j, jStr)
-            if (mono(j)%support == dflt_int) then
-                call s_mpi_abort('mono('//trim(jStr)//')%support must be '// &
+            if (acoustic(j)%support == dflt_int) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%support must be '// &
                                  'specified. Exiting ...')
             end if
 
             if (n == 0) then ! 1D
-                if (mono(j)%support /= 1) then
-                    call s_mpi_abort('Only Mono(i)support = 1 is allowed for '// &
+                if (acoustic(j)%support /= 1) then
+                    call s_mpi_abort('Only acoustic(i)support = 1 is allowed for '// &
                                      '1D simulations. Exiting ...')
-                elseif (mono(j)%support == 1 .and. f_is_default(mono(j)%loc(1))) then
-                    call s_mpi_abort('mono_loc(1) must be specified for '// &
-                                     'Mono(i)support = 1. Exiting ...')
+                elseif (acoustic(j)%support == 1 .and. f_is_default(acoustic(j)%loc(1))) then
+                    call s_mpi_abort('acoustic(j)%loc(1) must be specified for '// &
+                                     'acoustic(i)support = 1. Exiting ...')
                 end if
             elseif (p == 0) then ! 2D
-                if (.not. any(mono(j)%support == (/2, 5, 6, 9, 10/))) then
-                    call s_mpi_abort('Only Mono(i)support = 2, 5, 6, 9, or 10 is '// &
+                if (.not. any(acoustic(j)%support == (/2, 5, 6, 9, 10/))) then
+                    call s_mpi_abort('Only acoustic(i)support = 2, 5, 6, 9, or 10 is '// &
                                      'allowed for 2D simulations. Exiting ...')
-                elseif (any(mono(j)%support == (/6, 10/)) .and. cyl_coord) then
-                    call s_mpi_abort('Only Mono(i)support = 6 or 10 is '// &
+                elseif (any(acoustic(j)%support == (/6, 10/)) .and. cyl_coord) then
+                    call s_mpi_abort('Only acoustic(i)support = 6 or 10 is '// &
                                      'allowed for 2D axisymmetric simulations. Exiting ...')
-                elseif (any(mono(j)%support == (/2, 5, 6, 9, 10/)) .and. &
-                        (f_is_default(mono(j)%loc(1)) .or. &
-                         f_is_default(mono(j)%loc(2)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
-                                     'specified for Mono(i)support = 2. '// &
+                elseif (any(acoustic(j)%support == (/2, 5, 6, 9, 10/)) .and. &
+                        (f_is_default(acoustic(j)%loc(1)) .or. &
+                         f_is_default(acoustic(j)%loc(2)))) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%loc(1:2) must be '// &
+                                     'specified for acoustic(i)support = 2. '// &
                                      'Exiting ...')
                 end if
             else ! 3D
-                if (.not. any(mono(j)%support == (/3, 7, 11/))) then
-                    call s_mpi_abort('Only Mono(i)support = 3, 7, or 11 is '// &
+                if (.not. any(acoustic(j)%support == (/3, 7, 11/))) then
+                    call s_mpi_abort('Only acoustic(i)support = 3, 7, or 11 is '// &
                                      'allowed for 3D simulations. Exiting ...')
                 elseif (cyl_coord) then
-                    call s_mpi_abort('Monopole is not supported in 3D '// &
+                    call s_mpi_abort('Acoustic source is not supported in 3D '// &
                                      'cylindrical simulations. Exiting ...')
-                elseif (mono(j)%support == 3 .and. &
-                        (f_is_default(mono(j)%loc(1)) .or. &
-                         f_is_default(mono(j)%loc(2)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:2) must be '// &
-                                     'specified for Mono(i)support = 3. '// &
+                elseif (acoustic(j)%support == 3 .and. &
+                        (f_is_default(acoustic(j)%loc(1)) .or. &
+                         f_is_default(acoustic(j)%loc(2)))) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%loc(1:2) must be '// &
+                                     'specified for acoustic(i)support = 3. '// &
                                      'Exiting ...')
-                elseif (any(mono(j)%support == (/7, 11/)) .and. &
-                        (f_is_default(mono(j)%loc(1)) .or. &
-                         f_is_default(mono(j)%loc(2)) .or. &
-                         f_is_default(mono(j)%loc(3)))) then
-                    call s_mpi_abort('mono('//trim(jStr)//')%loc(1:3) must be '// &
-                                     'specified for Mono(i)support = 7 or 11. '// &
+                elseif (any(acoustic(j)%support == (/7, 11/)) .and. &
+                        (f_is_default(acoustic(j)%loc(1)) .or. &
+                         f_is_default(acoustic(j)%loc(2)) .or. &
+                         f_is_default(acoustic(j)%loc(3)))) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%loc(1:3) must be '// &
+                                     'specified for acoustic(i)support = 7 or 11. '// &
                                      'Exiting ...')
                 end if
             end if
 
-            if (f_is_default(mono(j)%mag)) then
-                call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
+            if (f_is_default(acoustic(j)%mag)) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%mag must be '// &
                                  'specified. Exiting ...')
-            elseif (mono(j)%mag <= 0d0) then
-                call s_mpi_abort('mono('//trim(jStr)//')%mag must be '// &
+            elseif (acoustic(j)%mag <= 0d0) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%mag must be '// &
                                  'positive. Exiting ...')
-            elseif (mono(j)%pulse == dflt_int) then
-                call s_mpi_abort('mono('//trim(jStr)//')%pulse must be '// &
+            elseif (acoustic(j)%pulse == dflt_int) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%pulse must be '// &
                                  'specified. Exiting ...')
-            elseif (.not. any(mono(j)%pulse == (/1, 2, 3/))) then
-                call s_mpi_abort('Only Mono(i)npulse = 1, 2, or 3 is '// &
+            elseif (.not. any(acoustic(j)%pulse == (/1, 2, 3/))) then
+                call s_mpi_abort('Only acoustic(i)npulse = 1, 2, or 3 is '// &
                                  'allowed. Exiting ...')
-            elseif (f_is_default(mono(j)%npulse)) then
-                call s_mpi_abort('mono('//trim(jStr)//')%npulse must be '// &
+            elseif (f_is_default(acoustic(j)%npulse)) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%npulse must be '// &
                                  'specified. Exiting ...')
-            elseif (mono(j)%support >= 5 .and. (.not. f_is_integer(mono(j)%npulse))) then
-                call s_mpi_abort('Mono(i)npulse must be an integer for '// &
-                                 'Mono(i)support >= 5 (Cylindrical or '// &
+            elseif (acoustic(j)%support >= 5 .and. (.not. f_is_integer(acoustic(j)%npulse))) then
+                call s_mpi_abort('acoustic(i)npulse must be an integer for '// &
+                                 'acoustic(i)support >= 5 (Cylindrical or '// &
                                  'Spherical support). Exiting ...')
-            elseif (mono(j)%support < 5 .and. f_is_default(mono(j)%dir)) then
-                call s_mpi_abort('mono('//trim(jStr)//')%dir must be '// &
+            elseif (acoustic(j)%support < 5 .and. f_is_default(acoustic(j)%dir)) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%dir must be '// &
                                  'specified for planer support. Exiting ...')
-            elseif (mono(j)%support == 1 .and. f_approx_equal(mono(j)%dir, 0d0)) then
-                call s_mpi_abort('Mono(i)dir must be non-zero for '// &
-                                 'Mono(i)support = 1. Exiting ...')
-            elseif (mono(j)%pulse == 2 .and. f_is_default(mono(j)%delay)) then
-                call s_mpi_abort('mono('//trim(jStr)//')%delay must be '// &
-                                 'specified for Mono(i)pulse = 2 (Gaussian). '// &
+            elseif (acoustic(j)%support == 1 .and. f_approx_equal(acoustic(j)%dir, 0d0)) then
+                call s_mpi_abort('acoustic(i)dir must be non-zero for '// &
+                                 'acoustic(i)support = 1. Exiting ...')
+            elseif (acoustic(j)%pulse == 2 .and. f_is_default(acoustic(j)%delay)) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%delay must be '// &
+                                 'specified for acoustic(i)pulse = 2 (Gaussian). '// &
                                  'Exiting ...')
-            elseif (mono(j)%pulse == 3 .and. mono(j)%support >= 5) then
-                call s_mpi_abort('Mono(i)support >= 5 (Cylindrical or '// &
+            elseif (acoustic(j)%pulse == 3 .and. acoustic(j)%support >= 5) then
+                call s_mpi_abort('acoustic(i)support >= 5 (Cylindrical or '// &
                                  'Spherical support) is not allowed for '// &
-                                 'Mono(i)pulse = 3 (square wave). Exiting ...')
+                                 'acoustic(i)pulse = 3 (square wave). Exiting ...')
             end if
 
-            if (any(mono(j)%support == (/5, 6, 7, 9, 10, 11/))) then ! Transducer or Transducer array
-                if (any(mono(j)%pulse == (/1, 3/)) .and. &
-                    xor(f_is_default(mono(j)%frequency), f_is_default(mono(j)%wavelength))) then
-                    call s_mpi_abort('One and only one of Mono(i)frequency '// &
-                                     'or Mono(i)wavelength must be specified '// &
-                                     'for Mono(i)pulse = 1 or 3. Exiting ...')
-                elseif (mono(j)%pulse == 2 .and. & ! Transducer or Transducer array
-                        xor(f_is_default(mono(j)%gauss_sigma_time), f_is_default(mono(j)%gauss_sigma_dist))) then
-                    call s_mpi_abort('One and only one of Mono(i)gauss_sigma_time '// &
-                                     'or Mono(i)gauss_sigma_dist must be specified '// &
-                                     'for Mono(i)pulse = 2. Exiting ...')
+            if (any(acoustic(j)%support == (/5, 6, 7, 9, 10, 11/))) then ! Transducer or Transducer array
+                if (any(acoustic(j)%pulse == (/1, 3/)) .and. &
+                    xor(f_is_default(acoustic(j)%frequency), f_is_default(acoustic(j)%wavelength))) then
+                    call s_mpi_abort('One and only one of acoustic(i)frequency '// &
+                                     'or acoustic(i)wavelength must be specified '// &
+                                     'for acoustic(i)pulse = 1 or 3. Exiting ...')
+                elseif (acoustic(j)%pulse == 2 .and. & ! Transducer or Transducer array
+                        xor(f_is_default(acoustic(j)%gauss_sigma_time), f_is_default(acoustic(j)%gauss_sigma_dist))) then
+                    call s_mpi_abort('One and only one of acoustic(i)gauss_sigma_time '// &
+                                     'or acoustic(i)gauss_sigma_dist must be specified '// &
+                                     'for acoustic(i)pulse = 2. Exiting ...')
                 end if
-                if (f_is_default(mono(j)%foc_length)) then
+                if (f_is_default(acoustic(j)%foc_length)) then
                     call s_mpi_abort('foc_length must be specified for '// &
-                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
-                elseif (mono(j)%foc_length <= 0d0) then
+                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                elseif (acoustic(j)%foc_length <= 0d0) then
                     call s_mpi_abort('foc_length must be positive for '// &
-                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
-                if (f_is_default(mono(j)%aperture)) then
+                if (f_is_default(acoustic(j)%aperture)) then
                     call s_mpi_abort('aperture must be specified for '// &
-                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
-                elseif (mono(j)%aperture <= 0d0) then
+                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                elseif (acoustic(j)%aperture <= 0d0) then
                     call s_mpi_abort('aperture must be positive for '// &
-                                     'Mono(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
             end if
 
-            if (any(mono(j)%support == (/7, 11/))) then ! Transducer array
-                if (mono(j)%num_elements == dflt_int) then
+            if (any(acoustic(j)%support == (/7, 11/))) then ! Transducer array
+                if (acoustic(j)%num_elements == dflt_int) then
                     call s_mpi_abort('num_elements must be specified for '// &
-                                     'Mono(i)support = 7 or 11. Exiting ...')
-                elseif (mono(j)%num_elements <= 0) then
+                                     'acoustic(i)support = 7 or 11. Exiting ...')
+                elseif (acoustic(j)%num_elements <= 0) then
                     call s_mpi_abort('num_elements must be positive for '// &
-                                     'Mono(i)support = 7 or 11. Exiting ...')
+                                     'acoustic(i)support = 7 or 11. Exiting ...')
                 end if
-                if (mono(j)%element_on == dflt_int) then
+                if (acoustic(j)%element_on == dflt_int) then
                     call s_mpi_abort('element_on must be specified for '// &
-                                     'Mono(i)support = 7 or 11. Exiting ...')
-                elseif (mono(j)%element_on < 0) then
+                                     'acoustic(i)support = 7 or 11. Exiting ...')
+                elseif (acoustic(j)%element_on < 0) then
                     call s_mpi_abort('element_on must be non-negative for '// &
-                                     'Mono(i)support = 7 or 11. Exiting ...')
+                                     'acoustic(i)support = 7 or 11. Exiting ...')
                 end if
             end if
 
-            if (mono(j)%support == 7) then ! 2D transducer array
-                if (f_is_default(mono(j)%element_spacing_angle)) then
+            if (acoustic(j)%support == 7) then ! 2D transducer array
+                if (f_is_default(acoustic(j)%element_spacing_angle)) then
                     call s_mpi_abort('element_spacing_angle must be specified for '// &
-                                     'Mono(i)support = 7. Exiting ...')
-                elseif (mono(j)%element_spacing_angle < 0d0) then
+                                     'acoustic(i)support = 7. Exiting ...')
+                elseif (acoustic(j)%element_spacing_angle < 0d0) then
                     call s_mpi_abort('element_spacing_angle must be non-negative for '// &
-                                     'Mono(i)support = 7. Exiting ...')
+                                     'acoustic(i)support = 7. Exiting ...')
                 end if
-            elseif (mono(j)%support == 11) then ! 3D transducer array
-                if (f_is_default(mono(j)%element_polygon_ratio)) then
+            elseif (acoustic(j)%support == 11) then ! 3D transducer array
+                if (f_is_default(acoustic(j)%element_polygon_ratio)) then
                     call s_mpi_abort('element_polygon_ratio must be specified for '// &
-                                     'Mono(i)support = 11. Exiting ...')
-                elseif (mono(j)%element_polygon_ratio <= 0d0) then
+                                     'acoustic(i)support = 11. Exiting ...')
+                elseif (acoustic(j)%element_polygon_ratio <= 0d0) then
                     call s_mpi_abort('element_polygon_ratio must be positive for '// &
-                                     'Mono(i)support = 11. Exiting ...')
+                                     'acoustic(i)support = 11. Exiting ...')
                 end if
             end if
         end do
 
-    end subroutine s_check_inputs_monopole
+    end subroutine s_check_inputs_acoustic_src
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity

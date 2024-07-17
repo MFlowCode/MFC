@@ -15,7 +15,7 @@
 # - weno_order : 5
 # - bubbles : T
 # - bubble_model : 3
-# - monopole : T
+# - acoustic_source : T
 - slug: viscous_weno5_sgb_mono
   path: benchmarks/viscous_weno5_sgb_mono/case.py
   args: []

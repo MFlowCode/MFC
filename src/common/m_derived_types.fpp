@@ -254,8 +254,8 @@ module m_derived_types
         real(kind(0d0)) :: zmax !< Max. boundary third coordinate direction
     end type integral_parameters
 
-    !> Monopole acoustic source parameters
-    type mono_parameters
+    !> Acoustic source parameters
+    type acoustic_parameters
         integer :: pulse !< Type of pulse
         integer :: support !< Type of support
         real(kind(0d0)), dimension(3) :: loc !< Physical location of acoustic source
@@ -275,7 +275,7 @@ module m_derived_types
         real(kind(0d0)) :: rotate_angle !< Angle of rotation of the entire circular 3D acoustic array
         integer :: num_elements !< Number of elements in the acoustic array
         integer :: element_on !< Element in the acoustic array to turn on
-    end type mono_parameters
+    end type acoustic_parameters
 
     !> Ghost Point for Immersed Boundaries
     type ghost_point

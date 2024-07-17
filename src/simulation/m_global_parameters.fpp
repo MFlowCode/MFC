@@ -415,13 +415,13 @@ module m_global_parameters
 
     !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
-    !> @name Acoustic monopole parameters
+    !> @name Acoustic acoustic_source parameters
     !> @{
-    logical :: monopole !< Monopole switch
-    type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
-    integer :: num_mono !< Number of monopoles
+    logical :: acoustic_source !< Acoustic source switch
+    type(acoustic_parameters), dimension(num_probes_max) :: acoustic !< Acoustic source parameters
+    integer :: num_source !< Number of acoustic sources
     !> @}
-    !$acc declare create(monopole, mono, num_mono)
+    !$acc declare create(acoustic_source, acoustic, num_source)
 
     !> @name Surface tension parameters
     !> @{
@@ -595,9 +595,9 @@ contains
         Web = dflt_real
         poly_sigma = dflt_real
 
-        ! Monopole source
-        monopole = .false.
-        num_mono = dflt_real
+        ! Acoustic source
+        acoustic_source = .false.
+        num_source = dflt_real
 
         ! Surface tension
         sigma = dflt_real
@@ -615,27 +615,27 @@ contains
         #:endfor
 
         do j = 1, num_probes_max
-            mono(j)%pulse = dflt_int
-            mono(j)%support = dflt_int
+            acoustic(j)%pulse = dflt_int
+            acoustic(j)%support = dflt_int
             do i = 1, 3
-                mono(j)%loc(i) = dflt_real
+                acoustic(j)%loc(i) = dflt_real
             end do
-            mono(j)%mag = dflt_real
-            mono(j)%length = dflt_real
-            mono(j)%wavelength = dflt_real
-            mono(j)%frequency = dflt_real
-            mono(j)%gauss_sigma_dist = dflt_real
-            mono(j)%gauss_sigma_time = dflt_real
-            mono(j)%npulse = dflt_real
-            mono(j)%dir = dflt_real
-            mono(j)%delay = dflt_real
-            mono(j)%foc_length = dflt_real
-            mono(j)%aperture = dflt_real
-            mono(j)%element_spacing_angle = dflt_real
-            mono(j)%element_polygon_ratio = dflt_real
-            mono(j)%rotate_angle = dflt_real
-            mono(j)%num_elements = dflt_int
-            mono(j)%element_on = dflt_int
+            acoustic(j)%mag = dflt_real
+            acoustic(j)%length = dflt_real
+            acoustic(j)%wavelength = dflt_real
+            acoustic(j)%frequency = dflt_real
+            acoustic(j)%gauss_sigma_dist = dflt_real
+            acoustic(j)%gauss_sigma_time = dflt_real
+            acoustic(j)%npulse = dflt_real
+            acoustic(j)%dir = dflt_real
+            acoustic(j)%delay = dflt_real
+            acoustic(j)%foc_length = dflt_real
+            acoustic(j)%aperture = dflt_real
+            acoustic(j)%element_spacing_angle = dflt_real
+            acoustic(j)%element_polygon_ratio = dflt_real
+            acoustic(j)%rotate_angle = dflt_real
+            acoustic(j)%num_elements = dflt_int
+            acoustic(j)%element_on = dflt_int
         end do
 
         fd_order = dflt_int
@@ -1049,7 +1049,7 @@ contains
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
         !$acc update device(m, n, p)
 
-        !$acc update device(alt_soundspeed, monopole, num_mono)
+        !$acc update device(alt_soundspeed, acoustic_source, num_source)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT)
 
         #:if not MFC_CASE_OPTIMIZATION
