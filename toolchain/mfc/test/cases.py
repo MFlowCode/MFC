@@ -605,7 +605,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['m'] = 25
                         case['n'] = 25
                         case['p'] = 25
-                print(case['m'] * max(case['n'], 1) * max(case['p'], 1))
                 
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
