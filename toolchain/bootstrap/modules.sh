@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get computer (if not supplied in command-line)
+# Get computer (if not supplied in command line)
 if [ -v $u_c ]; then
     log   "Select a system:"
     log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Summit (s) | Wombat (w)"
@@ -66,7 +66,7 @@ fi
 
 log "Loading modules (& env variables) for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
-# Reset modules to default system configuration
+# Reset modules to default system configuration (unless Phoenix or Carpenter)
 if [ "$u_c" != 'p' ] && [ "$u_c" != 'c' ]; then
     module reset > /dev/null 2>&1
     code="$?"
@@ -102,6 +102,7 @@ for element in ${ELEMENTS[@]}; do
     fi
 done
 
+# Don't check for Cray paths on Carpenter, otherwise do check if they exist
 if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" != 'c' ]; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
