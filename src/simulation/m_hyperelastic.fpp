@@ -237,7 +237,7 @@ contains
                   btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
    
                   ! STEP 5a: updating the Cauchy stress primitive scalar field
-                  call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
+                  call s_compute_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
                   ! STEP 5b: updating the pressure field
                   q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                         G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K

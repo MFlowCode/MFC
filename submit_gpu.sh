@@ -32,11 +32,15 @@
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/3Dsph_hyper_prestress_input.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t simulation -a bciv-delta-gpu -c delta
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/3Dsph_hyper_prestress_input.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t post_process -a bciv-delta-gpu -c delta
 
-./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hyper/hyper_gel.py -p gpuA100x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t pre_process -a bciv-delta-gpu -c delta
-./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hyper/hyper_gel.py -p gpuA100x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t simulation -a bciv-delta-gpu -c delta
+#./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hyper/hyper_gel.py -p gpuA100x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t pre_process -a bciv-delta-gpu -c delta
+#./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hyper/hyper_gel.py -p gpuA100x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t simulation -a bciv-delta-gpu -c delta
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hyper/hyper_gel.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t post_process -a bciv-delta-gpu -c delta
 
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hypoe/hypo_gel.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t pre_process -a bciv-delta-gpu -c delta
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hypoe/hypo_gel.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t simulation -a bciv-delta-gpu -c delta
 #./mfc.sh run /scratch/bciv/rodrigu1/cav2024/hypoe/hypo_gel.py -p gpuA40x4 -N 1 -n 1 -g 1 -w 01:00:00 -# test1 -t post_process -a bciv-delta-gpu -c delta
+
+#./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test61/case.py -e batch -p gpuA100x4 -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t pre_process -a bciv-delta-gpu -c delta
+./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test61/case.py -e batch -p gpuA100x4 -N 1 -n 1 -g 0 -w 02:00:00 -# test1 -t simulation -a bciv-delta-gpu -c delta 
+#./mfc.sh run /scratch/bciv/rodrigu1/ctr2024/test61/case.py -e batch -p gpuA100x4 -N 1 -n 1 -g 0 -w 01:00:00 -# test1 -t post_process -a bciv-delta-gpu -c delta
 
