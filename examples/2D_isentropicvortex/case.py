@@ -96,7 +96,7 @@ print(json.dumps({
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'F',
-    'omega_wrt(3)'                 :'F',
+    'omega_wrt(3)'                 :'T',
     'fd_order'                     : 2,
     # ==========================================================================
 
