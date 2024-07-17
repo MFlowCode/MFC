@@ -10,4 +10,4 @@ pylint
 argparse
 fprettify
 dataclasses
-jsonschema
+fastjsonschema

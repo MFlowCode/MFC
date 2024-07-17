@@ -68,6 +68,7 @@ if (MFC_SILO)
         GIT_REPOSITORY "https://github.com/LLNL/Silo"
         GIT_TAG        438477c80d32a3e1757d4584b993f382cace1535
         GIT_PROGRESS   ON
+        GIT_SHALLOW    ON
         PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
                        && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
                        && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo-GNU-13.patch"

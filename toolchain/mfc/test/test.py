@@ -62,7 +62,7 @@ def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL
 
-    cases = [ _.to_case() for _ in list_cases() ]
+    cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
@@ -75,7 +75,7 @@ def test():
 
         return
 
-    cases = __filter(cases)
+    cases = [ _.to_case() for _ in __filter(cases) ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)

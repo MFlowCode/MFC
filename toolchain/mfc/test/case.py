@@ -247,7 +247,7 @@ class TestCaseBuilder:
     def to_case(self) -> TestCase:
         dictionary = {}
         if self.path:
-            dictionary.update(input.load(self.path, self.args).params)
+            dictionary.update(input.load(self.path, self.args, do_print=False).params)
 
             for key, value in dictionary.items():
                 if not isinstance(value, str):
@@ -262,7 +262,6 @@ class TestCaseBuilder:
 
         if self.functor:
             self.functor(dictionary)
-            # print(dictionary)
 
         return TestCase(self.trace, dictionary, self.ppn)
 
@@ -288,7 +287,7 @@ class CaseGeneratorStack:
 
 # pylint: disable=too-many-arguments
 def define_case_f(trace: str, path: str, args: List[str] = None, newMods: dict = None, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, newMods or {}, path, args or [], ppn, functor)
+    return TestCaseBuilder(trace, newMods or {}, path, args or [], ppn or 1, functor)
 
 
 def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
@@ -307,4 +306,4 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(' -> '.join(traces), mods, None, [], ppn, functor)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, [], ppn or 1, functor)

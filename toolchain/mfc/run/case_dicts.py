@@ -1,3 +1,7 @@
+from functools import cache
+
+import fastjsonschema
+
 from enum import Enum
 from ..state import ARG
 
@@ -347,7 +351,8 @@ _properties = { k: v.value for k, v in ALL.items() }
 
 SCHEMA = {
     "type": "object",
-    "properties": _properties
+    "properties": _properties,
+    "additionalProperties": False,
 }
 
 
@@ -362,3 +367,8 @@ def get_input_dict_keys(target_name: str) -> list:
         return result
 
     return [ x for x in result if x not in CASE_OPTIMIZATION ]
+
+
+@cache
+def get_validator():
+    return fastjsonschema.compile(SCHEMA)
