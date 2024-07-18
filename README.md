@@ -55,17 +55,17 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```shell
-brew install wget python cmake gcc@13 mpich
+brew install wget python cmake gcc@14 mpich
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
 ```shell
-git clone https://github.com/MFlowCode/MFC.git
+git clone https://github.com/MFlowCode/MFC
 cd MFC
 ```
 and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
 ```shell
-echo -e "export CC=gcc-13 \nexport CXX=g++-13 \nexport FC=gfortran-13" >> ~/.profile
+echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14" >> ~/.profile
 source ~/.profile
 ```
 then you can build MFC and run the test suite!
@@ -82,9 +82,9 @@ The shock-droplet interaction case above was run via
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
-You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
+You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your other favorite software.
 
-## Is this really exascale
+## Is this _really_ exascale?
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
 The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
