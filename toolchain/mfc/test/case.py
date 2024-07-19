@@ -260,8 +260,8 @@ class TestCaseBuilder:
 
 @dataclasses.dataclass
 class CaseGeneratorStack:
-    trace: list # list of strs
-    mods:  list # list of dicts
+    trace: list # list of strs 
+    mods:  list # list of dicts 
 
     def __init__(self) -> None:
         self.trace, self.mods = [], []
