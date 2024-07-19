@@ -731,6 +731,8 @@ contains
         integer :: i, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
 
+        call nvtxStartRange("Compute_RHS")
+
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
 
@@ -1033,6 +1035,7 @@ contains
         end if
         ! ==================================================================
 
+        call nvtxEndRange
     end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
