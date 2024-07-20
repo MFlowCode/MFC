@@ -199,7 +199,7 @@ contains
                         if (freq_conv_flag .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) then
                             frequency_local = c/wavelength(ai)
                         elseif (gauss_conv_flag .and. pulse(ai) == 2) then
-                            gauss_sigma_time_local = c/gauss_sigma_dist(ai)
+                            gauss_sigma_time_local = gauss_sigma_dist(ai)/c
                         end if
 
                         ! Update momentum source term
