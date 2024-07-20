@@ -85,7 +85,7 @@ BASE_CFG = {
     'acoustic_source'                   : 'F',
     'num_source'                        : 1,
     'acoustic(1)%loc(1)'                : 0.5,
-    'acoustic(1)%mag'                   : 1.0,
+    'acoustic(1)%mag'                   : 0.2,
     'acoustic(1)%length'                : 0.25,
     'acoustic(1)%dir'                   : 1.0,
     'acoustic(1)%npulse'                : 1,
