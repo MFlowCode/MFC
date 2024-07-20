@@ -171,19 +171,18 @@ contains
             end do
         end do
 
-        ! Acoustic sources are looped through sequentially because they can have very different computational costs
-        !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local, q_prim_local, freq_conv_flag, gauss_conv_flag, c, small_gamma, angle, xyz_to_r_ratios)
         !$acc loop seq
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
-
+            
             ! Decide if frequency need to be converted from wavelength
             frequency_local = frequency(ai)
             gauss_sigma_time_local = gauss_sigma_time(ai)
             freq_conv_flag = f_is_default(frequency(ai))
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
-
+            
+            !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local, xyz_to_r_ratios)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -527,6 +526,7 @@ contains
     !! @param c Speed of sound
     !! @param n_tait Gas constant (small gamma)
     subroutine s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, n_tait)
+        !$acc routine seq
         real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_local
         real(kind(0d0)), intent(in) :: q_prim_local
         real(kind(0d0)), intent(out) :: c, n_tait
