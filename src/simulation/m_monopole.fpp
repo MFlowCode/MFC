@@ -146,7 +146,7 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: angle ! Angle with x-axis for mom source term vector
-        real(kind(0d0)) :: xyz_to_r_ratios(3) ! [xyz]/r for mom source term vector
+        real(kind(0d0)) :: x_to_r_ratio, y_to_r_ratio, z_to_r_ratio ! [xyz]/r for mom source term vector
         real(kind(0d0)) :: source_temporal, source_spatial
 
         integer :: i, j, k, l, q !< generic loop variables
@@ -175,14 +175,12 @@ contains
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
-            
+
             ! Decide if frequency need to be converted from wavelength
-            frequency_local = frequency(ai)
-            gauss_sigma_time_local = gauss_sigma_time(ai)
             freq_conv_flag = f_is_default(frequency(ai))
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
-            
-            !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local, xyz_to_r_ratios)
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -196,15 +194,12 @@ contains
                         call s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, small_gamma)
 
                         ! Wavelength to frequency conversion
-                        if (freq_conv_flag .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) then
-                            frequency_local = c/wavelength(ai)
-                        elseif (gauss_conv_flag .and. pulse(ai) == 2) then
-                            gauss_sigma_time_local = gauss_sigma_dist(ai)/c
-                        end if
+                        if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
+                        if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
                         ! Update momentum source term
                         call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
                         mom_src_diff = source_temporal*source_spatial
 
                         if (n == 0) then ! 1D
@@ -222,9 +217,9 @@ contains
                                 mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
                                 mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                             else
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*xyz_to_r_ratios(1)
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*xyz_to_r_ratios(2)
-                                mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*xyz_to_r_ratios(3)
+                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*x_to_r_ratio
+                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*y_to_r_ratio
+                                mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*z_to_r_ratio
                             end if
                         end if
 
@@ -233,7 +228,7 @@ contains
                             mass_src_diff = mom_src_diff/c
                         else
                             call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                            call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                            call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
                             mass_src_diff = source_temporal*source_spatial
                         end if
                         mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
@@ -333,12 +328,14 @@ contains
     !! @param ai Acoustic source index
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
+    !! @param x_to_r_ratio Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param y_to_r_ratio Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param z_to_r_ratio Ratio of the z-component of the source term to the magnitude (for 3D)
+    subroutine s_source_spatial(j, k, l, loc, ai, source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
         !$acc routine seq
         integer, intent(in) :: j, k, l, ai
         real(kind(0d0)), dimension(3), intent(in) :: loc
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(kind(0d0)), intent(out) :: source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio
 
         real(kind(0d0)) :: sig, r(3)
 
@@ -360,9 +357,9 @@ contains
         if (any(support(ai) == (/1, 2, 3, 4/))) then
             call s_source_spatial_planar(ai, sig, r, source)
         elseif (any(support(ai) == (/5, 6, 7/))) then
-            call s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
+            call s_source_spatial_transducer(ai, sig, r, source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
         elseif (any(support(ai) == (/9, 10, 11/))) then
-            call s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
+            call s_source_spatial_transducer_array(ai, sig, r, source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
         end if
     end subroutine s_source_spatial
 
@@ -399,12 +396,14 @@ contains
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
+    !! @param x_to_r_ratio Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param y_to_r_ratio Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param z_to_r_ratio Ratio of the z-component of the source term to the magnitude (for 3D)
+    subroutine s_source_spatial_transducer(ai, sig, r, source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
         !$acc routine seq
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(kind(0d0)), intent(out) :: source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio
 
         real(kind(0d0)) :: current_angle, angle_half_aperture, dist, norm
 
@@ -429,9 +428,9 @@ contains
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
 
                 norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (foc_length(ai) - r(1))**2d0)
-                xyz_to_r_ratios(1) = -(r(1) - foc_length(ai))/norm
-                xyz_to_r_ratios(2) = -r(2)/norm
-                xyz_to_r_ratios(3) = -r(3)/norm
+                x_to_r_ratio = -(r(1) - foc_length(ai))/norm
+                y_to_r_ratio = -r(2)/norm
+                z_to_r_ratio = -r(3)/norm
             end if
 
         end if
@@ -443,12 +442,14 @@ contains
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios Ratio of the [xyz]-component of the source term to the magnitude (for 3D)
-    subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
+    !! @param x_to_r_ratio Ratio of the x-component of the source term to the magnitude (for 3D)
+    !! @param y_to_r_ratio Ratio of the y-component of the source term to the magnitude (for 3D)
+    !! @param z_to_r_ratio Ratio of the z-component of the source term to the magnitude (for 3D)
+    subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio)
         !$acc routine seq
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(kind(0d0)), intent(out) :: source, angle, x_to_r_ratio, y_to_r_ratio, z_to_r_ratio
 
         integer :: elem, elem_min, elem_max
         real(kind(0d0)) :: current_angle, angle_half_aperture, angle_per_elem, dist
@@ -510,9 +511,9 @@ contains
                     source = dexp(-0.5d0*(dist/(sig/2d0))**2d0)/(dsqrt(2d0*pi)*sig/2d0)
 
                     norm = dsqrt(r(2)**2d0 + r(3)**2d0 + (f - r(1))**2d0)
-                    xyz_to_r_ratios(1) = -(r(1) - f)/norm
-                    xyz_to_r_ratios(2) = -r(2)/norm
-                    xyz_to_r_ratios(3) = -r(3)/norm
+                    x_to_r_ratio = -(r(1) - f)/norm
+                    y_to_r_ratio = -r(2)/norm
+                    z_to_r_ratio = -r(3)/norm
                 end if
 
             end do
@@ -579,5 +580,41 @@ contains
         c = dsqrt(n_tait*(q_prim_local + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
 
     end subroutine s_compute_speed_of_sound_acoustic_src
+
+    !> This function performs wavelength to frequency conversion
+    !! @param freq_conv_flag Determines if frequency is given or wavelength
+    !! @param ai Acoustic source index
+    !! @param c Speed of sound
+    !! @return frequency_local Converted frequency
+    function f_frequency_local(freq_conv_flag, ai, c)
+        logical, intent(in) :: freq_conv_flag
+        integer, intent(in) :: ai
+        real(kind(0d0)), intent(in) :: c
+        real(kind(0d0)) :: f_frequency_local
+
+        if (freq_conv_flag) then
+            f_frequency_local = c/wavelength(ai)
+        else
+            f_frequency_local = frequency(ai)
+        end if
+    end function f_frequency_local
+
+    !> This function performs Gaussian sigma dist to time conversion
+    !! @param gauss_conv_flag Determines if sigma_dist is given or sigma_time
+    !! @param c Speed of sound
+    !! @param ai Acoustic source index
+    !! @return gauss_sigma_time_local Converted Gaussian sigma time
+    function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+        logical, intent(in) :: gauss_conv_flag
+        integer, intent(in) :: ai
+        real(kind(0d0)), intent(in) :: c
+        real(kind(0d0)) :: f_gauss_sigma_time_local
+
+        if (gauss_conv_flag) then
+            f_gauss_sigma_time_local = gauss_sigma_dist(ai)/c
+        else
+            f_gauss_sigma_time_local = gauss_sigma_time(ai)
+        end if
+    end function f_gauss_sigma_time_local
 
 end module m_acoustic_src

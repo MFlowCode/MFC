@@ -815,7 +815,7 @@ For all acoustic support types:
 - `%%npulse == 2` requires `%%delay` to be set.
 
 Description of the acoustic support types:
-- `%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `%%loc(1)` in 1D simulation.
+- `%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `%%loc(1)` in 1D simulation. `%%dir > 0` specifies a rightward propagating wave, and `%%dir < 0` specifies a leftward propagating wave. `%%dir = 0` is not allowed.
 
 - `%%support = 2` specifies a semi-infinite source plane in 2D simulation.
 The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`).
@@ -829,7 +829,7 @@ The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\ma
 
 - `%%support = 7` specifies a spherical transducer in 3D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`, `%%loc(3)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the spherical cap (intersection of the cap and the x-axis). The aperture is the diameter of the projection of the spherical cap onto the y-z plane. If a semi-sphere is desired, set the aperture to double the focal length. Again, the equation is exact.
 
-- `%%support = 9` specifies an arcuate transducer array in 2D simulation. The total aperture of the array is `%%aperture`, which is similar to `%%support = 5`. The parameters `%%num_elements` and `%%element_spacing_angle` specify the number of transducer elements and the spacing angle. The spacing angle is the angle of the gap betwen adjacent transducer elements in the array. Because the total aperture is set, each transducer element is smaller if the spacing angle is larger. Physically it represents curved panels. Note that similar to `%%support = 5`, the mass source term correction factor is empirically determined to be -0.85.
+- `%%support = 9` specifies an arcuate transducer array in 2D simulation. The total aperture of the array is `%%aperture`, which is similar to `%%support = 5`. The parameters `%%num_elements` and `%%element_spacing_angle` specify the number of transducer elements and the spacing angle. The spacing angle is the angle of the gap between adjacent transducer elements in the array. Because the total aperture is set, each transducer element is smaller if the spacing angle is larger. Physically it represents curved panels. Note that similar to `%%support = 5`, the mass source term correction factor is empirically determined to be -0.85.
 
 - `%%support = 10` specifies an annular transducer array in 2D axisymmetric simulation. It is identical to `%%support = 9` in terms of simulation parameters. It physically represents the a annulus obtained by revolving the arc in `%%support = 9` around the x-axis.
 

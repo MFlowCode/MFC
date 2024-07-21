@@ -217,13 +217,13 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("bubbles", 'F') == 'T':
             return 2e-10
 
+        if self.params.get("acoustic_source", 'F') == 'T':
+            return 2e-12
+
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if self.params.get("relax", 'F') == 'T':
-            return 1e-10
-
-        if self.params.get("ib", 'F') == 'T':
+        if self.params.get("relax", 'F') == 'T' or self.params.get("ib", 'F') == 'T':
             return 1e-10
 
         return 1e-12

@@ -239,13 +239,13 @@ contains
             if (any(acoustic(j)%pulse == (/1, 3/)) .and. &
                 .not. xor(f_is_default(acoustic(j)%frequency), f_is_default(acoustic(j)%wavelength))) then
                 call s_mpi_abort('One and only one of acoustic(i)frequency '// &
-                                    'or acoustic(i)wavelength must be specified '// &
-                                    'for acoustic(i)pulse = 1 or 3. Exiting ...')
+                                 'or acoustic(i)wavelength must be specified '// &
+                                 'for acoustic(i)pulse = 1 or 3. Exiting ...')
             elseif (acoustic(j)%pulse == 2 .and. &
                     .not. xor(f_is_default(acoustic(j)%gauss_sigma_time), f_is_default(acoustic(j)%gauss_sigma_dist))) then
                 call s_mpi_abort('One and only one of acoustic(i)gauss_sigma_time '// &
-                                    'or acoustic(i)gauss_sigma_dist must be specified '// &
-                                    'for acoustic(i)pulse = 2. Exiting ...')
+                                 'or acoustic(i)gauss_sigma_dist must be specified '// &
+                                 'for acoustic(i)pulse = 2. Exiting ...')
             end if
             if (f_is_default(acoustic(j)%npulse)) then
                 call s_mpi_abort('acoustic('//trim(jStr)//')%npulse must be '// &
