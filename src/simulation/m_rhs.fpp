@@ -731,6 +731,8 @@ contains
         integer :: i, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
 
+        call nvtxStartRange("Compute_RHS")
+
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
 
@@ -804,7 +806,7 @@ contains
                                                  q_prim_qp, &
                                                  dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                                  ix, iy, iz)
-        call nvtxEndRange()
+        call nvtxEndRange
 
         call nvtxStartRange("Surface_Tension")
         if (.not. f_is_default(sigma)) call s_get_capilary(q_prim_qp%vf)
@@ -833,16 +835,13 @@ contains
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-                call nvtxEndRange
             else
-
                 iv%beg = 1; iv%end = E_idx - 1
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-                call nvtxEndRange
 
                 iv%beg = E_idx; iv%end = E_idx
                 call s_reconstruct_cell_boundary_values_first_order( &
@@ -850,7 +849,6 @@ contains
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-                call nvtxEndRange
 
                 iv%beg = E_idx + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
@@ -858,8 +856,6 @@ contains
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-                call nvtxEndRange
-
             end if
 
             ! Reconstruct viscous derivatives for viscosity
@@ -889,7 +885,7 @@ contains
                 end if
             end if
 
-            call nvtxEndRange
+            call nvtxEndRange ! WENO
 
             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
@@ -901,6 +897,7 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
+            call nvtxStartRange("RHS_riemann_solver")
 
             ! Computing Riemann Solver Flux and Source Flux =================
 
@@ -930,7 +927,7 @@ contains
                                                  q_cons_qp, &
                                                  q_prim_qp, &
                                                  flux_src_n(id))
-            call nvtxEndRange()
+            call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
@@ -1038,6 +1035,7 @@ contains
         end if
         ! ==================================================================
 
+        call nvtxEndRange
     end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
