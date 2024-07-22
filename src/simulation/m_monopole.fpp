@@ -152,7 +152,8 @@ contains
 
         integer, intent(in) :: t_step
 
-        real(kind(0d0)) :: q_prim_local, q_cons_local(sys_size)
+        real(kind(0d0)) :: myalpha(num_fluids), myalpha_rho(num_fluids)
+        real(kind(0d0)) :: myRho, B_tait
         real(kind(0d0)) :: sim_time, c, small_gamma
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
@@ -191,18 +192,53 @@ contains
             freq_conv_flag = f_is_default(frequency(ai))
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(q_cons_local, xyz_to_r_ratios)
+            !$acc parallel loop collapse(3) gang vector default(present) private(myalpha, myalpha_rho, xyz_to_r_ratios)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
 
                         ! Compute speed of sound
+                        myRho = 0d0
+                        B_tait = 0d0
+                        small_gamma = 0d0
+
                         !$acc loop seq
-                        do q = 1, sys_size
-                            q_cons_local(q) = q_cons_vf(q)%sf(j, k, l)
+                        do q = 1, num_fluids
+                            myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
+                            myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
                         end do
-                        q_prim_local = q_prim_vf(E_idx)%sf(j, k, l)
-                        call s_compute_speed_of_sound_acoustic(q_cons_local, q_prim_local, c, small_gamma)
+
+                        if (bubbles) then
+                            if (mpp_lim .and. (num_fluids > 2)) then
+                                !$acc loop seq
+                                do q = 1, num_fluids
+                                    myRho = myRho + myalpha_rho(q)
+                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
+                                    small_gamma = small_gamma + myalpha(q)*gammas(q)
+                                end do
+                            elseif (num_fluids > 2) then
+                                !$acc loop seq
+                                do q = 1, num_fluids - 1
+                                    myRho = myRho + myalpha_rho(q)
+                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
+                                    small_gamma = small_gamma + myalpha(q)*gammas(q)
+                                end do
+                            else
+                                myRho = myalpha_rho(1)
+                                B_tait = pi_infs(1)
+                                small_gamma = gammas(1)
+                            end if
+                        else
+                            !$acc loop seq
+                            do q = 1, num_fluids
+                                myRho = myRho + myalpha_rho(q)
+                                B_tait = B_tait + myalpha(q)*pi_infs(q)
+                                small_gamma = small_gamma + myalpha(q)*gammas(q)
+                            end do
+                        end if
+
+                        small_gamma = 1d0/small_gamma + 1d0
+                        c = dsqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1d0)/small_gamma)*B_tait)/myRho)
 
                         ! Wavelength to frequency conversion
                         if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
@@ -260,6 +296,7 @@ contains
             end do
         end do
 
+        ! Update the rhs variables
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -494,6 +531,7 @@ contains
             angle_per_elem = (2d0*angle_half_aperture - (num_elements(ai) - 1d0)*element_spacing_angle(ai))/num_elements(ai)
             dist = foc_length(ai) - dsqrt(r(2)**2d0 + (foc_length(ai) - r(1))**2d0)
 
+            !$acc loop seq
             do elem = elem_min, elem_max
                 angle_max = angle_half_aperture - (element_spacing_angle(ai) + angle_per_elem)*(elem - 1d0)
                 angle_min = angle_max - angle_per_elem
@@ -511,6 +549,7 @@ contains
             f = foc_length(ai)
             half_apert = aperture(ai)/2d0
 
+            !$acc loop seq
             do elem = elem_min, elem_max
                 angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(ai), kind(0d0)) + rotate_angle(ai)
 
@@ -541,66 +580,6 @@ contains
 
         end if
     end subroutine s_source_spatial_transducer_array
-
-    !> This subroutine calculates the speed of sound within the acoustic source module
-    !! @param q_cons_local Conserved quantities of the elements
-    !! @param q_prim_local Primitive quantity of the element
-    !! @param c Speed of sound
-    !! @param n_tait Gas constant (small gamma)
-    subroutine s_compute_speed_of_sound_acoustic(q_cons_local, q_prim_local, c, n_tait)
-        !$acc routine seq
-        real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_local
-        real(kind(0d0)), intent(in) :: q_prim_local
-        real(kind(0d0)), intent(out) :: c, n_tait
-
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
-        real(kind(0d0)) :: myRho, B_tait
-        integer :: q
-
-        myRho = 0d0
-        n_tait = 0d0
-        B_tait = 0d0
-
-        !$acc loop seq
-        do q = 1, num_fluids
-            myalpha_rho(q) = q_cons_local(q)
-            myalpha(q) = q_cons_local(advxb + q - 1)
-        end do
-
-        if (bubbles) then
-            if (mpp_lim .and. (num_fluids > 2)) then
-                !$acc loop seq
-                do q = 1, num_fluids
-                    myRho = myRho + myalpha_rho(q)
-                    n_tait = n_tait + myalpha(q)*gammas(q)
-                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                end do
-            elseif (num_fluids > 2) then
-                !$acc loop seq
-                do q = 1, num_fluids - 1
-                    myRho = myRho + myalpha_rho(q)
-                    n_tait = n_tait + myalpha(q)*gammas(q)
-                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                end do
-            else
-                myRho = myalpha_rho(1)
-                n_tait = gammas(1)
-                B_tait = pi_infs(1)
-            end if
-        else
-            !$acc loop seq
-            do q = 1, num_fluids
-                myRho = myRho + myalpha_rho(q)
-                n_tait = n_tait + myalpha(q)*gammas(q)
-                B_tait = B_tait + myalpha(q)*pi_infs(q)
-            end do
-        end if
-
-        n_tait = 1d0/n_tait + 1d0
-
-        c = dsqrt(n_tait*(q_prim_local + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
-
-    end subroutine s_compute_speed_of_sound_acoustic
 
     !> This function performs wavelength to frequency conversion
     !! @param freq_conv_flag Determines if frequency is given or wavelength
