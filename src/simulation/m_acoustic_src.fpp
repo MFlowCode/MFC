@@ -383,9 +383,7 @@ contains
     !! @param ai Acoustic source index
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios(1) Ratio of the x-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(2) Ratio of the y-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(3) Ratio of the z-component of the source term to the magnitude (for 3D)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
         !$acc routine seq
         integer, intent(in) :: j, k, l, ai
@@ -453,9 +451,7 @@ contains
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios(1) Ratio of the x-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(2) Ratio of the y-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(3) Ratio of the z-component of the source term to the magnitude (for 3D)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
         !$acc routine seq
         integer, intent(in) :: ai
@@ -501,9 +497,7 @@ contains
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
-    !! @param xyz_to_r_ratios(1) Ratio of the x-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(2) Ratio of the y-component of the source term to the magnitude (for 3D)
-    !! @param xyz_to_r_ratios(3) Ratio of the z-component of the source term to the magnitude (for 3D)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         !$acc routine seq
         integer, intent(in) :: ai

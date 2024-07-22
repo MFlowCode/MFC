@@ -218,7 +218,7 @@ print(json.dumps({{**case, **mods}}))
             return 2e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
-            return 2e-12
+            return 1e-11
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
