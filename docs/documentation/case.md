@@ -530,7 +530,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%foc_length`             | Real    | Transducer - Focal length of the transducer |
 | `acoustic(i)%%aperture`               | Real    | Transducer - Aperture of the transducer |
 | `acoustic(i)%%num_elements`           | Integer | Transducer array - Number of transducer elements in a transducer array |
-| `acoustic(i)%%element_on`             | Integer | Transducer array - The element number of the transducer array that is on |
+| `acoustic(i)%%element_on`             | Integer | Transducer array - Element number that is on (optional; default = 0 for all elements) |
 | `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
 | `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
 | `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
@@ -541,7 +541,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `num_source` defines the total number of source planes by an integer.
 
-- `%%support` specifies the choice of the geometry of acoustic source distribution. See table [Acoustic Support](#acoustic-supports) for details.
+- `%%support` specifies the choice of the geometry of acoustic source distribution. See table [Acoustic Supports](#acoustic-supports) for details.
 
 - `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc). 
 
@@ -567,7 +567,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%num_elements` specifies the number of transducer elements in a transducer array. 
 
-- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1.
+- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1. If all elements are on, set `%%element_on` to 0.
 
 - `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radian. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
 
@@ -806,13 +806,18 @@ Each patch requires a different set of parameters, which are also listed in this
 
 Details of the required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
 The acoustic support number (`#`) corresponds to the acoustic support type `Acoustic(i)%%support`, where $i$ is the acoustic source index.
-For each `%%parameter`, prepend the parameter with `Acoustic(i)%`.
+For each `%%parameter`, prepend the parameter with `acoustic(i)%`.
 
-For all acoustic support types:
-- `%%npulse == 1 or 3` requires exactly one of `%%frequency` or `%%wavelength` to be set.
-- `%%npulse == 1 or 3` accepts `%%delay` as an optional parameter (default = 0).
-- `%%npulse == 2` requires exactly one of `%%gauss_sigma_time` or `%%gauss_sigma_space` to be set.
-- `%%npulse == 2` requires `%%delay` to be set.
+Additional requirements for all acoustic support types:
+- ``acoustic_source = 'T'`` must be used to activate the acoustic source module.
+
+- `num_source` must be set to the total number of acoustic sources.
+
+- `%%support` must be set to the acoustic support number listed in the table.
+
+- `%%npulse = 1 or 3` requires exactly one of `%%frequency` or `%%wavelength` to be set. It accepts `%%delay` as an optional parameter (default = 0).
+
+- `%%npulse = 2` requires exactly one of `%%gauss_sigma_time` or `%%gauss_sigma_space` to be set. It requires `%%delay` to be set.
 
 Description of the acoustic support types:
 - `%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `%%loc(1)` in 1D simulation. `%%dir > 0` specifies a rightward propagating wave, and `%%dir < 0` specifies a leftward propagating wave. `%%dir = 0` is not allowed.

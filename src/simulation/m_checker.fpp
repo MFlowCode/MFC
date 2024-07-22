@@ -175,7 +175,7 @@ contains
             call s_int_to_str(j, jStr)
             if (acoustic(j)%support == dflt_int) then
                 call s_mpi_abort('acoustic('//trim(jStr)//')%support must be '// &
-                                 'specified. Exiting ...')
+                                 'specified for acoustic_source. Exiting ...')
             end if
 
             if (n == 0) then ! 1D
@@ -295,12 +295,13 @@ contains
                     call s_mpi_abort('num_elements must be positive for '// &
                                      'acoustic(i)support = 9, 10, or 11. Exiting ...')
                 end if
-                if (acoustic(j)%element_on == dflt_int) then
-                    call s_mpi_abort('element_on must be specified for '// &
-                                     'acoustic(i)support = 9, 10, or 11. Exiting ...')
-                elseif (acoustic(j)%element_on < 0) then
-                    call s_mpi_abort('element_on must be non-negative for '// &
-                                     'acoustic(i)support = 9, 10, or 11. Exiting ...')
+                if (acoustic(j)%element_on /= dflt_int) then
+                    if (acoustic(j)%element_on < 0) then
+                        call s_mpi_abort('element_on must be non-negative. Exiting ...')
+                    elseif (acoustic(j)%element_on > acoustic(j)%num_elements) then
+                        call s_mpi_abort('element_on must be less than or equal '// &
+                                        'to num_elements. Exiting ...')
+                    end if
                 end if
             end if
 

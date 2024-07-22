@@ -301,7 +301,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.push('Transducer Array', {**transducer_params, 'acoustic(1)%num_elements': 4, 'acoustic(1)%element_spacing_angle': 0.05, 'acoustic(1)%element_on': 0})
             stack.push('support=9', {'acoustic(1)%support': 9})
-            cases.append(define_case_d(stack, 'All Elements', {'acoustic(1)%element_on': 0}))
+            cases.append(define_case_d(stack, 'All Elements', {}))
             cases.append(define_case_d(stack, 'One element', {'acoustic(1)%element_on': 1}))
             stack.pop()
             cases.append(define_case_d(stack, 'support=10', {'acoustic(1)%support': 10, 'cyl_coord': 'T', 'bc_y%beg': -2}))
@@ -322,7 +322,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.push('Transducer Array', {**transducer_params, 'acoustic(1)%num_elements': 6, 'acoustic(1)%element_polygon_ratio': 0.7})
             stack.push('support=11', {'acoustic(1)%support': 11})
-            cases.append(define_case_d(stack, 'All Elements', {'acoustic(1)%element_on': 0}))
+            cases.append(define_case_d(stack, 'All Elements', {}))
             cases.append(define_case_d(stack, 'One element', {'acoustic(1)%element_on': 1}))
             stack.pop()
             stack.pop()

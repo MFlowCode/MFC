@@ -597,7 +597,7 @@ contains
 
         ! Acoustic source
         acoustic_source = .false.
-        num_source = dflt_real
+        num_source = dflt_int
 
         ! Surface tension
         sigma = dflt_real

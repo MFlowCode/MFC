@@ -100,7 +100,11 @@ contains
             element_spacing_angle(i) = acoustic(i)%element_spacing_angle
             element_polygon_ratio(i) = acoustic(i)%element_polygon_ratio
             num_elements(i) = acoustic(i)%num_elements
-            element_on(i) = acoustic(i)%element_on
+            if (acoustic(i)%element_on == dflt_int) then
+                element_on(i) = 0
+            else
+                element_on(i) = acoustic(i)%element_on
+            end if
             if (f_is_default(acoustic(i)%rotate_angle)) then
                 rotate_angle(i) = 0d0
             else
