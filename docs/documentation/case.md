@@ -526,8 +526,9 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%gauss_sigma_time`       | Real    | Gaussian - Gaussian pulse time width in terms of sigma  (exclusive) |
 | `acoustic(i)%%gauss_sigma_dist`       | Real    | Gaussian - Gaussian pulse spatial width in terms of sigma (exclusive) |
 | `acoustic(i)%%delay`                  | Real    | Time delay of the acoustic wave (optional for `%%pulse = 1` or `3`; default = 0) |
-| `acoustic(i)%%dir`                    | Real    | Planer - Direction of acoustic propagation	|
-| `acoustic(i)%%length`                 | Real    | Planer - Spatial pulse length |
+| `acoustic(i)%%dir`                    | Real    | Planer - Direction of acoustic propagation |
+| `acoustic(i)%%length`                 | Real    | 2D/3D Planer - Spatial pulse length |
+| `acoustic(i)%%height`                 | Real    | 3D Planer - Spatial pulse height |
 | `acoustic(i)%%foc_length`             | Real    | Transducer - Focal length of the transducer |
 | `acoustic(i)%%aperture`               | Real    | Transducer - Aperture of the transducer |
 | `acoustic(i)%%num_elements`           | Integer | Transducer array - Number of transducer elements in a transducer array |
@@ -562,7 +563,9 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%dir` specifies the direction of acoustic wave propagation for planar waves. The direction is defined by the angle in degrees from the x-axis in the x-y plane. It applies to both 2D and 3D simulation of planar waves (support is infinite in z-direction for 3D).
 
-- `%%length` specifies the spatial length of the planar wave. It is the length of the source plane perpendicular to the direction of wave propagation.
+- `%%length` specifies the spatial length of the 2D or 3D planar wave. It is the length of the source plane perpendicular to the direction of wave propagation.
+
+- `%%height` specifies the spatial height of the planar wave. Since `%%dir` is in the x-y plane, the height is perpendicular to the direction of wave propagation.
 
 - `%%foc_length` specifies the focal length of the transducer for transducer waves. It is the distance from the transducer to the focal point.
 
@@ -799,7 +802,7 @@ Each patch requires a different set of parameters, which are also listed in this
 | ---: | :----:                       | :---:     | :---                                                                                    |
 |  1   | Planar source                | 1D        | `%%loc(1)`, `%%pulse`, `%%npulse`, `%%mag`, and `%%dir`                                 |
 |  2   | Planar source                | 2D        | #1 requirements, `%%loc(2)` and `%%length`                                              |
-|  3   | Planar source infinite in z  | 3D        | #2 requirements                                                                         |
+|  3   | Planar source                | 3D        | #2 requirements and `%%height`                                                          |
 |  5   | Cylindrical Transducer       | 2D        | `%%loc(1)`, `%%loc(2)`, `%%pulse`, `%%npulse`, `%%mag`, `%%foc_length`, `%%aperture`    |
 |  6   | Spherical Transducer         | 2D-Axisym | #5 requirements                                                                         |
 |  7   | Spherical Transducer         | 3D        | #5 requirements and `%%loc(3)`                                                          |

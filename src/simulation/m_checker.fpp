@@ -275,7 +275,26 @@ contains
                                  'allowed for pulse = 3 (square wave). Exiting ...')
             end if
 
-            if (any(acoustic(j)%support == (/5, 6, 7, 9, 10, 11/))) then ! Transducer or Transducer array
+            if (acoustic(j)%support == 2 .or. acoustic(j)%support == 3) then ! 2D/3D Planar
+                if (f_is_default(acoustic(j)%length)) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%length must be '// &
+                                     'specified for support = 2 or 3. Exiting ...')
+                elseif (acoustic(j)%length <= 0d0) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%length must be '// &
+                                     'positive. Exiting ...')
+                end if
+            end if
+            if (acoustic(j)%support == 3) then ! 3D Planar
+                if (f_is_default(acoustic(j)%height)) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%height must be '// &
+                                     'specified for support = 3. Exiting ...')
+                elseif (acoustic(j)%height <= 0d0) then
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%height must be '// &
+                                     'positive. Exiting ...')
+                end if
+            end if
+
+            if (acoustic(j)%support >= 5) then ! Transducer or Transducer array
                 if (f_is_default(acoustic(j)%foc_length)) then
                     call s_mpi_abort('acoustic('//trim(jStr)//')%foc_length '// &
                                      'must be specified for support '// &

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
+# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_acoustic_T
 # Additional Benchmarked Features
 # - viscosity enabled
 # - weno_Re_flux : T
 # - weno_order : 5
 # - bubbles : T
 # - bubble_model : 3
-# - monopole : T
+# - acoustic_source : T
 
 import json, math, argparse
 
@@ -228,17 +228,18 @@ print(json.dumps({
     # ==========================================================
     
     # Acoustic source ==========================================
-    'Monopole'                     : 'T',
-    'num_mono'                     : 1,
-    'Mono(1)%support'              : 3,
-    'Mono(1)%loc(1)'               : -5.E-03/x0,
-    'Mono(1)%loc(2)'               : 0.,
-    'Mono(1)%length'               : 1.0/x0,
-    'Mono(1)%npulse'               : 1,
-    'Mono(1)%dir'                  : 1.,
-    'Mono(1)%pulse'                : 1,
-    'Mono(1)%mag'                  : pa,
-    'Mono(1)%length'               : (1./(300000.))*cact/x0,
+    'acoustic_source'              : 'T',
+    'num_source'                   : 1,
+    'acoustic(1)%support'          : 3,
+    'acoustic(1)%loc(1)'           : -5.E-03/x0,
+    'acoustic(1)%loc(2)'           : 0.,
+    'acoustic(1)%length'           : 1.0/x0,
+    'acoustic(1)%height'           : 1.0/x0,
+    'acoustic(1)%npulse'           : 1,
+    'acoustic(1)%dir'              : 1.,
+    'acoustic(1)%pulse'            : 1,
+    'acoustic(1)%mag'              : pa,
+    'acoustic(1)%wavelength'       : (1./(300000.))*cact/x0,
     # ==========================================================
 }))
 
