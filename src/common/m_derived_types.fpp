@@ -261,8 +261,9 @@ module m_derived_types
         logical :: dipole !< Whether the source is a dipole or monopole
         real(kind(0d0)), dimension(3) :: loc !< Physical location of acoustic source
         real(kind(0d0)) :: mag !< Acoustic pulse magnitude
-        real(kind(0d0)) :: length !< Length of line source
-        real(kind(0d0)) :: wavelength !< Length of line source
+        real(kind(0d0)) :: length !< Length of planar source (2D/3D)
+        real(kind(0d0)) :: height !< Height of planar source (3D)
+        real(kind(0d0)) :: wavelength !< Wave length of pulse
         real(kind(0d0)) :: frequency !< Frequency of pulse
         real(kind(0d0)) :: gauss_sigma_dist !< sigma of Gaussian pulse multiplied by speed of sound
         real(kind(0d0)) :: gauss_sigma_time !< sigma of Gaussian pulse

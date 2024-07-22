@@ -623,6 +623,7 @@ contains
             end do
             acoustic(j)%mag = dflt_real
             acoustic(j)%length = dflt_real
+            acoustic(j)%height = dflt_real
             acoustic(j)%wavelength = dflt_real
             acoustic(j)%frequency = dflt_real
             acoustic(j)%gauss_sigma_dist = dflt_real

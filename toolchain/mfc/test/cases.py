@@ -317,7 +317,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%loc(3)': 0.5, 'acoustic(1)%wavelength': 0.02})
 
             stack.push('Planar', {})
-            stack.push('support=3', {'acoustic(1)%support': 3})
+            stack.push('support=3', {'acoustic(1)%support': 3, 'acoustic(1)%height': 1e5})
             cases.append(define_case_d(stack, '', {}))
             cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%dipole': 'T'}))
             stack.pop()
@@ -360,7 +360,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.push("", {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%support': 2})
 
             if len(dimInfo[0]) >= 3:
-                stack.push("", {'acoustic(1)%support': 3})
+                stack.push("", {'acoustic(1)%support': 3, 'acoustic(1)%height': 1e5})
 
             for polytropic in ['T', 'F']:
                 stack.push("Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})

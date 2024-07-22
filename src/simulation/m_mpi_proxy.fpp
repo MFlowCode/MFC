@@ -252,7 +252,8 @@ contains
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'mag', 'length', 'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
+            #:for VAR in [ 'mag', 'length', 'height', &
+                'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
                 'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
                 'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

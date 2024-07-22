@@ -264,7 +264,7 @@ for f_id in range(1,10+1):
 
         SIMULATION[f"acoustic({mono_id})%dipole"] = ParamType.LOG
 
-        for real_attr in ["mag", "length", "wavelength", "frequency",
+        for real_attr in ["mag", "length", "height", "wavelength", "frequency",
                           "gauss_sigma_dist", "gauss_sigma_time", "npulse",
                           "dir", "delay", "foc_length", "aperture",
                           "element_spacing_angle", "element_polygon_ratio",

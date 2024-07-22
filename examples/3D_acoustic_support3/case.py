@@ -81,6 +81,7 @@ print(json.dumps({
     'acoustic(1)%loc(2)'           : 0.0005,
     'acoustic(1)%dir'              : math.pi/4,
     'acoustic(1)%length'           : 0.0005,
+    'acoustic(1)%height'           : 0.0005,
     'acoustic(1)%pulse'            : 2,
     'acoustic(1)%npulse'           : 1,
     'acoustic(1)%mag'              : 1.,

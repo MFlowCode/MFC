@@ -31,8 +31,8 @@ module m_acoustic_src
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_acoustic)
     !$acc declare link(loc_acoustic)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
-    !$acc declare link(mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    !$acc declare link(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
     !$acc declare link(foc_length, aperture)
@@ -59,8 +59,8 @@ module m_acoustic_src
     real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_acoustic
     !$acc declare create(loc_acoustic)
 
-    real(kind(0d0)), allocatable, dimension(:) :: mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    !$acc declare create(mag, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    real(kind(0d0)), allocatable, dimension(:) :: mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
+    !$acc declare create(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
 
     real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
     !$acc declare create(foc_length, aperture)
@@ -86,7 +86,7 @@ contains
     subroutine s_initialize_acoustic_src_module
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
+        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
         do i = 1, num_source
             do j = 1, 3
                 loc_acoustic(j, i) = acoustic(i)%loc(j)
@@ -95,6 +95,7 @@ contains
             dipole(i) = acoustic(i)%dipole
             support(i) = acoustic(i)%support
             length(i) = acoustic(i)%length
+            height(i) = acoustic(i)%height
             wavelength(i) = acoustic(i)%wavelength
             frequency(i) = acoustic(i)%frequency
             gauss_sigma_dist(i) = acoustic(i)%gauss_sigma_dist
@@ -123,7 +124,7 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_acoustic, mag, dipole, support, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
+        !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
 
         @:ALLOCATE_GLOBAL(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
@@ -428,7 +429,7 @@ contains
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source
 
-        real(kind(0d0)) :: dist, rxnew, rynew
+        real(kind(0d0)) :: dist
 
         source = 0d0
 
@@ -439,7 +440,9 @@ contains
             ! If we let unit vector e = (cos(dir), sin(dir)),
             dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai)) ! dot(r,e)
             if ((r(1) - dist*cos(dir(ai)))**2d0 + (r(2) - dist*sin(dir(ai)))**2d0 < 0.25d0*length(ai)**2d0) then ! |r - dist*e| < length/2
-                source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+                if (support(ai) /= 3 .or. abs(r(3)) < 0.25d0*height(ai)) then ! additional height constraint for 3D
+                    source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)
+                end if
             end if
         end if
     end subroutine s_source_spatial_planar
