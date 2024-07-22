@@ -191,7 +191,7 @@ contains
                             q_cons_local(q) = q_cons_vf(q)%sf(j, k, l)
                         end do
                         q_prim_local = q_prim_vf(E_idx)%sf(j, k, l)
-                        call s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, small_gamma)
+                        call s_compute_speed_of_sound_acoustic(q_cons_local, q_prim_local, c, small_gamma)
 
                         ! Wavelength to frequency conversion
                         if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
@@ -228,7 +228,6 @@ contains
                             mass_src_diff = mom_src_diff/c
                         else
                             call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                            call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                             mass_src_diff = source_temporal*source_spatial
                         end if
                         mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
@@ -530,7 +529,7 @@ contains
     !! @param q_prim_local Primitive quantity of the element
     !! @param c Speed of sound
     !! @param n_tait Gas constant (small gamma)
-    subroutine s_compute_speed_of_sound_acoustic_src(q_cons_local, q_prim_local, c, n_tait)
+    subroutine s_compute_speed_of_sound_acoustic(q_cons_local, q_prim_local, c, n_tait)
         !$acc routine seq
         real(kind(0d0)), dimension(sys_size), intent(in) :: q_cons_local
         real(kind(0d0)), intent(in) :: q_prim_local
@@ -583,7 +582,7 @@ contains
 
         c = dsqrt(n_tait*(q_prim_local + ((n_tait - 1d0)/n_tait)*B_tait)/myRho)
 
-    end subroutine s_compute_speed_of_sound_acoustic_src
+    end subroutine s_compute_speed_of_sound_acoustic
 
     !> This function performs wavelength to frequency conversion
     !! @param freq_conv_flag Determines if frequency is given or wavelength
