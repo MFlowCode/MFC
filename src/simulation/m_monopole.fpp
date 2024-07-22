@@ -25,6 +25,9 @@ module m_acoustic_src
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
     !$acc declare link(pulse, support)
 
+    @:CRAY_DECLARE_GLOBAL(logical, dimension(:), dipole)
+    !$acc declare link(dipole)
+
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_acoustic)
     !$acc declare link(loc_acoustic)
 
@@ -49,6 +52,9 @@ module m_acoustic_src
 #else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
+
+    logical, allocatable, dimension(:) :: dipole
+    !$acc declare create(dipole)
 
     real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_acoustic
     !$acc declare create(loc_acoustic)
@@ -80,12 +86,13 @@ contains
     subroutine s_initialize_acoustic_src_module
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), support(1:num_source), length(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
+        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
         do i = 1, num_source
             do j = 1, 3
                 loc_acoustic(j, i) = acoustic(i)%loc(j)
             end do
             mag(i) = acoustic(i)%mag
+            dipole(i) = acoustic(i)%dipole
             support(i) = acoustic(i)%support
             length(i) = acoustic(i)%length
             wavelength(i) = acoustic(i)%wavelength
@@ -116,7 +123,7 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_acoustic, mag, support, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
+        !$acc update device(loc_acoustic, mag, dipole, support, length, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
 
         @:ALLOCATE_GLOBAL(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
@@ -206,6 +213,12 @@ contains
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         mom_src_diff = source_temporal*source_spatial
 
+                        if (dipole(ai)) then
+                            mass_src_diff = mom_src_diff/c
+                            mom_src_diff = 0d0
+                            cycle
+                        end if
+
                         if (n == 0) then ! 1D
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(ai)) ! Left or right-going wave
 
@@ -230,7 +243,8 @@ contains
                         ! Update mass source term
                         if (support(ai) < 5) then ! Planar
                             mass_src_diff = mom_src_diff/c
-                        else
+                        else ! Spherical or cylindrical support
+                            ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
                             call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
                             mass_src_diff = source_temporal*source_spatial
                         end if

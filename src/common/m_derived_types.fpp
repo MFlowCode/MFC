@@ -258,6 +258,7 @@ module m_derived_types
     type acoustic_parameters
         integer :: pulse !< Type of pulse
         integer :: support !< Type of support
+        logical :: dipole !< Whether the source is a dipole or monopole
         real(kind(0d0)), dimension(3) :: loc !< Physical location of acoustic source
         real(kind(0d0)) :: mag !< Acoustic pulse magnitude
         real(kind(0d0)) :: length !< Length of line source

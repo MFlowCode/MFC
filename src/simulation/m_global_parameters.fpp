@@ -617,6 +617,7 @@ contains
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int
             acoustic(j)%support = dflt_int
+            acoustic(j)%dipole = .false.
             do i = 1, 3
                 acoustic(j)%loc(i) = dflt_real
             end do

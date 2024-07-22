@@ -281,13 +281,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('Gaussian', {'acoustic(1)%pulse': 2, 'acoustic(1)%delay': 0.02})
             cases.append(define_case_d(stack, 'Sigma Time', {'acoustic(1)%gauss_sigma_time': 0.01}))
             cases.append(define_case_d(stack, 'Sigma Dist', {'acoustic(1)%gauss_sigma_dist': 0.01}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%gauss_sigma_dist': 0.01, 'acoustic(1)%dipole': 'T'}))
             stack.pop()
 
         elif len(dimInfo[0]) == 2:
             stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%wavelength': 0.02})
 
             stack.push('Planar', {})
-            cases.append(define_case_d(stack, 'support=2', {'acoustic(1)%support': 2}))
+            stack.push('support=2', {'acoustic(1)%support': 2})
+            cases.append(define_case_d(stack, '', {}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%dipole': 'T'}))
+            stack.pop()
             stack.pop()
 
             stack.push('Transducer', transducer_params)
@@ -313,7 +317,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%loc(3)': 0.5, 'acoustic(1)%wavelength': 0.02})
 
             stack.push('Planar', {})
-            cases.append(define_case_d(stack, 'support=3', {'acoustic(1)%support': 3}))
+            stack.push('support=3', {'acoustic(1)%support': 3})
+            cases.append(define_case_d(stack, '', {}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%dipole': 'T'}))
+            stack.pop()
             stack.pop()
 
             stack.push('Transducer', transducer_params)
