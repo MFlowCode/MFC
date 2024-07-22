@@ -233,93 +233,106 @@ contains
                 call s_mpi_abort('acoustic('//trim(jStr)//')%pulse must be '// &
                                  'specified. Exiting ...')
             elseif (.not. any(acoustic(j)%pulse == (/1, 2, 3/))) then
-                call s_mpi_abort('Only acoustic(i)npulse = 1, 2, or 3 is '// &
+                call s_mpi_abort('Only acoustic('//trim(jStr)//')%npulse = 1, 2, or 3 is '// &
                                  'allowed. Exiting ...')
             end if
             if (any(acoustic(j)%pulse == (/1, 3/)) .and. &
                 .not. xor(f_is_default(acoustic(j)%frequency), f_is_default(acoustic(j)%wavelength))) then
-                call s_mpi_abort('One and only one of acoustic(i)frequency '// &
-                                 'or acoustic(i)wavelength must be specified '// &
-                                 'for acoustic(i)pulse = 1 or 3. Exiting ...')
+                call s_mpi_abort('One and only one of acoustic('//trim(jStr)//')%frequency '// &
+                                 'or acoustic('//trim(jStr)//')%wavelength must be specified '// &
+                                 'for pulse = 1 or 3. Exiting ...')
             elseif (acoustic(j)%pulse == 2 .and. &
                     .not. xor(f_is_default(acoustic(j)%gauss_sigma_time), f_is_default(acoustic(j)%gauss_sigma_dist))) then
-                call s_mpi_abort('One and only one of acoustic(i)gauss_sigma_time '// &
-                                 'or acoustic(i)gauss_sigma_dist must be specified '// &
-                                 'for acoustic(i)pulse = 2. Exiting ...')
+                call s_mpi_abort('One and only one of acoustic('//trim(jStr)//')%gauss_sigma_time '// &
+                                 'or acoustic('//trim(jStr)//')%gauss_sigma_dist must be specified '// &
+                                 'for pulse = 2. Exiting ...')
             end if
             if (f_is_default(acoustic(j)%npulse)) then
                 call s_mpi_abort('acoustic('//trim(jStr)//')%npulse must be '// &
                                  'specified. Exiting ...')
             elseif (acoustic(j)%support >= 5 .and. (.not. f_is_integer(acoustic(j)%npulse))) then
-                call s_mpi_abort('acoustic(i)npulse must be an integer for '// &
-                                 'acoustic(i)support >= 5 (Cylindrical or '// &
-                                 'Spherical support). Exiting ...')
+                call s_mpi_abort('acoustic('//trim(jStr)//')%npulse '// &
+                                 'must be an integer for support >= 5 '// &
+                                 '(non-planar supports). Exiting ...')
+            elseif (acoustic(j)%npulse >= 5 .and. acoustic(j)%dipole) then
+                call s_mpi_abort('acoustic('//trim(jStr)//')%dipole is not '// &
+                                 'supported for support >= 5 '// &
+                                 '(non-planar supports). Exiting ...')
             elseif (acoustic(j)%support < 5 .and. f_is_default(acoustic(j)%dir)) then
                 call s_mpi_abort('acoustic('//trim(jStr)//')%dir must be '// &
-                                 'specified for planer support. Exiting ...')
+                                 'specified for support < 5 (planer support). '// &
+                                 'Exiting ...')
             elseif (acoustic(j)%support == 1 .and. f_approx_equal(acoustic(j)%dir, 0d0)) then
-                call s_mpi_abort('acoustic(i)dir must be non-zero for '// &
-                                 'acoustic(i)support = 1. Exiting ...')
+                call s_mpi_abort('acoustic('//trim(jStr)//')dir must be non-zero '// &
+                                 'for support = 1. Exiting ...')
             elseif (acoustic(j)%pulse == 2 .and. f_is_default(acoustic(j)%delay)) then
                 call s_mpi_abort('acoustic('//trim(jStr)//')%delay must be '// &
-                                 'specified for acoustic(i)pulse = 2 (Gaussian). '// &
+                                 'specified for pulse = 2 (Gaussian). '// &
                                  'Exiting ...')
             elseif (acoustic(j)%pulse == 3 .and. acoustic(j)%support >= 5) then
-                call s_mpi_abort('acoustic(i)support >= 5 (Cylindrical or '// &
-                                 'Spherical support) is not allowed for '// &
-                                 'acoustic(i)pulse = 3 (square wave). Exiting ...')
+                call s_mpi_abort('acoustic('//trim(jStr)//')%support >= 5 '// &
+                                 '(Cylindrical or Spherical support) is not '// &
+                                 'allowed for pulse = 3 (square wave). Exiting ...')
             end if
 
             if (any(acoustic(j)%support == (/5, 6, 7, 9, 10, 11/))) then ! Transducer or Transducer array
                 if (f_is_default(acoustic(j)%foc_length)) then
-                    call s_mpi_abort('foc_length must be specified for '// &
-                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%foc_length '// &
+                                     'must be specified for support '// &
+                                     '= 5, 6, 7, 9, 10, or 11. Exiting ...')
                 elseif (acoustic(j)%foc_length <= 0d0) then
-                    call s_mpi_abort('foc_length must be positive for '// &
-                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%foc_length '// &
+                                     'must be positive for support '// &
+                                     '= 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
                 if (f_is_default(acoustic(j)%aperture)) then
-                    call s_mpi_abort('aperture must be specified for '// &
-                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%aperture '// &
+                                     'must be specified for support '// &
+                                     '= 5, 6, 7, 9, 10, or 11. Exiting ...')
                 elseif (acoustic(j)%aperture <= 0d0) then
-                    call s_mpi_abort('aperture must be positive for '// &
-                                     'acoustic(i)support = 5, 6, 7, 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%aperture '// &
+                                     'must be positive for support '// &
+                                     '= 5, 6, 7, 9, 10, or 11. Exiting ...')
                 end if
             end if
 
             if (any(acoustic(j)%support == (/9, 10, 11/))) then ! Transducer array
                 if (acoustic(j)%num_elements == dflt_int) then
-                    call s_mpi_abort('num_elements must be specified for '// &
-                                     'acoustic(i)support = 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%num_elements '// &
+                                     'must be specified for support '// &
+                                     '= 9, 10, or 11. Exiting ...')
                 elseif (acoustic(j)%num_elements <= 0) then
-                    call s_mpi_abort('num_elements must be positive for '// &
-                                     'acoustic(i)support = 9, 10, or 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%num_elements '// &
+                                     'must be positive for support '// &
+                                     '= 9, 10, or 11. Exiting ...')
                 end if
                 if (acoustic(j)%element_on /= dflt_int) then
                     if (acoustic(j)%element_on < 0) then
-                        call s_mpi_abort('element_on must be non-negative. Exiting ...')
+                        call s_mpi_abort('acoustic('//trim(jStr)//')%element_on '// &
+                                         'must be non-negative. Exiting ...')
                     elseif (acoustic(j)%element_on > acoustic(j)%num_elements) then
-                        call s_mpi_abort('element_on must be less than or equal '// &
-                                        'to num_elements. Exiting ...')
+                        call s_mpi_abort('acoustic('//trim(jStr)//')%element_on '// &
+                                         'must be less than or equal '// &
+                                         'to num_elements. Exiting ...')
                     end if
                 end if
             end if
 
             if (any(acoustic(j)%support == (/9, 10/))) then ! 2D transducer array
                 if (f_is_default(acoustic(j)%element_spacing_angle)) then
-                    call s_mpi_abort('element_spacing_angle must be specified for '// &
-                                     'acoustic(i)support = 9 or 10. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%element_spacing_angle '// &
+                                     'must be specified for support = 9 or 10. Exiting ...')
                 elseif (acoustic(j)%element_spacing_angle < 0d0) then
-                    call s_mpi_abort('element_spacing_angle must be non-negative for '// &
-                                     'acoustic(i)support = 9 or 10. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%element_spacing_angle '// &
+                                     'must be non-negative for support = 9 or 10. Exiting ...')
                 end if
             elseif (acoustic(j)%support == 11) then ! 3D transducer array
                 if (f_is_default(acoustic(j)%element_polygon_ratio)) then
-                    call s_mpi_abort('element_polygon_ratio must be specified for '// &
-                                     'acoustic(i)support = 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%element_polygon_ratio '// &
+                                     'must be specified for support = 11. Exiting ...')
                 elseif (acoustic(j)%element_polygon_ratio <= 0d0) then
-                    call s_mpi_abort('element_polygon_ratio must be positive for '// &
-                                     'acoustic(i)support = 11. Exiting ...')
+                    call s_mpi_abort('acoustic('//trim(jStr)//')%element_polygon_ratio '// &
+                                     'must be positive for support = 11. Exiting ...')
                 end if
             end if
         end do

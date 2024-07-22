@@ -213,9 +213,9 @@ contains
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         mom_src_diff = source_temporal*source_spatial
 
-                        if (dipole(ai)) then
-                            mass_src_diff = mom_src_diff/c
-                            mom_src_diff = 0d0
+                        if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
+                            mass_src(j, k, l) = mass_src(j, k, l) + 2d0*mom_src_diff/c
+                            if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2d0*mom_src_diff*c/(small_gamma - 1d0)
                             cycle
                         end if
 
@@ -431,7 +431,7 @@ contains
         if (support(ai) == 5 .or. support(ai) == 6) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2d0)/(foc_length(ai)))
-            
+
             if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(ai)) then
                 dist = foc_length(ai) - dsqrt(r(2)**2d0 + (foc_length(ai) - r(1))**2d0)
                 source = 1d0/(dsqrt(2d0*pi)*sig/2d0)*dexp(-0.5d0*(dist/(sig/2d0))**2d0)

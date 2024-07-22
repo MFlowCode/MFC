@@ -515,7 +515,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | ---:                                  | :----:  | :--- |
 | `acoustic_source`                     | Logical | Acoustic source module activation |
 | `num_source`                          | Integer | Number of acoustic sources |
-| `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source | 
+| `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source |
+| `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false for monopole) |
 | `acoustic(i)%%loc(j)`                 | Real    | $j$-th coordinate of the point that defines the acoustic source location |
 | `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
 | `acoustic(i)%%npulse`                 | Real    | Number of pulse cycles |
@@ -542,6 +543,8 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 - `num_source` defines the total number of source planes by an integer.
 
 - `%%support` specifies the choice of the geometry of acoustic source distribution. See table [Acoustic Supports](#acoustic-supports) for details.
+
+- `%%dipole` changes the default monopole (one-sided) source to a dipole source. It is only available for planar waves.
 
 - `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc). 
 
@@ -814,6 +817,8 @@ Additional requirements for all acoustic support types:
 - `num_source` must be set to the total number of acoustic sources.
 
 - `%%support` must be set to the acoustic support number listed in the table.
+
+- `%%dipole` is only supported for planar sources.
 
 - `%%npulse = 1 or 3` requires exactly one of `%%frequency` or `%%wavelength` to be set. It accepts `%%delay` as an optional parameter (default = 0).
 
