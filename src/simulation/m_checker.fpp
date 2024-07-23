@@ -237,12 +237,12 @@ contains
                                  'allowed. Exiting ...')
             end if
             if (any(acoustic(j)%pulse == (/1, 3/)) .and. &
-                .not. xor(f_is_default(acoustic(j)%frequency), f_is_default(acoustic(j)%wavelength))) then
+                (f_is_default(acoustic(j)%frequency) .eqv. f_is_default(acoustic(j)%wavelength))) then ! XNOR
                 call s_mpi_abort('One and only one of acoustic('//trim(jStr)//')%frequency '// &
                                  'or acoustic('//trim(jStr)//')%wavelength must be specified '// &
                                  'for pulse = 1 or 3. Exiting ...')
             elseif (acoustic(j)%pulse == 2 .and. &
-                    .not. xor(f_is_default(acoustic(j)%gauss_sigma_time), f_is_default(acoustic(j)%gauss_sigma_dist))) then
+                    (f_is_default(acoustic(j)%gauss_sigma_time) .eqv. f_is_default(acoustic(j)%gauss_sigma_dist))) then ! XNOR
                 call s_mpi_abort('One and only one of acoustic('//trim(jStr)//')%gauss_sigma_time '// &
                                  'or acoustic('//trim(jStr)//')%gauss_sigma_dist must be specified '// &
                                  'for pulse = 2. Exiting ...')
