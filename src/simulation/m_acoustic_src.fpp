@@ -369,7 +369,8 @@ contains
         elseif (pulse(ai) == 3) then ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
-            source = mag(ai)*sign(1d0, mod((sim_time - delay(ai))*frequency_local, 1d0) - 0.5d0)
+            source = -mag(ai)*sign(1d0, mod((sim_time - delay(ai))*frequency_local, 1d0) - 0.5d0)
+            ! -mag(ai) so it is positive for the first half of the period
 
         end if
     end subroutine s_source_temporal
