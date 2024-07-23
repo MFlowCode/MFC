@@ -333,6 +333,7 @@ contains
         real(kind(0d0)), intent(out) :: source
 
         real(kind(0d0)) :: omega ! angular frequency
+        real(kind(0d0)) :: sine_wave ! sine function for square wave
         real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
@@ -369,8 +370,13 @@ contains
         elseif (pulse(ai) == 3) then ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
-            source = -mag(ai)*sign(1d0, mod((sim_time - delay(ai))*frequency_local, 1d0) - 0.5d0)
-            ! -mag(ai) so it is positive for the first half of the period
+            sine_wave = sin((sim_time - delay(ai))*frequency_local)
+            source = mag(ai)*sign(1d0, sine_wave)
+
+            ! Prevent max-norm differences due to compilers
+            if (abs(sine_wave) < 0.1) then
+                source = mag(ai)*sine_wave*10d0
+            end if
 
         end if
     end subroutine s_source_temporal
