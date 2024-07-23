@@ -1,9 +1,42 @@
-This file was created on 2024-07-22 23:42:07.111745.
+This file was created on 2024-07-23 13:11:25.214063.
 
 mfc.sh:
 
     Invocation: test -f 2F58A83F -t 2DE548B7 --generate -j 4
     Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.22.1 on GRAM
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 pre_process:
 
@@ -16,6 +49,39 @@ pre_process:
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.22.1 on GRAM
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -71,72 +137,6 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.22.1 on GRAM
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.22.1 on GRAM
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_PR/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -155,7 +155,7 @@ CPU:
     Core(s) per socket:                 8
     Socket(s):                          1
     Stepping:                           2
-    BogoMIPS:                           4377.59
+    BogoMIPS:                           4377.60
     Flags:                              fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid pni pclmulqdq vmx ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni umip waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l1d arch_capabilities
     Virtualization:                     VT-x
     Hypervisor vendor:                  Microsoft

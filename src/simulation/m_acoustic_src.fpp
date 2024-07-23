@@ -374,9 +374,9 @@ contains
             sine_wave = sin((sim_time - delay(ai))*omega)
             source = mag(ai)*sign(1d0, sine_wave)
 
-            ! Prevent max-norm differences due to compilers
-            if (abs(sine_wave) < 0.1) then
-                source = mag(ai)*sine_wave*10d0
+            ! Prevent max-norm differences due to compilers to pass CI
+            if (abs(sine_wave) < 1d-2) then
+                source = mag(ai)*sine_wave*1d2
             end if
 
         end if
