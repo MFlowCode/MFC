@@ -6,7 +6,7 @@ goto label_windows
 
 :label_windows
 
-if not exist "%cd%\toolchain\mfc.py" (
+if not exist "%cd%\toolchain\main.py" (
   echo.
   echo ^[mfc.bat^] You must call this script from within MFC's root folder
   echo.
@@ -40,7 +40,7 @@ if %errorlevel% neq 0 (
     copy "%cd%\toolchain\requirements.txt" "%cd%\build" 2> NUL
 )
 
-python3 "%cd%\toolchain\mfc.py" %*
+python3 "%cd%\toolchain\main.py" %*
 set main_py_err=%errorlevel%
 
 call "%cd%\build\venv\Scripts\deactivate.bat"
