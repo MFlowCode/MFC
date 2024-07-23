@@ -372,6 +372,11 @@ contains
             omega = 2d0*pi*frequency_local
             source = mag(ai)*sign(1d0, sin((sim_time - delay(ai))*omega))
 
+            ! Avoid difference in compiler implementations
+            if (abs(sin((sim_time - delay(ai))*omega)) < 1d-12) then
+                source = 0d0
+            end if
+
         end if
     end subroutine s_source_temporal
 
