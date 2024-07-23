@@ -1,4 +1,4 @@
-This file was created on 2024-07-22 23:32:05.605350.
+This file was created on 2024-07-22 23:42:05.597167.
 
 mfc.sh:
 
@@ -38,7 +38,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -49,8 +49,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -71,7 +71,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
@@ -82,8 +82,8 @@ syscheck:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

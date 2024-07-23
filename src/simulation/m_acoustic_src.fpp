@@ -370,7 +370,8 @@ contains
         elseif (pulse(ai) == 3) then ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
-            sine_wave = sin((sim_time - delay(ai))*frequency_local)
+            omega = 2d0*pi*frequency_local
+            sine_wave = sin((sim_time - delay(ai))*omega)
             source = mag(ai)*sign(1d0, sine_wave)
 
             ! Prevent max-norm differences due to compilers
