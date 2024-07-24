@@ -1,11 +1,11 @@
-This file was created on 2024-07-14 17:42:23.258969.
+This file was created on 2024-07-24 16:33:34.651162.
 
 mfc.sh:
 
-    Invocation: test -o whale_bubble_annulus --generate
+    Invocation: test -o Example -a -r --generate -j 8
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -14,8 +14,8 @@ simulation:
         C       : GNU v13.1.0 (/usr/bin/cc)
         Fortran : GNU v13.1.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -31,9 +31,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -64,14 +64,14 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -80,8 +80,8 @@ pre_process:
         C       : GNU v13.1.0 (/usr/bin/cc)
         Fortran : GNU v13.1.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -97,9 +97,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -130,9 +130,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

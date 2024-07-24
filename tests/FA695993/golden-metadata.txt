@@ -1,9 +1,9 @@
-This file was created on 2024-07-14 17:13:49.642576.
+This file was created on 2024-07-24 15:51:08.512691.
 
 mfc.sh:
 
-    Invocation: test -o Example -r --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
+    Invocation: test -o 1D qbmm -a --generate
+    Lock:       mpi=No & gpu=No & debug=Yes & gcov=No & unified=No
 
 pre_process:
 
@@ -21,19 +21,19 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -54,19 +54,19 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -87,19 +87,19 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -120,19 +120,19 @@ post_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

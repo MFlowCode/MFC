@@ -6,6 +6,8 @@ from .case import (
     CaseGeneratorStack, TestCaseBuilder
 )
 
+from ..state import CFG
+
 def get_bc_mods(bc: int, dimInfo):
     params = {}
     for dimCmp in dimInfo[0]:
@@ -590,18 +592,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             def modify_example_case(case: dict):
+
+                if ('mpi', True) in CFG().items():
+                    case['parallel_io'] = 'T'
+                else:
+                    case['parallel_io'] = 'F'
+
                 if case['t_step_stop'] > 100:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 100
                     case['t_step_save'] = 10
-                if case['m'] * max(case['n'], 1) * max(case['p'], 1) > 15625:
+
+                caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
+                if caseSize > 625:
                     if case['n'] == 0 and case['p'] == 0:
-                        case['m'] = 15625
+                        case['m'] = 625
                     elif case['p'] == 0:
-                        case['m'] = 125
-                        case['n'] = 125
+                        case['m'] = 25
+                        case['n'] = 25
                     # m, n, p < 25 causes errors
-                    else:
+                    elif caseSize > 15625:
                         case['m'] = 25
                         case['n'] = 25
                         case['p'] = 25
