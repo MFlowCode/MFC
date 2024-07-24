@@ -138,7 +138,10 @@ class TestCase(case.Case):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
     def get_filepath(self):
-        return os.path.join(self.get_dirpath(), "case.py")
+        filepath = os.path.join(self.get_dirpath(), "case.py")
+        if os.name == 'nt':
+            return filepath.replace('\\', '\\\\')
+        return filepath
 
     def delete_output(self):
         dirpath = self.get_dirpath()

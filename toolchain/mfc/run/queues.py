@@ -1,4 +1,4 @@
-import typing, dataclasses
+import os, typing, dataclasses
 
 from     mfc import common
 from ..state import ARG
@@ -26,6 +26,9 @@ class InteractiveSystem(QueueSystem):
         return True
 
     def gen_submit_cmd(self, filepath: str) -> typing.List[str]:
+        if os.name == 'nt':
+            return [filepath]
+
         return ["/bin/bash", filepath]
 
 
