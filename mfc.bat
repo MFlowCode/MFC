@@ -16,7 +16,7 @@ if not exist "%cd%\toolchain\main.py" (
 mkdir "%cd%\build" 2> NUL
 
 if not exist "%cd%\build\venv" (
-	python3 -m venv "%cd%\build\venv"
+	python -m venv "%cd%\build\venv"
 	if %errorlevel% neq 0 (
 		echo.
 		echo ^[mfc.bat^] Failed to create the Python virtual environment. Delete the build/venv folder and try again.
@@ -40,7 +40,7 @@ if %errorlevel% neq 0 (
     copy "%cd%\toolchain\requirements.txt" "%cd%\build" 2> NUL
 )
 
-python3 "%cd%\toolchain\main.py" %*
+python "%cd%\toolchain\main.py" %*
 set main_py_err=%errorlevel%
 
 call "%cd%\build\venv\Scripts\deactivate.bat"

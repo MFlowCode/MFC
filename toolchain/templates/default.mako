@@ -75,11 +75,11 @@ if engine == 'batch':
         ${helpers.run_prologue(target)}
 
         % if not mpi:
-            ${profiler} "${target.get_install_binpath(case)}"
+            ${profiler} "${target.get_install_binpath(case)}.exe"
         % else:
-            ${profiler}                                      \
-                mpiexec --ntasks ${nodes*tasks_per_node}     \
-                        "${target.get_install_binpath(case)}"
+            ${profiler}                                            \
+                mpiexec -n ${nodes*tasks_per_node}                 \
+                        "${target.get_install_binpath(case)}.exe"
         % endif
 
         ${helpers.run_epilogue(target)}
