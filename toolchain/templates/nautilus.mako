@@ -3,29 +3,35 @@
 <%namespace name="helpers" file="helpers.mako"/>
 
 % if engine == 'batch':
-#PBS -l select=${nodes}:ncpus=192:mpiprocs=${tasks_per_node}
-#PBS -N "${name}"
-#PBS -l walltime=${walltime}
+#SBATCH --nodes=${nodes}
+#SBATCH --ntasks-per-node=${tasks_per_node}
+#SBATCH --cpus-per-task=1
+#SBATCH --job-name="${name}"
+#SBATCH --time=${walltime}
 % if partition:
-#PBS -q ${partition}
+#SBATCH --qos=${partition}
 % endif
 % if account:
-#PBS -A ${account}
+#SBATCH --account="${account}"
 % endif
+% if gpu:
+#SBATCH --gpu-bind=verbose,closest
+#SBATCH --gres=gpu:v100-16:${tasks_per_node}
+% endif
+#SBATCH --output="${name}.out"
+#SBATCH --error="${name}.err"
+#SBATCH --export=ALL
 % if email:
-#PBS -M ${email}
-#PBS -m abe
+#SBATCH --mail-user=${email}
+#SBATCH --mail-type="BEGIN, END, FAIL"
 % endif
-#PBS -o "${name}.out"
-#PBS -e "${name}.err"
-#PBS -V
 % endif
 
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOTDIR}"
-. ./mfc.sh load -c c -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c n -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo
 
@@ -39,7 +45,7 @@ echo
             mpirun -np ${nodes*tasks_per_node}            \
                    "${target.get_install_binpath(case)}")
     % endif
-            
+
     ${helpers.run_epilogue(target)}
 
     echo

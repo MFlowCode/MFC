@@ -5,7 +5,7 @@ module m_check_ib_patches
     ! Dependencies =============================================================
     use m_derived_types          !< Definitions of the derived types
 
-    use m_global_parameters      !< Global parameters for the code
+    use m_global_parameters      !< Global parameters
 
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
 

@@ -1148,7 +1148,7 @@ contains
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg, dt)
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
@@ -1462,6 +1462,10 @@ contains
         !$acc update device(relax, relax_model)
         if (relax) then
             !$acc update device(palpha_eps, ptgalpha_eps)
+        end if
+
+        if (ib) then
+            !$acc update device(ib_markers%sf)
         end if
 
     end subroutine s_initialize_gpu_vars

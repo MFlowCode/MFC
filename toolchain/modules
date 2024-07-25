@@ -61,6 +61,12 @@ d-gpu nvhpc/22.11 openmpi+cuda/4.1.5+cuda cmake
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 c     DoD Carpenter
-c-all python
-c-cpu gcc/12.2.0 cmake/3.28.1-gcc-12.2.0 openmpi/4.1.6
-c-gpu nvhpc/23.7 cuda/12.2
+c-all python/3.12.1
+c-cpu compiler-rt/2024.2.0 ifort/2024.2.0 icc/2023.1.0 mpi/latest cmake/3.28.1-intel-2023.0.0
+c-cpu CC=gcc CXX=g++ FC=gfortran
+
+n     DoD Nautilus
+n-all slurm
+n-cpu penguin/openmpi/4.1.5/gcc-8.5.0
+n-gpu penguin/openmpi/4.1.5/nvhpc-22.3 nvidia/nvhpc/22.3 cuda/cuda-11.6
+n-gpu CC=nvc CXX=nvc++ FC=nvfortran
