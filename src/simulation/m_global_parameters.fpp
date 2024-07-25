@@ -121,10 +121,10 @@ module m_global_parameters
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
         integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
-        logical, parameter :: wenojs = ${wenojs}$           !< WENO-JS (default)
-        logical, parameter :: mapped_weno = ${mapped_weno}$ !< WENO-M (WENO with mapping of nonlinear weights)
-        logical, parameter :: wenoz = ${wenoz}$             !< WENO-Z
-        logical, parameter :: teno = ${teno}$               !< TENO (Targeted ENO)
+        logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
+        logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
+        logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
+        logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
