@@ -135,8 +135,10 @@ contains
 
     !> Checks constraints on time stepping parameters
     subroutine s_check_inputs_time_stepping
-        if (dt <= 0) then
-            call s_mpi_abort('dt must be positive. Exiting ...')
+        if (.not. cfl_dt) then
+            if (dt <= 0) then
+                call s_mpi_abort('dt must be positive. Exiting ...')
+            end if
         end if
 
         if (time_stepper < 1 .or. time_stepper > 5) then

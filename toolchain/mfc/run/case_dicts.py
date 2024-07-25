@@ -48,6 +48,8 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'cfl_adap_dt': ParamType.LOG,
+    'cfl_const_dt': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -76,6 +78,9 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'cfl_dt': ParamType.LOG,
+    'n_start': ParamType.INT,
+    'n_start_old': ParamType.INT
 })
 
 for ib_id in range(1, 10+1):
@@ -115,7 +120,7 @@ for p_id in range(1, 10+1):
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
+                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
@@ -204,6 +209,10 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'n_start': ParamType.INT,
+    't_stop': ParamType.REAL,
+    't_save': ParamType.REAL,
+    'cfl_target': ParamType.REAL
 })
 
 # NOTE: Not currently present
@@ -309,7 +318,11 @@ POST_PROCESS.update({
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
-    'ib': ParamType.LOG
+    'ib': ParamType.LOG,
+    'cfl_target': ParamType.REAL,
+    't_save': ParamType.REAL,
+    't_stop': ParamType.REAL,
+    'n_start': ParamType.INT,
 })
 
 for cmp_id in range(1,3+1):
