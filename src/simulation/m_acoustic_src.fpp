@@ -19,7 +19,7 @@ module m_acoustic_src
     use m_helper_basic         !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_acoustic_src_module, s_acoustic_src_calculations
+    private; public :: s_initialize_acoustic_src_module, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
@@ -158,9 +158,7 @@ contains
         real(kind(0d0)) :: sim_time, c, small_gamma
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
-        real(kind(0d0)) :: angle ! Angle with x-axis for mom source term vector
-        real(kind(0d0)) :: xyz_to_r_ratios(3) ! [xyz]/r for mom source term vector
-        real(kind(0d0)) :: source_temporal, source_spatial
+        real(kind(0d0)) :: source_temporal
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
@@ -184,7 +182,7 @@ contains
             end do
         end do
 
-        !$acc loop seq
+        !$acc parallel loop async
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
@@ -193,109 +191,110 @@ contains
             freq_conv_flag = f_is_default(frequency(ai))
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(myalpha, myalpha_rho, xyz_to_r_ratios)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+            !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
+            do i = 1, source_spatials(ai)%num_points
+                j = source_spatials(ai)%coord(1, i)
+                k = source_spatials(ai)%coord(2, i)
+                l = source_spatials(ai)%coord(3, i)
 
-                        ! Compute speed of sound
-                        myRho = 0d0
-                        B_tait = 0d0
-                        small_gamma = 0d0
+                ! Compute speed of sound
+                myRho = 0d0
+                B_tait = 0d0
+                small_gamma = 0d0
 
+                !$acc loop seq
+                do q = 1, num_fluids
+                    myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
+                    myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                end do
+
+                if (bubbles) then
+                    if (mpp_lim .and. (num_fluids > 2)) then
                         !$acc loop seq
                         do q = 1, num_fluids
-                            myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
-                            myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                            myRho = myRho + myalpha_rho(q)
+                            B_tait = B_tait + myalpha(q)*pi_infs(q)
+                            small_gamma = small_gamma + myalpha(q)*gammas(q)
                         end do
-
-                        if (bubbles) then
-                            if (mpp_lim .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do q = 1, num_fluids
-                                    myRho = myRho + myalpha_rho(q)
-                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                    small_gamma = small_gamma + myalpha(q)*gammas(q)
-                                end do
-                            elseif (num_fluids > 2) then
-                                !$acc loop seq
-                                do q = 1, num_fluids - 1
-                                    myRho = myRho + myalpha_rho(q)
-                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                    small_gamma = small_gamma + myalpha(q)*gammas(q)
-                                end do
-                            else
-                                myRho = myalpha_rho(1)
-                                B_tait = pi_infs(1)
-                                small_gamma = gammas(1)
-                            end if
-                        else
-                            !$acc loop seq
-                            do q = 1, num_fluids
-                                myRho = myRho + myalpha_rho(q)
-                                B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                small_gamma = small_gamma + myalpha(q)*gammas(q)
-                            end do
-                        end if
-
-                        small_gamma = 1d0/small_gamma + 1d0
-                        c = dsqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1d0)/small_gamma)*B_tait)/myRho)
-
-                        ! Wavelength to frequency conversion
-                        if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
-                        if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
-
-                        ! Update momentum source term
-                        call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
-                        mom_src_diff = source_temporal*source_spatial
-
-                        if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
-                            mass_src(j, k, l) = mass_src(j, k, l) + 2d0*mom_src_diff/c
-                            if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2d0*mom_src_diff*c/(small_gamma - 1d0)
-                            cycle
-                        end if
-
-                        if (n == 0) then ! 1D
-                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(ai)) ! Left or right-going wave
-
-                        elseif (p == 0) then ! 2D
-                            if (support(ai) < 5) then ! Planar
-                                angle = dir(ai)
-                            end if
-                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(angle)
-                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(angle)
-
-                        else ! 3D
-                            if (support(ai) < 5) then ! Planar
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
-                            else
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*xyz_to_r_ratios(1)
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*xyz_to_r_ratios(2)
-                                mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*xyz_to_r_ratios(3)
-                            end if
-                        end if
-
-                        ! Update mass source term
-                        if (support(ai) < 5) then ! Planar
-                            mass_src_diff = mom_src_diff/c
-                        else ! Spherical or cylindrical support
-                            ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
-                            call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
-                            mass_src_diff = source_temporal*source_spatial
-                        end if
-                        mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
-
-                        ! Update energy source term
-                        if (model_eqns /= 4) then
-                            E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
-                        end if
-
+                    elseif (num_fluids > 2) then
+                        !$acc loop seq
+                        do q = 1, num_fluids - 1
+                            myRho = myRho + myalpha_rho(q)
+                            B_tait = B_tait + myalpha(q)*pi_infs(q)
+                            small_gamma = small_gamma + myalpha(q)*gammas(q)
+                        end do
+                    else
+                        myRho = myalpha_rho(1)
+                        B_tait = pi_infs(1)
+                        small_gamma = gammas(1)
+                    end if
+                else
+                    !$acc loop seq
+                    do q = 1, num_fluids
+                        myRho = myRho + myalpha_rho(q)
+                        B_tait = B_tait + myalpha(q)*pi_infs(q)
+                        small_gamma = small_gamma + myalpha(q)*gammas(q)
                     end do
-                end do
+                end if
+
+                small_gamma = 1d0/small_gamma + 1d0
+                c = dsqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1d0)/small_gamma)*B_tait)/myRho)
+
+                ! Wavelength to frequency conversion
+                if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
+                if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+
+                ! Update momentum source term
+                call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                mom_src_diff = source_temporal*source_spatials(ai)%val(i)
+
+                if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
+                    mass_src(j, k, l) = mass_src(j, k, l) + 2d0*mom_src_diff/c
+                    if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2d0*mom_src_diff*c/(small_gamma - 1d0)
+                    cycle
+                end if
+
+                if (n == 0) then ! 1D
+                    mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1d0, dir(ai)) ! Left or right-going wave
+
+                elseif (p == 0) then ! 2D
+                    if (support(ai) < 5) then ! Planar
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                    else
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
+                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
+                    end if
+
+                else ! 3D
+                    if (support(ai) < 5) then ! Planar
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                    else
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(1, i)
+                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(2, i)
+                        mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(3, i)
+                    end if
+                end if
+
+                ! Update mass source term
+                if (support(ai) < 5) then ! Planar
+                    mass_src_diff = mom_src_diff/c
+                else ! Spherical or cylindrical support
+                    ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
+                    call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                    mass_src_diff = source_temporal*source_spatials(ai)%val(i)
+                end if
+                mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
+
+                ! Update energy source term
+                if (model_eqns /= 4) then
+                    E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2d0/(small_gamma - 1d0)
+                end if
+
             end do
         end do
+        !$acc wait
 
         ! Update the rhs variables
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -314,7 +313,6 @@ contains
                 end do
             end do
         end do
-
     end subroutine
 
     !> This subroutine gives the temporally varying amplitude of the pulse
@@ -381,6 +379,64 @@ contains
 
         end if
     end subroutine s_source_temporal
+
+    subroutine s_precalculate_acoustic_spatial_sources
+        integer :: j, k, l, ai
+        real(kind(0d0)) :: idx, source_spatial, angle
+        real(kind(0d0)) :: xyz_to_r_ratios(3)
+        real(kind(0d0)), parameter :: threshold = 1d-10
+
+        @:ALLOCATE_GLOBAL(source_spatials(num_source))
+
+        do ai = 1, num_source
+            ! First pass: Count the number of points for each source
+            source_spatials(ai)%num_points = 0
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        if (abs(source_spatial) < threshold) cycle
+                        source_spatials(ai)%num_points = source_spatials(ai)%num_points + 1
+                    end do
+                end do
+            end do
+
+            ! Allocate arrays with the correct size
+            @:ALLOCATE(source_spatials(ai)%coord(3, source_spatials(ai)%num_points))
+            @:ALLOCATE(source_spatials(ai)%val(source_spatials(ai)%num_points))
+            if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
+                if (n /= 0 .and. p == 0) then
+                    @:ALLOCATE(source_spatials(ai)%angle(source_spatials(ai)%num_points))
+                end if
+                if (p /= 0) then
+                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(3, source_spatials(ai)%num_points))
+                end if
+            end if
+
+            ! Second pass: Store the values
+            idx = 0 ! Reset counter
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        if (abs(source_spatial) < threshold) cycle
+                        idx = idx + 1
+                        source_spatials(ai)%coord(:, idx) = (/j, k, l/)
+                        source_spatials(ai)%val(idx) = source_spatial
+                        if (support(ai) >= 5) then
+                            if (n /= 0 .and. p == 0) source_spatials(ai)%angle(idx) = angle
+                            if (p /= 0) source_spatials(ai)%xyz_to_r_ratios(:, idx) = xyz_to_r_ratios
+                        end if
+                    end do
+                end do
+            end do
+#ifdef MFC_DEBUG
+            write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials(ai)%num_points, &
+                ' grid points with non-zero source term'
+            ! read(*,*) ! Pause the code and wait for user input
+#endif
+        end do
+    end subroutine
 
     !> This subroutine gives the spatial support of the acoustic source
     !! @param j x-index
