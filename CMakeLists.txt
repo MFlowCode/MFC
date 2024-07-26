@@ -177,8 +177,6 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
 
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(
-	    # $<$<COMPILE_LANGUAGE:Fortran:-Minline>
-	    # $<$<COMPILE_LANGUAGE:Fortran:-cuda=inline>
 	    -Minfo=inline
         )
     elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -212,13 +210,19 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # Enable LTO/IPO if supported
     CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
     if (SUPPORTS_IPO)
-        message(STATUS "Enabled IPO / LTO")
-        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(STATUS "Trying to enable IPO / LTO")
+	# Currently, attempting to double-compile with unified memory 
+	# causes the compiler to crash.
+        if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" AND NOT MFC_Unified)
             # Is this message super clear or necessary?
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
         else()
-            # Passes -Mipa flag on NVIDIA compiler, which is now deprecated.
+            if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" AND MFC_Unified)
+                message(WARNING "Cross-module inlining currently does not work" 
+                                " with GH200 unified memory! You may see degraded performance!")
+            endif()
+            # Passes -Mipa flag on NVIDIA compiler, which is now inert and deprecated.
             set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
         endif()
     else()
@@ -371,31 +375,30 @@ HANDLE_SOURCES(syscheck OFF)
 #             being used.
 
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
+cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
 
-    # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
-    # A little hacky, but it *is* an edge-case for *one* compiler.
-    if (NVHPC_USE_TWO_PASS_IPO)
-        add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
+# Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
+# A little hacky, but it *is* an edge-case for *one* compiler.
+if (NVHPC_USE_TWO_PASS_IPO)
+    add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
         target_compile_options(${ARGS_TARGET}_lib PRIVATE 
 		$<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
 	)
-        message(STATUS "Current target = ${ARGS_TARGET}_lib")
 
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
-        #set_property(TARGET ${ARGS_TARGET}_exe PROPERTY OUTPUT_NAME ${ARGS_TARGET})
-        # Odd, I'm explicitly stating a target as dependent on the other yet it is not rebuilt...
-        # ...wait, let's try a clean build.
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        # Okay, so we need to somehow get some of these flags onto the second target... hmmm
-        # Do I seriously have to go in and add the properties to the exe target too?
         target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        list(APPEND IPO_TARGETS ${ARGS_TARGET}_lib ${ARGS_TARGET})
     else()
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
+        target_compile_options(${ARGS_TARGET} PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
+        )
+	list(APPEND IPO_TARGETS ${ARGS_TARGET})
     endif()
 
-    foreach (a_target ${ARGS_TARGET}_lib ${ARGS_TARGET})
+    foreach (a_target ${IPO_TARGETS})
     set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
 
     target_include_directories(${a_target} PRIVATE
