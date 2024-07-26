@@ -123,10 +123,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_low_Mach_correction(dimInfo):
         ndims = len(dimInfo[0])
 
-        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0})
+        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
 
         for low_Mach in [1, 2]:
-            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach, 'dt': 1e-7})
+            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach})
             if ndims == 1:
                 stack.push("", {
                     'patch_icpp(1)%vel(1)':   1e-2, 'patch_icpp(2)%vel(1)': 1e-2, 'patch_icpp(3)%vel(1)': 1e-2
