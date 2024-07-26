@@ -124,7 +124,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         ndims = len(dimInfo[0])
 
         for low_Mach in [1, 2]:
-            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach, 'riemann_solver': 2})
+            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach, 'riemann_solver': 2, 'wenoz': 'T'})
             if ndims == 1:
                 stack.push("", {
                     'patch_icpp(1)%vel(1)':   1e-4, 'patch_icpp(2)%vel(1)': 1e-4, 'patch_icpp(3)%vel(1)': 1e-4
