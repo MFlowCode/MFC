@@ -111,8 +111,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if riemann_solver == 2:
                 cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
-                cases.append(define_case_d(stack, "low_Mach=1", {'low_Mach': 1}))
-                cases.append(define_case_d(stack, "low_Mach=2", {'low_Mach': 2}))
 
             if num_fluids == 2:
                 if riemann_solver == 2:
@@ -120,6 +118,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 cases.append(define_case_d(stack, 'mpp_lim', {'mpp_lim': 'T'}))
 
+            stack.pop()
+
+    def alter_low_Mach_fix(dimInfo):
+        ndims = len(dimInfo[0])
+
+        for low_Mach in [1, 2]:
+            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach, 'riemann_solver': 2})
+            if ndims == 1:
+                stack.push("", {
+                    'patch_icpp(1)%vel(1)':   1e-4, 'patch_icpp(2)%vel(1)': 1e-4, 'patch_icpp(3)%vel(1)': 1e-4
+                })
+            elif ndims == 2:
+                stack.push("", {
+                    'patch_icpp(1)%vel(1)':   1e-4, 'patch_icpp(2)%vel(1)': 1e-4, 'patch_icpp(3)%vel(1)': 1e-4,
+                    'patch_icpp(1)%vel(2)':   1e-4, 'patch_icpp(2)%vel(2)': 1e-4, 'patch_icpp(3)%vel(2)': 1e-4
+                })
+            elif ndims == 3:
+                stack.push("", {
+                    'patch_icpp(1)%vel(1)':   1e-4, 'patch_icpp(2)%vel(1)': 1e-4, 'patch_icpp(3)%vel(1)': 1e-4,
+                    'patch_icpp(1)%vel(2)':   1e-4, 'patch_icpp(2)%vel(2)': 1e-4, 'patch_icpp(3)%vel(2)': 1e-4,
+                    'patch_icpp(1)%vel(3)':   1e-4, 'patch_icpp(2)%vel(3)': 1e-4, 'patch_icpp(3)%vel(3)': 1e-4
+                })
+
+            cases.append(define_case_d(stack, '', {}))
+            stack.pop()
             stack.pop()
 
     def alter_num_fluids(dimInfo):
@@ -136,6 +159,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 })
 
             alter_riemann_solvers(num_fluids)
+            alter_low_Mach_fix(dimInfo)
             alter_ib(dimInfo)
 
             if num_fluids == 1:
