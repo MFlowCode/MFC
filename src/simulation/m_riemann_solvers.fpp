@@ -1342,7 +1342,7 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, c_avg)
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, dir_idx(1), pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1390,7 +1390,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, dir_idx(1), pcorr)
 
                                 !$acc loop seq
                                 do i = 1, contxe
@@ -1772,7 +1772,7 @@ contains
                                     end do
                                 end if
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
@@ -1820,7 +1820,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
 
                                 !$acc loop seq
                                 do i = 1, contxe
@@ -2123,7 +2123,7 @@ contains
                                     end do
                                 end if
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
@@ -2172,7 +2172,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 1) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
 
                                 !$acc loop seq
                                 do i = 1, contxe
@@ -2350,11 +2350,13 @@ contains
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
         real(kind(0d0)), intent(in) :: s_L, s_R
+        integer, intent(in) :: idx1
         real(kind(0d0)), intent(out) :: pcorr
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: zcoef
+        integer :: i
 
         vel_L_rms = 0d0; vel_R_rms = 0d0
         !$acc loop seq
