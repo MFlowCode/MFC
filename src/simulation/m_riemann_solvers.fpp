@@ -882,7 +882,7 @@ contains
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: pcorr, zcoef !< low Mach number correction
+        real(kind(0d0)) :: pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
