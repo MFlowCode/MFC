@@ -111,6 +111,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if riemann_solver == 2:
                 cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
+                cases.append(define_case_d(stack, "low_Mach=1", {'low_Mach': 1}))
+                cases.append(define_case_d(stack, "low_Mach=2", {'low_Mach': 2}))
 
             if num_fluids == 2:
                 if riemann_solver == 2:
@@ -490,7 +492,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         if ndims == 3:
             stack.pop()
-
 
     def alter_phasechange(dimInfo):
         ndims = len(dimInfo[0])

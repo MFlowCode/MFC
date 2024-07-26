@@ -130,6 +130,14 @@ contains
         elseif (riemann_solver /= 3 .and. avg_state == dflt_int) then
             call s_mpi_abort('avg_state must be set if '// &
                              'riemann_solver != 3. Exiting ...')
+        elseif (all(low_Mach /= (/0, 1, 2/))) then
+            call s_mpi_abort('low_Mach must be 0, 1 or 2. Exiting ...')
+        elseif (riemann_solver /= 2 .and. low_Mach /= 0) then
+            call s_mpi_abort('low_Mach = 1 or 2 '// &
+                             'requires riemann_solver = 2. Exiting ...')
+        elseif (low_Mach /= 0 .and. model_eqns == 3) then
+            call s_mpi_abort('low_Mach = 1 or 2 does not support '// &
+                             'model_eqns = 3. Exiting ...')
         end if
     end subroutine s_check_inputs_riemann_solver
 
