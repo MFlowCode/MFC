@@ -1395,7 +1395,7 @@ contains
                                 else
                                     pcorr = 0d0
                                 end if
-                                
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
