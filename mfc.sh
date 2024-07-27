@@ -54,7 +54,7 @@ code=$?
 echo
 
 if [ $code -ne 0 ]; then
-    error "mfc.py finished with a $code exit code."
+    error "main.py finished with a $code exit code."
 fi
 
 # Deactivate the Python virtualenv in case the user "source"'d this script

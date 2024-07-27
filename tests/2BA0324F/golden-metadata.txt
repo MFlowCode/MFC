@@ -1,8 +1,8 @@
-This file was created on 2024-07-26 20:49:17.961190.
+This file was created on 2024-07-26 22:39:25.579365.
 
 mfc.sh:
 
-    Invocation: test -o Example -a -m 1 --generate
+    Invocation: test -j 8 -o Example -a --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
 simulation:

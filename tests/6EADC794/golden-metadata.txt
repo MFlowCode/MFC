@@ -1,42 +1,9 @@
-This file was created on 2024-07-26 22:00:00.010267.
+This file was created on 2024-07-26 22:39:14.198733.
 
 mfc.sh:
 
-    Invocation: test -o Example -a -m 1 --generate
+    Invocation: test -j 8 -o Example -a --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.1 on bok-asus
-    
-        C       : GNU v13.1.0 (/usr/bin/cc)
-        Fortran : GNU v13.1.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
 
 simulation:
 
@@ -116,6 +83,39 @@ post_process:
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.1 on bok-asus
+    
+        C       : GNU v13.1.0 (/usr/bin/cc)
+        Fortran : GNU v13.1.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

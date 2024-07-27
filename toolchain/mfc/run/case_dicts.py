@@ -195,8 +195,8 @@ SIMULATION.update({
     'num_probes': ParamType.INT,
     'probe_wrt': ParamType.LOG,
     'bubble_model': ParamType.INT,
-    'Monopole': ParamType.LOG,
-    'num_mono': ParamType.INT,
+    'acoustic_source': ParamType.LOG,
+    'num_source': ParamType.INT,
     'qbmm': ParamType.LOG,
     'R0_type': ParamType.INT,
     'integral_wrt': ParamType.LOG,
@@ -263,15 +263,20 @@ for f_id in range(1,10+1):
         SIMULATION[f"fluid_pp({f_id})%Re({re_id})"] = ParamType.REAL
 
     for mono_id in range(1,4+1):
-        for int_attr in ["pulse", "support"]:
-            SIMULATION[f"Mono({mono_id})%{int_attr}"] = ParamType.INT
+        for int_attr in ["pulse", "support", "num_elements", "element_on"]:
+            SIMULATION[f"acoustic({mono_id})%{int_attr}"] = ParamType.INT
 
-        for real_attr in ["mag", "length", "dir", "npulse", "delay",
-                          "foc_length", "aperture", "support_width"]:
-            SIMULATION[f"Mono({mono_id})%{real_attr}"] = ParamType.REAL
+        SIMULATION[f"acoustic({mono_id})%dipole"] = ParamType.LOG
+
+        for real_attr in ["mag", "length", "height", "wavelength", "frequency",
+                          "gauss_sigma_dist", "gauss_sigma_time", "npulse",
+                          "dir", "delay", "foc_length", "aperture",
+                          "element_spacing_angle", "element_polygon_ratio",
+                          "rotate_angle"]:
+            SIMULATION[f"acoustic({mono_id})%{real_attr}"] = ParamType.REAL
 
         for cmp_id in range(1,3+1):
-            SIMULATION[f"Mono({mono_id})%loc({cmp_id})"] = ParamType.REAL
+            SIMULATION[f"acoustic({mono_id})%loc({cmp_id})"] = ParamType.REAL
 
     for int_id in range(1,5+1):
         for cmp in ["x", "y", "z"]:
