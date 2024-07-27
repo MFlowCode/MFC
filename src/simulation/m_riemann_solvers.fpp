@@ -44,7 +44,6 @@ module m_riemann_solvers
  s_riemann_solver, &
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
- s_compute_low_Mach_correction, &
  s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
@@ -1343,7 +1342,7 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, c_avg)
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, dir_idx(1), pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(dir_idx(1)), vel_R(dir_idx(1)), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1392,7 +1391,7 @@ contains
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
                                 if (low_Mach == 1) then
-                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(dir_idx(1)), vel_R(dir_idx(1)), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
                                 else
                                     pcorr = 0d0
                                 end if
@@ -1777,7 +1776,7 @@ contains
                                     end do
                                 end if
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(idx1), vel_R(idx1), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
@@ -1826,7 +1825,7 @@ contains
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
                                 if (low_Mach == 1) then
-                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(idx1), vel_R(idx1), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
                                 else
                                     pcorr = 0d0
                                 end if
@@ -2132,7 +2131,7 @@ contains
                                     end do
                                 end if
 
-                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                if (low_Mach == 2) call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(idx1), vel_R(idx1), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
@@ -2182,7 +2181,7 @@ contains
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
                                 if (low_Mach == 1) then
-                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
+                                    call s_compute_low_Mach_correction(rho_L, rho_R, vel_L(idx1), vel_R(idx1), vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
                                 else
                                     pcorr = 0d0
                                 end if
@@ -2358,8 +2357,8 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-    subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, idx1, pcorr)
-        real(kind(0d0)), dimension(num_dims), intent(inout) :: vel_L, vel_R
+    subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
+        real(kind(0d0)), intent(inout) :: vel_L, vel_R
         real(kind(0d0)), intent(in) :: vel_L_rms, vel_R_rms
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
@@ -2375,14 +2374,14 @@ contains
 
         if (low_Mach == 1) then
             pcorr = rho_L*rho_R* &
-                    (s_L - vel_L(idx1))*(s_R - vel_R(idx1))*(vel_R(idx1) - vel_L(idx1))/ &
-                    (rho_R*(s_R - vel_R(idx1)) - rho_L*(s_L - vel_L(idx1)))* &
+                    (s_L - vel_L)*(s_R - vel_R)*(vel_R - vel_L)/ &
+                    (rho_R*(s_R - vel_R) - rho_L*(s_L - vel_L))* &
                     (zcoef - 1d0)
         else if (low_Mach == 2) then
-            vel_L_tmp = 5d-1*((vel_L(idx1) + vel_R(idx1)) + zcoef*(vel_L(idx1) - vel_R(idx1)))
-            vel_R_tmp = 5d-1*((vel_L(idx1) + vel_R(idx1)) + zcoef*(vel_R(idx1) - vel_L(idx1)))
-            vel_L(idx1) = vel_L_tmp
-            vel_R(idx1) = vel_R_tmp
+            vel_L_tmp = 5d-1*((vel_L + vel_R) + zcoef*(vel_L - vel_R))
+            vel_R_tmp = 5d-1*((vel_L + vel_R) + zcoef*(vel_R - vel_L))
+            vel_L = vel_L_tmp
+            vel_R = vel_R_tmp
         end if
 
     end subroutine s_compute_low_Mach_correction
