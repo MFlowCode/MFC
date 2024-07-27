@@ -2363,7 +2363,6 @@ contains
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
         real(kind(0d0)), intent(in) :: s_L, s_R
-        integer, intent(in) :: idx1
         real(kind(0d0)), intent(inout) :: pcorr
 
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
@@ -2382,6 +2381,7 @@ contains
             vel_R_tmp = 5d-1*((vel_L + vel_R) + zcoef*(vel_R - vel_L))
             vel_L = vel_L_tmp
             vel_R = vel_R_tmp
+            pcorr = 0d0
         end if
 
     end subroutine s_compute_low_Mach_correction
