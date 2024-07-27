@@ -1,42 +1,9 @@
-This file was created on 2024-07-24 15:51:08.512691.
+This file was created on 2024-07-26 20:49:05.142935.
 
 mfc.sh:
 
-    Invocation: test -o 1D qbmm -a --generate
-    Lock:       mpi=No & gpu=No & debug=Yes & gcov=No & unified=No
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.1 on bok-asus
-    
-        C       : GNU v13.1.0 (/usr/bin/cc)
-        Fortran : GNU v13.1.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : OFF
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test -o Example -a -m 1 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
 simulation:
 
@@ -54,13 +21,13 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -87,13 +54,13 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -120,13 +87,46 @@ post_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.1 on bok-asus
+    
+        C       : GNU v13.1.0 (/usr/bin/cc)
+        Fortran : GNU v13.1.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/Internship/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
     
     Configuration Environment:
     

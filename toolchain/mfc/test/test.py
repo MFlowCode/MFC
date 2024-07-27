@@ -140,9 +140,10 @@ def test():
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
+    os.makedirs(case.get_dirpath() + "/D")
+
     tol = case.compute_tolerance()
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
-
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
@@ -154,7 +155,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     pack, err = packer.pack(case.get_dirpath())
     if err is not None:
         raise MFCException(f"Test {case}: {err}")
-
+    
     if pack.has_NaNs():
         raise MFCException(f"Test {case}: NaNs detected in the case.")
 
@@ -180,7 +181,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 raise MFCException(f"Test {case}: {msg}")
 
     if ARG("test_all"):
-        case.delete_output()
+        # case.delete_output()
         cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
