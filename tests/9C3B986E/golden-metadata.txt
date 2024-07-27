@@ -1,8 +1,8 @@
-This file was created on 2024-07-26 17:36:17.325884.
+This file was created on 2024-07-27 01:56:20.983463.
 
 mfc.sh:
 
-    Invocation: test -o low_Mach=1 --generate -- -c delta
+    Invocation: test -r -o low_Mach=1 --generate -- -c delta
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
 syscheck:

@@ -1,8 +1,8 @@
-This file was created on 2024-07-26 17:34:58.350623.
+This file was created on 2024-07-27 01:55:02.541735.
 
 mfc.sh:
 
-    Invocation: test -o low_Mach=1 --generate -- -c delta
+    Invocation: test -r -o low_Mach=1 --generate -- -c delta
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
 syscheck:
@@ -155,7 +155,7 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             2726.587
+    CPU MHz:             2445.356
     BogoMIPS:            4890.71
     Virtualization:      AMD-V
     L1d cache:           32K
