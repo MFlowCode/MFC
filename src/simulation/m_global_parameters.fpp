@@ -170,7 +170,7 @@ module m_global_parameters
 !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity)
 
 #ifdef CRAY_ACC_WAR
-    @CRAY_DECLARE_GLOBAL(low_Mach)
+    @:CRAY_DECLARE_GLOBAL(low_Mach)
     !$acc declare link(low_Mach)
 #else
     !$acc declare create(low_Mach)
