@@ -223,6 +223,9 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("bubbles", 'F') == 'T':
             return 2e-10
 
+        if self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
+            return 5e-10
+
         if self.params.get("acoustic_source", 'F') == 'T':
             if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
                 return 1e-5
