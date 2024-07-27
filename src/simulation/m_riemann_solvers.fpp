@@ -1522,7 +1522,7 @@ contains
                     end do
 
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, vel_L_tmp, vel_R_tmp, &
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
                     !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -1990,7 +1990,7 @@ contains
                     end do
                     !$acc end parallel loop
                 else
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, vel_L_tmp, vel_R_tmp, Re_L, Re_R, &
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
                     !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2358,7 +2358,6 @@ contains
     end subroutine s_hllc_riemann_solver
 
     subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
-        !$acc routine seq
         real(kind(0d0)), dimension(num_dims), intent(inout) :: vel_L, vel_R
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
