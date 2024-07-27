@@ -44,6 +44,7 @@ module m_riemann_solvers
  s_riemann_solver, &
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
+ s_compute_low_Mach_correction, &
  s_finalize_riemann_solvers_module
 
     abstract interface ! =======================================================
