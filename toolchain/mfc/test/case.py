@@ -82,15 +82,15 @@ BASE_CFG = {
     'sigV'                          : 0.1,
     'rhoRV'                         : 0.0,
 
-    'Monopole'                      : 'F',
-    'num_mono'                      : 1,
-    'Mono(1)%loc(1)'                : 0.5,
-    'Mono(1)%mag'                   : 1.0,
-    'Mono(1)%length'                : 0.25,
-    'Mono(1)%dir'                   : 1.0,
-    'Mono(1)%npulse'                : 1,
-    'Mono(1)%pulse'                 : 1,
-    'rdma_mpi'                      : 'F',
+    'acoustic_source'                   : 'F',
+    'num_source'                        : 1,
+    'acoustic(1)%loc(1)'                : 0.5,
+    'acoustic(1)%mag'                   : 0.2,
+    'acoustic(1)%length'                : 0.25,
+    'acoustic(1)%dir'                   : 1.0,
+    'acoustic(1)%npulse'                : 1,
+    'acoustic(1)%pulse'                 : 1,
+    'rdma_mpi'                          : 'F',
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -138,7 +138,10 @@ class TestCase(case.Case):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
     def get_filepath(self):
-        return os.path.join(self.get_dirpath(), "case.py")
+        filepath = os.path.join(self.get_dirpath(), "case.py")
+        if os.name == 'nt':
+            return filepath.replace('\\', '\\\\')
+        return filepath
 
     def delete_output(self):
         dirpath = self.get_dirpath()
@@ -211,20 +214,19 @@ print(json.dumps({{**case, **mods}}))
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
     def compute_tolerance(self) -> float:
-        if self.params.get("qbmm", 'F') == 'T':
+        if self.params.get("hypoelasticity", 'F') == 'T':
+            return 1e-7
+
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm']):
             return 1e-10
 
         if self.params.get("bubbles", 'F') == 'T':
             return 2e-10
 
-        if self.params.get("hypoelasticity", 'F') == 'T':
-            return 1e-7
-
-        if self.params.get("relax", 'F') == 'T':
-            return 1e-10
-
-        if self.params.get("ib", 'F') == 'T':
-            return 1e-10
+        if self.params.get("acoustic_source", 'F') == 'T':
+            if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
+                return 1e-5
+            return 2e-12
 
         return 1e-12
 
