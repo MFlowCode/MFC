@@ -1849,21 +1849,20 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
                                         xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                     vel_L(idxi) + &
-                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                (1d0 - dir_flg(idxi))* &
-                                                                vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L - ptilde_L)) &
+                                                     vel_L(dir_idx(i)) + &
+                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                                (1d0 - dir_flg(dir_idx(i)))* &
+                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                              dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
                                         + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                       vel_R(idxi) + &
-                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                  (1d0 - dir_flg(idxi))* &
-                                                                  vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R - ptilde_R)) &
-                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
+                                                       vel_R(dir_idx(i)) + &
+                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                                  (1d0 - dir_flg(dir_idx(i)))* &
+                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -1894,13 +1893,12 @@ contains
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
-                                        xi_M*(vel_L(idxi) + &
-                                              dir_flg(idxi)* &
+                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
+                                        xi_M*(vel_L(dir_idx(i)) + &
+                                              dir_flg(dir_idx(i))* &
                                               s_M*(xi_L - 1d0)) &
-                                        + xi_P*(vel_R(idxi) + &
-                                                dir_flg(idxi)* &
+                                        + xi_P*(vel_R(dir_idx(i)) + &
+                                                dir_flg(dir_idx(i))* &
                                                 s_P*(xi_R - 1d0))
 
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(idxi)%sf(j,k,l) = 0d0
