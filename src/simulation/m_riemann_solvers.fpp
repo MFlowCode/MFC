@@ -1521,7 +1521,8 @@ contains
                             end do
                         end do
                     end do
-
+                    !$acc end parallel loop
+                    !$acc end data
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc data copyin(num_dims, low_Mach)
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
@@ -1987,6 +1988,7 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
+                    !$acc end data
                 else
                     !$acc data copyin(num_dims, low_Mach)
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
@@ -2309,6 +2311,8 @@ contains
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
+                    !$acc end data
                 end if
             end if
         #:endfor
