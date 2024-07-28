@@ -19,7 +19,7 @@ module m_acoustic_src
     use m_helper_basic         !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_acoustic_src_module, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
+    private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
@@ -83,7 +83,7 @@ module m_acoustic_src
 contains
 
     !> This subroutine initializes the acoustic source module
-    subroutine s_initialize_acoustic_src_module
+    subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
@@ -130,7 +130,7 @@ contains
         @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
         @:ALLOCATE_GLOBAL(E_src(0:m, 0:n, 0:p))
 
-    end subroutine
+    end subroutine s_initialize_acoustic_src
 
     !> This subroutine updates the rhs by computing the mass, mom, energy sources
     !! @param q_cons_vf Conservative variables
@@ -182,7 +182,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop async
+        ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
@@ -192,7 +192,7 @@ contains
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
-            do i = 1, source_spatials(ai)%num_points
+            do i = 1, source_spatials_num_points(ai)
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)
                 l = source_spatials(ai)%coord(3, i)
@@ -202,22 +202,15 @@ contains
                 B_tait = 0d0
                 small_gamma = 0d0
 
-                !$acc loop seq
+                !$acc loop
                 do q = 1, num_fluids
                     myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
                     myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
                 end do
 
                 if (bubbles) then
-                    if (mpp_lim .and. (num_fluids > 2)) then
-                        !$acc loop seq
-                        do q = 1, num_fluids
-                            myRho = myRho + myalpha_rho(q)
-                            B_tait = B_tait + myalpha(q)*pi_infs(q)
-                            small_gamma = small_gamma + myalpha(q)*gammas(q)
-                        end do
-                    elseif (num_fluids > 2) then
-                        !$acc loop seq
+                    if (num_fluids > 2) then
+                        !$acc loop reduction(+:myRho,B_tait,small_gamma)
                         do q = 1, num_fluids - 1
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -228,8 +221,10 @@ contains
                         B_tait = pi_infs(1)
                         small_gamma = gammas(1)
                     end if
-                else
-                    !$acc loop seq
+                end if
+
+                if ((.not. bubbles) .or. (mpp_lim .and. (num_fluids > 2))) then
+                    !$acc loop reduction(+:myRho,B_tait,small_gamma)
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
                         B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -294,7 +289,6 @@ contains
 
             end do
         end do
-        !$acc wait
 
         ! Update the rhs variables
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -380,62 +374,72 @@ contains
         end if
     end subroutine s_source_temporal
 
+    !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
     subroutine s_precalculate_acoustic_spatial_sources
         integer :: j, k, l, ai
-        real(kind(0d0)) :: idx, source_spatial, angle
-        real(kind(0d0)) :: xyz_to_r_ratios(3)
+        integer :: count
+        real(kind(0d0)) :: source_spatial, angle, xyz_to_r_ratios(3)
         real(kind(0d0)), parameter :: threshold = 1d-10
 
-        @:ALLOCATE_GLOBAL(source_spatials(num_source))
+        @:ALLOCATE_GLOBAL(source_spatials_num_points(1:num_source))
+        @:ALLOCATE_GLOBAL(source_spatials(1:num_source))
 
         do ai = 1, num_source
             ! First pass: Count the number of points for each source
-            source_spatials(ai)%num_points = 0
+            count = 0
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
-                        if (abs(source_spatial) < threshold) cycle
-                        source_spatials(ai)%num_points = source_spatials(ai)%num_points + 1
+                        if (abs(source_spatial) >= threshold) count = count + 1
                     end do
                 end do
             end do
+            source_spatials_num_points(ai) = count
+            !$acc update device(source_spatials_num_points(ai))
 
             ! Allocate arrays with the correct size
-            @:ALLOCATE(source_spatials(ai)%coord(3, source_spatials(ai)%num_points))
-            @:ALLOCATE(source_spatials(ai)%val(source_spatials(ai)%num_points))
+            @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
+            @:ALLOCATE(source_spatials(ai)%val(1:count))
             if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
                 if (n /= 0 .and. p == 0) then
-                    @:ALLOCATE(source_spatials(ai)%angle(source_spatials(ai)%num_points))
+                    @:ALLOCATE(source_spatials(ai)%angle(1:count))
                 end if
                 if (p /= 0) then
-                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(3, source_spatials(ai)%num_points))
+                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
                 end if
             end if
 
             ! Second pass: Store the values
-            idx = 0 ! Reset counter
+            count = 0 ! Reset counter
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
-                        idx = idx + 1
-                        source_spatials(ai)%coord(:, idx) = (/j, k, l/)
-                        source_spatials(ai)%val(idx) = source_spatial
+                        count = count + 1
+                        source_spatials(ai)%coord(:, count) = (/j, k, l/)
+                        source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
-                            if (n /= 0 .and. p == 0) source_spatials(ai)%angle(idx) = angle
-                            if (p /= 0) source_spatials(ai)%xyz_to_r_ratios(:, idx) = xyz_to_r_ratios
+                            if (n /= 0 .and. p == 0) source_spatials(ai)%angle(count) = angle
+                            if (p /= 0) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do
             end do
-#ifdef MFC_DEBUG
-            write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials(ai)%num_points, &
-                ' grid points with non-zero source term'
-            ! read(*,*) ! Pause the code and wait for user input
-#endif
+
+            !$acc update device(source_spatials(ai)%coord)
+            !$acc update device(source_spatials(ai)%val)
+
         end do
+
+#ifdef MFC_DEBUG
+        do ai = 1, num_source
+            write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials_num_points(ai), &
+                ' grid points with non-zero source term'
+        end do
+#endif
+
     end subroutine
 
     !> This subroutine gives the spatial support of the acoustic source

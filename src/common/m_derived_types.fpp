@@ -281,7 +281,6 @@ module m_derived_types
 
     !> Acoustic source source_spatial pre-calculated values
     type source_spatial_type
-        integer :: num_points !< Number of grid points with non-zero source_spatial values
         integer, dimension(:, :), allocatable :: coord !< List of grid points indices with non-zero source_spatial values
         real(kind(0d0)), dimension(:), allocatable :: val !< List of non-zero source_spatial values
         real(kind(0d0)), dimension(:), allocatable :: angle !< List of angles with x-axis for mom source term vector

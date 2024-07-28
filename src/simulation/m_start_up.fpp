@@ -1258,7 +1258,7 @@ contains
 #endif
 
         if (acoustic_source) then
-            call s_initialize_acoustic_src_module()
+            call s_initialize_acoustic_src()
         end if
 
         if (any(Re_size > 0)) then
