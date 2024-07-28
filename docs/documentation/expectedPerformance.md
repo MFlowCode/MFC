@@ -13,8 +13,9 @@ This case is located in `examples/3D_performance_test`.
 We report results for various numbers of grid points per CPU die (or GPU device) and hardware.
 Results are for MFC v4.9.3 (July 2024 release), though numbers have not changed meaningfully since then.
 All results are for the compiler that gave the best performance.
-CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device.
-GPU results on single-precision (SP) GPUs performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation.
+* CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device.
+These are reported as (X/Y cores), where X is the used cores, and Y is the total on the die.
+* GPU results on single-precision (SP) GPUs performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation.
 AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we report results for one GCD, though one can quickly estimate full MI250X runtime by halving the single GCD grind time number.
 
 | Hardware                  |            |   Grind Time   |    Compiler    |   Computer   |
@@ -28,9 +29,9 @@ AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we repo
 | NVIDIA A40 (SP GPU)       | 1 GPU          | 3.3        | NVHPC 22.11          | NCSA Delta  |
 | NVIDIA RTX6000 (SP GPU)   | 1 GPU          | 3.9        | NVHPC 22.11          | GT Phoenix  |
 | Apple M1 Max              | 8 cores        | 72         | GNU 14.1.0           | N/A         |
-| Intel Xeon Gold 6454S (Sapphire Rapids)      | 32 cores       | 118        | NVHPC 24.5           | GT Rogues Gallery  |
-| AMD EPYC 7713 (Milan)                        | 32 cores       | 137        | GNU 12.1.0           | GT Phoenix  |
-| Intel Xeon Gold 6226 (Cascade Lake)          | 12 cores       | 152        | Intel oneAPI 2022.1  | GT Phoenix  |
+| Intel Xeon Gold 6454S (Sapphire Rapids)      | 16/32 cores     | 111        | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137        | GNU 12.1.0           | GT Phoenix  |
+| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152        | Intel oneAPI 2022.1  | GT Phoenix  |
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
