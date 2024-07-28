@@ -139,8 +139,9 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
-
-    os.makedirs(case.get_dirpath() + "/D")
+    
+    if not os.path.isdir(case.get_dirpath() + "/D"):
+        os.makedirs(case.get_dirpath() + "/D")
 
     tol = case.compute_tolerance()
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
@@ -155,7 +156,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     pack, err = packer.pack(case.get_dirpath())
     if err is not None:
         raise MFCException(f"Test {case}: {err}")
-    
+
     if pack.has_NaNs():
         raise MFCException(f"Test {case}: NaNs detected in the case.")
 
