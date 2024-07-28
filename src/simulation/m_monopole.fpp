@@ -1,6 +1,6 @@
 !>
-!! @file m_viscous.f90
-!! @brief Contains module m_viscous
+!! @file m_monopole.f90
+!! @brief Contains module m_monopole
 
 #:include 'macros.fpp'
 
@@ -19,8 +19,7 @@ module m_monopole
     use m_helper_basic           !< Functions to compare floating point numbers
     ! ==========================================================================
     implicit none
-    private; public :: s_initialize_monopole_module, s_monopole_calculations, &
- s_compute_monopole_rhs
+    private; public :: s_initialize_monopole_module, s_monopole_calculations
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
@@ -112,10 +111,6 @@ contains
         @:ALLOCATE_GLOBAL(mono_E_src(0:m, 0:n, 0:p))
 
     end subroutine
-
-    subroutine s_compute_monopole_rhs
-
-    end subroutine s_compute_monopole_rhs
 
     subroutine s_monopole_calculations(q_cons_vf, &
                                        q_prim_vf, t_step, id, rhs_vf)
@@ -214,10 +209,9 @@ contains
 
                             sound = n_tait*(q_prim_vf(E_idx)%sf(j, k, l) + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                             sound = dsqrt(sound)
-!                                            const_sos = dsqrt(n_tait)
+
                             const_sos = n_tait*(1.01d5 + ((n_tait - 1d0)/n_tait)*B_tait)/myRho
                             const_sos = dsqrt(const_sos)
-                            !TODO: does const_sos need to be changed?
 
                             term_index = 2
 
@@ -235,10 +229,8 @@ contains
                             end if
 
                             mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/sound
-!                                            mono_mass_src(j, k, l) = mono_mass_src(j, k, l) + s2/const_sos
 
                             if (n == 0) then
-
                                 ! 1D
                                 if (dir(q) < -0.1d0) then
                                     !left-going wave
@@ -248,8 +240,6 @@ contains
                                     mono_mom_src(1, j, k, l) = mono_mom_src(1, j, k, l) + s2
                                 end if
                             else if (p == 0) then
-                                ! IF ( (j==1) .AND. (k==1) .AND. proc_rank == 0) &
-                                !    PRINT*, '====== Monopole magnitude: ', f_g(the_time,sound,const_sos,mono(q))
                                 if (.not. f_is_default(dir(q))) then
                                     ! 2d
                                     !mono_mom_src(1,j,k,l) = s2
@@ -281,7 +271,6 @@ contains
 
                             if (model_eqns /= 4) then
                                 if (support(q) == 5) then
-!                                                    mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*sound**2.d0/(n_tait - 1.d0)
                                     mono_E_src(j, k, l) = mono_E_src(j, k, l) + s1*const_sos**2.d0/(n_tait - 1.d0)
                                 else
                                     mono_E_src(j, k, l) = mono_E_src(j, k, l) + s2*sound/(n_tait - 1.d0)
@@ -527,4 +516,4 @@ contains
 
     end function f_delta
 
-end module
+end module m_monopole

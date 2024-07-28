@@ -1,20 +1,6 @@
 name: 'Test Suite'
 
-on:
-  push:
-    paths:
-      - '**.f90'
-      - '**.fpp'
-      - '**.py'
-      - '**.yml'
-      - 'mfc.sh'
-      - 'golden.txt'
-      - 'CMakeLists.txt'
-      - 'requirements.txt'
-
-  pull_request:
-
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
     
 jobs:
   file-changes:
@@ -129,7 +115,8 @@ jobs:
     name: Self Hosted
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
-    continue-on-error: true
+    continue-on-error: false
+    timeout-minutes: 1400
     strategy:
       matrix:
         device: ['cpu', 'gpu']
@@ -140,6 +127,9 @@ jobs:
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
+    env:
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v3
