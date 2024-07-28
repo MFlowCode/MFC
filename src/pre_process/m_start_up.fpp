@@ -141,7 +141,7 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n
+            sigma, adv_n, hyperelasticity, pre_stress
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

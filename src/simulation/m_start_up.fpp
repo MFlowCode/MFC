@@ -46,8 +46,9 @@ module m_start_up
 
     use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
-
     use m_hypoelastic
+
+    use m_hyperelastic
 
     use m_phase_change          !< Phase-change module
 
@@ -140,7 +141,7 @@ contains
             teno_CT, mp_weno, weno_avg, &
             riemann_solver, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
-            x_a, x_b, y_a, y_b, z_a, z_b, &
+            x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
@@ -148,8 +149,8 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles, bubble_model, &
-            R0ref, &
+            rhoref, pref, bubbles, bubble_model, & 
+ 
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
 #:endif
@@ -163,7 +164,7 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z
+            g_x, g_y, g_z, hyperelasticity, R0ref
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -361,7 +362,7 @@ contains
             end if
         end do
 
-        if ((bubbles .eqv. .true.) .or. (hypoelasticity .eqv. .true.)) then
+        if ((bubbles .eqv. .true.) .or. (elasticity .eqv. .true.)) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -591,7 +592,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles .or. hypoelasticity) then
+                if ( bubbles .or. elasticity ) then
 
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -616,6 +617,7 @@ contains
                                            MPI_DOUBLE_PRECISION, status, ierr)
                     end do
                 end if
+                
 
                 call s_mpi_barrier()
 
@@ -681,9 +683,9 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles .or. hypoelasticity) then
+                if ( bubbles .or. elasticity ) then
 
-                    do i = 1, sys_size!adv_idx%end
+                    do i = 1, sys_size !adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -1274,7 +1276,6 @@ contains
         call acc_present_dump()
 #endif
 
-        if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1315,6 +1316,9 @@ contains
 
         call s_initialize_cbc_module()
         call s_initialize_derived_variables()
+
+        if (hypoelasticity) call s_initialize_hypoelastic_module()
+        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
@@ -1396,6 +1400,7 @@ contains
         do i = 1, sys_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
+
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
@@ -1410,7 +1415,6 @@ contains
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
-
 
         !$acc update device(relax, relax_model)
         if (relax) then
@@ -1429,6 +1433,7 @@ contains
         s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
+        if (hypoelasticity) call s_finalize_hypoelastic_module() 
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()

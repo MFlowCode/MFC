@@ -72,17 +72,23 @@ module m_global_parameters
     ! ==========================================================================
 
     ! Simulation Algorithm Parameters ==========================================
-    integer :: model_eqns            !< Multicomponent flow model
-    logical :: relax                 !< activate phase change
-    integer :: relax_model           !< Relax Model
-    real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
-    integer :: num_fluids            !< Number of different fluids present in the flow
-    logical :: adv_alphan            !< Advection of the last volume fraction
-    logical :: mpp_lim               !< Alpha limiter
-    integer :: sys_size              !< Number of unknowns in the system of equations
-    integer :: weno_order            !< Order of accuracy for the WENO reconstruction
-    logical :: hypoelasticity        !< activate hypoelasticity
+
+    integer :: model_eqns      !< Multicomponent flow model
+    logical :: relax           !< activate phase change
+    integer :: relax_model     !< Relax Model
+    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+    integer :: num_fluids      !< Number of different fluids present in the flow
+    logical :: adv_alphan      !< Advection of the last volume fraction
+    logical :: mpp_lim         !< Alpha limiter
+    integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    logical :: hypoelasticity  !< activate hypoelasticity
+    logical :: hyperelasticity !< activate hyperelasticity
+    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
+    integer :: b_size          !< Number of components in the b tensor
+    integer :: tensor_size     !< Number of components in the nonsymmetric tensor
+    logical :: pre_stress      !< activate pre_stressed domain
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -96,6 +102,7 @@ module m_global_parameters
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
+    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
@@ -217,6 +224,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
+    integer :: xibeg, xiend
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -280,6 +288,9 @@ contains
         weno_order = dflt_int
 
         hypoelasticity = .false.
+        hyperelasticity = .false.
+        elasticity = .false.
+        pre_stress = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -588,11 +599,22 @@ contains
                 end if
             end if
 
-            if (hypoelasticity) then
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
                 sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
             end if
 
             if (.not. f_is_default(sigma)) then
@@ -618,6 +640,24 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
+            end if
 
             if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
@@ -695,6 +735,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        xibeg = xi_idx%beg
+        xiend = xi_idx%end
 
         ! ==================================================================
 

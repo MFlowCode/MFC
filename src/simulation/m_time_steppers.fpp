@@ -25,6 +25,8 @@ module m_time_steppers
 
     use m_ibm
 
+    use m_hyperelastic
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_boundary_conditions
@@ -181,9 +183,17 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
-
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = xibeg, xiend + 1
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
                     iz_t%beg:iz_t%end))
@@ -812,6 +822,10 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        call nvtxStartRange("RHS-ELASTIC")
+          if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        call nvtxEndRange
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -829,7 +843,6 @@ contains
             time = time + (finish - start)
         end if
         ! ==================================================================
-
     end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
@@ -959,6 +972,7 @@ contains
         end if
 
     end subroutine s_time_step_cycling
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
@@ -993,8 +1007,14 @@ contains
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = xibeg, xiend + 1
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if

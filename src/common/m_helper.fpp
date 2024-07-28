@@ -73,8 +73,8 @@ contains
             lE = q
         end if
 
-        if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
+        if (allocated(fd_coeff_s)) deallocate(fd_coeff_s)
+        allocate(fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
 
         ! Computing the 1st order finite-difference coefficients
         if (fd_order_in == 1) then
@@ -83,7 +83,6 @@ contains
                 fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
                 fd_coeff_s(1, i) = -fd_coeff_s(0, i)
             end do
-
             ! Computing the 2nd order finite-difference coefficients
         elseif (fd_order_in == 2) then
             do i = lB, lE
@@ -91,7 +90,6 @@ contains
                 fd_coeff_s(0, i) = 0d0
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
             end do
-
             ! Computing the 4th order finite-difference coefficients
         else
             do i = lB, lE
@@ -101,7 +99,6 @@ contains
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
                 fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
             end do
-
         end if
 
     end subroutine s_compute_finite_difference_coefficients

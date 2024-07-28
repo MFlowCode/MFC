@@ -19,6 +19,7 @@ class ParamType(Enum):
 
 COMMON = {
     'hypoelasticity': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
     'pref': ParamType.REAL,
     'p': ParamType.INT,
@@ -48,6 +49,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -76,6 +78,7 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'pre_stress': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):

@@ -173,9 +173,11 @@ contains
     !> Checks constraints on the hypoelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_hypoelasticity
-        if (model_eqns /= 2) then
-            call s_mpi_abort('hypoelasticity requires 5-equation model'// &
-                             '(model_eqns = 2). Exiting ...')
+        !if ((model_eqns /= 2) .or. (model_eqns /= 3)) then
+        if ((model_eqns == 1) .or. (model_eqns == 4)) then
+            call s_mpi_abort('hypoelasticity requires either '// &
+                             '5-equation (model_eqns = 2) or '// &
+                             '6-equation model (model_eqns = 3). Exiting ...')
         end if
     end subroutine s_check_inputs_hypoelasticity
 

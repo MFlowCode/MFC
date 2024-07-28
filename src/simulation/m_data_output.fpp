@@ -305,7 +305,6 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -334,12 +333,14 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
-                    
-                    if ( c .lt. 10d-12 ) then
-                        print*, 'code has crashed at processor: ',proc_rank,' at j :: ',j,', k :: ',k,' l :: ',l,'with alph1a ::',alpha(1),'and alpha2 ::', alpha(2)
-                        print*, 'ICFL ERROR, I TOLD YOU AGAIN!'                     
-                       ! call s_mpi_abort()
-                    endif
+
+                    if (c /= c) then
+                        print *, 'crashed at processor: ', proc_rank, ', at j :: ', j, ', k :: ', k, ' l :: ', l
+                        print *, 'alpha1 ::', alpha(1), 'and alpha2 ::', alpha(2), ' alpha3 :: ', alpha(3)
+                        print *, 'alpha_rho1 ::', alpha_rho(1), ', alpha_rho2 ::', alpha_rho(2), ' alpha_rho3 :: ', alpha_rho(3)
+                        print *, 'E :: ', E, ', pres :: ', pres, ', rho :: ', rho
+                        call s_mpi_abort('Exiting ...')
+                    end if
 
                     if (grid_geometry == 3) then
                         if (k == 0) then
@@ -1218,7 +1219,7 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    if (hypoelasticity) then
+                    if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
@@ -1232,7 +1233,8 @@ contains
 
                     dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                    if (hypoelasticity) then
+                    if (elasticity) then
+
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
@@ -1248,7 +1250,7 @@ contains
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                    else if (hypoelasticity) then
+                    else if (elasticity) then
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1301,7 +1303,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1332,7 +1334,7 @@ contains
 
                         dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                        if (hypoelasticity) then
+                        if (elasticity) then
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1347,7 +1349,7 @@ contains
 
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                        else if (hypoelasticity) then
+                        else if (elasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1376,7 +1378,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     end if
                 end if
@@ -1413,7 +1415,7 @@ contains
 
                             dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                            if (hypoelasticity) then
+                            if (elasticity) then
                                 call s_compute_pressure( &
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
@@ -1428,7 +1430,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1460,7 +1462,7 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if (elasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1553,8 +1555,8 @@ contains
                             nRdot(1), &
                             R(1), &
                             Rdot(1)
-                    else if (hypoelasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                    else if (elasticity) then
+                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &

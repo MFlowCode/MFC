@@ -357,6 +357,12 @@ contains
                                 q_prim_vf(i)%sf(-j, k, l) = &
                                     q_prim_vf(i)%sf(j - 1, k, l)
                             end do
+ 
+                            if(hyperelasticity) then
+                              q_prim_vf(xibeg)%sf(-j, k, l) = &
+                                 -q_prim_vf(xibeg)%sf(j - 1, k, l)
+                            end if
+
                         end do
                     end do
                 end do
@@ -400,6 +406,11 @@ contains
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg)%sf(m + j, k, l) = &
+                                -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
+                            end if
 
                         end do
                     end do
@@ -448,6 +459,11 @@ contains
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
+                                -q_prim_vf(xibeg + 1)%sf(l, j - 1, k)
+                            end if
                         end do
                     end do
                 end do
@@ -490,6 +506,11 @@ contains
                                 q_prim_vf(i)%sf(l, n + j, k) = &
                                     q_prim_vf(i)%sf(l, n - (j - 1), k)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &
+                                -q_prim_vf(xibeg + 1)%sf(l, n - (j - 1), k)
+                            end if
                         end do
                     end do
                 end do
@@ -537,6 +558,11 @@ contains
                                 q_prim_vf(i)%sf(k, l, -j) = &
                                     q_prim_vf(i)%sf(k, l, j - 1)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xiend)%sf(k, l, -j) = &
+                                -q_prim_vf(xiend)%sf(k, l, j - 1)
+                            end if 
                         end do
                     end do
                 end do
@@ -579,6 +605,11 @@ contains
                                 q_prim_vf(i)%sf(k, l, p + j) = &
                                     q_prim_vf(i)%sf(k, l, p - (j - 1))
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xiend)%sf(k, l, p + j) = &
+                                -q_prim_vf(xiend)%sf(k, l, p - (j - 1))
+                            end if
                         end do
                     end do
                 end do
