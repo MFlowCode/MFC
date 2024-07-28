@@ -1264,7 +1264,6 @@ contains
                     end do
                 elseif (model_eqns == 4) then
                     !ME4
-                    !$acc data copyin(num_dims, low_Mach)
                     !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
                     !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R, pcorr)
                     do l = is3%beg, is3%end
@@ -1522,9 +1521,7 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                    !$acc end data
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc data copyin(num_dims, low_Mach)
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
                     !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr)
                     do l = is3%beg, is3%end
@@ -1988,9 +1985,7 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                    !$acc end data
                 else
-                    !$acc data copyin(num_dims, low_Mach)
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
                     !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
@@ -2312,7 +2307,6 @@ contains
                         end do
                     end do
                     !$acc end parallel loop
-                    !$acc end data
                 end if
             end if
         #:endfor
