@@ -163,7 +163,7 @@ contains
                 rho_K = max(rho_K, sgm_eps)
                 if ( G_K .le. verysmall ) G_K = 0d0
 
-                if ( G_K .gt. 10d0 ) then
+                if ( G_K .gt. 20d0 ) then
                   !$acc loop seq 
                   do i = 1, tensor_size
                     tensora(i) = 0d0
