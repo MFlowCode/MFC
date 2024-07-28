@@ -10,9 +10,9 @@ We solve an example 3D, inviscid, 5-equation model problem with two advected spe
 The numerics are WENO5 finite volume reconstruction and HLLC approximate Riemann solver.
 This case is located in `examples/3D_performance_test`.
 
-We report results for various numbers of grid points per CPU die (or GPU device) and hardware.
 Results are for MFC v4.9.3 (July 2024 release), though numbers have not changed meaningfully since then.
 All results are for the compiler that gave the best performance.
+Note:
 * CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device.
 These are reported as (X/Y cores), where X is the used cores, and Y is the total on the die.
 * GPU results on single-precision (SP) GPUs performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation.
