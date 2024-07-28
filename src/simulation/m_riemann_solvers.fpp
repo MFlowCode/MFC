@@ -2358,16 +2358,15 @@ contains
     end subroutine s_hllc_riemann_solver
 
     subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, vel_L_rms, vel_R_rms, c_L, c_R, s_L, s_R, pcorr)
+        !$acc routine seq
         real(kind(0d0)), intent(inout) :: vel_L, vel_R
         real(kind(0d0)), intent(in) :: vel_L_rms, vel_R_rms
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
         real(kind(0d0)), intent(in) :: s_L, s_R
-        real(kind(0d0)), intent(inout) :: pcorr
-
+        real(kind(0d0)), intent(out) :: pcorr
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: zcoef
-        integer :: i
 
         zcoef = min(1d0, max(vel_L_rms**0.5d0/c_L, vel_R_rms**0.5d0/c_R))
 
