@@ -2355,7 +2355,7 @@ contains
 
     subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
         !$acc routine seq
-        real(kind(0d0)), dimension(num_dims), intent(inout) :: vel_L, vel_R
+        real(kind(0d0)), dimension(*), intent(inout) :: vel_L, vel_R
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
         real(kind(0d0)), intent(in) :: s_L, s_R
@@ -2364,10 +2364,7 @@ contains
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: zcoef
         integer :: idx1, i
-
-#ifndef _CRAYFTN
-!$acc update device(num_dims, low_Mach)
-#endif
+        !$acc declare create(num_dims, low_Mach)
 
         vel_L_rms = 0d0
         vel_R_rms = 0d0
