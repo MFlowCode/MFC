@@ -2364,7 +2364,6 @@ contains
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: zcoef
         integer :: idx1, i
-        !$acc declare create(num_dims, low_Mach)
 
         vel_L_rms = 0d0
         vel_R_rms = 0d0
