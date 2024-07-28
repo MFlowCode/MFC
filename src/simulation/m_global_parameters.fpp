@@ -148,6 +148,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture properties correction
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
+    integer :: hyper_model     !< hyperelasticity solver algorithm
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical :: cu_tensor
 
@@ -527,6 +528,7 @@ contains
         hypoelasticity = .false.
         hyperelasticity = .false.
         elasticity = .false.
+        hyper_model = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -857,6 +859,7 @@ contains
                     xi_idx%end = sys_size + num_dims
                     ! adding three more equations for the \xi field and the elastic energy
                     sys_size = xi_idx%end + 1
+                    hyper_model = 1
                 end if
 
                 if (.not. f_is_default(sigma)) then
