@@ -378,8 +378,17 @@ contains
     subroutine s_precalculate_acoustic_spatial_sources
         integer :: j, k, l, ai
         integer :: count
+        integer :: dim
         real(kind(0d0)) :: source_spatial, angle, xyz_to_r_ratios(3)
         real(kind(0d0)), parameter :: threshold = 1d-10
+
+        if (n == 0) then
+            dim = 1
+        elseif (p == 0) then
+            dim = 2
+        else
+            dim = 3
+        end if
 
         @:ALLOCATE_GLOBAL(source_spatials_num_points(1:num_source))
         @:ALLOCATE_GLOBAL(source_spatials(1:num_source))
@@ -391,7 +400,8 @@ contains
                 do k = 0, n
                     do j = 0, m
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
-                        if (abs(source_spatial) >= threshold) count = count + 1
+                        if (abs(source_spatial) < threshold) cycle
+                        count = count + 1
                     end do
                 end do
             end do
@@ -402,10 +412,9 @@ contains
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
             @:ALLOCATE(source_spatials(ai)%val(1:count))
             if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
-                if (n /= 0 .and. p == 0) then
+                if (dim == 2) then
                     @:ALLOCATE(source_spatials(ai)%angle(1:count))
-                end if
-                if (p /= 0) then
+                elseif (dim == 3) then
                     @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
                 end if
             end if
@@ -418,27 +427,42 @@ contains
                         call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
                         count = count + 1
-                        source_spatials(ai)%coord(:, count) = (/j, k, l/)
+                        source_spatials(ai)%coord(1, count) = j
+                        source_spatials(ai)%coord(2, count) = k
+                        source_spatials(ai)%coord(3, count) = l
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
-                            if (n /= 0 .and. p == 0) source_spatials(ai)%angle(count) = angle
-                            if (p /= 0) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
+                            if (dim == 2) source_spatials(ai)%angle(count) = angle
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do
             end do
 
+            if (source_spatials_num_points(ai) /= count) then
+                write (*,*) "Fatal Error: Inconsistent allocation of source_spatials"
+                call exit(1)
+            end if
+
             !$acc update device(source_spatials(ai)%coord)
             !$acc update device(source_spatials(ai)%val)
+            if (support(ai) >= 5) then
+                if (dim == 2) then
+                    !$acc update device(source_spatials(ai)%angle)
+                end if
+                if (dim == 3) then
+                    !$acc update device(source_spatials(ai)%xyz_to_r_ratios)
+                end if
+            end if
 
         end do
 
-#ifdef MFC_DEBUG
+! #ifdef MFC_DEBUG
         do ai = 1, num_source
             write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials_num_points(ai), &
                 ' grid points with non-zero source term'
         end do
-#endif
+! #endif
 
     end subroutine
 
