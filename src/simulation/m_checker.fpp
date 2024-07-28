@@ -134,10 +134,10 @@ contains
             call s_mpi_abort('low_Mach must be 0, 1 or 2. Exiting ...')
         elseif (riemann_solver /= 2 .and. low_Mach /= 0) then
             call s_mpi_abort('low_Mach = 1 or 2 '// &
-                                'requires riemann_solver = 2. Exiting ...')
+                             'requires riemann_solver = 2. Exiting ...')
         elseif (low_Mach /= 0 .and. model_eqns == 3) then
             call s_mpi_abort('low_Mach = 1 or 2 does not support '// &
-                                'model_eqns = 3. Exiting ...')
+                             'model_eqns = 3. Exiting ...')
         end if
     end subroutine s_check_inputs_riemann_solver
 
