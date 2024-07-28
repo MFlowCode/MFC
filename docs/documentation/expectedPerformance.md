@@ -1,4 +1,4 @@
-# Performance Results
+# Performance
 
 MFC has been benchmarked on several CPUs and GPU devices.
 This page shows a summary of these results.
