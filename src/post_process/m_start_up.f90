@@ -34,6 +34,9 @@ module m_start_up
     use m_checker_common
 
     use m_checker
+
+    use m_finite_differences
+
     ! ==========================================================================
 
     implicit none
