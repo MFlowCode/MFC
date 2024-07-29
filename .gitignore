@@ -3,6 +3,7 @@ package.json
 yarn.lock
 docker-compose.yml
 
+.venv/
 /build/
 .vscode/
 src/*/include/case.fpp
@@ -35,26 +36,27 @@ docs/documentation/*-example.png
 docs/documentation/examples.md
 
 examples/*batch/*/
-examples/*/D/*
-examples/*/p*
-examples/*/D_*
-examples/*/*.inf
-examples/*/*.inp
-examples/*/*.dat
-examples/*/*.o*
-examples/*/silo*
-examples/*/restart_data*
-examples/*/*.out
-examples/*/binary
-examples/*/fort.1
-examples/*/*.sh
-examples/*/*.err
-examples/*/viz/
+examples/**/D/*
+examples/**/p*
+examples/**/D_*
+examples/**/*.inf
+examples/**/*.inp
+examples/**/*.dat
+examples/**/*.o*
+examples/**/silo*
+examples/**/restart_data*
+examples/**/*.out
+examples/**/binary
+examples/**/fort.1
+examples/**/*.sh
+examples/**/*.err
+examples/**/viz/
 examples/*.jpg
 examples/*.png
 examples/*/workloads/
 examples/*/run-*/
 examples/*/logs/
+examples/**/*.f90
 workloads/
 
 benchmarks/*batch/*/

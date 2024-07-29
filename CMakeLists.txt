@@ -127,13 +127,15 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fbacktrace
             -fimplicit-none
             #-ffpe-trap=invalid,zero,denormal,overflow
-        )
+            -fsignaling-nans
+	    )
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-argument-mismatch>
+            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>            
         )
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
