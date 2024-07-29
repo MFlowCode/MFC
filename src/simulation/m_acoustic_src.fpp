@@ -458,12 +458,12 @@ contains
 
         end do
 
-! #ifdef MFC_DEBUG
+#ifdef MFC_DEBUG
         do ai = 1, num_source
             write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials_num_points(ai), &
                 ' grid points with non-zero source term'
         end do
-! #endif
+#endif
 
     end subroutine
 
