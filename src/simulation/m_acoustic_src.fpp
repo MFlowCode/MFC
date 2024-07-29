@@ -162,6 +162,7 @@ contains
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
+        integer :: num_points
 
         logical :: freq_conv_flag, gauss_conv_flag
 
@@ -191,8 +192,10 @@ contains
             freq_conv_flag = f_is_default(frequency(ai))
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
+            num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
+
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
-            do i = 1, source_spatials_num_points(ai)
+            do i = 1, num_points
                 j = source_spatials(ai)%coord(1, i)
                 k = source_spatials(ai)%coord(2, i)
                 l = source_spatials(ai)%coord(3, i)
@@ -390,7 +393,7 @@ contains
             dim = 3
         end if
 
-        @:ALLOCATE_GLOBAL(source_spatials_num_points(1:num_source))
+        allocate (source_spatials_num_points(1:num_source)) ! Only allocate GPU variable to prevent GPU bug
         @:ALLOCATE_GLOBAL(source_spatials(1:num_source))
 
         do ai = 1, num_source
@@ -406,7 +409,6 @@ contains
                 end do
             end do
             source_spatials_num_points(ai) = count
-            !$acc update device(source_spatials_num_points(ai))
 
             ! Allocate arrays with the correct size
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
@@ -440,8 +442,7 @@ contains
             end do
 
             if (source_spatials_num_points(ai) /= count) then
-                write (*,*) "Fatal Error: Inconsistent allocation of source_spatials"
-                call exit(1)
+                call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
             !$acc update device(source_spatials(ai)%coord)
@@ -476,7 +477,6 @@ contains
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
-        !$acc routine seq
         integer, intent(in) :: j, k, l, ai
         real(kind(0d0)), dimension(3), intent(in) :: loc
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -513,7 +513,6 @@ contains
     !! @param r Displacement from source to current point
     !! @param source Source term amplitude
     subroutine s_source_spatial_planar(ai, sig, r, source)
-        !$acc routine seq
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source
@@ -544,7 +543,6 @@ contains
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
-        !$acc routine seq
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -590,7 +588,6 @@ contains
     !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
-        !$acc routine seq
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: sig, r(3)
         real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
@@ -619,7 +616,6 @@ contains
             angle_per_elem = (2d0*angle_half_aperture - (num_elements(ai) - 1d0)*element_spacing_angle(ai))/num_elements(ai)
             dist = foc_length(ai) - dsqrt(r(2)**2d0 + (foc_length(ai) - r(1))**2d0)
 
-            !$acc loop seq
             do elem = elem_min, elem_max
                 angle_max = angle_half_aperture - (element_spacing_angle(ai) + angle_per_elem)*(elem - 1d0)
                 angle_min = angle_max - angle_per_elem
@@ -637,7 +633,6 @@ contains
             f = foc_length(ai)
             half_apert = aperture(ai)/2d0
 
-            !$acc loop seq
             do elem = elem_min, elem_max
                 angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(ai), kind(0d0)) + rotate_angle(ai)
 
@@ -675,6 +670,7 @@ contains
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
     function f_frequency_local(freq_conv_flag, ai, c)
+        !$acc routine seq
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: c
@@ -693,6 +689,7 @@ contains
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
     function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+        !$acc routine seq
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai
         real(kind(0d0)), intent(in) :: c
