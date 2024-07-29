@@ -2355,7 +2355,11 @@ contains
     end subroutine s_hllc_riemann_solver
 
     subroutine s_compute_low_Mach_correction(rho_L, rho_R, vel_L, vel_R, c_L, c_R, s_L, s_R, idx1, pcorr)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_compute_low_Mach_correction
+#else
         !$acc routine seq
+#endif
         real(kind(0d0)), dimension(num_dims), intent(inout) :: vel_L, vel_R
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
@@ -2376,18 +2380,18 @@ contains
 
         zcoef = min(1d0, max(vel_L_rms**0.5d0/c_L, vel_R_rms**0.5d0/c_R))
 
-        ! if (low_Mach == 1) then
-            ! pcorr = rho_L*rho_R* &
-            !         (s_L - vel_L(idx1))*(s_R - vel_R(idx1))*(vel_R(idx1) - vel_L(idx1))/ &
-            !         (rho_R*(s_R - vel_R(idx1)) - rho_L*(s_L - vel_L(idx1)))* &
-            !         (zcoef - 1d0)
-        ! else if (low_Mach == 2) then
+        if (low_Mach == 1) then
+            pcorr = rho_L*rho_R* &
+                    (s_L - vel_L(idx1))*(s_R - vel_R(idx1))*(vel_R(idx1) - vel_L(idx1))/ &
+                    (rho_R*(s_R - vel_R(idx1)) - rho_L*(s_L - vel_L(idx1)))* &
+                    (zcoef - 1d0)
+        else if (low_Mach == 2) then
             pcorr = 0d0
             vel_L_tmp = 5d-1*((vel_L(idx1) + vel_R(idx1)) + zcoef*(vel_L(idx1) - vel_R(idx1)))
             vel_R_tmp = 5d-1*((vel_L(idx1) + vel_R(idx1)) + zcoef*(vel_R(idx1) - vel_L(idx1)))
             vel_L(idx1) = vel_L_tmp
             vel_R(idx1) = vel_R_tmp
-        ! end if
+        end if
 
     end subroutine s_compute_low_Mach_correction
 
