@@ -49,6 +49,9 @@ module m_acoustic_src
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_src)
     !$acc declare link(mom_src)
 
+    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), source_spatials_num_points)
+    !$acc declare link(source_spatials_num_points)
+
     @:CRAY_DECLARE_GLOBAL(type(source_spatial_type), dimension(:), source_spatials)
     !$acc declare link(source_spatials)
 
@@ -81,12 +84,13 @@ module m_acoustic_src
     !> @}
     !$acc declare create(mass_src, e_src, mom_src)
 
+    integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
+    !$acc declare create(source_spatials_num_points)
+
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
     !$acc declare create(source_spatials)
 
 #endif
-
-    integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source (CPU only to prevent GPU bug)
 
 contains
 
@@ -401,7 +405,7 @@ contains
             dim = 3
         end if
 
-        allocate (source_spatials_num_points(1:num_source)) ! Only allocate GPU variable to prevent GPU bug
+        @:ALLOCATE_GLOBAL(source_spatials_num_points(1:num_source))
         @:ALLOCATE_GLOBAL(source_spatials(1:num_source))
 
         do ai = 1, num_source
