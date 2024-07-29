@@ -34,6 +34,12 @@ module m_start_up
     use m_checker_common
 
     use m_checker
+
+    use m_thermochem            !< Procedures used to compute thermodynamic
+                                !! quantities
+
+    use m_finite_differences
+
     ! ==========================================================================
 
     implicit none
@@ -64,6 +70,7 @@ contains
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
             hypoelasticity, G, &
+            chem_wrt_Y, chem_wrt_T, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
@@ -174,6 +181,7 @@ contains
 
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+
     end subroutine s_perform_time_step
 
     subroutine s_save_data(t_step, varname, pres, c, H)
@@ -286,6 +294,21 @@ contains
             end if
         end do
         ! ----------------------------------------------------------------------
+
+        ! Adding the species' concentrations to the formatted database file ----
+        do i = 1, num_species
+            if (chem_wrt_Y(i) .or. prim_vars_wrt) then
+                q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
+                                                    -offset_y%beg:n + offset_y%end, &
+                                                    -offset_z%beg:p + offset_z%end)
+
+                write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
+
+            end if
+        end do
 
         ! Adding the flux limiter function to the formatted database file
         do i = 1, E_idx - mom_idx%beg

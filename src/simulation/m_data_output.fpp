@@ -348,6 +348,11 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
+            do i = chemxb, chemxe
+                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) >= -1d0), "bad conc")
+                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) <=  2d0), "bad conc")
+            end do
+
             if (vcfl_max_glb /= vcfl_max_glb) then
                 call s_mpi_abort('VCFL is NaN. Exiting ...')
             elseif (vcfl_max_glb > 1d0) then
@@ -524,10 +529,8 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
-                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                            .or. &
-                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                            ) then
+                        ! todo: revisit change here
+                        if (((i >= adv_idx%beg) .and. (i <= adv_idx%end))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else
                             write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
@@ -633,6 +636,8 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                .or. &
+                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
@@ -714,6 +719,8 @@ contains
                                 if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                     .or. &
                                     ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                    .or. &
+                                    ((i >= chemxb) .and. (i <= chemxe)) &
                                     ) then
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
@@ -955,7 +962,7 @@ contains
         real(kind(0d0)) :: G
         real(kind(0d0)) :: dyn_p
 
-        integer :: i, j, k, l, s, q !< Generic loop iterator
+        integer :: i, j, k, l, s, q, d !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
@@ -968,6 +975,8 @@ contains
         integer :: npts !< Number of included integral points
         real(kind(0d0)) :: rad, thickness !< For integral quantities
         logical :: trigger !< For integral quantities
+
+        real(kind(0d0)) :: rhoYks(1:num_species)
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
@@ -1020,6 +1029,12 @@ contains
                     k = 0
                     l = 0
 
+                    if (chemistry) then
+                        do d = 1, num_species
+                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k, l)
+                        end do
+                    end if
+
                     ! Computing/Sharing necessary state variables
                     if (hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
@@ -1039,14 +1054,14 @@ contains
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, pres, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, pres)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres)
                     end if
 
                     if (model_eqns == 4) then
@@ -1109,6 +1124,12 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             elseif (p == 0) then ! 2D simulation
+                if (chemistry) then
+                    do d = 1, num_species
+                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
+                    end do
+                end if
+
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         do s = -1, m
@@ -1139,13 +1160,16 @@ contains
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                dyn_p, pi_inf, gamma, rho, qv, pres, &
+                                dyn_p, pi_inf, gamma, rho, qv, &
+                                rhoYks, &
+                                pres, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                                    dyn_p, pi_inf, gamma, rho, qv, pres)
+                                                    dyn_p, pi_inf, gamma, rho, qv, &
+                                                    rhoYks, pres)
                         end if
 
                         if (model_eqns == 4) then
@@ -1218,17 +1242,25 @@ contains
 
                             dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
+                            if (chemistry) then
+                                do d = 1, num_species
+                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l - 2)
+                                end do
+                            end if
+
                             if (hypoelasticity) then
                                 call s_compute_pressure( &
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
-                                    dyn_p, pi_inf, gamma, rho, qv, pres, &
+                                    dyn_p, pi_inf, gamma, rho, qv, &
+                                    rhoYks, pres, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
-                                                        dyn_p, pi_inf, gamma, rho, qv, pres)
+                                                        dyn_p, pi_inf, gamma, rho, qv, &
+                                                        rhoYks, pres)
                             end if
 
                             ! Compute mixture sound speed
