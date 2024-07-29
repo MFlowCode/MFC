@@ -192,8 +192,8 @@ contains
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
             q_prim_vf(tempxb)%sf(j, k, l) = &
-                q_prim_vf(E_idx)%sf(j, k, l) * mean_molecular_weight &
-                / (gas_constant * q_prim_vf(1)%sf(j, k, l))
+                q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight &
+                /(gas_constant*q_prim_vf(1)%sf(j, k, l))
         #:endif
 
         ! Updating the patch identities bookkeeping variable
@@ -571,7 +571,7 @@ contains
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
             q_prim_vf(tempxb)%sf(j, k, l) = &
-                q_prim_vf(E_idx)%sf(j, k, l) * mean_molecular_weight / (gas_constant * q_prim_vf(1)%sf(j, k, l))
+                q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight/(gas_constant*q_prim_vf(1)%sf(j, k, l))
         #:endif
 
         ! Set streamwise velocity to hypertangent function of y

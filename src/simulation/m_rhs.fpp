@@ -55,7 +55,7 @@ module m_rhs
     use m_surface_tension
 
     use m_body_forces
-    
+
     use m_chemistry
     ! ==========================================================================
 
@@ -1077,7 +1077,7 @@ contains
         end if
         call cpu_time(t_finish)
         if (t_step >= 4) then
-            ncells   = max((ix%end - ix%beg), 1)*max((iy%end - iy%beg), 1)*max((iz%end - iz%beg), 1)
+            ncells = max((ix%end - ix%beg), 1)*max((iy%end - iy%beg), 1)*max((iz%end - iz%beg), 1)
             time_avg = (abs(t_finish - t_start)/ncells + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0

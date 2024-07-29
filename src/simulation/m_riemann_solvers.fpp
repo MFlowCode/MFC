@@ -37,7 +37,7 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension      !< To get the capilary fluxes
-    
+
     use m_chemistry
     ! ==========================================================================
 
@@ -743,13 +743,13 @@ contains
                             if (chemistry .and. chem_params%advection) then
                                 !$acc loop seq
                                 do i = chemxb, chemxe
-                                    Y_L = qL_prim_rs${XYZ}$_vf(j,     k, l, i)
+                                    Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
 
                                     flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
-                                        - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
-                                        + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
-                                        /(s_M - s_P)
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
+                                                                     + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
+                                                                    /(s_M - s_P)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                 end do
                             end if

@@ -78,8 +78,8 @@ contains
 
                             ! \nabla \cdot (F)
                             rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + &
-                                (flux_n(${NORM_DIR}$)%vf(eqn)%sf(x - mx, y - my, z - mz) - &
-                                 flux_n(${NORM_DIR}$)%vf(eqn)%sf(x, y, z))/d${XYZ}$ (${XYZ}$)
+                                                      (flux_n(${NORM_DIR}$)%vf(eqn)%sf(x - mx, y - my, z - mz) - &
+                                                       flux_n(${NORM_DIR}$)%vf(eqn)%sf(x, y, z))/d${XYZ}$ (${XYZ}$)
 
                         end do
 
@@ -124,14 +124,14 @@ contains
                         end do
 
                         do eqn = chemxb, chemxe
-                            Ys(eqn - chemxb + 1) = q_cons_qp(eqn)%sf(x, y, z) / rho
+                            Ys(eqn - chemxb + 1) = q_cons_qp(eqn)%sf(x, y, z)/rho
                         end do
 
                         dyn_pres = 0d0
 
                         do i = momxb, momxe
                             dyn_pres = dyn_pres + rho*q_cons_qp(i)%sf(x, y, z)* &
-                                q_cons_qp(i)%sf(x, y, z)/2d0
+                                       q_cons_qp(i)%sf(x, y, z)/2d0
                         end do
 
                         call get_temperature(.true., q_cons_qp(E_idx)%sf(x, y, z) - dyn_pres, &

@@ -153,7 +153,7 @@ contains
                 pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
             else
                 pres = (pref + pi_inf)* &
-                    (energy/ &
+                       (energy/ &
                         (rhoref*(1 - alf)) &
                         )**(1/gamma + 1) - pi_inf
             end if
@@ -174,16 +174,16 @@ contains
                 end do
 
                 pres = ( &
-                    energy - &
-                    0.5d0*(mom**2.d0)/rho - &
-                    pi_inf - qv - E_e &
-                    )/gamma
+                       energy - &
+                       0.5d0*(mom**2.d0)/rho - &
+                       pi_inf - qv - E_e &
+                       )/gamma
 
             end if
 
         #:else
             do i = 1, num_species
-                Y_rs(i) = rhoYks(i) / rho
+                Y_rs(i) = rhoYks(i)/rho
             end do
 
             if (sum(Y_rs) > 1d-16) then
@@ -1154,7 +1154,7 @@ contains
                         end do
 
                         call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                        T = q_prim_vf(E_idx)%sf(j, k, l) * mix_mol_weight / (gas_constant * rho)
+                        T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
                         call get_mixture_energy_mass(T, Ys, e_mix)
 
                         q_cons_vf(E_idx)%sf(j, k, l) = &
@@ -1171,8 +1171,8 @@ contains
                         else if ((model_eqns /= 4) .and. (bubbles)) then
                             ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
-                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
-                                                        (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
+                                                           (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
+                                                           (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                         else
                             !Tait EOS, no conserved energy variable
                             q_cons_vf(E_idx)%sf(j, k, l) = 0.

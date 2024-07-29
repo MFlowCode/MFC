@@ -810,13 +810,13 @@ contains
         end if
 
         write (1, '(A)') ""
-        if (momxb  /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb,  momxe,  " Momentum"
-        if (E_idx  /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx,  E_idx,  " Energy/Pressure"
-        if (advxb  /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb,  advxe,  " Advection"
+        if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
+        if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
+        if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
         if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
-        if (bubxb  /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb,  bubxe,  " Bubbles"
-        if (strxb  /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb,  strxe,  " Stress"
-        if (intxb  /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb,  intxe,  " Internal Energies"
+        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles"
+        if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
+        if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
         if (tempxb /= 0) write (1, '("[",I2,",",I2,"]",A)') tempxb, tempxe, " Temperature"
 
