@@ -31,7 +31,7 @@
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
-cd "${MFC_ROOTDIR}"
+cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
 . ./mfc.sh load -c f -m ${'g' if gpu else 'c'}
 % endif

@@ -56,6 +56,7 @@ mfc.sh:
 
     Invocation: {' '.join(sys.argv[1:])}
     Lock:       {CFG()}
+    Git:        {common.generate_git_tagline()}
 
 """
 
