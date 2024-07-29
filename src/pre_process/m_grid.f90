@@ -28,7 +28,7 @@ module m_grid
 
     implicit none
 
-    private; 
+    private;
     public :: s_initialize_grid_module, &
               s_generate_grid, &
               s_generate_serial_grid, &

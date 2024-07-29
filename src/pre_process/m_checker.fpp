@@ -2,6 +2,8 @@
 !!@file m_checker.f90
 !!@brief Contains module m_checker
 
+#:include 'macros.fpp'
+
 !> @brief The purpose of the module is to check for compatible input files
 module m_checker
 
@@ -28,6 +30,7 @@ contains
         call s_check_inputs_grid_stretching
         call s_check_inputs_qbmm_and_polydisperse
         call s_check_inputs_perturb_density
+        call s_check_inputs_chemistry
         call s_check_inputs_misc
 
     end subroutine s_check_inputs
@@ -261,6 +264,14 @@ contains
             end if
         end do
     end subroutine s_check_inputs_perturb_density
+
+    subroutine s_check_inputs_chemistry
+
+        if (chemistry) then
+            @:ASSERT(num_species > 0)
+        end if
+
+    end subroutine s_check_inputs_chemistry
 
     !> Checks miscellaneous constraints
         !! (vel_profile and instability_wave)

@@ -1,7 +1,7 @@
 import os, typing, hashlib, dataclasses
 
 from .printer import cons
-from .common  import MFC_ROOT_DIR, MFCException, system, delete_directory, create_directory, \
+from .common  import MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
@@ -39,6 +39,9 @@ class MFCTarget:
         m.update(self.name.encode())
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
+
+        if case.params.get('chemistry', 'F') == 'T':
+            m.update(case.get_cantera_solution().name.encode())
 
         return m.hexdigest()[:10]
 

@@ -140,12 +140,13 @@ export MFC_GCC_VER=13
 export CC=gcc-$MFC_GCC_VER
 export CXX=g++-$MFC_GCC_VER
 export FC=gfortran-$MFC_GCC_VER
+export BOOST_INCLUDE=/opt/homebrew/include
 ```
 
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
 ```shell
-brew install wget python cmake gcc@$MFC_GCC_VER mpich
+brew install wget python cmake boost gcc@$MFC_GCC_VER mpich
 ```
 
 They will download the dependencies MFC requires to build itself.

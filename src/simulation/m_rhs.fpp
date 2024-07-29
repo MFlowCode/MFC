@@ -2,6 +2,7 @@
 !! @file m_rhs.f90
 !! @brief Contains module m_rhs
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to calculate the right-
@@ -54,6 +55,8 @@ module m_rhs
     use m_surface_tension
 
     use m_body_forces
+    
+    use m_chemistry
     ! ==========================================================================
 
     implicit none
@@ -600,6 +603,16 @@ contains
                                  & iz%beg:iz%end))
                     end do
                 end if
+
+                if (chemistry) then
+                    do l = chemxb, chemxe
+                        @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
+                                 & ix%beg:ix%end, &
+                                 & iy%beg:iy%end, &
+                                 & iz%beg:iz%end))
+                    end do
+                end if
+
             else
                 do l = 1, sys_size
                     @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
@@ -728,8 +741,9 @@ contains
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
-        integer :: i, j, k, l, q, ii, id !< Generic loop iterators
+        integer :: i, c, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
+        integer :: ncells
 
         call nvtxStartRange("Compute_RHS")
 
@@ -753,6 +767,11 @@ contains
                     end do
                 end do
             end do
+        end do
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            rhs_vf(i)%sf(:, :, :) = 0d0
         end do
 
         ! ==================================================================
@@ -788,7 +807,8 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
-        call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+
         call nvtxEndRange
 
         if (t_step == t_step_stop) return
@@ -970,6 +990,26 @@ contains
             call nvtxEndRange
             ! END: Additional physics and source terms =========================
 
+            #:if chemistry
+                if (chem_params%advection) then
+                    call nvtxStartRange("RHS_Chem_Advection")
+
+                    #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+
+                        if (id == ${NORM_DIR}$) then
+                            call s_compute_chemistry_rhs_${XYZ}$ ( &
+                                flux_n, &
+                                rhs_vf, &
+                                flux_src_n(${NORM_DIR}$)%vf, &
+                                q_prim_vf)
+                        end if
+
+                    #:endfor
+
+                    call nvtxEndRange
+                end if
+            #:endif
+
         end do
         ! END: Dimensional Splitting Loop =================================
 
@@ -1005,6 +1045,15 @@ contains
             t_step, &
             rhs_vf)
         call nvtxEndRange
+
+        #:if chemistry
+            if (chem_params%reactions) then
+                call nvtxStartRange("RHS_Chem_Reactions")
+                call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_vf, q_prim_qp%vf)
+                call nvtxEndRange
+            end if
+        #:endif
+
         ! END: Additional pphysics and source terms ============================
 
         if (run_time_info .or. probe_wrt .or. ib) then
@@ -1028,7 +1077,8 @@ contains
         end if
         call cpu_time(t_finish)
         if (t_step >= 4) then
-            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
+            ncells   = max((ix%end - ix%beg), 1)*max((iy%end - iy%beg), 1)*max((iz%end - iz%beg), 1)
+            time_avg = (abs(t_finish - t_start)/ncells + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
         end if
@@ -2379,3 +2429,4 @@ contains
     end subroutine s_finalize_rhs_module
 
 end module m_rhs
+
