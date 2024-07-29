@@ -31,7 +31,7 @@
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
-cd "${MFC_ROOTDIR}"
+cd "${MFC_ROOT_DIR}"
 . ./mfc.sh load -c d -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo

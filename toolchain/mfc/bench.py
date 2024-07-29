@@ -5,7 +5,7 @@ import rich.table
 from .printer import cons
 from .state   import ARG, CFG
 from .build   import get_targets, DEFAULT_TARGETS
-from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
+from .common  import system, MFC_BENCH_FILEPATH, MFC_BUILD_DIR, format_list_to_string
 from .common  import file_load_yaml, file_dump_yaml, create_directory
 from .common  import MFCException
 
@@ -23,7 +23,7 @@ def bench(targets = None):
 
     targets = get_targets(targets)
 
-    bench_dirpath = os.path.join(MFC_SUBDIR, "benchmarks", str(uuid.uuid4())[:4])
+    bench_dirpath = os.path.join(MFC_BUILD_DIR, "benchmarks", str(uuid.uuid4())[:4])
     create_directory(bench_dirpath)
 
     cons.print()

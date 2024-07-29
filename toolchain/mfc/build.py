@@ -1,7 +1,7 @@
 import os, typing, hashlib, dataclasses
 
 from .printer import cons
-from .common  import MFCException, system, delete_directory, create_directory, \
+from .common  import MFC_ROOT_DIR, MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
