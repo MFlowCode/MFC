@@ -4,7 +4,7 @@ import math
 import json
 
 gam = 1.4
-Ma0 = 1E-2
+Ma0 = 1E-3
 c0 = math.sqrt(gam)
 u0 = Ma0*c0
 
