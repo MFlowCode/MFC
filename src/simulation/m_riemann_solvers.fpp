@@ -2360,7 +2360,7 @@ contains
         real(kind(0d0)), intent(in) :: rho_L, rho_R
         real(kind(0d0)), intent(in) :: c_L, c_R
         real(kind(0d0)), intent(in) :: s_L, s_R
-        real(kind(0d0)), intent(out) :: pcorr
+        real(kind(0d0)), intent(inout) :: pcorr
         real(kind(0d0)) :: vel_L_rms, vel_R_rms
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: zcoef
