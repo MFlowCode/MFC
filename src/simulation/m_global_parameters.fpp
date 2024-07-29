@@ -423,13 +423,6 @@ module m_global_parameters
     !> @}
     !$acc declare create(acoustic_source, acoustic, num_source)
 
-    !> @name Acoustic source_spatial pre-calculated values
-    !> @{
-    integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
-    type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
-    !> @}
-    !$acc declare create(source_spatials_num_points, source_spatials)
-
     !> @name Surface tension parameters
     !> @{
     real(kind(0d0)) :: sigma
