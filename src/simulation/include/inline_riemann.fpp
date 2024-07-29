@@ -47,7 +47,7 @@
 #:def compute_low_Mach_correction()
 
     zcoef = min(1d0, max(vel_L_rms**0.5d0/c_L, vel_R_rms**0.5d0/c_R))
-    pcorr = 0d0 
+    pcorr = 0d0
 
     if (low_Mach == 1) then
         pcorr = rho_L*rho_R* &

@@ -1343,7 +1343,7 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
                                                               vel_avg_rms, c_avg)
 
-                                if (low_Mach == 2) then 
+                                if (low_Mach == 2) then
                                     @:compute_low_Mach_correction()
                                 end if
 
@@ -1393,7 +1393,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                if (low_Mach == 1) then 
+                                if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
                                 end if
 
@@ -2179,7 +2179,7 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                if (low_Mach == 1) then 
+                                if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
                                 end if
 
@@ -2354,7 +2354,6 @@ contains
                                        norm_dir, ix, iy, iz)
 
     end subroutine s_hllc_riemann_solver
-
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
