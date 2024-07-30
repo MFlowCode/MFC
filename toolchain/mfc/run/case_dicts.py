@@ -209,6 +209,7 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'low_Mach': ParamType.INT,
 })
 
 # NOTE: Not currently present

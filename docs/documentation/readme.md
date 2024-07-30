@@ -8,7 +8,7 @@
 - [Example Cases](examples.md)
 - [Running MFC](running.md)
 - [Flow Visualization](visualization.md)
-- [Performance Results](expectedPerformance.md)
+- [Performance](expectedPerformance.md)
 - [MFC's Authors](authors.md)
 - [References](references.md)
 
