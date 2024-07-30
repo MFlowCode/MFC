@@ -18,18 +18,21 @@ module m_boundary_conditions
 
     implicit none
 
-    private; public :: s_populate_primitive_variables_buffers, &
- s_populate_capillary_buffers
+    private; 
+    public :: s_populate_primitive_variables_buffers, &
+              s_populate_capillary_buffers
 
 contains
 
     !>  The purpose of this procedure is to populate the buffers
-    !!      of the conservative variables, depending on the selected
+    !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
+    !! @param q_prim_vf Primitive variable
     subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+
         integer :: bc_loc, bc_dir
 
         ! Population of Buffers in x-direction =============================
@@ -214,9 +217,9 @@ contains
 
     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -325,9 +328,10 @@ contains
 
     subroutine s_symmetry(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -353,6 +357,12 @@ contains
                                 q_prim_vf(i)%sf(-j, k, l) = &
                                     q_prim_vf(i)%sf(j - 1, k, l)
                             end do
+ 
+                            if(hyperelasticity) then
+                              q_prim_vf(xibeg)%sf(-j, k, l) = &
+                                 -q_prim_vf(xibeg)%sf(j - 1, k, l)
+                            end if
+
                         end do
                     end do
                 end do
@@ -396,6 +406,11 @@ contains
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg)%sf(m + j, k, l) = &
+                                -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
+                            end if
 
                         end do
                     end do
@@ -444,6 +459,11 @@ contains
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
+                                -q_prim_vf(xibeg + 1)%sf(l, j - 1, k)
+                            end if
                         end do
                     end do
                 end do
@@ -486,6 +506,11 @@ contains
                                 q_prim_vf(i)%sf(l, n + j, k) = &
                                     q_prim_vf(i)%sf(l, n - (j - 1), k)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &
+                                -q_prim_vf(xibeg + 1)%sf(l, n - (j - 1), k)
+                            end if
                         end do
                     end do
                 end do
@@ -533,6 +558,11 @@ contains
                                 q_prim_vf(i)%sf(k, l, -j) = &
                                     q_prim_vf(i)%sf(k, l, j - 1)
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xiend)%sf(k, l, -j) = &
+                                -q_prim_vf(xiend)%sf(k, l, j - 1)
+                            end if 
                         end do
                     end do
                 end do
@@ -575,6 +605,11 @@ contains
                                 q_prim_vf(i)%sf(k, l, p + j) = &
                                     q_prim_vf(i)%sf(k, l, p - (j - 1))
                             end do
+
+                            if(hyperelasticity) then 
+                              q_prim_vf(xiend)%sf(k, l, p + j) = &
+                                -q_prim_vf(xiend)%sf(k, l, p - (j - 1))
+                            end if
                         end do
                     end do
                 end do
@@ -606,9 +641,10 @@ contains
 
     subroutine s_periodic(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -825,9 +861,10 @@ contains
 
     subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -897,9 +934,10 @@ contains
 
     subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -1038,9 +1076,10 @@ contains
 
     subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -1215,8 +1254,9 @@ contains
 
     subroutine s_qbmm_extrapolation(pb, mv, bc_dir, bc_loc)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        integer :: bc_dir, bc_loc
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: bc_dir, bc_loc
+
         integer :: j, k, l, q, i
 
         !< x-direction =========================================================
@@ -1348,7 +1388,7 @@ contains
 
     subroutine s_populate_capillary_buffers(c_divs)
 
-        type(scalar_field), dimension(num_dims + 1) :: c_divs
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         integer :: i, j, k, l
 
         ! x - direction

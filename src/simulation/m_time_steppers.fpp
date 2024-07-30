@@ -25,6 +25,8 @@ module m_time_steppers
 
     use m_ibm
 
+    use m_hyperelastic
+
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
     use m_boundary_conditions
@@ -89,7 +91,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_time_steppers_module() ! -----------------------
+    subroutine s_initialize_time_steppers_module
 
         type(int_bounds_info) :: ix_t, iy_t, iz_t !<
             !! Indical bounds in the x-, y- and z-directions
@@ -181,9 +183,17 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
-
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = xibeg, xiend + 1
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
                     iz_t%beg:iz_t%end))
@@ -200,7 +210,7 @@ contains
             end do
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end))
@@ -285,14 +295,14 @@ contains
             call s_open_run_time_information_file()
         end if
 
-    end subroutine s_initialize_time_steppers_module ! ---------------------
+    end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
         !! @param t_step Current time step
-    subroutine s_1st_order_tvd_rk(t_step, time_avg) ! --------------------------------
+    subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: nR3bar
@@ -302,14 +312,6 @@ contains
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -399,14 +401,14 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_1st_order_tvd_rk ! ------------------------------------
+    end subroutine s_1st_order_tvd_rk
 
     !> 2nd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_2nd_order_tvd_rk(t_step, time_avg) ! --------------------------------
+    subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -419,14 +421,6 @@ contains
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -586,15 +580,14 @@ contains
         call cpu_time(finish)
         ! ==================================================================
 
-    end subroutine s_2nd_order_tvd_rk ! ------------------------------------
+    end subroutine s_2nd_order_tvd_rk
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -609,14 +602,6 @@ contains
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-
-        if (ib .and. t_step == 1) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -635,7 +620,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt_in*rhs_vf(i)%sf(j, k, l)
+                            + dt*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -651,7 +636,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_pb(j, k, l, q, i)
+                                    + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -668,7 +653,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_mv(j, k, l, q, i)
+                                    + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -710,7 +695,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
                     end do
                 end do
             end do
@@ -726,7 +711,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -744,7 +729,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -785,7 +770,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
                     end do
                 end do
             end do
@@ -801,7 +786,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -819,7 +804,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -836,6 +821,10 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
+
+        call nvtxStartRange("RHS-ELASTIC")
+          if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        call nvtxEndRange
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -854,17 +843,16 @@ contains
             time = time + (finish - start)
         end if
         ! ==================================================================
-
-    end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+    end subroutine s_3rd_order_tvd_rk
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for
         !!      the source term
         !! @param t_step Current time-step
-    subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
+    subroutine s_strang_splitting(t_step, time_avg)
 
-        integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
@@ -874,13 +862,13 @@ contains
         call nvtxStartRange("Time_Step")
 
         ! Stage 1 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
-
-        ! Stage 2 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
 
+        ! Stage 2 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg)
+
         ! Stage 3 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
+        call s_adaptive_dt_bubble(t_step)
 
         call nvtxEndRange
 
@@ -890,13 +878,13 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_strang_splitting ! ------------------------------------
+    end subroutine s_strang_splitting
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param q_cons_vf conservative variables
-    subroutine s_adaptive_dt_bubble(t_step) ! ------------------------
+        !! @param t_step Current time-step
+    subroutine s_adaptive_dt_bubble(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp
@@ -913,14 +901,19 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
 
-        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
-        real(kind(0d0)) :: ldt !< local dt
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
+
+        real(kind(0d0)), intent(in) :: ldt !< local dt
 
         integer :: i, j, k, l
 
@@ -943,9 +936,9 @@ contains
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step
-    subroutine s_time_step_cycling(t_step) ! ----------------------------
+    subroutine s_time_step_cycling(t_step)
 
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         integer :: i !< Generic loop iterator
 
@@ -978,10 +971,10 @@ contains
             end do
         end if
 
-    end subroutine s_time_step_cycling ! -----------------------------------
+    end subroutine s_time_step_cycling
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_time_steppers_module() ! -------------------------
+    subroutine s_finalize_time_steppers_module
 
         integer :: i, j !< Generic loop iterators
 
@@ -1014,8 +1007,14 @@ contains
             @:DEALLOCATE(q_prim_vf(i)%sf)
         end do
 
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = stress_idx%beg, stress_idx%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = xibeg, xiend + 1
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
         end if
@@ -1046,6 +1045,6 @@ contains
             call s_close_run_time_information_file()
         end if
 
-    end subroutine s_finalize_time_steppers_module ! -----------------------
+    end subroutine s_finalize_time_steppers_module
 
 end module m_time_steppers

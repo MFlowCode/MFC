@@ -34,24 +34,27 @@ module m_data_output
 
     implicit none
 
-    private; public :: s_initialize_data_output_module, &
- s_open_run_time_information_file, &
- s_open_com_files, &
- s_open_probe_files, &
- s_write_run_time_information, &
- s_write_data_files, &
- s_write_serial_data_files, &
- s_write_parallel_data_files, &
- s_write_com_files, &
- s_write_probe_files, &
- s_close_run_time_information_file, &
- s_close_com_files, &
- s_close_probe_files, &
- s_finalize_data_output_module
+    private; 
+    public :: s_initialize_data_output_module, &
+              s_open_run_time_information_file, &
+              s_open_com_files, &
+              s_open_probe_files, &
+              s_write_run_time_information, &
+              s_write_data_files, &
+              s_write_serial_data_files, &
+              s_write_parallel_data_files, &
+              s_write_com_files, &
+              s_write_probe_files, &
+              s_close_run_time_information_file, &
+              s_close_com_files, &
+              s_close_probe_files, &
+              s_finalize_data_output_module
+
     abstract interface ! ===================================================
 
         !> Write data files
         !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
         subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
 
@@ -112,7 +115,7 @@ contains
         !!      In general, this requires generating a table header for
         !!      those stability criteria which will be written at every
         !!      time-step.
-    subroutine s_open_run_time_information_file() ! ------------------------
+    subroutine s_open_run_time_information_file
 
         character(LEN=name_len) :: file_name = 'run_time.inf' !<
             !! Name of the run-time information file
@@ -170,7 +173,7 @@ contains
                 '============== ICFL Max ============='
         end if
 
-    end subroutine s_open_run_time_information_file ! ----------------------
+    end subroutine s_open_run_time_information_file
 
     !>  This opens a formatted data file where the root processor
         !!      can write out the CoM information
@@ -212,7 +215,7 @@ contains
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
-    subroutine s_open_probe_files() ! --------------------------------------
+    subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
@@ -257,7 +260,7 @@ contains
             end do
         end if
 
-    end subroutine s_open_probe_files ! ------------------------------------
+    end subroutine s_open_probe_files
 
     !>  The goal of the procedure is to output to the run-time
         !!      information file the stability criteria extrema in the
@@ -266,7 +269,7 @@ contains
         !!      these stability criteria extrema over all time-steps.
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time step
-    subroutine s_write_run_time_information(q_prim_vf, t_step) ! -----------
+    subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
@@ -302,7 +305,6 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
@@ -331,12 +333,14 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
-                    
-                    if ( c .lt. 10d-12 ) then
-                        print*, 'code has crashed at processor: ',proc_rank,' at j :: ',j,', k :: ',k,' l :: ',l,'with alph1a ::',alpha(1),'and alpha2 ::', alpha(2)
-                        print*, 'ICFL ERROR, I TOLD YOU AGAIN!'                     
-                       ! call s_mpi_abort()
-                    endif
+
+                    if (c /= c) then
+                        print *, 'crashed at processor: ', proc_rank, ', at j :: ', j, ', k :: ', k, ' l :: ', l
+                        print *, 'alpha1 ::', alpha(1), 'and alpha2 ::', alpha(2), ' alpha3 :: ', alpha(3)
+                        print *, 'alpha_rho1 ::', alpha_rho(1), ', alpha_rho2 ::', alpha_rho(2), ' alpha_rho3 :: ', alpha_rho(3)
+                        print *, 'E :: ', E, ', pres :: ', pres, ', rho :: ', rho
+                        call s_mpi_abort('Exiting ...')
+                    end if
 
                     if (grid_geometry == 3) then
                         if (k == 0) then
@@ -499,13 +503,17 @@ contains
 
         call s_mpi_barrier()
 
-    end subroutine s_write_run_time_information ! --------------------------
+    end subroutine s_write_run_time_information
 
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step) ! ---------------------
+    !>  The goal of this subroutine is to output the grid and
+        !!      conservative variables data files for given time-step.
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param t_step Current time-step
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(inOUT) :: q_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -866,22 +874,17 @@ contains
             end if
         end if
 
-    end subroutine s_write_serial_data_files ! ------------------------------------
+    end subroutine s_write_serial_data_files
 
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step) ! --
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(in) :: q_cons_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inOUT) :: q_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
@@ -978,7 +981,11 @@ contains
         else
             ! Initialize MPI data I/O
 
-            call s_initialize_mpi_data(q_cons_vf)
+            if (ib) then
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            else
+                call s_initialize_mpi_data(q_cons_vf)
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step, '.dat'
@@ -1050,7 +1057,7 @@ contains
 
 #endif
 
-    end subroutine s_write_parallel_data_files ! ---------------------------
+    end subroutine s_write_parallel_data_files
 
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information
@@ -1107,7 +1114,7 @@ contains
         !!  @param t_step Current time-step
         !!  @param q_cons_vf Conservative variables
         !!  @param accel_mag Acceleration magnitude information
-    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag) ! -----------
+    subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -1212,7 +1219,7 @@ contains
                     l = 0
 
                     ! Computing/Sharing necessary state variables
-                    if (hypoelasticity) then
+                    if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G, fluid_pp(:)%G)
@@ -1226,7 +1233,8 @@ contains
 
                     dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                    if (hypoelasticity) then
+                    if (elasticity) then
+
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
@@ -1242,7 +1250,7 @@ contains
 
                     if (model_eqns == 4) then
                         lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                    else if (hypoelasticity) then
+                    else if (elasticity) then
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1295,7 +1303,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1326,7 +1334,7 @@ contains
 
                         dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                        if (hypoelasticity) then
+                        if (elasticity) then
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
@@ -1341,7 +1349,7 @@ contains
 
                         if (model_eqns == 4) then
                             lit_gamma = 1d0/fluid_pp(1)%gamma + 1d0
-                        else if (hypoelasticity) then
+                        else if (elasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1370,7 +1378,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                     end if
                 end if
@@ -1407,7 +1415,7 @@ contains
 
                             dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
-                            if (hypoelasticity) then
+                            if (elasticity) then
                                 call s_compute_pressure( &
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
@@ -1422,7 +1430,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1454,7 +1462,7 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if (elasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1547,8 +1555,8 @@ contains
                             nRdot(1), &
                             R(1), &
                             Rdot(1)
-                    else if (hypoelasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                    else if (elasticity) then
+                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1720,14 +1728,14 @@ contains
             end if
         end if
 
-    end subroutine s_write_probe_files ! -----------------------------------
+    end subroutine s_write_probe_files
 
     !>  The goal of this subroutine is to write to the run-time
         !!      information file basic footer information applicable to
         !!      the current computation and to close the file when done.
         !!      The footer contains the stability criteria extrema over
         !!      all of the time-steps and the simulation run-time.
-    subroutine s_close_run_time_information_file() ! -----------------------
+    subroutine s_close_run_time_information_file
 
         real(kind(0d0)) :: run_time !< Run-time of the simulation
 
@@ -1748,7 +1756,7 @@ contains
             '========================================'
         close (1)
 
-    end subroutine s_close_run_time_information_file ! ---------------------
+    end subroutine s_close_run_time_information_file
 
     !> Closes communication files
     subroutine s_close_com_files() ! ---------------------------------------
@@ -1761,7 +1769,7 @@ contains
     end subroutine s_close_com_files ! -------------------------------------
 
     !> Closes probe files
-    subroutine s_close_probe_files() ! -------------------------------------
+    subroutine s_close_probe_files
 
         integer :: i !< Generic loop iterator
 
@@ -1769,12 +1777,12 @@ contains
             close (i + 30)
         end do
 
-    end subroutine s_close_probe_files ! -----------------------------------
+    end subroutine s_close_probe_files
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_data_output_module() ! -------------------------
+    subroutine s_initialize_data_output_module
 
         type(int_bounds_info) :: ix, iy, iz
 
@@ -1814,10 +1822,10 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
 
-    end subroutine s_initialize_data_output_module ! -----------------------
+    end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_data_output_module() ! ---------------------------
+    subroutine s_finalize_data_output_module
 
         integer :: i !< Generic loop iterator
 
@@ -1834,6 +1842,6 @@ contains
         s_convert_to_mixture_variables => null()
         s_write_data_files => null()
 
-    end subroutine s_finalize_data_output_module ! -------------------------
+    end subroutine s_finalize_data_output_module
 
 end module m_data_output

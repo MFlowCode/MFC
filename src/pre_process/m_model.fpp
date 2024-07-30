@@ -22,10 +22,12 @@ module m_model
 contains
 
     !> This procedure reads a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model The binary of the STL file.
     subroutine s_read_stl_binary(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(OUT) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(out) :: model
 
         integer :: i, j, iunit, iostat
 
@@ -69,10 +71,12 @@ contains
     end subroutine s_read_stl_binary
 
     !> This procedure reads an ASCII STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     subroutine s_read_stl_ascii(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(OUT) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(out) :: model
 
         integer :: i, j, iunit, iostat
 
@@ -148,10 +152,12 @@ contains
     end subroutine s_read_stl_ascii
 
     !> This procedure reads an STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     subroutine s_read_stl(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(OUT) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(out) :: model
 
         integer :: iunit, iostat
 
@@ -180,10 +186,12 @@ contains
     end subroutine
 
     !> This procedure reads an OBJ file.
+    !! @param filepath Path to the odj file.
+    !! @param model The obj file.
     subroutine s_read_obj(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(OUT) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(out) :: model
 
         integer :: i, j, k, l, iunit, iostat, nVertices
 
@@ -258,7 +266,7 @@ contains
     !! @return The model read from the file.
     function f_model_read(filepath) result(model)
 
-        character(LEN=*), intent(IN) :: filepath
+        character(LEN=*), intent(in) :: filepath
 
         type(t_model) :: model
 
@@ -276,10 +284,12 @@ contains
     end function f_model_read
 
     !> This procedure writes a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model STL to write
     subroutine s_write_stl(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(IN) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(in) :: model
 
         integer :: i, j, iunit, iostat
 
@@ -324,10 +334,12 @@ contains
     end subroutine s_write_stl
 
     !> This procedure writes an OBJ file.
+    !! @param filepath Path to the obj file.
+    !! @param model obj to write.
     subroutine s_write_obj(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(IN) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(in) :: model
 
         integer :: iunit, iostat
 
@@ -360,11 +372,11 @@ contains
 
     !> This procedure writes a binary STL file.
     !! @param filepath  Path to the file to write.
-    !! @param triangles Triangles to write.
+    !! @param model Model to write.
     subroutine s_model_write(filepath, model)
 
-        character(LEN=*), intent(IN) :: filepath
-        type(t_model), intent(IN) :: model
+        character(LEN=*), intent(in) :: filepath
+        type(t_model), intent(in) :: model
 
         select case (filepath(len(trim(filepath)) - 3:len(trim(filepath))))
         case (".stl")
@@ -382,7 +394,7 @@ contains
     !> This procedure frees the memory allocated for an STL mesh.
     subroutine s_model_free(model)
 
-        type(t_model), intent(INOUT) :: model
+        type(t_model), intent(inout) :: model
 
         deallocate (model%trs)
 
@@ -390,10 +402,10 @@ contains
 
     function f_read_line(iunit, line) result(bIsLine)
 
-        integer, intent(IN) :: iunit
-        character(80), intent(OUT) :: line
-        logical :: bIsLine
+        integer, intent(in) :: iunit
+        character(80), intent(out) :: line
 
+        logical :: bIsLine
         integer :: iostat
 
         bIsLine = .true.
@@ -419,7 +431,7 @@ contains
 
     subroutine s_skip_ignored_lines(iunit)
 
-        integer, intent(IN) :: iunit
+        integer, intent(in) :: iunit
 
         character(80) :: line
 

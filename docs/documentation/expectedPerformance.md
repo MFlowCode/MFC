@@ -1,26 +1,41 @@
-# Performance Results
+# Performance
 
 MFC has been benchmarked on several CPUs and GPU devices.
 This page shows a summary of these results.
 
-## Expected time-steps/hour
+## Figure of merit: Grind time performance
 
-The following table outlines observed performance as nanoseconds per grid point (ns/GP) per equation (eq) per right-hand side (rhs) evaluation (lower is better).
-We solve an example 3D, inviscid, 5-equation model problem with two advected species (a total of 8 PDEs).
-The numerics are WENO5 and the HLLC approximate Riemann solver.
+The following table outlines observed performance as nanoseconds per grid point (ns/GP) per equation (eq) per right-hand side (rhs) evaluation (lower is better), also known as the grind time.
+We solve an example 3D, inviscid, 5-equation model problem with two advected species (8 PDEs) and 8M grid points (158-cubed uniform grid).
+The numerics are WENO5 finite volume reconstruction and HLLC approximate Riemann solver.
 This case is located in `examples/3D_performance_test`.
-We report results for various numbers of grid points per CPU die (or GPU device) and hardware.
 
-| Hardware             |  | 1M GPs      | 4M GPs      | 8M GPs | Compiler    | Computer      |
-| ---:                 | :----:  |    :----:      |  :---:         | :---:        | :----:      | :---          |
-| NVIDIA V100          | 1 device       | 12.0         | 13.0          | 13.0        | NVHPC 22.11 | PACE Phoenix  |
-| NVIDIA V100          | 1 device      | 12.6         |  13.0        | 13.0        | NVHPC 22.11 | OLCF Summit   |
-| NVIDIA A100          | 1 device      | 8.9        | 7.0          | 7.4        | NVHPC 23.5  | Wingtip       |
-| AMD MI250X           | 1 GCD      | 13.5          | 11.3       | 12      | CCE 16.0.1  | OLCF Frontier |
-| Intel Xeon Gold 6226 | 12 cores     | 245           | 211           | 211         | GNU 10.3.0  | PACE Phoenix  |
-| Apple M2     | 6 cores      | 365           | 306          | 563        | GNU 13.2.0  | N/A           |
+Results are for MFC v4.9.3 (July 2024 release), though numbers have not changed meaningfully since then.
+All results are for the compiler that gave the best performance.
+Note:
+* CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device.
+These are reported as (X/Y cores), where X is the used cores, and Y is the total on the die.
+* GPU results on single-precision (SP) GPUs performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation.
+AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we report results for one GCD, though one can quickly estimate full MI250X runtime by halving the single GCD grind time number.
 
-__All results are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
+| Hardware                  |            |   Grind Time   |    Compiler    |   Computer   |
+| ---:                      | ----:      |    :----:      |  :---         | :---         | 
+| NVIDIA GH200 (GPU only)   | 1 GPU          | 0.32       | NVHPC 24.1           | GT Rogues Gallery  |
+| NVIDIA H100               | 1 GPU          | 0.45       | NVHPC 24.5           | GT Rogues Gallery  |
+| NVIDIA A100               | 1 GPU          | 0.62       | NVHPC 22.11          | GT Phoenix  |
+| NVIDIA V100               | 1 GPU          | 0.99       | NVHPC 22.11          | GT Phoenix  |
+| NVIDIA A30                | 1 GPU          | 1.06       | NVHPC 24.1           | GT Rogues Gallery  |
+| AMD MI250X                | 1 __GCD__      | 1.09       | CCE 16.0.1           | OLCF Frontier |
+| AMD MI100                 | 1 GPU          | 1.38       | CCE 16.0.1           | Cray internal system |
+| NVIDIA A40 (SP GPU)       | 1 GPU          | 3.3        | NVHPC 22.11          | NCSA Delta  |
+| NVIDIA RTX6000 (SP GPU)   | 1 GPU          | 3.9        | NVHPC 22.11          | GT Phoenix  |
+| Apple M1 Max                                 | 8/10 cores      | 72         | GNU 14.1.0           | N/A         |
+| AMD EPYC 9534 (Genoa)                        | 64/64 cores     | 96         | GNU 12.3.0           | GT Phoenix  |
+| Intel Xeon Gold 6454S (Sapphire Rapids)      | 16/32 cores     | 111        | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137        | GNU 12.1.0           | GT Phoenix  |
+| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152        | Intel oneAPI 2022.1  | GT Phoenix  |
+
+__All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
 ## Weak scaling
 

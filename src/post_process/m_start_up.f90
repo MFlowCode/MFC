@@ -31,6 +31,8 @@ module m_start_up
 
     use m_compile_specific
 
+    use m_checker_common
+
     use m_checker
     ! ==========================================================================
 
@@ -41,7 +43,7 @@ contains
     !>  Reads the configuration file post_process.inp, in order
         !!      to populate parameters in module m_global_parameters.f90
         !!      with the user provided inputs
-    subroutine s_read_input_file() ! ---------------------------------------
+    subroutine s_read_input_file
 
         character(LEN=name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -72,7 +74,8 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, sim_data
+            relax_model, cf_wrt, sigma, adv_n, ib, sim_data, &
+            hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -104,13 +107,13 @@ contains
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if
 
-    end subroutine s_read_input_file ! -------------------------------------
+    end subroutine s_read_input_file
 
     !>  Checking that the user inputs make sense, i.e. that the
         !!      individual choices are compatible with the code's options
         !!      and that the combination of these choices results into a
         !!      valid configuration for the post-process
-    subroutine s_check_input_file() ! --------------------------------------
+    subroutine s_check_input_file
 
         character(LEN=len_trim(case_dir)) :: file_loc !<
             !! Generic string used to store the address of a particular file
@@ -131,13 +134,14 @@ contains
                              'case_dir. Exiting ...')
         end if
 
+        call s_check_inputs_common()
         call s_check_inputs()
 
-    end subroutine s_check_input_file ! ------------------------------------
+    end subroutine s_check_input_file
 
     subroutine s_perform_time_step(t_step)
 
-        integer, intent(INOUT) :: t_step
+        integer, intent(inout) :: t_step
         if (proc_rank == 0) then
             print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
                 int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
@@ -145,9 +149,9 @@ contains
                 (t_step_stop - t_step_start)/t_step_save + 1, &
                 t_step
         end if
-
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
+
         ! Populating the buffer regions of the grid variables
         if (buff_size > 0) then
             call s_populate_grid_variables_buffer_regions()
@@ -160,13 +164,14 @@ contains
 
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+
     end subroutine s_perform_time_step
 
     subroutine s_save_data(t_step, varname, pres, c, H)
 
-        integer, intent(INOUT) :: t_step
-        character(LEN=name_len), intent(INOUT) :: varname
-        real(kind(0d0)), intent(INOUT) :: pres, c, H
+        integer, intent(inout) :: t_step
+        character(LEN=name_len), intent(inout) :: varname
+        real(kind(0d0)), intent(inout) :: pres, c, H
 
         integer :: i, j, k, l
 
@@ -311,22 +316,34 @@ contains
 
         end if
         ! ----------------------------------------------------------------------
-
         ! Adding the elastic shear stresses to the formatted database file -----
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then
                     q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-
                     write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
             end do
         end if
+        if (hyperelasticity) then
+            do i = 1, xiend - xibeg + 1
+                if (prim_vars_wrt) then
+                    q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+                    write (varname, '(A,I0)') 'xi', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                end if
+                varname(:) = ' '
+            end do
+        end if
+
         ! ----------------------------------------------------------------------
 
         ! Adding the pressure to the formatted database file -------------------
@@ -503,6 +520,12 @@ contains
         end if
         ! ----------------------------------------------------------------------
 
+        if (ib) then
+            q_sf = real(ib_markers%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
+            varname = 'ib_markers'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+        end if
+
         ! Adding Q_M to the formatted database file ------------------
         if (p > 0 .and. qm_wrt) then
             call s_derive_qm(q_prim_vf, q_sf)
@@ -636,13 +659,12 @@ contains
             call s_close_energy_data_file()
         end if
 
-
         ! Closing the formatted database file
         call s_close_formatted_database_file()
 
     end subroutine s_save_data
 
-    subroutine s_initialize_modules()
+    subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
@@ -666,7 +688,7 @@ contains
         end if
     end subroutine s_initialize_modules
 
-    subroutine s_initialize_mpi_domain()
+    subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -691,7 +713,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    subroutine s_finalize_modules()
+    subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 

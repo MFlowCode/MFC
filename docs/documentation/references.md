@@ -10,6 +10,8 @@
 
 - <a id="Bryngelson19">Bryngelson, S. H., Schmidmayer, K., Coralic, V., Meng, J. C., Maeda, K., and Colonius, T. (2019). Mfc: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver. arXiv preprint arXiv:1907.10512.</a>
 
+- <a id="Chen22">Chen, S. S., Li, J. P., Li, Z., Yuan, W., & Gao, Z. H. (2022). Anti-dissipation pressure correction under low Mach numbers for Godunov-type schemes. Journal of Computational Physics, 456, 111027. </a>
+
 - <a id="Childs12">Childs, H., Brugger, E., Whitlock, B., Meredith, J., Ahern, S., Pugmire, D., Biagas, K., Miller, M., Harrison, C., Weber, G. H., Krishnan, H., Fogal, T., Sanderson, A., Garth, C., Bethel, E. W., Camp, D., R¨ubel, O., Durant, M., Favre, J. M., and Navr´atil, P. (2012). VisIt: An End-User Tool For Visualizing and Analyzing Very Large Data. In High Performance Visualization–Enabling Extreme-Scale Scientific Insight, pages 357–372.</a>
 
 - <a id="Coralic15">Coralic, V. (2015). Simulation of shock-induced bubble collapse with application to vascular injury in shockwave lithotripsy. PhD thesis, California Institute of Technology.</a>
@@ -19,6 +21,10 @@
 - <a id="Gottlieb98">Gottlieb, S. and Shu, C.-W. (1998). Total variation diminishing runge-kutta schemes. Mathematics of computation of the American Mathematical Society, 67(221):73–85.</a>
 
 - <a id="Henrick05">Henrick, A. K., Aslam, T. D., and Powers, J. M. (2005). Mapped weighted essentially nonoscillatory schemes: achieving optimal order near critical points. Journal of Computational Physics, 207(2):542–567.</a>
+
+- <a id="Borges08">Borges, R., Carmona, M., Costa, B., and Don, W. S. (2008). An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws. Journal of computational physics, 227(6):3191–3211.</a>
+
+- <a id="Fu16">Fu, L., Hu, X. Y., and Adams, N. A. (2016). A family of high-order targeted ENO schemes for compressible-fluid simulations. Journal of Computational Physics, 305:333–359.</a>
 
 - <a id="Johnsen08">Johnsen, E. (2008). Numerical simulations of non-spherical bubble collapse: With applications to shockwave lithotripsy. PhD thesis, California Institute of Technology.</a>
 
@@ -37,6 +43,8 @@
 - <a id="Thompson87">Thompson, K. W. (1987). Time dependent boundary conditions for hyperbolic systems. Journal of computational physics, 68(1):1–24.</a>
 
 - <a id="Thompson90">Thompson, K. W. (1990). Time-dependent boundary conditions for hyperbolic systems, ii. Journal of computational physics, 89(2):439–461.</a>
+
+- <a id="Thornber08">Thornber, B., Mosedale, A., Drikakis, D., Youngs, D., & Williams, R. J. (2008). An improved reconstruction method for compressible flows with low Mach number features. Journal of computational Physics, 227(10), 4873-4894.</a>
 
 - <a id="Titarev04">Titarev, V. A. and Toro, E. F. (2004). Finite-volume weno schemes for three-dimensional conservation laws. Journal of Computational Physics, 201(1):238–260.</a>
 

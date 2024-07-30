@@ -1,5 +1,5 @@
 #:def s_compute_speed_of_sound()
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c, G)
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
@@ -10,8 +10,8 @@
         real(kind(0d0)), intent(IN) :: H
         real(kind(0d0)), dimension(num_fluids), intent(IN) :: adv
         real(kind(0d0)), intent(IN) :: vel_sum
+        real(kind(0d0)), optional, dimension(num_fluids), intent(IN) :: G
         real(kind(0d0)), intent(OUT) :: c
-
         real(kind(0d0)) :: blkmod1, blkmod2
 
         integer :: q
@@ -22,6 +22,7 @@
             blkmod2 = ((gammas(2) + 1d0)*pres + &
                        pi_infs(2))/gammas(2)
             c = (1d0/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+
         elseif (model_eqns == 3) then
             c = 0d0
             !$acc loop seq
@@ -43,6 +44,7 @@
                     (pres + pi_inf/(gamma + 1d0))/ &
                     (rho*(1d0 - adv(num_fluids)))
             end if
+
         else
             c = ((H - 5d-1*vel_sum)/gamma)
         end if

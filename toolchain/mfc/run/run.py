@@ -70,7 +70,7 @@ def get_baked_templates() -> dict:
 def __job_script_filepath() -> str:
     return os.path.abspath(os.sep.join([
         os.path.dirname(ARG("input")),
-        f"{ARG('name')}.sh"
+        f"{ARG('name')}.{'bat' if os.name == 'nt' else 'sh'}"
     ]))
 
 

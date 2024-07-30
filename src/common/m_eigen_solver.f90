@@ -10,7 +10,8 @@ module m_eigen_solver
 
     implicit none
 
-    private; public :: cg, cbal, corth, comqr2, csroot, cdiv, pythag
+    private; 
+    public :: cg, cbal, corth, comqr2, csroot, cdiv, pythag
 
 contains
 
@@ -51,9 +52,14 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer nm, nl, is1, is2, ierr
-        real(kind(0d0)), dimension(nm, nl) :: ar, ai, zr, zi
-        real(kind(0d0)), dimension(nl) :: wr, wi, fv1, fv2, fv3
+        integer, intent(in) :: nm, nl
+        real(kind(0d0)), dimension(nm:nl), intent(inout) :: ar, ai
+        real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
+        real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
+        real(kind(0d0)), dimension(nl), intent(out) :: fv1, fv2, fv3
+        integer, intent(out) :: ierr
+
+        integer :: is1, is2
 
         if (nl <= nm) go to 10
         ierr = 10*nl
@@ -125,11 +131,14 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer i, j, k, l, ml, nl, jj, nm, igh, low, iexc
-        real(kind(0d0)), dimension(nm, nl) :: ar, ai
-        real(kind(0d0)), dimension(nl) :: scale
+        integer, intent(in) :: nm, nl
+        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
+        integer, intent(out) :: low, igh
+        real(kind(0d0)), dimension(nl), intent(out) :: scale
+
+        integer :: i, j, k, l, ml, jj, iexc
         real(kind(0d0)) :: c, f, g, r, s, b2, radix
-        logical noconv
+        logical :: noconv
 
         radix = 16.0d0
 
@@ -295,12 +304,13 @@ contains
 !     this version dated august 1983.
 !
 !     ------------------------------------------------------------------
-        integer i, j, ml, nl, ii, jj, la, mp, nm, igh, kp1, low
-        real(kind(0d0)), dimension(nm, nl) :: ar, ai
-        real(kind(0d0)), dimension(igh) :: ortr, orti
+        integer, intent(in) :: nm, nl, low, igh
+        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
+        real(kind(0d0)), dimension(igh), intent(out) :: ortr, orti
+
+        integer :: i, j, ml, ii, jj, la, mp, kp1, mll
         real(kind(0d0)) :: f, g, h, fi, fr, scale, c
 
-        integer mll
         mll = 6
 
         la = igh - 1
@@ -460,11 +470,14 @@ contains
 !     this version dated october 1989.
 !
 !     ------------------------------------------------------------------
-        integer i, j, k, l, ml, nl, en, ii, jj, ll, nm, nn, igh, ip1, &
-            itn, its, low, lp1, enm1, iend, ierr
-        real(kind(0d0)), dimension(nm, nl) :: hr, hi, zr, zi
-        real(kind(0d0)), dimension(nl) :: wr, wi
-        real(kind(0d0)), dimension(igh) :: ortr, orti
+        integer, intent(in) :: nm, nl, low, igh
+        real(kind(0d0)), dimension(nm, nl), intent(inout) :: hr, hi
+        real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
+        real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
+        real(kind(0d0)), dimension(igh), intent(inout) :: ortr, orti
+        integer, intent(out) :: ierr
+
+        integer :: i, j, k, l, ml, en, ii, jj, ll, nn, ip1, itn, its, lp1, enm1, iend
         real(kind(0d0)) :: si, sr, ti, tr, xi, xr, yi, yr, zzi, zzr, &
                            norm, tst1, tst2, c, d
 !
@@ -843,9 +856,13 @@ contains
 !
 !     ------------------------------------------------------------------
 !
-        integer i, j, k, ml, nl, ii, nm, igh, low
-        double precision scale(nl), zr(nm, ml), zi(nm, ml)
-        double precision s
+        integer, intent(in) :: nm, nl, low, igh
+        double precision, intent(in) :: scale(nl)
+        integer, intent(in) :: ml
+        double precision, intent(inout) :: zr(nm, ml), zi(nm, ml)
+
+        integer :: i, j, k, ii
+        double precision :: s
 
         if (ml == 0) go to 200
         if (igh == low) go to 120
@@ -885,7 +902,8 @@ contains
     end subroutine cbabk2
 
     subroutine csroot(xr, xi, yr, yi)
-        real(kind(0d0)) :: xr, xi, yr, yi
+        real(kind(0d0)), intent(in) :: xr, xi
+        real(kind(0d0)), intent(out) :: yr, yi
 !
 !     (yr,yi) = complex dsqrt(xr,xi)
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
@@ -904,7 +922,8 @@ contains
     end subroutine csroot
 
     subroutine cdiv(ar, ai, br, bi, cr, ci)
-        real(kind(0d0)) :: ar, ai, br, bi, cr, ci
+        real(kind(0d0)), intent(in) :: ar, ai, br, bi
+        real(kind(0d0)), intent(out) :: cr, ci
 !
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
@@ -921,7 +940,8 @@ contains
     end subroutine cdiv
 
     subroutine pythag(a, b, c)
-        real(kind(0d0)) :: a, b, c
+        real(kind(0d0)), intent(in) :: a, b
+        real(kind(0d0)), intent(out) :: c
 !
 !     finds dsqrt(a**2+b**2) without overflow or destructive underflow
 !

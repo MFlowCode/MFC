@@ -24,8 +24,11 @@
 
 Welcome to the home of MFC!
 MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
 MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
+
+MFC is used on the latest leadership-class supercomputers.
+It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
+MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and made use of OLCF Frontier and LLNL El Capitan early access systems.
   
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
@@ -55,17 +58,17 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```shell
-brew install wget python cmake gcc@13 mpich
+brew install wget python cmake gcc@14 mpich
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
 ```shell
-git clone https://github.com/MFlowCode/MFC.git
+git clone https://github.com/MFlowCode/MFC
 cd MFC
 ```
 and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
 ```shell
-echo -e "export CC=gcc-13 \nexport CXX=g++-13 \nexport FC=gfortran-13" >> ~/.profile
+echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14" >> ~/.profile
 source ~/.profile
 ```
 then you can build MFC and run the test suite!
@@ -82,9 +85,9 @@ The shock-droplet interaction case above was run via
 ./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
 ```
 where `8` is the number of cores the example will run on.
-You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
+You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your other favorite software.
 
-## Is this really exascale
+## Is this _really_ exascale?
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
 The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
@@ -127,11 +130,13 @@ They are organized below. Just click the drop-downs!
 <summary>Numerics</summary>
 
 * Shock and interface capturing schemes
-	* First-order upwinding, WENO3 and 5.
+	* First-order upwinding
+ 	* WENO reconstructions of order 3 and 5
+  	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
-	* Reliable handling of high density ratios.
+	* Reliable handling of high density ratios
 * Exact and approximate (e.g., HLL, HLLC) Riemann solvers
-* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more.
+* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more
 * Runge-Kutta orders 1-3 (SSP TVD)
 * Interface sharpening (THINC-like)
 </details>

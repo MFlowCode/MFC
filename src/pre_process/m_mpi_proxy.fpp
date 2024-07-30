@@ -33,7 +33,7 @@ contains
         !!       these are not available to the remaining processors. This
         !!       subroutine is then in charge of broadcasting the required
         !!       information.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -55,7 +55,7 @@ contains
             & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity', 'relax',    &
             & 'parallel_io', 'perturb_flow', 'vel_profile', 'instability_wave',&
             & 'perturb_sph', 'bubbles', 'polytropic', 'polydisperse', 'qbmm',  &
-            & 'file_per_process', 'adv_n', 'ib' ]
+            & 'file_per_process', 'adv_n', 'ib', 'hyperelasticity','pre_stress']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -117,14 +117,14 @@ contains
         end do
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !> Description: This subroutine takes care of efficiently distributing
         !!              the computational domain among the available processors
         !!             as well as recomputing some of the global parameters so
         !!              that they reflect the configuration of sub-domain that is
         !!              overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -534,6 +534,6 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
 end module m_mpi_proxy

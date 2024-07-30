@@ -62,7 +62,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module() ! -------------------
+    subroutine s_initialize_initial_condition_module
 
         integer :: i !< generic loop iterator
 
@@ -107,7 +107,7 @@ contains
         patch_id_fp = 0
         ib_markers%sf = 0
 
-    end subroutine s_initialize_initial_condition_module ! -----------------
+    end subroutine s_initialize_initial_condition_module
 
     !>  This subroutine peruses the patches and depending on the
         !!              type of geometry associated with a particular patch, it
@@ -115,7 +115,7 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition() ! ----------------------------
+    subroutine s_generate_initial_condition
 
         integer :: i  !< Generic loop operator
 
@@ -257,10 +257,7 @@ contains
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
-                
-                elseif (patch_icpp(i)%geometry == 22) then
-                    call s_2D_lung(i, patch_id_fp, q_prim_vf, .false.)
-                
+
                 end if
                 !> @}
             end do
@@ -318,8 +315,7 @@ contains
         if (instability_wave) call s_superposition_instability_wave()
 
         ! Converting the primitive variables to the conservative ones
-        call s_convert_primitive_to_conservative_variables(q_prim_vf, &
-                                                           q_cons_vf)
+        call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -327,9 +323,9 @@ contains
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
 
-    end subroutine s_generate_initial_condition ! --------------------------
+    end subroutine s_generate_initial_condition
 
-    subroutine s_perturb_sphere() ! ----------------------------------------
+    subroutine s_perturb_sphere
 
         integer :: i, j, k, l !< generic loop operators
 
@@ -359,9 +355,9 @@ contains
             end do
         end do
 
-    end subroutine s_perturb_sphere ! --------------------------------------
+    end subroutine s_perturb_sphere
 
-    subroutine s_perturb_surrounding_flow() ! ------------------------------
+    subroutine s_perturb_surrounding_flow
 
         integer :: i, j, k, l !<  generic loop iterators
 
@@ -393,7 +389,7 @@ contains
             end do
         end do
 
-    end subroutine s_perturb_surrounding_flow ! ----------------------------
+    end subroutine s_perturb_surrounding_flow
 
     !>  This subroutine computes velocity perturbations for a temporal mixing
         !!              layer with hypertangent mean streamwise velocity profile
@@ -401,7 +397,7 @@ contains
         !!              instability waves with spatial wavenumbers, (4,0), (2,0),
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
-    subroutine s_superposition_instability_wave() ! ------------------------
+    subroutine s_superposition_instability_wave
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)) :: tr, ti
         real(kind(0d0)) :: Lx, Lz
@@ -457,7 +453,7 @@ contains
             end do
         end do
 
-    end subroutine s_superposition_instability_wave ! ----------------------
+    end subroutine s_superposition_instability_wave
 
     !>  This subroutine computes instability waves for a given set of spatial
         !!              wavenumbers (alpha, beta) in x and z directions.
@@ -466,6 +462,11 @@ contains
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha, beta, tr, ti, wave, shift)
         real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
+        ! THESE VARIABLES ARE UNUSED WITHIN THE FUNCTION
+        real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(out) :: wave !< instability wave
+        real(kind(0d0)), intent(in) :: shift !< phase shift
+
         real(kind(0d0)), dimension(0:n) :: rho_mean, u_mean !<  mean density and velocity profiles
         real(kind(0d0)) :: p_mean !< mean pressure profile
         real(kind(0d0)), dimension(0:n) :: drho_mean, du_mean, dt_mean !< y-derivatives of mean profiles
@@ -475,10 +476,7 @@ contains
         real(kind(0d0)), dimension(0:5*(n + 1) - 1, 0:5*(n + 1) - 1) :: zr, zi !< eigenvectors
         real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: wr, wi !< eigenvalues
         real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: fv1, fv2, fv3 !< temporary memory
-        real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
         real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: vr, vi, vnr, vni !< most unstable eigenvector and normalized one
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave !< instability wave
-        real(kind(0d0)) :: shift !< phase shift
         real(kind(0d0)) :: gam, pi_inf, rho1, mach, c1
         integer :: ierr
         integer :: j, k, l !<  generic loop iterators
@@ -579,13 +577,14 @@ contains
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(nl, wr, wi, zr, zi, alpha, beta, wave, shift)
-        integer nl
-        real(kind(0d0)), dimension(0:nl - 1) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nl - 1, 0:nl - 1) :: zr, zi !< eigenvectors
+        integer, intent(in) :: nl
+        real(kind(0d0)), dimension(0:nl - 1), intent(in) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:nl - 1, 0:nl - 1), intent(in) :: zr, zi !< eigenvectors
+        real(kind(0d0)), intent(in) :: alpha, beta, shift
+
         real(kind(0d0)), dimension(0:nl - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave
-        real(kind(0d0)) :: alpha, beta, ang, shift
-        real(kind(0d0)) :: norm
+        real(kind(0d0)) :: norm, ang
         real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
         integer idx
         integer i, j, k
@@ -642,7 +641,7 @@ contains
     end subroutine s_generate_wave
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module() ! ---------------------
+    subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 
@@ -659,6 +658,6 @@ contains
         deallocate (patch_id_fp)
         deallocate (ib_markers%sf)
 
-    end subroutine s_finalize_initial_condition_module ! -------------------
+    end subroutine s_finalize_initial_condition_module
 
 end module m_initial_condition

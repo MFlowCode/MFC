@@ -1,5 +1,4 @@
 from enum import Enum
-
 from ..state import ARG
 
 class ParamType(Enum):
@@ -8,8 +7,19 @@ class ParamType(Enum):
     LOG = {"enum": ["T", "F"]}
     STR = {"type": "string"}
 
+    _ANALYTIC_INT = {"type": ["integer", "string"]}
+    _ANALYTIC_REAL = {"type": ["number", "string"]}
+
+    def analytic(self):
+        if self == self.INT:
+            return self._ANALYTIC_INT
+        if self == self.REAL:
+            return self._ANALYTIC_REAL
+        return self.STR
+
 COMMON = {
     'hypoelasticity': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
     'pref': ParamType.REAL,
     'p': ParamType.INT,
@@ -39,6 +49,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -67,6 +78,7 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'pre_stress': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -108,7 +120,9 @@ for p_id in range(1, 10+4):
                       "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
                       "normal", "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
                       "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
+
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
+    PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
     # (cameron): This parameter has since been removed.
     # for i in range(100):
@@ -128,15 +142,16 @@ for p_id in range(1, 10+4):
         PRE_PROCESS[f'patch_icpp({p_id})%{cmp}_centroid'] = ParamType.REAL
         PRE_PROCESS[f'patch_icpp({p_id})%length_{cmp}'] = ParamType.REAL
 
-        for append in ["radii", "normal", "vel"]:
+        for append in ["radii", "normal"]:
             PRE_PROCESS[f'patch_icpp({p_id})%{append}({cmp_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%vel({cmp_id})'] = ParamType.REAL.analytic()
 
     for arho_id in range(1, 10+1):
-        PRE_PROCESS[f'patch_icpp({p_id})%alpha({arho_id})'] = ParamType.REAL
-        PRE_PROCESS[f'patch_icpp({p_id})%alpha_rho({arho_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%alpha({arho_id})'] = ParamType.REAL.analytic()
+        PRE_PROCESS[f'patch_icpp({p_id})%alpha_rho({arho_id})'] = ParamType.REAL.analytic()
 
     for taue_id in range(1, 6+1):
-        PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL
+        PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL.analytic()
 
     if p_id >= 2:
         PRE_PROCESS[f'patch_icpp({p_id})%alter_patch'] = ParamType.LOG
@@ -163,7 +178,10 @@ SIMULATION.update({
     't_step_print': ParamType.INT,
     'time_stepper': ParamType.INT,
     'weno_eps': ParamType.REAL,
+    'teno_CT': ParamType.REAL,
     'mapped_weno': ParamType.LOG,
+    'wenoz': ParamType.LOG,
+    'teno': ParamType.LOG,
     'mp_weno': ParamType.LOG,
     'weno_avg': ParamType.LOG,
     'weno_Re_flux': ParamType.LOG,
@@ -178,8 +196,8 @@ SIMULATION.update({
     'num_probes': ParamType.INT,
     'probe_wrt': ParamType.LOG,
     'bubble_model': ParamType.INT,
-    'Monopole': ParamType.LOG,
-    'num_mono': ParamType.INT,
+    'acoustic_source': ParamType.LOG,
+    'num_source': ParamType.INT,
     'qbmm': ParamType.LOG,
     'R0_type': ParamType.INT,
     'integral_wrt': ParamType.LOG,
@@ -191,6 +209,7 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'low_Mach': ParamType.INT,
 })
 
 # NOTE: Not currently present
@@ -246,15 +265,20 @@ for f_id in range(1,10+1):
         SIMULATION[f"fluid_pp({f_id})%Re({re_id})"] = ParamType.REAL
 
     for mono_id in range(1,4+1):
-        for int_attr in ["pulse", "support"]:
-            SIMULATION[f"Mono({mono_id})%{int_attr}"] = ParamType.INT
+        for int_attr in ["pulse", "support", "num_elements", "element_on"]:
+            SIMULATION[f"acoustic({mono_id})%{int_attr}"] = ParamType.INT
 
-        for real_attr in ["mag", "length", "dir", "npulse", "delay",
-                          "foc_length", "aperture", "support_width"]:
-            SIMULATION[f"Mono({mono_id})%{real_attr}"] = ParamType.REAL
+        SIMULATION[f"acoustic({mono_id})%dipole"] = ParamType.LOG
+
+        for real_attr in ["mag", "length", "height", "wavelength", "frequency",
+                          "gauss_sigma_dist", "gauss_sigma_time", "npulse",
+                          "dir", "delay", "foc_length", "aperture",
+                          "element_spacing_angle", "element_polygon_ratio",
+                          "rotate_angle"]:
+            SIMULATION[f"acoustic({mono_id})%{real_attr}"] = ParamType.REAL
 
         for cmp_id in range(1,3+1):
-            SIMULATION[f"Mono({mono_id})%loc({cmp_id})"] = ParamType.REAL
+            SIMULATION[f"acoustic({mono_id})%loc({cmp_id})"] = ParamType.REAL
 
     for int_id in range(1,5+1):
         for cmp in ["x", "y", "z"]:
@@ -295,7 +319,8 @@ POST_PROCESS.update({
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
-    'sim_data': ParamType.LOG
+    'sim_data': ParamType.LOG,
+    'ib': ParamType.LOG
 })
 
 for cmp_id in range(1,3+1):
@@ -327,7 +352,7 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "nb", "weno_order", "num_fluids" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

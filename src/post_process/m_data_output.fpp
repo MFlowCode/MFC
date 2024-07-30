@@ -110,7 +110,7 @@ module m_data_output
 
 contains
 
-    subroutine s_initialize_data_output_module() ! ----------------------------
+    subroutine s_initialize_data_output_module
         ! Description: Computation of parameters, allocation procedures, and/or
         !              any other tasks needed to properly setup the module
 
@@ -418,9 +418,9 @@ contains
 
         ! END: Querying Number of Flow Variable(s) in Binary Output ========
 
-    end subroutine s_initialize_data_output_module ! --------------------------
+    end subroutine s_initialize_data_output_module
 
-    subroutine s_open_formatted_database_file(t_step) ! --------------------
+    subroutine s_open_formatted_database_file(t_step)
         ! Description: This subroutine opens a new formatted database file, or
         !              replaces an old one, and readies it for the data storage
         !              of the grid and the flow variable(s) associated with the
@@ -433,7 +433,7 @@ contains
         !              not performed in multidimensions.
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
@@ -450,7 +450,7 @@ contains
             ! Creating formatted database slave file at the above location
             ! and setting up the structure of the file and its header info
             ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                            DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
+                            DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
                             DB_HDF5, dbfile)
 
             ! Verifying that the creation and setup process of the formatted
@@ -471,7 +471,7 @@ contains
                 file_loc = trim(rootdir)//trim(file_loc)
 
                 ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                                DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
+                                DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
                                 DB_HDF5, dbroot)
 
                 if (dbroot == -1) then
@@ -537,7 +537,7 @@ contains
 
         ! END: Binary Database Format ======================================
 
-    end subroutine s_open_formatted_database_file ! ------------------------
+    end subroutine s_open_formatted_database_file
 
     subroutine s_open_intf_data_file() ! ------------------------
 
@@ -572,6 +572,7 @@ contains
     end subroutine s_open_energy_data_file ! ----------------------------------------
 
     subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
+
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
         !              the current time-step, t_step. The local processor will
@@ -592,7 +593,7 @@ contains
         !              subroutine s_write_variable_to_formatted_database_file.
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Bookkeeping variables storing the name and type of mesh that is
         ! handled by the local processor(s). Note that due to an internal
@@ -768,7 +769,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_write_grid_to_formatted_database_file ! ---------------
+    end subroutine s_write_grid_to_formatted_database_file
 
     subroutine s_write_variable_to_formatted_database_file(varname, t_step)
         ! Description: The goal of this subroutine is to write to the formatted
@@ -789,10 +790,10 @@ contains
 
         ! Name of the flow variable, which will be written to the formatted
         ! database file at the current time-step, t_step
-        character(LEN=*), intent(IN) :: varname
+        character(LEN=*), intent(in) :: varname
 
         ! Time-step that is currently being post-processed
-        integer, intent(IN) :: t_step
+        integer, intent(in) :: t_step
 
         ! Bookkeeping variables storing the name and type of flow variable
         ! that is about to be handled by the local processor(s). Note that
@@ -977,7 +978,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_write_variable_to_formatted_database_file ! -----------
+    end subroutine s_write_variable_to_formatted_database_file
 
     subroutine s_write_intf_data_file(q_prim_vf)
 
@@ -987,7 +988,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
         real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb 
+        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
@@ -997,7 +998,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                            maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1005,30 +1006,34 @@ contains
 
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         do l = 0, p
-            if (z_cc(l) .lt. dz(l) .and. z_cc(l) .gt. 0) then
+            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
                 cent = l
             end if
         end do
-        thres = 0.9d0
+        thres = 0.9d0*maxalph_glb
         do k = 0, n
             OLoop: do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
                 axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
                 ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
                 aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
-                if ((axp .gt. thres .and. axm .lt. thres) .or. (axp .lt. thres .and. axm .gt. thres) &
-                    .or. (ayp .gt. thres .and. aym .lt. thres) .or. (ayp .lt. thres .and. aym .gt. thres)) then
+                if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) &
+                    .or. (ayp > thres .and. aym < thres) .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
                         y_d1(counter) = y_cc(k)
+                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = sqrt(dx(j)**2 + dy(k)**2)
                     else
                         euc_d = dsqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                         tgp = dsqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
-                            if (euc_d .lt. tgp) then
+                            if (euc_d < tgp) then
                                 cycle OLoop
-                            elseif (euc_d .gt. tgp .and. i == counter) then
+                            elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
+                                !artificial bounding on the interface for bubble at a centroid.
+                                !need to remove eventually.
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)
@@ -1039,7 +1044,6 @@ contains
                 end if
             end do OLoop
         end do
-
 
         allocate (y_d(counter))
         allocate (x_d(counter))
@@ -1061,9 +1065,7 @@ contains
                         x_td(i), y_td(i), 0d0
                 end if
             end do
-         end if
-
-        
+        end if
 
     end subroutine s_write_intf_data_file ! -----------------------------------
 
@@ -1089,48 +1091,48 @@ contains
         dV = 0d0
         pres_av = 0d0
         pres = 0d0
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        pres = 0d0
-                        dV = dx(i)*dy(j)*dz(k)
-                        rho = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
-                        pres = q_prim_vf(E_idx)%sf(i, j, k)
-                        Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
-                        do s = 1, num_dims
-                            vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                            Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
-                            if (dabs(vel(s)) > maxvel) then
-                                maxvel = dabs(vel(s))
-                            end if
-                        end do
-                        do l = 1, adv_idx%end - E_idx
-                            adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
-                            gamma = gamma + adv(l)*fluid_pp(l)%gamma
-                            pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
-                            rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        end do
-
-                        H = ((gamma + 1d0)*pres + pi_inf)/rho
-
-                        call s_compute_speed_of_sound(pres, rho, &
-                                                      gamma, pi_inf, &
-                                                      H, adv, 0d0, c)
-
-                        Ma = maxvel/c
-                        if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
-                            MaxMa = Ma
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    pres = 0d0
+                    dV = dx(i)*dy(j)*dz(k)
+                    rho = 0d0
+                    gamma = 0d0
+                    pi_inf = 0d0
+                    pres = q_prim_vf(E_idx)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                    do s = 1, num_dims
+                        vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
+                        Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        if (dabs(vel(s)) > maxvel) then
+                            maxvel = dabs(vel(s))
                         end if
-                        Vl = Vl + adv(1)*dV
-                        Vb = Vb + adv(2)*dV
-                        pres_av = pres_av + adv(1)*pres*dV
-                        Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
                     end do
+                    do l = 1, adv_idx%end - E_idx
+                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                        gamma = gamma + adv(l)*fluid_pp(l)%gamma
+                        pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
+                        rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
+                    end do
+
+                    H = ((gamma + 1d0)*pres + pi_inf)/rho
+
+                    call s_compute_speed_of_sound(pres, rho, &
+                                                  gamma, pi_inf, &
+                                                  H, adv, 0d0, c)
+
+                    Ma = maxvel/c
+                    if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
+                        MaxMa = Ma
+                    end if
+                    Vl = Vl + adv(1)*dV
+                    Vb = Vb + adv(2)*dV
+                    pres_av = pres_av + adv(1)*pres*dV
+                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
                 end do
             end do
+        end do
 
         tmp = pres_av
         call s_mpi_allreduce_sum(tmp, pres_av)
@@ -1189,7 +1191,7 @@ contains
 
         end if
 
-    end subroutine s_close_formatted_database_file ! -----------------------
+    end subroutine s_close_formatted_database_file
 
     subroutine s_close_intf_data_file() ! -----------------------
 
@@ -1227,6 +1229,6 @@ contains
             deallocate (dims)
         end if
 
-    end subroutine s_finalize_data_output_module ! -----------------------
+    end subroutine s_finalize_data_output_module
 
 end module m_data_output

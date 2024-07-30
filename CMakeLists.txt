@@ -465,6 +465,7 @@ function(MFC_SETUP_TARGET)
                     PRIVATE -gpu=unified
                 )
             endif()
+
             if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${ARGS_TARGET}
                     PRIVATE -gpu=autocompare,debug

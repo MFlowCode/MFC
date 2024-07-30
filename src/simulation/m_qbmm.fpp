@@ -18,6 +18,8 @@ module m_qbmm
 
     use m_variables_conversion !< State variables type conversion procedures
 
+    use m_helper_basic           !< Functions to compare floating point numbers
+
     use m_helper
 
     ! ==========================================================================
@@ -55,7 +57,7 @@ module m_qbmm
 
 contains
 
-    subroutine s_initialize_qbmm_module()
+    subroutine s_initialize_qbmm_module
 
         integer :: i1, i2, q, i, j
 
@@ -101,14 +103,14 @@ contains
                                 momrhs(2, i1, i2, 4, q) = 1.d0 + i2
                                 momrhs(3, i1, i2, 4, q) = 0d0
 
-                                if (Re_inv /= dflt_real) then
+                                if (.not. f_is_default(Re_inv)) then
                                     ! add viscosity
                                     momrhs(1, i1, i2, 5, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 5, q) = i2
                                     momrhs(3, i1, i2, 5, q) = 0d0
                                 end if
 
-                                if (Web /= dflt_real) then
+                                if (.not. f_is_default(Web)) then
                                     ! add surface tension
                                     momrhs(1, i1, i2, 6, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 6, q) = -1.d0 + i2
@@ -274,14 +276,14 @@ contains
                                 momrhs(2, i1, i2, 4, q) = 1.d0 + i2
                                 momrhs(3, i1, i2, 4, q) = 0d0
 
-                                if (Re_inv /= dflt_real) then
+                                if (.not. f_is_default(Re_inv)) then
                                     ! add viscosity
                                     momrhs(1, i1, i2, 5, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 5, q) = i2
                                     momrhs(3, i1, i2, 5, q) = 0d0
                                 end if
 
-                                if (Web /= dflt_real) then
+                                if (.not. f_is_default(Web)) then
                                     ! add surface tension
                                     momrhs(1, i1, i2, 6, q) = -2.d0 + i1
                                     momrhs(2, i1, i2, 6, q) = -1.d0 + i2
@@ -425,11 +427,13 @@ contains
 
     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
 
-        type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
 
-        integer :: idir
         integer :: i, j, k, l, q
 
         real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -695,8 +699,9 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0.d0)), intent(IN) :: pres, rho, c
-        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
+        real(kind(0.d0)), intent(in) :: pres, rho, c
+        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+
         integer :: i1, i2, q
 
         coeffs = 0d0
@@ -709,8 +714,8 @@ contains
                         coeffs(2, i1, i2) = -3d0*i2/2d0
                         coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
-                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2d0*i2/Web/rho
                         coeffs(7, i1, i2) = 0d0
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
@@ -729,9 +734,9 @@ contains
                         coeffs(13, i1, i2) = 0d0
                         coeffs(14, i1, i2) = 0d0
                         coeffs(15, i1, i2) = 0d0
-                        if (Re_inv /= dflt_real) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(17, i1, i2) = -i2*2d0/Web/rho
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2d0/Web/rho
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(18, i1, i2) = i2*6d0*Re_inv/(rho*c)
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
@@ -739,19 +744,19 @@ contains
                             coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
                             coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
-                            if (Web /= dflt_real) then
+                            if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
                             coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                         coeffs(27, i1, i2) = 3d0*i2*gam*R_v*Tw/(c*rho)
                         coeffs(28, i1, i2) = 3d0*i2*gam*R_v*Tw/(c*c*rho)
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(29, i1, i2) = 12d0*i2*gam*R_v*Tw*Re_inv/(rho*rho*c*c)
                         end if
                         coeffs(30, i1, i2) = 3d0*i2*gam/(c*rho)
                         coeffs(31, i1, i2) = 3d0*i2*gam/(c*c*rho)
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(32, i1, i2) = 12d0*i2*gam*Re_inv/(rho*rho*c*c)
                         end if
                     end if
@@ -768,8 +773,9 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0.d0)), intent(INOUT) :: pres, rho, c
-        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(OUT) :: coeffs
+        real(kind(0.d0)), intent(inout) :: pres, rho, c
+        real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+
         integer :: i1, i2, q
 
         coeffs = 0d0
@@ -782,8 +788,8 @@ contains
                         coeffs(2, i1, i2) = -3d0*i2/2d0
                         coeffs(3, i1, i2) = i2/rho
                         coeffs(4, i1, i2) = i1
-                        if (Re_inv /= dflt_real) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(6, i1, i2) = -2d0*i2/Web/rho
+                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4d0*i2*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2d0*i2/Web/rho
                         coeffs(7, i1, i2) = i2*pv/rho
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
@@ -802,9 +808,9 @@ contains
                         coeffs(13, i1, i2) = i2*(pv)/rho
                         coeffs(14, i1, i2) = 2d0*i2*(pv)/(c*rho)
                         coeffs(15, i1, i2) = i2*(pv)/(c*c*rho)
-                        if (Re_inv /= dflt_real) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
-                        if (Web /= dflt_real) coeffs(17, i1, i2) = -i2*2d0/Web/rho
-                        if (Re_inv /= dflt_real) then
+                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4d0*Re_inv/rho
+                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2d0/Web/rho
+                        if (.not. f_is_default(Re_inv)) then
                             coeffs(18, i1, i2) = i2*6d0*Re_inv/(rho*c)
                             coeffs(19, i1, i2) = -i2*2d0*Re_inv/(rho*c*c)
                             coeffs(20, i1, i2) = i2*4d0*pres*Re_inv/(rho*rho*c)
@@ -812,7 +818,7 @@ contains
                             coeffs(22, i1, i2) = -i2*4d0/(rho*rho*c)
                             coeffs(23, i1, i2) = -i2*4d0/(rho*rho*c*c)
                             coeffs(24, i1, i2) = i2*16d0*Re_inv*Re_inv/(rho*rho*c)
-                            if (Web /= dflt_real) then
+                            if (.not. f_is_default(Web)) then
                                 coeffs(25, i1, i2) = i2*8d0*Re_inv/Web/(rho*rho*c)
                             end if
                             coeffs(26, i1, i2) = -12d0*i2*gam*Re_inv/(rho*rho*c*c)
@@ -825,13 +831,13 @@ contains
 
     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub_sc)
 
-        type(scalar_field), dimension(:), intent(INOUT) :: q_prim_vf, q_cons_vf
-        type(scalar_field), dimension(:), intent(INOUT) :: momsp
-        type(scalar_field), dimension(0:, 0:, :), intent(INOUT) :: moms3d
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
-        real(kind(0d0)), dimension(startx:, starty:, startz:) :: nbub_sc
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: momsp
+        type(scalar_field), dimension(0:, 0:, :), intent(inout) :: moms3d
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+        real(kind(0d0)), dimension(startx:, starty:, startz:) :: nbub_sc !> Unused Variable not sure what to put as intent
 
         real(kind(0d0)), dimension(nmom) :: moms, msum
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
@@ -1045,8 +1051,8 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(nnode), intent(INOUT) :: wght, abscX, abscY
-        real(kind(0d0)), dimension(nmom), intent(IN) :: momin
+        real(kind(0d0)), dimension(nmom), intent(in) :: momin
+        real(kind(0d0)), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
         real(kind(0d0)), dimension(0:2, 0:2) :: moms
         real(kind(0d0)), dimension(3) :: M1, M3
@@ -1112,8 +1118,9 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(2), intent(INOUT) :: frho, fup
-        real(kind(0d0)), dimension(3), intent(IN) :: fmom
+        real(kind(0d0)), dimension(2), intent(inout) :: frho, fup
+        real(kind(0d0)), dimension(3), intent(in) :: fmom
+
         real(kind(0d0)) :: bu, d2, c2
 
         bu = fmom(2)/fmom(1)
@@ -1129,8 +1136,9 @@ contains
 
     function f_quad(abscX, abscY, wght_in, q, r, s)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode, nb), intent(IN) :: abscX, abscY, wght_in
-        real(kind(0.d0)), intent(IN) :: q, r, s
+        real(kind(0.d0)), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+        real(kind(0.d0)), intent(in) :: q, r, s
+
         real(kind(0.d0)) :: f_quad_RV, f_quad
         integer :: i
 
@@ -1144,9 +1152,9 @@ contains
 
     function f_quad2D(abscX, abscY, wght_in, pow)
         !$acc routine seq
-        real(kind(0.d0)), dimension(nnode), intent(IN) :: abscX, abscY, wght_in
+        real(kind(0.d0)), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+        real(kind(0.d0)), dimension(3), intent(in) :: pow
 
-        real(kind(0.d0)), dimension(3), intent(IN) :: pow
         real(kind(0.d0)) :: f_quad2D
 
         f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))

@@ -30,7 +30,6 @@ Ns = math.ceil(Nt/100)
 #Configuration case dictionary
 data = {
     # Logistics =============================
-        #'case_dir'          : '\'.\'',
         'run_time_info'     : 'T',
     # =======================================
 
