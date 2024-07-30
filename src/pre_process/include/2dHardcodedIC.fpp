@@ -129,6 +129,13 @@
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
        end if
+
+     case (207) ! Bumps for the patch geometry of the lung
+        h = 0.0
+        lam = 1.0
+        amp =  patch_icpp(patch_id)%a2 
+        
+        
        
     case default
        if (proc_rank == 0) then
