@@ -31,6 +31,7 @@ AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we repo
 | NVIDIA RTX6000 (SP GPU)   | 1 GPU          | 3.9        | NVHPC 22.11          | GT Phoenix  |
 | Apple M1 Max                                 | 8/10 cores      | 72         | GNU 14.1.0           | N/A         |
 | AMD EPYC 9534 (Genoa)                        | 64/64 cores     | 96         | GNU 12.3.0           | GT Phoenix  |
+| AMD EPYC 7763 (Milan)                        | 24/64 cores     | 108        | GNU 11.4.0           | NCSA Delta  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 16/32 cores     | 111        | NVHPC 24.5           | GT Rogues Gallery  |
 | AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137        | GNU 12.1.0           | GT Phoenix  |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152        | Intel oneAPI 2022.1  | GT Phoenix  |
