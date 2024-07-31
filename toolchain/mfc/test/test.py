@@ -139,9 +139,6 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
-    
-    if not os.path.isdir(case.get_dirpath() + "/D"):
-        os.makedirs(case.get_dirpath() + "/D")
 
     tol = case.compute_tolerance()
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
@@ -182,7 +179,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 raise MFCException(f"Test {case}: {msg}")
 
     if ARG("test_all"):
-        # case.delete_output()
+        case.delete_output()
         cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)

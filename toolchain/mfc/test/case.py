@@ -192,14 +192,13 @@ mods = {{}}
 
 if "post_process" in ARGS["dict"]["targets"]:
     mods = {{
-        'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
+        'c_wrt'        : 'T', 'cons_vars_wrt'   : 'T',
         'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
         'rho_wrt'      : 'T', 'mom_wrt(1)'      : 'T',
         'vel_wrt(1)'   : 'T', 'E_wrt'           : 'T',
         'pres_wrt'     : 'T', 'alpha_wrt(1)'    : 'T',
         'gamma_wrt'    : 'T', 'heat_ratio_wrt'  : 'T',
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
-        'c_wrt'        : 'T',
     }}
 
     if case['p'] != 0:
