@@ -18,26 +18,27 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 * GPU results on single-precision (SP) GPUs performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation.
 AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we report results for one GCD, though one can quickly estimate full MI250X runtime by halving the single GCD grind time number.
 
-| Hardware                  |            |   Grind Time   |    Compiler    |   Computer   |
-| ---:                      | ----:      |    :----:      |  :---         | :---         | 
-| NVIDIA GH200 (GPU only)   | 1 GPU          | 0.32       | NVHPC 24.1           | GT Rogues Gallery  |
-| NVIDIA H100               | 1 GPU          | 0.45       | NVHPC 24.5           | GT Rogues Gallery  |
-| NVIDIA A100               | 1 GPU          | 0.62       | NVHPC 22.11          | GT Phoenix  |
-| NVIDIA V100               | 1 GPU          | 0.99       | NVHPC 22.11          | GT Phoenix  |
-| NVIDIA A30                | 1 GPU          | 1.06       | NVHPC 24.1           | GT Rogues Gallery  |
-| AMD MI250X                | 1 __GCD__      | 1.09       | CCE 16.0.1           | OLCF Frontier |
-| AMD MI100                 | 1 GPU          | 1.38       | CCE 16.0.1           | Cray internal system |
-| NVIDIA A40 (SP GPU)       | 1 GPU          | 3.3        | NVHPC 22.11          | NCSA Delta  |
-| NVIDIA RTX6000 (SP GPU)   | 1 GPU          | 3.9        | NVHPC 22.11          | GT Phoenix  |
-| Apple M1 Max                                 | 8/10 cores      | 72         | GNU 14.1.0           | N/A         |
-| AMD EPYC 9534 (Genoa)                        | 64/64 cores     | 96         | GNU 12.3.0           | GT Phoenix  |
-| AMD EPYC 7763 (Milan)                        | 24/64 cores     | 108        | GNU 11.4.0           | NCSA Delta  |
-| Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 16/32 cores     | 110        | GNU 12.3.0           | GT ICE  |
-| Intel Xeon Gold 6454S (Sapphire Rapids)      | 16/32 cores     | 111        | NVHPC 24.5           | GT Rogues Gallery  |
-| NVIDIA Grace CPU (Arm, Neoverse V2)          | 18/72 cores     | 116        | NVHPC 24.1           | GT Rogues Gallery  |
-| AMD EPYC 7452 (Rome)                         | 16/32 cores     | 126        | GNU 12.3.0           | GT ICE  |
-| AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137        | GNU 12.1.0           | GT Phoenix  |
-| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152        | Intel oneAPI 2022.1  | GT Phoenix  |
+| Hardware                                     |                 | Grind Time     | Compiler             | Computer     |
+| ---:                                         | ----:           | ----:         | :---                 | :---         | 
+| NVIDIA GH200 (GPU only)                      | 1 GPU           | 0.32           | NVHPC 24.1           | GT Rogues Gallery  |
+| NVIDIA H100                                  | 1 GPU           | 0.45           | NVHPC 24.5           | GT Rogues Gallery  |
+| NVIDIA A100                                  | 1 GPU           | 0.62           | NVHPC 22.11          | GT Phoenix  |
+| NVIDIA V100                                  | 1 GPU           | 0.99           | NVHPC 22.11          | GT Phoenix  |
+| NVIDIA A30                                   | 1 GPU           | 1.06           | NVHPC 24.1           | GT Rogues Gallery  |
+| AMD MI250X                                   | 1 __GCD__       | 1.09           | CCE 16.0.1           | OLCF Frontier |
+| AMD MI100                                    | 1 GPU           | 1.38           | CCE 16.0.1           | Cray internal system |
+| NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
+| NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
+| Apple M1 Max                                 | 8/10 cores      | 72             | GNU 14.1.0           | N/A         |
+| AMD EPYC 9534 (Genoa)                        | 64/64 cores     | 96             | GNU 12.3.0           | GT Phoenix  |
+| AMD EPYC 7763 (Milan)                        | 24/64 cores     | 108            | GNU 11.4.0           | NCSA Delta  |
+| Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 16/32 cores     | 110            | GNU 12.3.0           | GT ICE  |
+| Intel Xeon Gold 6454S (Sapphire Rapids)      | 16/32 cores     | 111            | NVHPC 24.5           | GT Rogues Gallery  |
+| NVIDIA Grace CPU (Arm, Neoverse V2)          | 18/72 cores     | 116            | NVHPC 24.1           | GT Rogues Gallery  |
+| AMD EPYC 7452 (Rome)                         | 16/32 cores     | 126            | GNU 12.3.0           | GT ICE  |
+| Intel Xeon Platinum 8352Y (Ice Lake)         | 12/32 cores     | 128            | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137            | GNU 12.1.0           | GT Phoenix  |
+| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152            | Intel oneAPI 2022.1  | GT Phoenix  |
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
