@@ -112,7 +112,6 @@ module m_global_parameters
     #:else
         integer :: num_dims       !< Number of spatial dimensions
     #:endif
-    logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
     logical :: prim_vars_wrt
@@ -494,7 +493,6 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_eps = dflt_real
