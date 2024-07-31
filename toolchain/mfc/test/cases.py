@@ -125,6 +125,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_low_Mach_correction():
+        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
+
+        for low_Mach in [1, 2]:
+            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach})
+            cases.append(define_case_d(stack, '', {}))
+            stack.pop()
+
+        stack.pop()
+
     def alter_num_fluids(dimInfo):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
@@ -139,6 +149,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 })
 
             alter_riemann_solvers(num_fluids)
+            alter_low_Mach_correction()
             alter_ib(dimInfo)
 
             if num_fluids == 1:
@@ -392,6 +403,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, 'artificial_Ma', {'pi_fac': 0.1}))
 
             stack.pop()
+
+            cases.append(define_case_d(stack, 'low_Mach=1', {'low_Mach': 1}))
+            cases.append(define_case_d(stack, 'low_Mach=2', {'low_Mach': 2}))
 
             stack.push("QBMM", {'qbmm': 'T'})
             cases.append(define_case_d(stack, '', {}))
