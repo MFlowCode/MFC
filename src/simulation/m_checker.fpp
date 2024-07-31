@@ -31,6 +31,7 @@ contains
         call s_check_inputs_model_eqns
         if (acoustic_source) call s_check_inputs_acoustic_src
         if (hypoelasticity) call s_check_inputs_hypoelasticity
+        if (hyperelasticity) call s_check_inputs_hyperelasticity
         if (bubbles) call s_check_inputs_bubbles
         if (adap_dt) call s_check_inputs_adapt_dt
         if (alt_soundspeed) call s_check_inputs_alt_soundspeed
@@ -368,13 +369,21 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        if (riemann_solver == 3) then
+        if (riemann_solver /= 1) then
             call s_mpi_abort('hypoelasticity requires HLL '// &
-                             '(riemann_solver = 1) or HLLC '// &
-                             '(riemann_solver = 2) Riemann solver. '// &
+                             '(riemann_solver = 1) Riemann solver. '// &
                              'Exiting ...')
         end if
-    end subroutine
+    end subroutine s_check_inputs_hypoelasticity
+        
+    !> Checks constraints on hyperelasticity parameters
+    subroutine s_check_inputs_hyperelasticity
+        if (riemann_solver /= 2) then
+           call s_mpi_abort('hyperelasticity requires HLLC '// &
+                            '(riemann_solver = 2) Riemann solver. '// &
+                            'Exiting ...')
+        end if
+    end subroutine s_check_inputs_hyperelasticity
 
     !> Checks constraints on bubble parameters
     subroutine s_check_inputs_bubbles
