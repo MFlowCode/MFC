@@ -432,6 +432,7 @@ contains
                     @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
                 end if
             end if
+            @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
             count = 0 ! Reset counter
