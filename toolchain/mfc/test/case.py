@@ -5,7 +5,7 @@ from typing import List, Set, Union, Callable
 from ..run.input import MFCInputFile
 
 from ..      import case, common
-from ..state import ARG
+from ..state import ARG, CFG
 from ..run   import input
 from ..build import MFCTarget, get_target
 
@@ -167,7 +167,7 @@ class TestCase(case.Case):
 
         common.create_directory(dirpath)
 
-        common.file_write(self.get_filepath(), f"""\
+        fileContent = f"""\
 #!/usr/bin/env python3
 #
 # {self.get_filepath()}:
@@ -207,8 +207,14 @@ if "post_process" in ARGS["dict"]["targets"]:
         mods['omega_wrt(2)'] = 'T'
         mods['omega_wrt(3)'] = 'T'
 
-print(json.dumps({{**case, **mods}}))
-""")
+"""
+        if ('mpi', True) in CFG().items():
+            fileContent += "\n    mods['parallel_io'] = 'T'\n"
+        else:
+            fileContent += "\n    mods['parallel_io'] = 'F'\n"
+        fileContent += "print(json.dumps({**case, **mods}))"
+
+        common.file_write(self.get_filepath(), fileContent)
 
     def to_MFCInputFile(self) -> MFCInputFile:
         return MFCInputFile(self.get_filepath(), self.get_dirpath(), self.params)

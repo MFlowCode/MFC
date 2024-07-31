@@ -1,11 +1,11 @@
-This file was created on 2024-07-31 01:58:09.060967.
+This file was created on 2024-07-31 06:04:55.989186.
 
 mfc.sh:
 
-    Invocation: test -o Example -j 8 -a -m 1 --generate
+    Invocation: test -j 8 -a -m 1 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -15,9 +15,9 @@ syscheck:
         Fortran : GNU v13.1.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -38,7 +38,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -49,8 +49,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -104,7 +104,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -114,8 +114,8 @@ simulation:
         Fortran : GNU v13.1.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
