@@ -94,7 +94,7 @@ jobs:
       - name: Test
         run:  |
           if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
-          /bin/bash mfc.sh test -j $(nproc) $OPT1 $OPT2
+          /bin/bash mfc.sh test -j $(nproc) $OPT1 $OPT2 --generate
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
