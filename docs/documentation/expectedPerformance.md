@@ -27,6 +27,7 @@ AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we repo
 | NVIDIA A30                                   | 1 GPU           | 1.06           | NVHPC 24.1           | GT Rogues Gallery  |
 | AMD MI250X                                   | 1 __GCD__       | 1.09           | CCE 16.0.1           | OLCF Frontier |
 | AMD MI100                                    | 1 GPU           | 1.38           | CCE 16.0.1           | Cray internal system |
+| NVIDIA P100                                  | 1 GPU           | 2.35           | NVHPC 23.5           | GT CSE Internal  |
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
 | Apple M1 Max                                 | 8/10 cores      | 72             | GNU 14.1.0           | N/A         |
