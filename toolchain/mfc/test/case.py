@@ -1,6 +1,6 @@
 import os, glob, hashlib, binascii, subprocess, itertools, dataclasses
 
-from typing import List, Set, Union, Callable
+from typing import List, Set, Union, Callable, Optional
 
 from ..run.input import MFCInputFile
 
@@ -209,9 +209,9 @@ if "post_process" in ARGS["dict"]["targets"]:
 
 """
         if ('mpi', True) in CFG().items():
-            fileContent += "\n    mods['parallel_io'] = 'T'\n"
+            fileContent += "mods['parallel_io'] = 'T'\n"
         else:
-            fileContent += "\n    mods['parallel_io'] = 'F'\n"
+            fileContent += "mods['parallel_io'] = 'F'\n"
         fileContent += "print(json.dumps({**case, **mods}))"
 
         common.file_write(self.get_filepath(), fileContent)
@@ -243,10 +243,10 @@ if "post_process" in ARGS["dict"]["targets"]:
 class TestCaseBuilder:
     trace:   str
     mods:    dict
-    path:    str | None
-    args:    List[str] | None
+    path:    Optional[str]
+    args:    Optional[List[str]]
     ppn:     int
-    functor: Callable | None
+    functor: Optional[Callable]
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
