@@ -39,6 +39,8 @@ AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we repo
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 12/32 cores     | 128            | NVHPC 24.5           | GT Rogues Gallery  |
 | AMD EPYC 7713 (Milan)                        | 32/64 cores     | 137            | GNU 12.1.0           | GT Phoenix  |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 152            | Intel oneAPI 2022.1  | GT Phoenix  |
+| Intel Xeon E5-2650V4 (Broadwell)             |  8/12 cores     | 230            | NVHPC 23.5           | GT CSE Internal  |
+
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
