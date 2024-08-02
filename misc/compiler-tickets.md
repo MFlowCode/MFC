@@ -7,6 +7,7 @@ __Authors:__ Spencer Bryngleson (Georgia Tech), Henry Le Berre (Georgia Tech), S
 * OLCFHELP-15413 'Performance on Frontier'
 * OLCFHELP-14881 'Frontier Hackathon'
 * OLCFDEV-1416 'CCE ACC routine seq'
+* OLCFHELP-19298 CCE OpenACC doesn't respect `acc declare create` statements when an abstract interface is in the same compilation unit
 
 ## CCE/Cray
 
