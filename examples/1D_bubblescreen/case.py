@@ -193,12 +193,13 @@ print(json.dumps({
     # Acoustic source ==========================================
     'acoustic_source'              : 'T',
     'num_source'                   : 1,
+    'acoustic(1)%support'          : 1,
     'acoustic(1)%loc(1)'           : -5.E-03/x0,
     'acoustic(1)%npulse'           : 1,
     'acoustic(1)%dir'              : 1.,
     'acoustic(1)%pulse'            : 1,
     'acoustic(1)%mag'              : pa,
-    'acoustic(1)%length'           : (1./(300000.))*cact/x0,
+    'acoustic(1)%wavelength'       : (1./(300000.))*cact/x0
     # ==========================================================
 }))
 

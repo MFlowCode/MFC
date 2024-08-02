@@ -5,12 +5,13 @@ from os.path import abspath, normpath, dirname, realpath
 from .printer import cons
 
 
-MFC_ROOTDIR        = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
-MFC_TESTDIR        = abspath(f"{MFC_ROOTDIR}/tests")
-MFC_SUBDIR         = abspath(f"{MFC_ROOTDIR}/build")
-MFC_TEMPLATEDIR    = abspath(f"{MFC_ROOTDIR}/toolchain/templates")
-MFC_LOCK_FILEPATH  = abspath(f"{MFC_SUBDIR}/lock.yaml")
-MFC_BENCH_FILEPATH = abspath(f"{MFC_ROOTDIR}/toolchain/bench.yaml")
+MFC_ROOTDIR         = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
+MFC_TESTDIR         = abspath(f"{MFC_ROOTDIR}/tests")
+MFC_SUBDIR          = abspath(f"{MFC_ROOTDIR}/build")
+MFC_TEMPLATEDIR     = abspath(f"{MFC_ROOTDIR}/toolchain/templates")
+MFC_LOCK_FILEPATH   = abspath(f"{MFC_SUBDIR}/lock.yaml")
+MFC_BENCH_FILEPATH  = abspath(f"{MFC_ROOTDIR}/toolchain/bench.yaml")
+MFC_EXAMPLE_DIRPATH = abspath(f"{MFC_ROOTDIR}/examples")
 
 MFC_LOGO = """\
      .=++*:          -+*+=.

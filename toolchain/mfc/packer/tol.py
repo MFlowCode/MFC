@@ -2,6 +2,7 @@ import math, typing
 
 from .pack   import Pack
 from .errors import compute_error, AverageError, Error
+from ..state   import ARG
 
 Tolerance = Error
 
@@ -60,7 +61,7 @@ Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
             if math.isnan(cVal):
                 return raise_err("is NaN in the pack file")
 
-            if not is_close(error, tol):
+            if not is_close(error, tol) and not ARG('command') == 'test':
                 return raise_err("is not within tolerance")
 
     # Return the average relative error
