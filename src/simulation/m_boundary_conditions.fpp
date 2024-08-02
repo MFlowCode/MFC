@@ -20,14 +20,14 @@ module m_boundary_conditions
 
     private; 
     public :: s_populate_primitive_variables_buffers, &
-              s_populate_capillary_buffers
+              s_populate_capillary_buffers  
 
 contains
 
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    !! @param q_prim_vf Primitive variable
+    !! @param q_prim_vf Primitive variable 
     subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
