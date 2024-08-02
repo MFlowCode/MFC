@@ -44,7 +44,7 @@ e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 p     GT Phoenix
 p-all python 
 p-cpu gcc openmpi
-p-gpu nvhpc hpcx cuda
+p-gpu nvhpc/22.11 cuda
 p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
 
 f     OLCF Frontier
