@@ -73,12 +73,8 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    # For these computations, the cylinder is placed at the (0,0,0)
-    # domain origin. 
-    # axial direction
     'x_domain%beg'                 : 0.0E+00,
     'x_domain%end'                 : 6.0E-03 / x0,
-    # r direction
     'y_domain%beg'                 : 0.0E+00,
     'y_domain%end'                 : 3.0E-03 / x0,
     'cyl_coord'                    : 'F',
@@ -92,13 +88,10 @@ print(json.dumps({
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
-    # Only one patches are necessary, the air tube
-    'num_patches'                  : 1,
+    'num_patches'                  : 2,
     # Use the 5 equation model
-    'model_eqns'                   : 2,
-    # 6 equations model does not need the K \div(u) term                    
+    'model_eqns'                   : 2,                  
     'alt_soundspeed'               : 'F',
-    # One fluids: air
     'num_fluids'                   : 1,
     # Advect both volume fractions
     'adv_alphan'                   : 'T',
@@ -123,14 +116,8 @@ print(json.dumps({
     # Use the HLLC  Riemann solver
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
-    # We use reflective boundary conditions at octant edges and 
-    # non-reflective boundary conditions at the domain edges
     'bc_x%beg'                     : -6,
     'bc_x%end'                     : -3,
-    #'bc_x%vb1'                     : vel / c0,
-    #'bc_x%pb1'                     : delta,
-    #'bc_x%rhob1'                   : beta,
-    #'bc_x%alfb1'                   : beta*vf0,
     'bc_y%beg'                     : -3,
     'bc_y%end'                     : -3,
     # Set IB to True and add 1 patch
@@ -150,7 +137,7 @@ print(json.dumps({
     'parallel_io'                  :'T',
     # ==========================================================================
 
-    # Patch: Constant Tube filled with air =====================================
+    #Ambient State =====================================
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : 3.0E-03 / x0,
     'patch_icpp(1)%y_centroid'     : 1.50E-03 / x0,
@@ -165,24 +152,24 @@ print(json.dumps({
     'patch_icpp(1)%v0'             : 0.0E+00,
     # # ========================================================================
 
+    #Shocked State =====================================   
+    'patch_icpp(2)%geometry'       : 3,
+    'patch_icpp(2)%x_centroid'     : 0.5E-03 / x0,
+    'patch_icpp(2)%y_centroid'     : 1.50E-03 / x0,
+    'patch_icpp(2)%length_x'       : 1.0E-03 / x0,
+    'patch_icpp(2)%length_y'       : 3.0E-03 / x0,  
+    'patch_icpp(2)%alpha_rho(1)'   : beta,
+    'patch_icpp(2)%alpha(1)'       : beta*vf0,
+    'patch_icpp(2)%vel(1)'         : vel / c0,
+    'patch_icpp(2)%vel(2)'         : 0.0E+00,
+    'patch_icpp(2)%pres'           : delta,
+    'patch_icpp(2)%r0'             : 1.,
+    'patch_icpp(2)%v0'             : 0.0E+00,
+    'patch_icpp(2)%alter_patch(1)' : 'T',  
+    # # ========================================================================
     
-    #'patch_icpp(2)%geometry'       : 3,
-    #'patch_icpp(2)%x_centroid'     : 0.5E-03 / x0,
-    #'patch_icpp(2)%y_centroid'     : 1.50E-03 / x0,
-    #'patch_icpp(2)%length_x'       : 1.0E-03 / x0,
-    #'patch_icpp(2)%length_y'       : 3.0E-03 / x0,  
-    #'patch_icpp(2)%alpha_rho(1)'   : beta,
-    #'patch_icpp(2)%alpha(1)'       : beta*vf0,
-    #'patch_icpp(2)%vel(1)'         : vel / c0,
-    #'patch_icpp(2)%vel(2)'         : 0.0E+00,
-    #'patch_icpp(2)%pres'           : delta,
-    #'patch_icpp(2)%r0'             : 1.,
-    #'patch_icpp(2)%v0'             : 0.0E+00,
-    #'patch_icpp(2)%alter_patch(1)' : 'T',  
     # Patch: Cylinder Immersed Boundary ========================================
-    # Specify the cylindrical air tube grid geometry
     'patch_ib(1)%geometry'       : 4,
-    #'patch_ib(1)%radius'       : 0.5E-03 / x0,
     'patch_ib(1)%x_centroid'     : 1.5E-03 / x0,
     'patch_ib(1)%y_centroid'     : 1.5E-03 / x0,
     'patch_ib(1)%c'     : 1.0E-03 / x0,
@@ -191,13 +178,9 @@ print(json.dumps({
     'patch_ib(1)%m'     : 0.02,
     'patch_ib(1)%slip'     : 'F',
     'patch_ib(1)%theta'     : 15,
-    # # ==========================================================================
-
+    # # =========================================================================
     'pref'                  : p0,
     'rhoref'                : rho0,
-
-    # Fluids Physical Parameters ===============================================
-    # Use the same stiffness as the air bubble
     # Fluids Physical Parameters ===============================
     # Surrounding liquid
     'fluid_pp(1)%gamma'             : 1.E+00/(n_tait-1.E+00),
