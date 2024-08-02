@@ -12,7 +12,7 @@ module m_acoustic_src
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_bubbles              !< Bubble dynamic routines
+    use m_bubbles                 !< Bubble dynamic routines
 
     use m_variables_conversion !< State variables type conversion procedures
 
@@ -104,7 +104,7 @@ contains
             aperture(i) = acoustic(i)%aperture
             npulse(i) = acoustic(i)%npulse
             pulse(i) = acoustic(i)%pulse
-            dir(i) = acoustic(i)%dir
+            dir(i) = acoustic(i)%dir   
             element_spacing_angle(i) = acoustic(i)%element_spacing_angle
             element_polygon_ratio(i) = acoustic(i)%element_polygon_ratio
             num_elements(i) = acoustic(i)%num_elements
