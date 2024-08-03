@@ -78,7 +78,6 @@ module m_global_parameters
     real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
     real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
-    logical :: adv_alphan            !< Advection of the last volume fraction
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
@@ -276,7 +275,6 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
-        adv_alphan = .false.
         weno_order = dflt_int
 
         hypoelasticity = .false.

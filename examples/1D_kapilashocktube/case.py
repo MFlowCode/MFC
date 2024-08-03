@@ -23,7 +23,6 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'T',
     'num_fluids'                   : 2,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
