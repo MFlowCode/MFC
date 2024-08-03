@@ -40,7 +40,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Apple M1 Max                                 |  8/10 cores     | 14             | GNU 14.1.0           | N/A     |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 17             | GNU 12.3.0           | GT ICE  |
 | IBM Power9                                   | 20/21 cores     | 21             | GNU 9.1.0            | OLCF Summit |
-
+| Intel Xeon E5-2650V4 (Broadwell)             | 12/12 cores     | 27             | NVHPC 23.5           | GT CSE Internal  |
 
 
 Processors To-do:
@@ -49,7 +49,6 @@ Processors To-do:
 | ---:                                         | ----:           | ----:          | :---                 | :---         | 
 | AMD EPYC 7763 (Milan)                        | 24/64 cores     | n/a            | GNU 11.4.0           | NCSA Delta  |
 | Ampere Altra Max (Arm, Neoverse-N1)          |  8/80 cores     | n/a            | GNU 12.2.0           | OLCF Wombat  | 
-| Intel Xeon E5-2650V4 (Broadwell)             |  8/12 cores     | n/a            | NVHPC 23.5           | GT CSE Internal  |
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
