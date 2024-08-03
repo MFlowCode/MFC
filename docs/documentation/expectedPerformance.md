@@ -28,6 +28,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD MI100                                    | 1 GPU           | 1.38           | CCE 16.0.1           | Cray internal system |
 | NVIDIA P100                                  | 1 GPU           | 2.35           | NVHPC 23.5           | GT CSE Internal  |
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
+| NVIDIA Grace CPU (Arm, Neoverse V2)          | 72/72 cores     | 3.7            | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
@@ -41,7 +42,6 @@ Processors To-do:
 | AMD EPYC 9534 (Genoa)                        | 64/64 cores     | n/a            | GNU 12.3.0           | GT Phoenix  |
 | AMD EPYC 7763 (Milan)                        | 24/64 cores     | n/a            | GNU 11.4.0           | NCSA Delta  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 16/32 cores     | n/a            | GNU 12.3.0           | GT ICE  |
-| NVIDIA Grace CPU (Arm, Neoverse V2)          | 18/72 cores     | n/a            | NVHPC 24.1           | GT Rogues Gallery  |
 | AMD EPYC 7452 (Rome)                         | 16/32 cores     | n/a            | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7713 (Milan)                        | 32/64 cores     | n/a            | GNU 12.1.0           | GT Phoenix  |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | n/a            | Intel oneAPI 2022.1  | GT Phoenix  |
