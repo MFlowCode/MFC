@@ -33,7 +33,9 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Apple M1 Max                                 |  8/10 cores     | 14.3           | GNU 14.1.0           | N/A         |
+| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 17.0           | GNU 12.3.0           | GT ICE  |
 | IBM Power9                                   | 20/21 cores     | 21.2           | GNU 9.1.0            | OLCF Summit |
+
 
 Processors To-do:
 
@@ -44,7 +46,6 @@ Processors To-do:
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 16/32 cores     | n/a            | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7452 (Rome)                         | 16/32 cores     | n/a            | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7713 (Milan)                        | 32/64 cores     | n/a            | GNU 12.1.0           | GT Phoenix  |
-| Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | n/a            | Intel oneAPI 2022.1  | GT Phoenix  |
 | Ampere Altra Max (Arm, Neoverse-N1)          |  8/80 cores     | n/a            | GNU 12.2.0           | OLCF Wombat  | 
 | Intel Xeon E5-2650V4 (Broadwell)             |  8/12 cores     | n/a            | NVHPC 23.5           | GT CSE Internal  |
 
