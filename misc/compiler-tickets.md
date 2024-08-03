@@ -2,13 +2,16 @@
 
 __Authors:__ Spencer Bryngleson (Georgia Tech), Henry Le Berre (Georgia Tech), Steve Abbott (HPE/Cray), Reuben Budiardja (OLCF)
 
+MFC has been used to isolate many compiler bugs. A short summary is below.
+
 ## OLCF (Frontier)
 
 * OLCFHELP-15413 'Performance on Frontier'
 * OLCFHELP-14881 'Frontier Hackathon'
 * OLCFDEV-1416 'CCE ACC routine seq'
+* OLCFHELP-19298 'CCE OpenACC doesn't respect `acc declare create` statements when an abstract interface is in the same compilation unit'
 
-## CCE/Cray
+## CCE (Cray, internal)
 
 * HPECOE-28 'Compiler performance bug on autogen kernels - LLVM IR'
 * CAST-31898, Case 5370334261
@@ -17,7 +20,7 @@ __Authors:__ Spencer Bryngleson (Georgia Tech), Henry Le Berre (Georgia Tech), S
 * PE-53844, 'CCE >17 crashes on host_data use_device for module variables'
 * PE-55153, 'xor crashes logical comparison for Fortran extensions'
 
-## NVHPC (NVIDIA)
+## NVHPC (NVIDIA, internal)
 
 * NV-33317 'NVHPC 22.5 fort2 TERMINATED by signal 11.'
 
