@@ -1152,7 +1152,7 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
+            print *, "Performance: ", time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/))), " ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
