@@ -32,6 +32,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD EPYC 7513 (Milan)                        | 32/32 cores     | 7.4            | GNU 12.3.0           | GT ICE  |
 | Apple M1 Max                                 |  8/10 cores     | 14.3           | GNU 14.1.0           | N/A         |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 17.0           | GNU 12.3.0           | GT ICE  |
 | IBM Power9                                   | 20/21 cores     | 21.2           | GNU 9.1.0            | OLCF Summit |
