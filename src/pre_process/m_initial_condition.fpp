@@ -419,9 +419,8 @@ contains
 
         if (p > 0) then
             ! Phase shifts
-            shift(1) = 2*pi*11d0/31d0; shift(2) = 2*pi*13d0/31d0; shift(3) = 2*pi*17d0/31d0;
-            shift(4) = 2*pi*19d0/31d0; shift(5) = 2*pi*23d0/31d0; shift(6) = 2*pi*29d0/31d0;
-            
+            shift(1) = 2*pi*11d0/31d0; shift(2) = 2*pi*13d0/31d0; shift(3) = 2*pi*17d0/31d0; 
+            shift(4) = 2*pi*19d0/31d0; shift(5) = 2*pi*23d0/31d0; shift(6) = 2*pi*29d0/31d0; 
             ! Compute 3D waves with phase shifts.
             call s_instability_wave(2*pi*4.0/59.0, 2*pi*4.0/59.0, wave_tmp, shift(1))
             wave2 = wave2 + wave_tmp
@@ -443,12 +442,12 @@ contains
             do j = 0, n
                 do i = 0, m
                     q_prim_vf(cont_idx%beg)%sf(i, j, k) = q_prim_vf(cont_idx%beg)%sf(i, j, k) + wave(1, i, j, k)    ! rho
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k) / uratio ! u
-                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)  / uratio    ! v
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)/uratio ! u
+                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)/uratio    ! v
                     if (p > 0) then
-                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k) / uratio ! w
+                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)/uratio ! w
                     end if
-                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)  / uratio**2 ! p
+                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)/uratio**2 ! p
 
                     if (bubbles .and. (.not. qbmm)) then
                         do q = 1, nb
@@ -471,18 +470,18 @@ contains
 
         if (num_fluids == 1) then
             gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
-        else 
+        else
             gam_b = 1d0 + 1d0/fluid_pp(num_fluids)%gamma
         end if
-        
+
         ! Loop
         ii = 1
         do while (.true.)
 
             f0 = (Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b) - 2d0/(Web*fR) + 1d0 - Ca - fP
-            f1 = -3d0*gam_b*(Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b+1d0) + 2d0/(Web*fR**2d0)
+            f1 = -3d0*gam_b*(Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b + 1d0) + 2d0/(Web*fR**2d0)
 
-            if (abs(f0) .le. 1e-10) then
+            if (abs(f0) <= 1e-10) then
                 ! Converged
                 exit
             else
@@ -522,7 +521,7 @@ contains
         real(kind(0d0)) :: gam, pi_inf, rho, mach, c1, adv
         real(kind(0d0)) :: xratio, uratio
         integer :: i, j !<  generic loop iterators
-        
+
         xratio = 59d0/patch_icpp(1)%length_y ! input scale / mixing layer scale
         uratio = 1d0/patch_icpp(1)%vel(1) ! input scale / mixing layer scale
 
@@ -531,9 +530,9 @@ contains
             adv = patch_icpp(1)%alpha(num_fluids)
         else
             adv = 0d0
-        end if 
+        end if
         gam = 1d0 + 1d0/gammas(1)
-        pi_inf = pi_infs(1)*(gam - 1d0)/gam * uratio**2
+        pi_inf = pi_infs(1)*(gam - 1d0)/gam*uratio**2
         rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(p_mean + pi_inf))/(rho*(1d0 - adv)))
@@ -541,7 +540,7 @@ contains
 
         ! Assign mean profiles
         do j = 0, n + 1
-            u_mean(j) = tanh(y_cb(j-1)*xratio)
+            u_mean(j) = tanh(y_cb(j - 1)*xratio)
             rho_mean(j) = rho
         end do
 
@@ -557,12 +556,12 @@ contains
         d(n + 1, n) = -1d0/((y_cb(n) - y_cb(n - 1))*xratio)
         d(n + 1, n + 1) = 1d0/((y_cb(n) - y_cb(n - 1))*xratio)
 
-        ! Compute 
+        ! Compute
         call s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
 
     end subroutine s_instability_wave
 
-    !> This subroutine solves linear system from linear stability analysis and 
+    !> This subroutine solves linear system from linear stability analysis and
         !!              generate instability waves for the given set of spatial
         !!              wave numbers and phase shift.
     subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
@@ -571,7 +570,7 @@ contains
         real(kind(0d0)), intent(in) :: p_mean !< mean pressure
         real(kind(0d0)), dimension(0:n + 1, 0:n + 1), intent(in) :: d !< differential operator in y dir
         real(kind(0d0)), intent(in) :: gam, pi_inf, mach, shift
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p),intent(inout) :: wave
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave
 
         real(kind(0d0)), dimension(0:n + 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
         real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1) :: ar, ai    !< matrices for eigenvalue problem
@@ -616,7 +615,6 @@ contains
             ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
             ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
             ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
-
             do k = 0, n + 1
                 ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
                 ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
@@ -682,16 +680,16 @@ contains
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             jj = 2*(n + 2)
-            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) / mach  
-            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) / mach  
+            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)/mach
+            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)/mach
 
             ! end
             ii = 5*(n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
             jj = 3*(n + 2) - 1
-            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) / mach  
-            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) / mach  
+            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii)*rho_mean(j)/mach
+            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii)*rho_mean(j)/mach
         end do
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
@@ -701,16 +699,16 @@ contains
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             jj = 2*(n + 2)
-            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) * mach  
-            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) * mach  
+            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)*mach
+            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)*mach
 
             ! end
             ii = (n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
             jj = 3*(n + 2) - 1
-            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) * mach  
-            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) * mach  
+            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii)*rho_mean(j)*mach
+            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii)*rho_mean(j)*mach
         end do
 
         ! Remove rho, u, v, w, p at BC
@@ -731,7 +729,7 @@ contains
         gi = 0d0
         do ii = 1, 5
             do j = 0, 5*n - 1
-                if (ii < 3) then 
+                if (ii < 3) then
                     do k = 0, n - 1
                         gr((ii - 1)*n + k, j) = fr((ii - 1)*n + k, j)
                         gi((ii - 1)*n + k, j) = fi((ii - 1)*n + k, j)
@@ -741,7 +739,7 @@ contains
                         gr((ii - 1)*n + k, j) = fr((ii - 1)*n + k + 2, j)
                         gi((ii - 1)*n + k, j) = fi((ii - 1)*n + k + 2, j)
                     end do
-                else 
+                else
                     do k = 0, n - 1
                         gr((ii - 1)*n - 4 + k, j) = fr((ii - 1)*n + k, j)
                         gi((ii - 1)*n - 4 + k, j) = fi((ii - 1)*n + k, j)
@@ -754,7 +752,7 @@ contains
         hi = 0d0
         do i = 0, 5*n - 5
             do jj = 1, 5
-                if (jj < 3) then 
+                if (jj < 3) then
                     do k = 0, n - 1
                         hr(i, (jj - 1)*n + k) = gr(i, (jj - 1)*n + k)
                         hi(i, (jj - 1)*n + k) = gi(i, (jj - 1)*n + k)
@@ -764,7 +762,7 @@ contains
                         hr(i, (jj - 1)*n + k) = gr(i, (jj - 1)*n + k + 2)
                         hi(i, (jj - 1)*n + k) = gi(i, (jj - 1)*n + k + 2)
                     end do
-                else 
+                else
                     do k = 0, n - 1
                         hr(i, (jj - 1)*n - 4 + k) = gr(i, (jj - 1)*n + k)
                         hi(i, (jj - 1)*n - 4 + k) = gi(i, (jj - 1)*n + k)
@@ -782,7 +780,7 @@ contains
         real(kind(0d0)), dimension(0:5*n - 5), intent(in) :: wr, wi !< eigenvalues
         real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(in) :: zr, zi !< eigenvectors
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p),intent(inout) :: wave
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave
         real(kind(0d0)), intent(in) :: alpha, beta, mach, shift
         real(kind(0d0)), dimension(0:5*n - 5) :: vr, vi, vnr, vni !< most unstable eigenvector
         real(kind(0d0)), dimension(0:5*(n + 2) - 1) :: xbr, xbi !< eigenvectors
@@ -836,7 +834,7 @@ contains
                     xbr((i - 1)*(n + 2) + 2 + k + 1) = vnr((i - 1)*n + k)
                     xbi((i - 1)*(n + 2) + 2 + k + 1) = vni((i - 1)*n + k)
                 end do
-            else 
+            else
                 do k = 0, n - 1
                     xbr((i - 1)*(n + 2) + k + 1) = vnr((i - 1)*n - 4 + k)
                     xbi((i - 1)*(n + 2) + k + 1) = vni((i - 1)*n - 4 + k)
@@ -845,10 +843,10 @@ contains
         end do
 
         ! rho at BC
-        xbr(0*(n + 2) + 0) = xbr(0*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) * mach  
-        xbi(0*(n + 2) + 0) = xbi(0*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) * mach  
-        xbr(0*(n + 2) + n + 1) = xbr(0*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) * mach  
-        xbi(0*(n + 2) + n + 1) = xbi(0*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) * mach  
+        xbr(0*(n + 2) + 0) = xbr(0*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)*mach
+        xbi(0*(n + 2) + 0) = xbi(0*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)*mach
+        xbr(0*(n + 2) + n + 1) = xbr(0*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)*mach
+        xbi(0*(n + 2) + n + 1) = xbi(0*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)*mach
 
         ! u at BC
         xbr(1*(n + 2) + 0) = xbr(1*(n + 2) + 1)
@@ -863,10 +861,10 @@ contains
         xbi(3*(n + 2) + n + 1) = xbi(3*(n + 2) + n)
 
         ! p at BC
-        xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) / mach  
-        xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) / mach  
-        xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) / mach  
-        xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
+        xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)/mach
+        xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)/mach
+        xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)/mach
+        xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)/mach
 
         xcr = 0d0
         xci = 0d0
@@ -886,8 +884,8 @@ contains
                     else
                         ang = alpha*(x_cc(i)*xratio) + beta*(z_cc(k)*xratio) + shift
                     end if
-                    wave(1, i, j, k) = xcr(            j)*cos(ang) - xci(            j)*sin(ang) ! rho
-                    wave(2, i, j, k) = xcr(  (n + 1) + j)*cos(ang) - xci(  (n + 1) + j)*sin(ang) ! u
+                    wave(1, i, j, k) = xcr(j)*cos(ang) - xci(j)*sin(ang) ! rho
+                    wave(2, i, j, k) = xcr((n + 1) + j)*cos(ang) - xci((n + 1) + j)*sin(ang) ! u
                     wave(3, i, j, k) = xcr(2*(n + 1) + j)*cos(ang) - xci(2*(n + 1) + j)*sin(ang) ! v
                     wave(4, i, j, k) = xcr(3*(n + 1) + j)*cos(ang) - xci(3*(n + 1) + j)*sin(ang) ! w
                     wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
