@@ -36,6 +36,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD EPYC 7713 (Milan)                        | 64/64 cores     | 5.0            | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 32/32 cores     | 6.2            | GNU 12.3.0           | GT ICE  |
+| Intel Xeon Gold 6548Y+ (Emerald Rapids)      | 32/32 cores     | 6.6            | Intel oneAPI 2021.9  | GT ICE  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Ampere Altra Max Q80-28 (Arm, Neoverse-N1)   | 80/80 cores     | 6.8            | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513 (Milan)                        | 32/32 cores     | 7.4            | GNU 12.3.0           | GT ICE  |
