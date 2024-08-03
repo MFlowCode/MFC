@@ -31,6 +31,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
 | NVIDIA Grace CPU (Arm, Neoverse V2)          | 72/72 cores     | 3.7            | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
+| AMD EPYC 7763 (Milan)                        | 64/64 cores     | 4.1            | GNU 11.4.0           | NCSA Delta  |
 | AMD EPYC 7713 (Milan)                        | 64/64 cores     | 5.0            | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 32/32 cores     | 6.2            | GNU 12.3.0           | GT ICE  |
@@ -41,14 +42,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 17             | GNU 12.3.0           | GT ICE  |
 | IBM Power9                                   | 20/21 cores     | 21             | GNU 9.1.0            | OLCF Summit |
 | Intel Xeon E5-2650V4 (Broadwell)             | 12/12 cores     | 27             | NVHPC 23.5           | GT CSE Internal  |
-
-
-Processors To-do:
-
-| Hardware                                     |                 | Grind Time     | Compiler             | Computer     |
-| ---:                                         | ----:           | ----:          | :---                 | :---         | 
-| AMD EPYC 7763 (Milan)                        | 24/64 cores     | n/a            | GNU 11.4.0           | NCSA Delta  |
-| Ampere Altra Max (Arm, Neoverse-N1)          |  8/80 cores     | n/a            | GNU 12.2.0           | OLCF Wombat  | 
+| TODO: Ampere Altra Max (Arm, Neoverse-N1)          |  8/80 cores     | n/a            | GNU 12.2.0           | OLCF Wombat  | 
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
