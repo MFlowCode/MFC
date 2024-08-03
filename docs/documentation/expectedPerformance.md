@@ -29,7 +29,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA P100                                  | 1 GPU           | 2.35           | NVHPC 23.5           | GT CSE Internal  |
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
-| Apple M1 Max                                 | 10/10 cores     | 14.3           | GNU 14.1.0           | N/A         |
+| Apple M1 Max                                 |  8/10 cores     | 14.3           | GNU 14.1.0           | N/A         |
 | IBM Power9                                   | 20/21 cores     | 21.2           | GNU 9.1.0            | OLCF Summit |
 
 Processors To-do:
