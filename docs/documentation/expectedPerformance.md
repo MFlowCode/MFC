@@ -26,6 +26,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA A30                                   | 1 GPU           | 1.1            | NVHPC 24.1           | GT Rogues Gallery  |
 | AMD MI250X                                   | 1 __GCD__       | 1.1            | CCE 16.0.1           | OLCF Frontier |
 | AMD MI100                                    | 1 GPU           | 1.4            | CCE 16.0.1           | Cray internal system |
+| NVIDIA L40S (SP GPU)                         | 1 GPU           | 1.7            | NVHPC 24.5           | GT ICE  |
 | NVIDIA P100                                  | 1 GPU           | 2.4            | NVHPC 23.5           | GT CSE Internal  |
 | AMD EPYC 9534 (Genoa)                        | 64/64 cores     | 2.7            | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
@@ -35,6 +36,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD EPYC 7713 (Milan)                        | 64/64 cores     | 5.0            | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 32/32 cores     | 6.2            | GNU 12.3.0           | GT ICE  |
+| Intel Xeon Gold 6548Y+ (Emerald Rapids)      | 32/32 cores     | 6.6            | Intel oneAPI 2021.9  | GT ICE  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Ampere Altra Max Q80-28 (Arm, Neoverse-N1)   | 80/80 cores     | 6.8            | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513 (Milan)                        | 32/32 cores     | 7.4            | GNU 12.3.0           | GT ICE  |
