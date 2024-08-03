@@ -18,7 +18,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 * GPU results are for a single GPU device. For single-precision (SP) GPUs, we performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation. AMD MI250X GPUs have two graphics compute dies (GCDs) per MI250X device; we report results for one GCD, though one can quickly estimate full MI250X runtime by halving the single GCD grind time number.
 
 | Hardware                                     |                 | Grind Time     | Compiler             | Computer     |
-| ---:                                         | ----:           | ----:         | :---                 | :---         | 
+| ---:                                         | ----:           | ----:          | :---                 | :---         | 
 | NVIDIA GH200 (GPU only)                      | 1 GPU           | 0.32           | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA H100                                  | 1 GPU           | 0.45           | NVHPC 24.5           | GT Rogues Gallery  |
 | NVIDIA A100                                  | 1 GPU           | 0.62           | NVHPC 22.11          | GT Phoenix  |
@@ -31,6 +31,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA A40 (SP GPU)                          | 1 GPU           | 3.3            | NVHPC 22.11          | NCSA Delta  |
 | NVIDIA Grace CPU (Arm, Neoverse V2)          | 72/72 cores     | 3.7            | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
+| AMD EPYC 7713 (Milan)                        | 64/64 cores     | 5.0            | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 32/32 cores     | 6.2            | GNU 12.3.0           | GT ICE  |
 | Intel Xeon Platinum 8352Y (Ice Lake)         | 32/32 cores     | 6.6            | NVHPC 24.5           | GT Rogues Gallery  |
@@ -45,9 +46,8 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 Processors To-do:
 
 | Hardware                                     |                 | Grind Time     | Compiler             | Computer     |
-| ---:                                         | ----:           | ----:         | :---                 | :---         | 
+| ---:                                         | ----:           | ----:          | :---                 | :---         | 
 | AMD EPYC 7763 (Milan)                        | 24/64 cores     | n/a            | GNU 11.4.0           | NCSA Delta  |
-| AMD EPYC 7713 (Milan)                        | 32/64 cores     | n/a            | GNU 12.1.0           | GT Phoenix  |
 | Ampere Altra Max (Arm, Neoverse-N1)          |  8/80 cores     | n/a            | GNU 12.2.0           | OLCF Wombat  | 
 | Intel Xeon E5-2650V4 (Broadwell)             |  8/12 cores     | n/a            | NVHPC 23.5           | GT CSE Internal  |
 
