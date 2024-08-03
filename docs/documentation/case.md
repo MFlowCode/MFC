@@ -273,7 +273,6 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 
 - `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
-See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-algorithm).
 
 - `model%%scale`, `model%%rotate` and `model%%translate` define how the model should be transformed to domain-space by first scaling by `model%%scale`, then rotating about the Z, X, and Y axes (using `model%%rotate`), and finally translating by `model%%translate`.
 
@@ -353,7 +352,6 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `bc_[x,y,z]%%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
-| `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
 | `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
@@ -399,14 +397,6 @@ Note that some code parameters are only compatible with 5-equation model.
 
 - `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
 The effect and use of the source term are assessed by [Schmidmayer et al., 2019](references.md#Schmidmayer19).
-
-- `adv_alphan` activates the advection equations of all the components of fluid.
-If this parameter is set false, the void fraction of $N$-th component is computed as the residual of the void fraction of the other components at each cell:
-
-$$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
-
-where $\alpha_i$ is the void fraction of $i$-th component.
-When a single-component flow is simulated, it requires that ``adv_alphan = 'T'``.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
