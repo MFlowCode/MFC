@@ -504,7 +504,7 @@ contains
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
-                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)*59d0/patch_icpp(1)%length_y) &
                  + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 

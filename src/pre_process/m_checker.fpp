@@ -273,6 +273,11 @@ contains
         if (instability_wave .and. (n == 0)) then
             call s_mpi_abort('instability_wave requires n > 0. Exiting ...')
         end if
+        ! BC for instability wave
+        if (instability_wave .and. (any((/bc_y%beg, bc_y%end/) /= -6))) then
+            call s_mpi_abort('instability_wave requires '// &
+                             'both bc_y%beg and bc_y%end to be 6. Exiting ...')
+        end if
     end subroutine s_check_inputs_misc
 
 end module m_checker
