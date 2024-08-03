@@ -495,7 +495,11 @@ contains
                 ieee_is_nan(f1) .or. &
                 ii > 1000 .or. &
                 fR < 0d0) then
-                call s_mpi_abort("Failed to compute equilibrium radius")
+
+                print *, "Failed to compute equilibrium radius"
+
+                fR = fR0
+                exit
             end if
 
             ii = ii + 1
