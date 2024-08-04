@@ -51,7 +51,6 @@ data = {
     # Simulation Algorithm ==================
         'model_eqns'        : 3,
         'alt_soundspeed'    : 'F',
-        'adv_alphan'        : 'T',
         'mixture_err'       : 'T',
         'mpp_lim'           : 'T',
         'time_stepper'      : 3,
