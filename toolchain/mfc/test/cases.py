@@ -513,18 +513,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'bc_x%beg': -1, 'bc_x%end': -1, 'bc_y%beg': -6, 'bc_y%end': -6, 
                 'fluid_pp(1)%gamma': 2.5, 'fluid_pp(1)%pi_inf': 0.0, 'fluid_pp(1)%Re(1)': 50.0,
                 'num_patches': 1, 'num_fluids': 1, 'vel_profile': 'T', 'instability_wave': 'T',
-
                 'patch_icpp(1)%x_centroid': 29.5, 'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_x': 59.0,
                 'patch_icpp(1)%length_y': 59.0, 'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
                 'patch_icpp(1)%vel(1)': 1.0, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 7142.857142857143,
-
                 'patch_icpp(2)%geometry': -100, 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6, 
                 'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 'patch_icpp(2)%vel(1)': -1e6, 
                 'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
-
                 'patch_icpp(3)%geometry': -100, 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6, 
                 'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 'patch_icpp(3)%vel(1)': -1e6, 
-                'patch_icpp(2)%vel(3)': -1e6, 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6,            
+                'patch_icpp(2)%vel(3)': -1e6, 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
             })
 
             if len(dimInfo[0]) == 2:
@@ -536,7 +533,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(1)%z_centroid': 29.5, 'patch_icpp(1)%length_z': 59.0, 'patch_icpp(1)%vel(3)': 0.0,
                     'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
                     'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 'patch_icpp(3)%vel(3)': -1e6
-                    })
+                })
 
             cases.append(define_case_d(stack, '', {}))
             stack.pop()
