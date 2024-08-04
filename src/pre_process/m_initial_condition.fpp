@@ -626,7 +626,7 @@ contains
 
         ! Apply BC
         if (bc_y%beg == -6 .and. bc_y%end == -6) then
-            ! Nonreflecting subsonic beffer BC
+            ! Nonreflecting subsonic buffer BC
             call s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         end if
 

@@ -531,7 +531,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.push('', {'p': 0, 'patch_icpp(1)%geometry': 3})
 
             if len(dimInfo[0]) == 3:
-                stack.push('', {'p': 63, 'patch_icpp(1)%geometry': 9, 
+                stack.push('', {'p': 49, 'patch_icpp(1)%geometry': 9, 
                     'z_domain%beg': 0.0, 'z_domain%end': 59.0, 'bc_z%beg': -1, 'bc_z%end': -1,
                     'patch_icpp(1)%z_centroid': 29.5, 'patch_icpp(1)%length_z': 59.0, 'patch_icpp(1)%vel(3)': 0.0,
                     'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
