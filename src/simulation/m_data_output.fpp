@@ -1019,7 +1019,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_write_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
@@ -1303,7 +1303,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1378,11 +1378,11 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                     end if
                 end if
-            else ! 3D f (t_step == t_step_stop)simulation
+            else ! 3D 
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
@@ -1430,7 +1430,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c, fluid_pp(:)%G)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1556,7 +1556,7 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (elasticity) then
-                        write (i + 30, '(6X,F12.12,F24.8,F24.8,F24.8,F24.8,'// &
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &

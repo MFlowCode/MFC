@@ -162,12 +162,14 @@ module m_riemann_solvers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-    !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
+    !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, & 
+    !$acc flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
-    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
+    !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, & 
+    !$acc flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
 #endif
     !> @}
 
@@ -2073,6 +2075,9 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
+                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -2234,17 +2239,15 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L, Gs)
+                                                              vel_L_rms, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R, Gs)
+                                                              vel_R_rms, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
-
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg, Gs)
-                                !SGR added Gs contribution to the speed of sound
+                                                              vel_avg_rms, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -2332,12 +2335,29 @@ contains
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq 
                                 do i = 1, num_dims
+                                    idxi = dir_idx(i)
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                        xi_M*(rho_L*(vel_L(idx1)* &
+                                                     vel_L(idxi) + &
+                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
+                                                                (1d0 - dir_flg(idxi))* &
+                                                                vel_L(idxi)) - vel_L(idxi))) + &
+                                              dir_flg(idxi)*(pres_L)) &
+                                        + xi_P*(rho_R*(vel_R(idx1)* &
+                                                       vel_R(idxi) + &
+                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
+                                                                  (1d0 - dir_flg(idxi))* &
+                                                                  vel_R(idxi)) - vel_R(idxi))) + &
+                                                dir_flg(idxi)*(pres_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
+
                                     !idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(dir_idx(i)) + s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-             (1d0 - dir_flg(dir_idx(i)))*vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_L)) + &
-                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(dir_idx(i)) + s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-             (1d0 - dir_flg(dir_idx(i)))*vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_R))
+                                    !flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                    !    xi_M*(rho_L*(vel_L(idx1)*vel_L(dir_idx(i)) + s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+             !(1d0 - dir_flg(dir_idx(i)))*vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_L)) + &
+             !                           xi_P*(rho_R*(vel_R(idx1)*vel_R(dir_idx(i)) + s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+             !(1d0 - dir_flg(dir_idx(i)))*vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_R)) &
+             !                           + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                 end do
 
                                 ! ENERGY FLUX.
@@ -2346,7 +2366,8 @@ contains
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) &
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
+                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R)) & 
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
@@ -2371,18 +2392,23 @@ contains
                                 if (hypoelasticity) then
                                     !$acc loop seq
                                     do i = 1, strxe - strxb + 1
-                                        flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
-                                            xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
-                                            xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
+                                      flux_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) = &
+                                        xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(idx1)*tau_e_L(i)) + &
+                                        xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(idx1)*tau_e_R(i))
                                     end do
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
                                 !$acc loop seq
                                 do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
-                                        xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                   flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                     xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                     *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                     + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                     *(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                  !flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                  !  xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
+                                  !  xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
                                 ! VOLUME FRACTION SOURCE FLUX.
@@ -2390,18 +2416,24 @@ contains
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
                                     vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
-                                        xi_M*(vel_L(idxi) + dir_flg(idxi)*s_M*(xi_L - 1d0)) + &
-                                        xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
+                                        xi_M*(vel_L(idxi) + &
+                                              dir_flg(idxi)* &
+                                              s_M*(xi_L - 1d0)) &
+                                        + xi_P*(vel_R(idxi) + &
+                                                dir_flg(idxi)* &
+                                                s_P*(xi_R - 1d0))
+                                        !xi_M*(vel_L(idxi) + dir_flg(idxi)*s_M*(xi_L - 1d0)) + &
+                                        !xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
 
                                 ! SURFACE TENSION FLUX. need to check
-                                if (.not. f_is_default(sigma)) then
-                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                        (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
-                                         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
-                                end if
+                                !if (.not. f_is_default(sigma)) then
+                                !    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                !        (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
+                                !         xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
+                                !end if
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
