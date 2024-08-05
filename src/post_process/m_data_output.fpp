@@ -1005,11 +1005,16 @@ contains
         end do
 
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
-        do l = 0, p
-            if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
-                cent = l
-            end if
-        end do
+        if (p > 0) then
+                do l = 0, p
+                    if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                        cent = l
+                    end if
+                end do
+        else
+                cent = 0
+        end if
+
         thres = 0.9d0*maxalph_glb
         do k = 0, n
             OLoop: do j = 0, m
@@ -1031,9 +1036,7 @@ contains
                         do i = 1, counter
                             if (euc_d < tgp) then
                                 cycle OLoop
-                            elseif (euc_d > tgp .and. i == counter .and. x_cc(j) < 1.5 .and. y_cc(k) < 1.5) then
-                                !artificial bounding on the interface for bubble at a centroid.
-                                !need to remove eventually.
+                            elseif (euc_d > tgp .and. i == counter) then
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)

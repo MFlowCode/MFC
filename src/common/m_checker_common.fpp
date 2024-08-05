@@ -38,6 +38,7 @@ contains
         call s_check_inputs_qbmm_and_polydisperse
         if (adv_n) call s_check_inputs_adv_n
         if (hypoelasticity) call s_check_inputs_hypoelasticity
+        if (hyperelasticity) call s_check_inputs_hyperelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
 #endif
@@ -179,7 +180,20 @@ contains
                              '5-equation (model_eqns = 2) or '// &
                              '6-equation model (model_eqns = 3). Exiting ...')
         end if
+        if (hyperelasticity) then
+            call s_mpi_abort('hyperelasticity cannot be true with hypoelasticity. '// &
+                             'Exiting ...')
+        end if
     end subroutine s_check_inputs_hypoelasticity
+
+    !> Checks constraints on the hyperelasticity parameters. 
+        !! Called by s_check_inputs_common for pre-processing and simulation
+    subroutine s_check_inputs_hyperelasticity
+        if (model_eqns /= 3) then
+           call s_mpi_abort('hyperelasticity requires '// &
+                            '6-equation model (model_eqns = 3). Exiting ...')
+        end if
+    end subroutine s_check_inputs_hyperelasticity
 
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
