@@ -56,6 +56,8 @@ PRE_PROCESS.update({
     't_step_old': ParamType.INT,
     't_step_start': ParamType.INT,
     'vel_profile': ParamType.LOG,
+    'vel_profile_coef': ParamType.REAL,
+    'vel_profile_domain': ParamType.REAL,
     'instability_wave': ParamType.LOG,
     'perturb_flow': ParamType.LOG,
     'perturb_flow_fluid': ParamType.INT,
