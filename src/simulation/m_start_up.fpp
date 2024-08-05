@@ -135,8 +135,7 @@ contains
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, adv_alphan, &
-            mpp_lim, time_stepper, weno_eps, weno_flat, &
+            model_eqns, mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
             teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
@@ -1156,7 +1155,7 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
+            print *, "Performance: ", time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/))), " ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
