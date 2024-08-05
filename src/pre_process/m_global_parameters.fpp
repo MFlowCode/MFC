@@ -105,6 +105,8 @@ module m_global_parameters
     integer :: precision !< Precision of output files
 
     logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
+    real(kind(0d0)) :: vel_profile_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    real(kind(0d0)) :: vel_profile_domain !< Domain for the hyperbolic tangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
@@ -294,6 +296,8 @@ contains
         file_per_process = .false.
         precision = 2
         vel_profile = .false.
+        vel_profile_coef = 1d0
+        vel_profile_domain = 1d0
         instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int

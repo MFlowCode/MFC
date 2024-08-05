@@ -399,21 +399,22 @@ contains
     subroutine s_superposition_instability_wave() ! ------------------------
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)), dimension(6) :: shift
-        real(kind(0d0)) :: uratio
+        real(kind(0d0)) :: uratio, Ldomain
         integer :: i, j, k, q
 
-        uratio = 1d0/patch_icpp(1)%vel(1) ! input scale / mixing layer scale
+        uratio = patch_icpp(1)%vel(1)
+        Ldomain = vel_profile_domain * patch_icpp(1)%length_y
 
         wave = 0d0
         wave1 = 0d0
         wave2 = 0d0
 
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*4.0/Ldomain, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*2.0/Ldomain, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*1.0/Ldomain, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
@@ -422,17 +423,17 @@ contains
             shift(1) = 2*pi*11d0/31d0; shift(2) = 2*pi*13d0/31d0; shift(3) = 2*pi*17d0/31d0; 
             shift(4) = 2*pi*19d0/31d0; shift(5) = 2*pi*23d0/31d0; shift(6) = 2*pi*29d0/31d0; 
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/59.0, 2*pi*4.0/59.0, wave_tmp, shift(1))
+            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, shift(1))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/59.0, 2*pi*2.0/59.0, wave_tmp, shift(2))
+            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, shift(2))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/59.0, 2*pi*1.0/59.0, wave_tmp, shift(3))
+            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, shift(3))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/59.0, -2*pi*4.0/59.0, wave_tmp, shift(4))
+            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, shift(4))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/59.0, -2*pi*2.0/59.0, wave_tmp, shift(5))
+            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, shift(5))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/59.0, -2*pi*1.0/59.0, wave_tmp, shift(6))
+            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, shift(6))
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -441,13 +442,15 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    q_prim_vf(cont_idx%beg)%sf(i, j, k) = q_prim_vf(cont_idx%beg)%sf(i, j, k) + wave(1, i, j, k)    ! rho
+                    q_prim_vf(cont_idx%beg)%sf(i, j, k) = q_prim_vf(cont_idx%beg)%sf(i, j, k) + wave(1, i, j, k) ! rho
                     q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)/uratio ! u
-                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)/uratio    ! v
+                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)/uratio ! v
                     if (p > 0) then
                         q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)/uratio ! w
                     end if
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)/uratio**2 ! p
+
+                    write(99, *) i, j, k, uratio, wave(1, i, j, k), wave(2, i, j, k), wave(3, i, j, k), wave(4, i, j, k), wave(5, i, j, k)
 
                     if (bubbles .and. (.not. qbmm)) then
                         do q = 1, nb
@@ -522,8 +525,8 @@ contains
         real(kind(0d0)) :: xratio, uratio
         integer :: i, j !<  generic loop iterators
 
-        xratio = 59d0/patch_icpp(1)%length_y ! input scale / mixing layer scale
-        uratio = 1d0/patch_icpp(1)%vel(1) ! input scale / mixing layer scale
+        xratio = vel_profile_coef
+        uratio = patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
         if (bubbles) then
@@ -537,6 +540,8 @@ contains
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(p_mean + pi_inf))/(rho*(1d0 - adv)))
         mach = 1d0/c1
+
+        print *, adv, gam, pi_inf, rho, p_mean, c1, mach
 
         ! Assign mean profiles
         do j = 0, n + 1
@@ -791,7 +796,7 @@ contains
         integer idx
         integer i, j, k
 
-        xratio = 59d0/patch_icpp(1)%length_y ! input scale / mixing layer scale
+        xratio = vel_profile_coef
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0

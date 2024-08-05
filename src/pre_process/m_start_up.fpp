@@ -129,9 +129,9 @@ contains
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, patch_icpp, fluid_pp, &
-            precision, parallel_io, vel_profile, instability_wave, pi_fac, &
-            perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
+            hypoelasticity, patch_icpp, fluid_pp, precision, parallel_io, &
+            vel_profile, vel_profile_coef, vel_profile_domain, instability_wave, &
+            pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
             rhoref, pref, bubbles, R0ref, nb, &
