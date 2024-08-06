@@ -962,7 +962,9 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, xi_field_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, & 
+                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, tau_e_L, tau_e_R, & 
+                    !$acc G_L, G_R, flux_ene_e, xi_field_L, xi_field_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1210,12 +1212,12 @@ contains
                                 ! f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
                                 !$acc loop seq 
                                 do i = 1, num_dims
-                                    !idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(dir_idx(i)) + s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-             (1d0 - dir_flg(dir_idx(i)))*vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_L)) + &
-                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(dir_idx(i)) + s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-             (1d0 - dir_flg(dir_idx(i)))*vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_R))
+                                    idxi = dir_idx(i)
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + s_M*(xi_L*(dir_flg(idxi)*s_S + &
+             (1d0 - dir_flg(idxi))*vel_L(idxi)) - vel_L(idxi))) + dir_flg(idxi)*(pres_L)) + &
+                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(idxi) + s_P*(xi_R*(dir_flg(idxi)*s_S + &
+             (1d0 - dir_flg(idxi))*vel_R(idxi)) - vel_R(idxi))) + dir_flg(idxi)*(pres_R))
                                 end do
 
                                 ! ENERGY FLUX.
@@ -1231,15 +1233,16 @@ contains
                                   flux_ene_e = 0d0;
                                   !$acc loop seq
                                   do i = 1, num_dims
+                                    idxi = dir_idx(i)
                                     ! MOMENTUM ELASTIC FLUX.
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                      flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
+                                      flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) &
                                       - xi_M*tau_e_L(dir_idx_tau(i)) - xi_P*tau_e_R(dir_idx_tau(i))
                                     ! ENERGY ELASTIC FLUX.
                                     flux_ene_e = flux_ene_e - &
-                                      xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) + &
+                                      xi_M*(vel_L(idxi)*tau_e_L(dir_idx_tau(i)) + &
                                       s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) - &
-                                      xi_P*(vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) + &
+                                      xi_P*(vel_R(idxi)*tau_e_R(dir_idx_tau(i)) + &
                                       s_P*(xi_R*((s_S - vel_R(i))*(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                   end do
                                   flux_rs${XYZ}$_vf(j, k, l, E_idx) = flux_rs${XYZ}$_vf(j, k, l, E_idx) + flux_ene_e
@@ -1256,10 +1259,10 @@ contains
                                 ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
                                 !$acc loop seq 
                                 do i = 1, num_dims
-                                    !idxi = dir_idx(i)
-                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
-                              xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_MP*(xi_L - 1) + 1) - vel_L(dir_idx(i)))) + &
-                              xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(dir_idx(i))))
+                                    idxi = dir_idx(i)
+                                    vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
+                              xi_M*(vel_L(idxi) + dir_flg(idxi)*(s_S*(xi_MP*(xi_L - 1) + 1) - vel_L(idxi))) + &
+                              xi_P*(vel_R(idxi) + dir_flg(idxi)*(s_S*(xi_PP*(xi_R - 1) + 1) - vel_R(idxi)))
                                 end do
 
                                 ! INTERNAL ENERGIES ADVECTION FLUX.
@@ -1358,7 +1361,9 @@ contains
 
                 elseif (model_eqns == 4) then
                     !ME4
-                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, & 
+                    !$acc vel_L, vel_R, alpha_L, alpha_R, vel_avg, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, & 
+                    !$acc vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1606,8 +1611,10 @@ contains
                     end do
                     !$acc end parallel loop
                 elseif (model_eqns == 2 .and. bubbles) then
-                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)
+                    !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, & 
+                    !$acc P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, & 
+                    !$acc s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, & 
+                    !$acc pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2076,7 +2083,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
-                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+                                !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
@@ -2233,7 +2240,6 @@ contains
                                       tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                       tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                     end do
-                                  !print *, 'I was here!'
                                 end if
 
                                 H_L = (E_L + pres_L)/rho_L
@@ -2264,15 +2270,6 @@ contains
                                 end if
 
                                 if (wave_speeds == 1) then
-                                    !s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
-                                    !s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
-                                    !s_S = (pres_R - pres_L + rho_L*vel_L(idx1)* &
-                                    !       (s_L - vel_L(idx1)) - &
-                                    !       rho_R*vel_R(idx1)* &
-                                    !       (s_R - vel_R(idx1))) &
-                                    !      /(rho_L*(s_L - vel_L(idx1)) - &
-                                    !        rho_R*(s_R - vel_R(idx1)))
-
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                         (((4d0*G_L)/3d0) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
@@ -2296,19 +2293,15 @@ contains
                                     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(idx1) - &
                                                      vel_R(idx1)))
-
                                     pres_SR = pres_SL
-
                                     Ms_L = max(1d0, sqrt(1d0 + ((5d-1 + gamma_L)/(1d0 + gamma_L))* &
                                                          (pres_SL/pres_L - 1d0)*pres_L/ &
                                                          ((pres_L + pi_inf_L/(1d0 + gamma_L)))))
                                     Ms_R = max(1d0, sqrt(1d0 + ((5d-1 + gamma_R)/(1d0 + gamma_R))* &
                                                          (pres_SR/pres_R - 1d0)*pres_R/ &
                                                          ((pres_R + pi_inf_R/(1d0 + gamma_R)))))
-
                                     s_L = vel_L(idx1) - c_L*Ms_L
                                     s_R = vel_R(idx1) + c_R*Ms_R
-
                                     s_S = 5d-1*((vel_L(idx1) + vel_R(idx1)) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
@@ -2343,8 +2336,6 @@ contains
                                         *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                         *(vel_R(idx1) + s_P*(xi_R - 1d0))
-                                        !xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
-                                        !xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
                                 ! MOMENTUM FLUX.
@@ -2366,15 +2357,7 @@ contains
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
                                                 dir_flg(idxi)*(pres_R)) &
                                         + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
-
-                                    !idxi = dir_idx(i)
-                                    !flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
-                                    !    xi_M*(rho_L*(vel_L(idx1)*vel_L(dir_idx(i)) + s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
-             !(1d0 - dir_flg(dir_idx(i)))*vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_L)) + &
-             !                           xi_P*(rho_R*(vel_R(idx1)*vel_R(dir_idx(i)) + s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
-             !(1d0 - dir_flg(dir_idx(i)))*vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*(pres_R)) &
-             !                           + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
-                                end do
+                               end do
 
                                 ! ENERGY FLUX.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
@@ -2383,12 +2366,10 @@ contains
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
                                                      (rho_L*s_S + pres_L/ &
                                                       (s_L - vel_L(idx1)))) - E_L)) &
-                                          ! s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) &
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
                                                         (s_R - vel_R(idx1)))) - E_R)) &
-                                          ! s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R)) & 
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
@@ -2428,9 +2409,6 @@ contains
                                      *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                      + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                      *(vel_R(idx1) + s_P*(xi_R - 1d0))
-                                  !flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                  !  xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i)*(vel_L(idx1) + s_M*(xi_L - 1d0)) + &
-                                  !  xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
                                 ! VOLUME FRACTION SOURCE FLUX.
@@ -2444,8 +2422,6 @@ contains
                                         + xi_P*(vel_R(idxi) + &
                                                 dir_flg(idxi)* &
                                                 s_P*(xi_R - 1d0))
-                                        !xi_M*(vel_L(idxi) + dir_flg(idxi)*s_M*(xi_L - 1d0)) + &
-                                        !xi_P*(vel_R(idxi) + dir_flg(idxi)*s_P*(xi_R - 1d0))
                                 end do
 
                                 ! REFERENCE MAP FLUX.
