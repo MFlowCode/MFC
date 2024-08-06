@@ -34,7 +34,6 @@ module m_hyperelastic
         !> @name Abstract subroutine for the infinite relaxation solver
         !> @{
         subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, G, j, k, l)
-            !$acc routine seq
             import :: scalar_field, sys_size, b_size
             type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
             type(scalar_field), dimension(b_size), intent(inout) :: btensor
@@ -79,7 +78,7 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_initialize_hyperelastic_module()
+    subroutine s_initialize_hyperelastic_module
         integer :: i !< generic iterator
 
         @:ALLOCATE(btensor%vf(1:b_size))
@@ -99,7 +98,7 @@ contains
         ! utilized to calculate the solution of a given Riemann problem
         if (hyper_model == 1) then
             s_compute_cauchy_solver => s_neoHookean_cauchy_solver
-        elseif (riemann_solver == 2) then
+        elseif (hyper_model == 2) then
             s_compute_cauchy_solver => s_Mooney_Rivlin_cauchy_solver
         end if
 
@@ -148,10 +147,11 @@ contains
         real(kind(0d0)) :: G_K
         integer :: j, k, l, i, r
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K,alpha_rho_K,rho_K,gamma_K,pi_inf_K,qv_K,G_K,Re_K, tensora, tensorb)
-        do l = 0, p - 2
-            do k = 0, n - 2
-                do j = 2, m - 2
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, & 
+        !$acc rho_K, gamma_K, pi_inf_K, qv_K, G_K, Re_K, tensora, tensorb)
+        do l = 0, p 
+            do k = 0, n 
+                do j = 0, m 
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_K(i) = q_cons_vf(i)%sf(j, k, l)
@@ -265,7 +265,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+        !!!$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(kind(0d0)), intent(in) :: G
@@ -306,7 +306,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !$acc routine seq
+        !!!!$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(kind(0d0)), intent(in) :: G
