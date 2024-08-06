@@ -20,7 +20,7 @@ gammal = 5.5
 Bl = 492.E+06
 rhol = 996.0
 c_l = 1648.7
-G_l = 1E3
+G_l = 1E+06
 
 
 #primitive vartiables
@@ -56,10 +56,10 @@ patmos_n = patmos/stress_char
 P_amp_n = P_amp/stress_char
 
 #geometry
-dlengx = 20.
+dlengx = 15.
 dlengy = 1.
 dlengz = 1.
-Ny = 100
+Ny = 25
 Nx = dlengx*Ny
 Nz = dlengz*Ny
 dx = dlengx/Nx
@@ -73,8 +73,8 @@ alphag_lung = 1.0
 interface_amp = 0.03
 
 # time stepping requirements
-time_end = 500
-cfl = 0.2
+time_end = 50
+cfl = 0.01
 
 dt = cfl * dx/c_l_n 
 Nt = int(time_end/dt)
@@ -100,11 +100,11 @@ print(json.dumps({
     'm'                            : int(Nx),
     'n'                            : int(Ny),
     'p'                            : int(Nz),
-    'stretch_x'                    : 'T',
+    'stretch_x'                    : 'F',
     'a_x'                          : 4.0E+00,
     'x_a'                          : -5.,
     'x_b'                          : 5.,
-    'loops_x'                      : 4,
+    'loops_x'                      : 0,
     'dt'                           : dt,
     't_step_start'                 : tstart,
     't_step_stop'                  : tstop,
@@ -139,8 +139,8 @@ print(json.dumps({
     # ==========================================================================
 
     # Turning on Hypoelasticity ================================================
-    #'hypoelasticity'               : 'T',     
-    'hyperelasticity'              : 'T',
+    'hypoelasticity'               : 'T',     
+    #'hyperelasticity'              : 'T',
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
@@ -206,7 +206,6 @@ print(json.dumps({
     'patch_icpp(2)%alpha_rho(2)'   : rhog_n*alphag_lung,
     'patch_icpp(2)%alpha(1)'       : alphal_lung,
     'patch_icpp(2)%alpha(2)'       : alphag_lung,
-    #'patch_icpp(2)%tau_e(1)'       : 0.0,
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================

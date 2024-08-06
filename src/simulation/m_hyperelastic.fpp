@@ -78,63 +78,6 @@ contains
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
-    subroutine s_initialize_hyperelastic_module
-        integer :: i !< generic iterator
-
-        @:ALLOCATE(btensor%vf(1:b_size))
-        do i = 1, b_size
-            @:ALLOCATE(btensor%vf(i)%sf(0:m, 0:n, 0:p))
-        end do
-        @:ACC_SETUP_VFs(btensor)
-
-        @:ALLOCATE(Gs(1:num_fluids))
-        !$acc loop seq
-        do i = 1, num_fluids
-            Gs(i) = fluid_pp(i)%G
-        end do
-        !$acc update device(Gs)
-
-        ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution of a given Riemann problem
-        if (hyper_model == 1) then
-            s_compute_cauchy_solver => s_neoHookean_cauchy_solver
-        elseif (hyper_model == 2) then
-            s_compute_cauchy_solver => s_Mooney_Rivlin_cauchy_solver
-        end if
-
-        @:ALLOCATE_GLOBAL(fd_coeff_x(-fd_number:fd_number, 0:m))
-        if (n > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_y(-fd_number:fd_number, 0:n))
-        end if
-        if (p > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_z(-fd_number:fd_number, 0:p))
-        end if
-
-        ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
-                                                      fd_number, fd_order)
-        !$acc update device(fd_coeff_x)
-        if (n > 0) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
-                                                          fd_number, fd_order)
-            !$acc update device(fd_coeff_y)
-        end if
-        if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
-                                                          fd_number, fd_order)
-            !$acc update device(fd_coeff_z)
-        end if
-
-    end subroutine s_initialize_hyperelastic_module
-
-    !>  The following subroutine handles the calculation of the btensor.
-        !!   The calculation of the btensor takes qprimvf.
-        !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
-        !! calculate the grad_xi, grad_xi is a nxn tensor
-        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
-        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
-        !! btensor is symmetric, save the data space
     subroutine s_hyperelastic_rmt_stress_update(q_cons_vf, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -163,7 +106,7 @@ contains
                     rho_K = max(rho_K, sgm_eps)
                     if (G_K <= verysmall) G_K = 0d0
 
-                    if (G_K > 20d0) then
+                    if (G_K > 1.0d-03) then
                         !$acc loop seq
                         do i = 1, tensor_size
                             tensora(i) = 0d0
@@ -238,7 +181,7 @@ contains
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
-                            call s_compute_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
+                            call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                                                            G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K
@@ -337,6 +280,63 @@ contains
             0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
+
+    !>  The following subroutine handles the calculation of the btensor.
+        !!   The calculation of the btensor takes qprimvf.
+        !! @param q_prim_vf Primitive variables
+        !! @param btensor is the output
+        !! calculate the grad_xi, grad_xi is a nxn tensor
+        !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
+        !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
+        !! btensor is symmetric, save the data space
+    subroutine s_initialize_hyperelastic_module
+        integer :: i !< generic iterator
+
+        @:ALLOCATE(btensor%vf(1:b_size))
+        do i = 1, b_size
+            @:ALLOCATE(btensor%vf(i)%sf(0:m, 0:n, 0:p))
+        end do
+        @:ACC_SETUP_VFs(btensor)
+
+        @:ALLOCATE(Gs(1:num_fluids))
+        !$acc loop seq
+        do i = 1, num_fluids
+            Gs(i) = fluid_pp(i)%G
+        end do
+        !$acc update device(Gs)
+
+        ! Associating procedural pointer to the subroutine that will be
+        ! utilized to calculate the solution of a given Riemann problem
+        if (hyper_model == 1) then
+            s_compute_cauchy_solver => s_neoHookean_cauchy_solver
+        elseif (hyper_model == 2) then
+            s_compute_cauchy_solver => s_Mooney_Rivlin_cauchy_solver
+        end if
+
+        @:ALLOCATE_GLOBAL(fd_coeff_x(-fd_number:fd_number, 0:m))
+        if (n > 0) then
+            @:ALLOCATE_GLOBAL(fd_coeff_y(-fd_number:fd_number, 0:n))
+        end if
+        if (p > 0) then
+            @:ALLOCATE_GLOBAL(fd_coeff_z(-fd_number:fd_number, 0:p))
+        end if
+
+        ! Computing centered finite difference coefficients
+        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
+                                                      fd_number, fd_order)
+        !$acc update device(fd_coeff_x)
+        if (n > 0) then
+            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
+                                                          fd_number, fd_order)
+            !$acc update device(fd_coeff_y)
+        end if
+        if (p > 0) then
+            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+                                                          fd_number, fd_order)
+            !$acc update device(fd_coeff_z)
+        end if
+
+    end subroutine s_initialize_hyperelastic_module
 
     subroutine s_finalize_hyperelastic_module()
 

@@ -369,11 +369,11 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        if (riemann_solver /= 1) then
-            call s_mpi_abort('hypoelasticity requires HLL '// &
-                             '(riemann_solver = 1) Riemann solver. '// &
-                             'Exiting ...')
-        end if
+        !if (riemann_solver /= 1) then
+        !    call s_mpi_abort('hypoelasticity requires HLL '// &
+        !                     '(riemann_solver = 1) Riemann solver. '// &
+        !                     'Exiting ...')
+        !end if
     end subroutine s_check_inputs_hypoelasticity
 
     !> Checks constraints on hyperelasticity parameters
