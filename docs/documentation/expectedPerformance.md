@@ -41,8 +41,9 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Ampere Altra Max Q80-28 (Arm, Neoverse-N1)   | 80/80 cores     | 6.8            | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513 (Milan)                        | 32/32 cores     | 7.4            | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7452 (Rome)                         | 32/32 cores     | 8.4            | GNU 12.3.0           | GT ICE  |
-| Apple M1 Max                                 |  8/10 cores     | 14             | GNU 14.1.0           | N/A     |
+| Apple M1 Pro                                 |  8/10 cores     | 14             | GNU 13.2.0           | N/A     |
 | Intel Xeon Gold 6226 (Cascade Lake)          | 12/12 cores     | 17             | GNU 12.3.0           | GT ICE  |
+| Apple M1 Max                                 |  8/10 cores     | 18             | GNU 14.1.0           | N/A     |
 | IBM Power9                                   | 20/21 cores     | 21             | GNU 9.1.0            | OLCF Summit |
 | Intel Xeon E5-2650V4 (Broadwell)             | 12/12 cores     | 27             | NVHPC 23.5           | GT CSE Internal  |
 
