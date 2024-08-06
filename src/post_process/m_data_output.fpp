@@ -1006,13 +1006,13 @@ contains
 
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         if (p > 0) then
-                do l = 0, p
-                    if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
-                        cent = l
-                    end if
-                end do
+            do l = 0, p
+                if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                    cent = l
+                end if
+            end do
         else
-                cent = 0
+            cent = 0
         end if
 
         thres = 0.9d0*maxalph_glb

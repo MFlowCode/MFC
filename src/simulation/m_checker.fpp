@@ -375,13 +375,13 @@ contains
                              'Exiting ...')
         end if
     end subroutine s_check_inputs_hypoelasticity
-        
+
     !> Checks constraints on hyperelasticity parameters
     subroutine s_check_inputs_hyperelasticity
         if (riemann_solver /= 2) then
-           call s_mpi_abort('hyperelasticity requires HLLC '// &
-                            '(riemann_solver = 2) Riemann solver. '// &
-                            'Exiting ...')
+            call s_mpi_abort('hyperelasticity requires HLLC '// &
+                             '(riemann_solver = 2) Riemann solver. '// &
+                             'Exiting ...')
         end if
     end subroutine s_check_inputs_hyperelasticity
 

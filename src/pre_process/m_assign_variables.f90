@@ -479,7 +479,7 @@ contains
             ! assigning the reference map to the q_prim vector field
             do i = 1, num_dims
                 q_prim_vf(i + xibeg - 1)%sf(j, k, l) = eta*xi_cart(i) + &
-                          (1d0 - eta)*orig_prim_vf(i + xibeg - 1)
+                                                       (1d0 - eta)*orig_prim_vf(i + xibeg - 1)
             end do
 
         end if

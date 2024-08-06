@@ -1382,7 +1382,7 @@ contains
 
                     end if
                 end if
-            else ! 3D 
+            else ! 3D
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then

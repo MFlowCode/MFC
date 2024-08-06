@@ -186,12 +186,12 @@ contains
         end if
     end subroutine s_check_inputs_hypoelasticity
 
-    !> Checks constraints on the hyperelasticity parameters. 
+    !> Checks constraints on the hyperelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_hyperelasticity
         if (model_eqns /= 3) then
-           call s_mpi_abort('hyperelasticity requires '// &
-                            '6-equation model (model_eqns = 3). Exiting ...')
+            call s_mpi_abort('hyperelasticity requires '// &
+                             '6-equation model (model_eqns = 3). Exiting ...')
         end if
     end subroutine s_check_inputs_hyperelasticity
 

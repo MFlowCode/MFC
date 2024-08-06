@@ -73,8 +73,8 @@ contains
             lE = q
         end if
 
-        if (allocated(fd_coeff_s)) deallocate(fd_coeff_s)
-        allocate(fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
+        if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
+        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
 
         ! Computing the 1st order finite-difference coefficients
         if (fd_order_in == 1) then
