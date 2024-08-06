@@ -3,8 +3,8 @@ import math, json
 
 ## 1 FOR BACKGROUND, 2 FOR BUBBLE, 3 FOR GEL
 # Pressure [Pa]
-p01 = 5E6
-p02 = 3550
+p01 = 101325.
+p02 = 101325
 p03 = p01
 
 # Temperature [K]
@@ -138,25 +138,25 @@ C0 = 0.25 # vapor concentration for IMR
 
 # patch 1: liquid water
 liq_wg = 0
-liq_wa = 1.00E-15
-liq_wv = 1.00E-15
+liq_wa = 0*1.00E-15
+liq_wv = 1.00E-9
 liq_wl = 1.00E00 - liq_wv - liq_wa - liq_wg
 # water vapor
-vap_wl = 1.00E-15
+vap_wl = 1.00E-9
 vap_wv = 1 / ( ( 1 - C0 ) / C0 * rho0wv2 / rho0wa2 + 1 )
-vap_wa = 1.00E-15
+vap_wa = 0*1.00E-15
 vap_wg = 0
 vap_tot = vap_wl + vap_wv + vap_wa + vap_wg
 # air
 air_wl = 1.00E-15
 air_wv = vap_tot
 air_wg = 0
-air_wa = 1.00E00 - air_wl - air_wv - air_wg
+air_wa = 0*(1.00E00 - air_wl - air_wv - air_wg)
 # bubble
-bub_wl = 1E-15
-bub_wv = vap_tot
+bub_wl = 1.0E-9
+bub_wv = 1.0-bub_wl
 bub_wg = 0
-bub_wa = 1 - bub_wl - bub_wv - bub_wg
+bub_wa = 0*(1 - bub_wl - bub_wv - bub_wg)
 # gel
 gel_wl = 0
 gel_wv = 0
@@ -172,7 +172,6 @@ Gg = 0.57E+03
 ## SIMULATION PARAMETERS
 
 # CFL
-cfl = 0.30
 
 # Bubble Initial Radius
 R0 = 50E-06
@@ -185,7 +184,7 @@ Nx0 = Nx
 
 # domain boundaries
 lref = 2*R0
-xb = - lref
+xb = -lref
 xe = lref
 
 yb = 0.00
@@ -204,7 +203,7 @@ zcenl = lenz/2.
 
 #xdist = 6.51E-10 #2.17E-5
 #sod = xdist/R0
-sod = 1.5
+sod = 0
 xcenb = sod*R0 #neg for bub in liq; pos bub in gel 
 ycenb = 0.00
 zcenb = 0.00
@@ -243,7 +242,7 @@ tend = 1.2 * tc
 # Nt = total number of steps. Ensure Nt > NtA (so the total tendA is covered)
 # Nt = AS * SF
 #Nt = int(2.5E3 * tend // tc * Nx / Nx0 + 1)
-Nt = int(2.0E3 * tend // tc * Nx / Nx0 + 1)
+Nt = int(1E6 * tend // tc * Nx / Nx0 + 1)
 #print(Nt)
 dt = tend / Nt
 
@@ -269,12 +268,12 @@ print(json.dumps({
     'a_x'          : 4.0E0,
     'x_a'          : -1.75*R0*(abs(sod)+1),
     'x_b'          : 5*R0,
-    'stretch_y'    : 'T',
+    'stretch_y'    : 'F',
     'loops_y'      : 2,
     'a_y'          : 4.0E0,
     'y_a'          : -2*R0*abs(sod),
     'y_b'          :  2*R0*abs(sod),
-    'stretch_z'    : 'T',
+    'stretch_z'    : 'F',
     'loops_z'      : 2,
     'a_z'          : 4.0E0,
     'z_a'          : -2*R0*abs(sod),
@@ -286,14 +285,15 @@ print(json.dumps({
     'dt'           : dt,        
     't_step_start' : tstart,       
     't_step_stop'  : Nt,      
-    't_step_save'  : AS,        
+    't_step_save'  : 1,        
     # ==========================================================
     # Simulation Algorithm Parameters ==========================
     'num_patches'  : 2,        
     'model_eqns'   : 3,        
     'num_fluids'   : 2,       
-    'hypoelasticity' : 'F', 
-    'hyperelasticity' : 'F',      
+    #'alt_soundspeed' : 'T',
+    #'hypoelasticity' : 'F', 
+    #'hyperelasticity' : 'F',      
     'mpp_lim'      : 'T',      
     'mixture_err'  : 'T',      
     #'relax'        : 'T',  
@@ -301,19 +301,19 @@ print(json.dumps({
     #'palpha_eps'   : 1.0E-6,   
     #'ptgalpha_eps' : 1.0E-2,   
     'time_stepper' : 3,        
-    'weno_order'   : 3,        
+    'weno_order'   : 5,        
     'weno_eps'     : 1.0E-16,
     'weno_Re_flux' : 'F',  
     'weno_avg'     : 'F',  
-    'mapped_weno'  : 'T',      
+    'mapped_weno'  : 'F',      
     'null_weights' : 'F',      
-    'mp_weno'      : 'F',      
+    'mp_weno'      : 'T',      
     'riemann_solver' : 2,   
     'wave_speeds'  : 1,        
     'avg_state'    : 2,        
     'bc_x%beg'     : -16, #-2,
     'bc_x%end'     : -16,       
-    'bc_y%beg'     : -2,       
+    'bc_y%beg'     : -2,           
     'bc_y%end'     : -6,
     'bc_z%beg'     : -2,
     'bc_z%end'     : -6,
@@ -354,6 +354,9 @@ print(json.dumps({
     'patch_icpp(2)%y_centroid'     : ycenb,
     'patch_icpp(2)%z_centroid'     : zcenb,
     'patch_icpp(2)%radius'         : R0,
+    'patch_icpp(2)%smoothen'       : 'T',
+    'patch_icpp(2)%smooth_patch_id': 1,
+    'patch_icpp(2)%smooth_coeff'   : 0.5E+00,
     'patch_icpp(2)%vel(1)'         : 0.0E+00,
     'patch_icpp(2)%vel(2)'         : 0.0E+00,
     'patch_icpp(2)%vel(3)'         : 0.0E+00,
@@ -370,12 +373,12 @@ print(json.dumps({
     'fluid_pp(1)%cv'          	   : cvwl,          
     'fluid_pp(1)%qv'        	   : qvwl,	
     'fluid_pp(1)%qvp'          	   : qvpwl,         
-    'fluid_pp(1)%G'                : Gl,
+    #'fluid_pp(1)%G'                : Gl,
     'fluid_pp(2)%gamma'            : 1.0E+00 / ( gamwv - 1 ),       
     'fluid_pp(2)%pi_inf'           : gamwv * piwv / ( gamwv - 1 ),  
     'fluid_pp(2)%cv'          	   : cvwv,          
     'fluid_pp(2)%qv'        	   : qvwv,  	
     'fluid_pp(2)%qvp'          	   : qvpwv,
-    'fluid_pp(2)%G'                : Gv,			
+    #'fluid_pp(2)%G'                : Gv,			
     # ==========================================================
 }))
