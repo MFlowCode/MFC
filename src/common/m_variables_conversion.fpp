@@ -37,7 +37,9 @@ module m_variables_conversion
               s_convert_primitive_to_conservative_variables, &
               s_convert_primitive_to_flux_variables, &
               s_compute_pressure, &
+#ifndef MFC_PRE_PROCESS
               s_compute_speed_of_sound, &
+#endif
               s_finalize_variables_conversion_module
 
     !> Abstract interface to two subroutines designed for the transfer/conversion
