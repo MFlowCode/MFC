@@ -18,8 +18,8 @@ module m_eigen_solver
 contains
 
     !>  This subroutine calls the recommended sequence of subroutines from the
-        !!              eigensystem subroutine package (eispack) to find the 
-        !!              eigenvalues and eigenvectors (if desired) of a complex 
+        !!              eigensystem subroutine package (eispack) to find the
+        !!              eigenvalues and eigenvectors (if desired) of a complex
         !!              general matrix.
         !! @param nm the row dimension of the two-dimensional array parameters
         !! @param nl the order of the matrix a=(ar,ai)
@@ -56,7 +56,7 @@ contains
 50      return
     end subroutine cg
 
-    !>  This subroutine is a translation of the algol procedure cbalance, 
+    !>  This subroutine is a translation of the algol procedure cbalance,
         !!              which is a complex version of balance, num. math. 13,
         !!              293-304(1969) by parlett and reinsch. handbook for auto.
         !!              comp., vol.ii-linear algebra, 315-326(1971).
@@ -74,7 +74,7 @@ contains
         !!            are equal to zero if
         !!            (1) i is greater than j and
         !!            (2) j=1,...,low-1 or i=igh+1,...,nl.
-        !! @param scale the information determining the permutations and scaling 
+        !! @param scale the information determining the permutations and scaling
         !!              factors used.
     subroutine cbal(nm, nl, ar, ai, low, igh, scale)
         integer, intent(in) :: nm, nl
@@ -207,10 +207,10 @@ contains
 
     !>  This subroutine is a translation of a complex analogue of the algol
         !!              procedure orthes, num. math. 12, 349-368(1968) by martin
-        !!              and wilkinson. handbook for auto. comp., vol.ii-linear 
+        !!              and wilkinson. handbook for auto. comp., vol.ii-linear
         !!              algebra, 339-358(1971). Given a complex general matrix,
         !!              this subroutine reduces a submatrix situated in rows and
-        !!              columns low through igh to upper hessenberg form by 
+        !!              columns low through igh to upper hessenberg form by
         !!              unitary similarity transformations.
         !! @param nm the row dimension of the two-dimensional array parameters
         !! @param nl the order of the matrix
@@ -317,12 +317,12 @@ contains
     end subroutine corth
 
     !>  This subroutine is a translation of a unitary analogue of the algol
-        !!              procedure  comlr2, num. math. 16, 181-204(1970) by 
-        !!              peters and wilkinson. handbook for auto. comp., 
-        !!              vol.ii-linear algebra, 372-395(1971). The unitary  
-        !!              analogue substitutes the qr algorithm of francis (comp. 
-        !!              jour. 4, 332-345(1962)) for the lr algorithm. 
-        !!              This subroutine finds the eigenvalues and eigenvectors 
+        !!              procedure  comlr2, num. math. 16, 181-204(1970) by
+        !!              peters and wilkinson. handbook for auto. comp.,
+        !!              vol.ii-linear algebra, 372-395(1971). The unitary
+        !!              analogue substitutes the qr algorithm of francis (comp.
+        !!              jour. 4, 332-345(1962)) for the lr algorithm.
+        !!              This subroutine finds the eigenvalues and eigenvectors
         !!              of a complex upper hessenberg matrix by the qr method.
         !!              The eigenvectors of a complex general matrix can
         !!              also be found if  corth  has been used to reduce this
@@ -333,9 +333,9 @@ contains
         !!            if  cbal  has not been used, set low=1.
         !! @param igh an integer determined by the balancing subroutine cbal.
         !!            if  cbal  has not been used, set igh=nl.
-        !! @param ortr information about the unitary transformations used in the 
+        !! @param ortr information about the unitary transformations used in the
         !!             reduction by  corth
-        !! @param orti information about the unitary transformations used in the 
+        !! @param orti information about the unitary transformations used in the
         !!             reduction by  corth
         !! @param hr the real part of the complex upper hessenberg matrix.
         !! @param hi the imaginary part of the complex upper hessenberg matrix.
@@ -687,12 +687,12 @@ contains
 1001    return
     end subroutine comqr2
 
-    !>  This subroutine is a translation of the algol procedure cbabk2, which is 
-        !!              a complex version of balbak, num. math. 13, 
-        !!              293-304(1969) by parlett and reinsch. handbook for auto. 
+    !>  This subroutine is a translation of the algol procedure cbabk2, which is
+        !!              a complex version of balbak, num. math. 13,
+        !!              293-304(1969) by parlett and reinsch. handbook for auto.
         !!              comp., vol.ii-linear algebra, 315-326(1971).
-        !!              This subroutine forms the eigenvectors of a complex 
-        !!              general matrix by back transforming those of the 
+        !!              This subroutine forms the eigenvectors of a complex
+        !!              general matrix by back transforming those of the
         !!              correspondingbalanced matrix determined by cbal.
         !! @param nm the row dimension of the two-dimensional array parameters
         !! @param nl the order of the matrix
@@ -700,12 +700,12 @@ contains
         !! @param ai the imaginary part of the complex matrix to be balanced
         !! @param low an integer determined by the balancing subroutine cbal
         !! @param igh an integer determined by the balancing subroutine cbal
-        !! @param scale the information determining the permutations and scaling 
+        !! @param scale the information determining the permutations and scaling
         !!              factors used.
         !! @param ml the number of eigenvectors to be back transformed
         !! @param zr the real part of the eigenvectors to be back transformed in
         !!           their first ml columns
-        !! @param zi the imaginary part of the eigenvectors to be back 
+        !! @param zi the imaginary part of the eigenvectors to be back
         !!           transformed in their first ml columns
     subroutine cbabk2(nm, nl, low, igh, scale, ml, zr, zi)
         integer, intent(in) :: nm, nl, low, igh
