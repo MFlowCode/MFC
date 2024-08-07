@@ -1,15 +1,15 @@
-This file was created on 2024-08-07 03:40:43.339377.
+This file was created on 2024-08-07 18:36:51.664855.
 
 mfc.sh:
 
-    Invocation: test -r --generate -o instability_wave -- -c delta
+    Invocation: test -o B9B39FA6 --generate -- -c delta
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
 post_process:
 
     CMake Configuration:
     
-        CMake v3.20.2 on dt-login02.delta.ncsa.illinois.edu
+        CMake v3.20.2 on dt-login03.delta.ncsa.illinois.edu
     
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
@@ -42,7 +42,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.20.2 on dt-login02.delta.ncsa.illinois.edu
+        CMake v3.20.2 on dt-login03.delta.ncsa.illinois.edu
     
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
@@ -71,19 +71,19 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
-        CMake v3.20.2 on dt-login02.delta.ncsa.illinois.edu
+        CMake v3.20.2 on dt-login03.delta.ncsa.illinois.edu
     
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -104,19 +104,19 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
-        CMake v3.20.2 on dt-login02.delta.ncsa.illinois.edu
+        CMake v3.20.2 on dt-login03.delta.ncsa.illinois.edu
     
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -155,7 +155,7 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             2445.356
+    CPU MHz:             3242.991
     BogoMIPS:            4890.71
     Virtualization:      AMD-V
     L1d cache:           32K
