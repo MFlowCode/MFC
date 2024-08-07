@@ -23,7 +23,6 @@ Please select your desired configuration from the list bellow:
 . ./mfc.sh load
 ```
 
-<a id="via-aptitude"></a>
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
 ```shell
@@ -77,7 +76,7 @@ Useful software to install for using WSL on Windows:
 - [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)
 - [Visual Studio Code](https://code.visualstudio.com/) and the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension
 
-Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see [Via Aptitude](#via-aptitude)).
+Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see `Via Aptitude` section).
 
   </details>
 
