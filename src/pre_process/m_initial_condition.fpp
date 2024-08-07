@@ -402,7 +402,7 @@ contains
         real(kind(0d0)) :: uratio, Ldomain
         integer :: i, j, k, q
 
-        uratio = patch_icpp(1)%vel(1)
+        uratio = 1d0/patch_icpp(1)%vel(1)
         Ldomain = vel_profile_domain * patch_icpp(1)%length_y
 
         wave = 0d0
@@ -449,8 +449,6 @@ contains
                         q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)/uratio ! w
                     end if
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)/uratio**2 ! p
-
-                    write(99, *) i, j, k, uratio, wave(1, i, j, k), wave(2, i, j, k), wave(3, i, j, k), wave(4, i, j, k), wave(5, i, j, k)
 
                     if (bubbles .and. (.not. qbmm)) then
                         do q = 1, nb
@@ -526,7 +524,7 @@ contains
         integer :: i, j !<  generic loop iterators
 
         xratio = vel_profile_coef
-        uratio = patch_icpp(1)%vel(1)
+        uratio = 1d0/patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
         if (bubbles) then
@@ -540,8 +538,6 @@ contains
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(p_mean + pi_inf))/(rho*(1d0 - adv)))
         mach = 1d0/c1
-
-        print *, adv, gam, pi_inf, rho, p_mean, c1, mach
 
         ! Assign mean profiles
         do j = 0, n + 1
@@ -645,7 +641,7 @@ contains
 
     subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(inout) :: hr, hi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(out) :: hr, hi    !< matrices for eigenvalue problem
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean !<  mean density profiles
         real(kind(0d0)), intent(in) :: mach
         real(kind(0d0)), dimension(0:5*n - 1, 0:5*n - 1) :: fr, fi    !< matrices for eigenvalue problem
