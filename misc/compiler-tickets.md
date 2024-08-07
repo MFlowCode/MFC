@@ -19,6 +19,7 @@ MFC has been used to isolate many compiler bugs. A short summary is below.
 * PE-47679, 'CCE-15.0.1,16.0.0 Unsupported OpenACC construct '!$acc routine seq''
 * PE-53844, 'CCE >17 crashes on host_data use_device for module variables'
 * PE-55153, 'xor crashes logical comparison for Fortran extensions'
+* HPECOE-71, associated with `OLCFHELP-19298`
 
 ## NVHPC (NVIDIA, internal)
 
