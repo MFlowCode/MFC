@@ -139,8 +139,8 @@ print(json.dumps({
     # ==========================================================================
 
     # Turning on Hypoelasticity ================================================
-    'hypoelasticity'               : 'T',     
-    #'hyperelasticity'              : 'T',
+    #'hypoelasticity'               : 'T',     
+    'hyperelasticity'              : 'F',
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
