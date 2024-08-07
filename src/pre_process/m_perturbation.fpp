@@ -2,7 +2,7 @@
 !! @file m_perturbation.fpp
 !! @brief Contains module m_perturbation
 
-!> @brief This module provides a platform that is 
+!> @brief This module provides a platform that is
 module m_perturbation
 
     ! Dependencies =============================================================
@@ -15,6 +15,8 @@ module m_perturbation
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
     ! complex general matrix
 
+    use m_initial_condition
+
     use ieee_arithmetic
 
     ! ==========================================================================
@@ -22,42 +24,7 @@ module m_perturbation
 
     implicit none
 
-    ! NOTE: The abstract interface allows for the declaration of a pointer to
-    ! a procedure such that the choice of the model equations does not have to
-    ! be queried every time the patch primitive variables are to be assigned in
-    ! a cell in the computational domain.
-    type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
-
-    type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
-
 contains
-
-    !> Computation of parameters, allocation procedures, and/or
-        !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_perturbation_module
-
-        integer :: i !< generic loop iterator
-
-        ! Allocating the primitive and conservative variables
-        allocate (q_prim_vf(1:sys_size))
-        allocate (q_cons_vf(1:sys_size))
-
-        do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
-            allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
-        end do
-
-        ! Setting default values for conservative and primitive variables so
-        ! that in the case that the initial condition is wrongly laid out on
-        ! the grid the simulation component will catch the problem on start-
-        ! up. The conservative variables do not need to be similarly treated
-        ! since they are computed directly from the primitive variables.
-        do i = 1, sys_size
-            q_cons_vf(i)%sf = dflt_real
-            q_prim_vf(i)%sf = dflt_real
-        end do
-
-    end subroutine s_initialize_perturbation_module
 
     subroutine s_perturb_sphere
 
@@ -107,9 +74,9 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     ! IF (perturb_alpha == 1d0) THEN
                     ! Perturb partial density
-                        !    CALL RANDOM_NUMBER(rand_real)
-                        !    rand_real = rand_real / 1d2 / 1d3
-                        !    q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
+                    !    CALL RANDOM_NUMBER(rand_real)
+                    !    rand_real = rand_real / 1d2 / 1d3
+                    !    q_prim_vf(perturb_flow_fluid)%sf(i,j,k) = q_prim_vf(perturb_flow_fluid)%sf(i,j,k) + rand_real
                     ! Perturb velocity
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
@@ -630,21 +597,5 @@ contains
         end do
 
     end subroutine s_generate_wave
-
-    !>  Deallocation procedures for the module
-    subroutine s_finalize_perturbation_module
-
-        integer :: i !< Generic loop iterator
-
-        ! Dellocating the primitive and conservative variables
-        do i = 1, sys_size
-            deallocate (q_prim_vf(i)%sf)
-            deallocate (q_cons_vf(i)%sf)
-        end do
-
-        deallocate (q_prim_vf)
-        deallocate (q_cons_vf)
-
-    end subroutine s_finalize_perturbation_module
 
 end module m_perturbation
