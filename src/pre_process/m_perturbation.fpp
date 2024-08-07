@@ -267,8 +267,8 @@ contains
         else
             adv = 0d0
         end if
-        gam = 1d0 + 1d0/gammas(1)
-        pi_inf = pi_infs(1)*(gam - 1d0)/gam*uratio**2
+        gam = 1d0 + 1d0/fluid_pp(1)%gamma
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam*uratio**2
         rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(p_mean + pi_inf))/(rho*(1d0 - adv)))
