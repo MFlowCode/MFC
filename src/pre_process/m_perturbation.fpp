@@ -15,8 +15,6 @@ module m_perturbation
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
     ! complex general matrix
 
-    use m_initial_condition
-
     use ieee_arithmetic
 
     ! ==========================================================================
@@ -26,8 +24,8 @@ module m_perturbation
 
 contains
 
-    subroutine s_perturb_sphere
-
+    subroutine s_perturb_sphere(q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
         real(kind(0d0)) :: perturb_alpha
@@ -58,8 +56,8 @@ contains
 
     end subroutine s_perturb_sphere
 
-    subroutine s_perturb_surrounding_flow
-
+    subroutine s_perturb_surrounding_flow(q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !<  generic loop iterators
 
         real(kind(0d0)) :: perturb_alpha
@@ -98,7 +96,8 @@ contains
         !!              instability waves with spatial wavenumbers, (4,0), (2,0),
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
-    subroutine s_superposition_instability_wave()
+    subroutine s_superposition_instability_wave(q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)), dimension(6) :: shift
         real(kind(0d0)) :: uratio, Ldomain
