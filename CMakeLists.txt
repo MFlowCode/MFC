@@ -375,12 +375,12 @@ HANDLE_SOURCES(syscheck OFF)
 #             being used.
 
 function(MFC_SETUP_TARGET)
-cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
-
-# Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
-# A little hacky, but it *is* an edge-case for *one* compiler.
-if (NVHPC_USE_TWO_PASS_IPO)
-    add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
+    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
+    
+    # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
+    # A little hacky, but it *is* an edge-case for *one* compiler.
+    if (NVHPC_USE_TWO_PASS_IPO)
+        add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
         target_compile_options(${ARGS_TARGET}_lib PRIVATE 
 		$<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
@@ -392,9 +392,6 @@ if (NVHPC_USE_TWO_PASS_IPO)
         list(APPEND IPO_TARGETS ${ARGS_TARGET}_lib ${ARGS_TARGET})
     else()
         add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET} PRIVATE
-            $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
-        )
 	list(APPEND IPO_TARGETS ${ARGS_TARGET})
     endif()
 
