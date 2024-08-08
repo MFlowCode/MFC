@@ -2,7 +2,8 @@
 !! @file m_perturbation.fpp
 !! @brief Contains module m_perturbation
 
-!> @brief This module provides a platform that is
+!> @brief This module contains subroutines that compute perturbations to the 
+!!              initial mean flow fields.
 module m_perturbation
 
     ! Dependencies =============================================================
@@ -99,12 +100,11 @@ contains
     subroutine s_superposition_instability_wave(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
-        real(kind(0d0)), dimension(6) :: shift
         real(kind(0d0)) :: uratio, Ldomain
         integer :: i, j, k, q
 
         uratio = 1d0/patch_icpp(1)%vel(1)
-        Ldomain = vel_profile_domain*patch_icpp(1)%length_y
+        Ldomain = mixlayer_domain*patch_icpp(1)%length_y
 
         wave = 0d0
         wave1 = 0d0
@@ -120,21 +120,18 @@ contains
         wave = wave1*0.05
 
         if (p > 0) then
-            ! Phase shifts
-            shift(1) = 2*pi*11d0/31d0; shift(2) = 2*pi*13d0/31d0; shift(3) = 2*pi*17d0/31d0; 
-            shift(4) = 2*pi*19d0/31d0; shift(5) = 2*pi*23d0/31d0; shift(6) = 2*pi*29d0/31d0; 
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, shift(1))
+            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, 2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, shift(2))
+            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, 2*pi*13d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, shift(3))
+            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, 2*pi*17d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, shift(4))
+            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, 2*pi*19d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, shift(5))
+            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, 2*pi*23d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, shift(6))
+            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, 2*pi*29d0/31d0)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -162,7 +159,7 @@ contains
 
     end subroutine s_superposition_instability_wave ! ----------------------
 
-    !>  This subroutine computes equilibrium radius for the perturbed pressure field
+    !>  This subroutine computes equilibrium bubble radius of the perturbed pressure field
     subroutine s_compute_equilibrium_state(fP, fR0, fR)
         real(kind(0d0)), intent(in) :: fP, fR0
         real(kind(0d0)), intent(inout) :: fR
@@ -170,11 +167,7 @@ contains
         real(kind(0d0)) :: gam_b
         integer :: ii, jj
 
-        if (num_fluids == 1) then
-            gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
-        else
-            gam_b = 1d0 + 1d0/fluid_pp(num_fluids)%gamma
-        end if
+        gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
 
         ! Loop
         ii = 1
@@ -191,7 +184,7 @@ contains
                 fR = fR - f0/f1
             end if
 
-            ! Failed
+            ! Failed case
             if (ieee_is_nan(f0) .or. &
                 ieee_is_nan(f1) .or. &
                 ii > 1000 .or. &
@@ -224,7 +217,7 @@ contains
         real(kind(0d0)) :: xratio, uratio
         integer :: i, j !<  generic loop iterators
 
-        xratio = vel_profile_coef
+        xratio = mixlayer_vel_coef
         uratio = 1d0/patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
@@ -297,9 +290,10 @@ contains
             end do
         end do
 
-        ! Compute B and C, then A = B + C
-        ! B includes terms without differential operator, and
-        ! C includes terms with differential operator
+        ! Compute B and C, then A = B + C. Here, A is the matrix for the linear
+        ! systems of equation (i.e. we are going to solve x for Ax = lambda x).
+        ! Here, B includes components of A without differential operator, and 
+        ! C includes components of A with differential operator.
         br = 0d0
         bi = 0d0
         ci = 0d0
@@ -326,7 +320,7 @@ contains
         ar = br
         ai = bi + ci
 
-        ! Apply BC
+        ! Apply BC to ar and ai matrices
         if (bc_y%beg == -6 .and. bc_y%end == -6) then
             ! Nonreflecting subsonic buffer BC
             call s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
@@ -340,6 +334,8 @@ contains
 
     end subroutine s_solve_linear_system
 
+    !> This subroutine applies non-reflecting subsonic buffer boundary condition
+        !!              to the linear system of equations (i.e. matrix A).
     subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
         real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(out) :: hr, hi    !< matrices for eigenvalue problem
@@ -353,11 +349,11 @@ contains
 
         ! Condition 2: du/dy = 0 at BC
         do j = 0, 5*(n + 2) - 1
-            ! beg
+            ! at y_domain%beg
             ii = (n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-            ! end
+            ! at y_domain%end
             ii = 2*(n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
@@ -365,11 +361,11 @@ contains
 
         ! Condition 3: dw/dy = 0 at BC
         do j = 0, 5*(n + 2) - 1
-            ! beg
+            ! at y_domain%beg
             ii = 3*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-            ! end
+            ! at y_domain%end
             ii = 4*(n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
@@ -377,15 +373,14 @@ contains
 
         ! Condition 4: dp/dy +- rho c dv/dy = 0 at BC
         do j = 0, 5*(n + 2) - 1
-            ! beg
+            ! at y_domain%beg
             ii = 4*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             jj = 2*(n + 2)
             ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)/mach
             ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)/mach
-
-            ! end
+            ! at y_domain%end
             ii = 5*(n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
@@ -396,15 +391,14 @@ contains
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
         do j = 0, 5*(n + 2) - 1
-            ! beg
+            ! at y_domain%beg
             ii = 0
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             jj = 2*(n + 2)
             ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)*mach
             ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)*mach
-
-            ! end
+            ! at y_domain%end
             ii = (n + 2) - 1
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
@@ -413,7 +407,7 @@ contains
             ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii)*rho_mean(j)*mach
         end do
 
-        ! Remove rho, u, v, w, p at BC
+        ! Remove unnecessary rows of the matrix A (rho, u, v, w, p at the boundaries)
         fr = 0d0
         fi = 0d0
         do ii = 1, 5
@@ -493,7 +487,7 @@ contains
         integer idx
         integer i, j, k
 
-        xratio = vel_profile_coef
+        xratio = mixlayer_vel_coef
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0
@@ -522,7 +516,7 @@ contains
             vni(i) = ci
         end do
 
-        ! Reassign vectors
+        ! Reassign missing values at boundaries based on the boundary condition
         xbr = 0d0
         xbi = 0d0
         do i = 1, 5
@@ -544,30 +538,31 @@ contains
             end if
         end do
 
-        ! rho at BC
+        ! rho at boundaries
         xbr(0*(n + 2) + 0) = xbr(0*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)*mach
         xbi(0*(n + 2) + 0) = xbi(0*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)*mach
         xbr(0*(n + 2) + n + 1) = xbr(0*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)*mach
         xbi(0*(n + 2) + n + 1) = xbi(0*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)*mach
 
-        ! u at BC
+        ! u at boundaries
         xbr(1*(n + 2) + 0) = xbr(1*(n + 2) + 1)
         xbi(1*(n + 2) + 0) = xbi(1*(n + 2) + 1)
         xbr(1*(n + 2) + n + 1) = xbr(1*(n + 2) + n)
         xbi(1*(n + 2) + n + 1) = xbi(1*(n + 2) + n)
 
-        ! w at BC
+        ! w at boundaries
         xbr(3*(n + 2) + 0) = xbr(3*(n + 2) + 1)
         xbi(3*(n + 2) + 0) = xbi(3*(n + 2) + 1)
         xbr(3*(n + 2) + n + 1) = xbr(3*(n + 2) + n)
         xbi(3*(n + 2) + n + 1) = xbi(3*(n + 2) + n)
 
-        ! p at BC
+        ! p at boundaries
         xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)/mach
         xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)/mach
         xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)/mach
         xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)/mach
 
+        ! Compute average to get cell-centered values
         xcr = 0d0
         xci = 0d0
         do i = 1, 5
@@ -577,7 +572,8 @@ contains
             end do
         end do
 
-        ! Generate an instability wave
+        ! Generate instability waves in x- and z-directions with phase shifts
+        ! wave = Re(eigfunc * exp(i*(alpha*x + beta*z)))
         do i = 0, m
             do j = 0, n
                 do k = 0, p

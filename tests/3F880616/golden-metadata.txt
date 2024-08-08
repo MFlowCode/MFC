@@ -1,11 +1,11 @@
-This file was created on 2024-08-08 01:55:04.643727.
+This file was created on 2024-08-08 03:53:14.350669.
 
 mfc.sh:
 
-    Invocation: test --generate -o instability_wave -j 4 -- -c delta
+    Invocation: test -o mixlayer_perturb --generate -- -c delta
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -71,7 +71,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -80,10 +80,10 @@ syscheck:
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -104,7 +104,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -113,9 +113,9 @@ pre_process:
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -155,7 +155,7 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             3193.810
+    CPU MHz:             2445.531
     BogoMIPS:            4891.06
     Virtualization:      AMD-V
     L1d cache:           32K

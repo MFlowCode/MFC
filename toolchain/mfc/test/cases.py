@@ -508,17 +508,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_instability_wave(dimInfo):
         if len(dimInfo[0]) > 1:
             for bubbles in ['F', 'T']:
-                stack.push('instability_wave', {
+                stack.push('mixlayer_perturb', {
                     'm': 24, 'n': 35, 'num_patches': 1, 'num_fluids': 1,
                     'x_domain%beg': 0.0, 'x_domain%end': 360.0, 'y_domain%beg': -180.0, 'y_domain%end': 180.0,
                     'bc_x%beg': -3, 'bc_x%end': -3, 'bc_y%beg': -6, 'bc_y%end': -6,
-                    'vel_profile': 'T', 'vel_profile_domain': 1.475, 'vel_profile_coef': 0.6, 'instability_wave': 'T',
-                    'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
-                    'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,  
+                    'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
+                    'mixlayer_perturb': 'T', 'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
+                    'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,
                     'fluid_pp(1)%Re(1)': 1.6881644098979287,
                     'patch_icpp(1)%x_centroid': 180.0, 'patch_icpp(1)%length_x': 360.0,
-                    'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0, 
-                    'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0, 
+                    'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0,
+                    'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0,
                     'patch_icpp(2)%geometry': -100, 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
                     'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 'patch_icpp(2)%vel(1)': -1e6,
                     'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
