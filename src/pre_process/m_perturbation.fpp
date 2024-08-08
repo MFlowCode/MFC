@@ -2,7 +2,7 @@
 !! @file m_perturbation.fpp
 !! @brief Contains module m_perturbation
 
-!> @brief This module contains subroutines that compute perturbations to the 
+!> @brief This module contains subroutines that compute perturbations to the
 !!              initial mean flow fields.
 module m_perturbation
 
@@ -292,7 +292,7 @@ contains
 
         ! Compute B and C, then A = B + C. Here, A is the matrix for the linear
         ! systems of equation (i.e. we are going to solve x for Ax = lambda x).
-        ! Here, B includes components of A without differential operator, and 
+        ! Here, B includes components of A without differential operator, and
         ! C includes components of A with differential operator.
         br = 0d0
         bi = 0d0
