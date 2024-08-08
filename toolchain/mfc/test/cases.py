@@ -509,10 +509,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if len(dimInfo[0]) > 1:
             for bubbles in ['F', 'T']:
                 stack.push('instability_wave', {
-                    'm': 24, 'n': 24, 'num_patches': 1, 'num_fluids': 1,
+                    'm': 24, 'n': 49, 'num_patches': 1, 'num_fluids': 1,
                     'x_domain%beg': 0.0, 'x_domain%end': 40.0, 'y_domain%beg': -20.0, 'y_domain%end': 20.0,
                     'bc_x%beg': -1, 'bc_x%end': -1, 'bc_y%beg': -6, 'bc_y%end': -6,
-                    'vel_profile': 'T', 'vel_profile_domain': 1.0, 'instability_wave': 'T',
+                    'vel_profile': 'T', 'vel_profile_domain': 1.475, 'vel_profile_coef': 0.04, 'instability_wave': 'T',
                     'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
                     'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,  
                     'fluid_pp(1)%Re(1)': 1.6881644098979287,
