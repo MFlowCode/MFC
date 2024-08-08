@@ -23,7 +23,27 @@ module m_perturbation
 
     implicit none
 
+    integer :: mixlayer_nvar ! Number of variables in linear stability analysis solver for mixing layer
+    integer, allocatable, dimension(:) :: mixlayer_var ! Index of variables in linear stability analysis solver
+
 contains
+
+    subroutine s_initialize_perturbation_module()
+
+        if (mixlayer_perturb) then
+            if (model_eqns == 2 .and. num_fluids == 1) then
+                mixlayer_nvar = 5 ! 1 continuity + 3 momentum + 1 energy
+                allocate (mixlayer_var(mixlayer_nvar))
+
+                mixlayer_var(1) = contxb
+                mixlayer_var(2) = momxb
+                mixlayer_var(3) = momxb + 1
+                mixlayer_var(4) = momxe
+                mixlayer_var(5) = E_idx
+            end if
+        end if
+
+    end subroutine s_initialize_perturbation_module
 
     subroutine s_perturb_sphere(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -39,7 +59,7 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
 
-                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(mixlayer_var(5) + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
@@ -47,7 +67,7 @@ contains
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(mixlayer_var(5) + l)%sf(i, j, k)*fluid_rho(l)
                         end do
 
                     end if
@@ -70,7 +90,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(mixlayer_var(5) + perturb_flow_fluid)%sf(i, j, k)
                     ! IF (perturb_alpha == 1d0) THEN
                     ! Perturb partial density
                     !    CALL RANDOM_NUMBER(rand_real)
@@ -99,7 +119,7 @@ contains
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
+        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)) :: uratio, Ldomain
         integer :: i, j, k, q
 
@@ -140,17 +160,17 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    q_prim_vf(cont_idx%beg)%sf(i, j, k) = q_prim_vf(cont_idx%beg)%sf(i, j, k) + wave(1, i, j, k) ! rho
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)/uratio ! u
-                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)/uratio ! v
+                    q_prim_vf(mixlayer_var(1))%sf(i, j, k) = q_prim_vf(mixlayer_var(1))%sf(i, j, k) + wave(mixlayer_var(1), i, j, k) ! rho
+                    q_prim_vf(mixlayer_var(2))%sf(i, j, k) = q_prim_vf(mixlayer_var(2))%sf(i, j, k) + wave(mixlayer_var(2), i, j, k)/uratio ! u
+                    q_prim_vf(mixlayer_var(3))%sf(i, j, k) = q_prim_vf(mixlayer_var(3))%sf(i, j, k) + wave(mixlayer_var(3), i, j, k)/uratio ! v
                     if (p > 0) then
-                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)/uratio ! w
+                        q_prim_vf(mixlayer_var(4))%sf(i, j, k) = q_prim_vf(mixlayer_var(4))%sf(i, j, k) + wave(mixlayer_var(4), i, j, k)/uratio ! w
                     end if
-                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)/uratio**2 ! p
+                    q_prim_vf(mixlayer_var(5))%sf(i, j, k) = q_prim_vf(mixlayer_var(5))%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
 
                     if (bubbles .and. (.not. qbmm)) then
                         do q = 1, nb
-                            call s_compute_equilibrium_state(q_prim_vf(E_idx)%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
+                            call s_compute_equilibrium_state(q_prim_vf(mixlayer_var(5))%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
                         end do
                     end if
                 end do
@@ -208,7 +228,7 @@ contains
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha, beta, wave, shift)
         real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
+        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
         real(kind(0d0)), dimension(0:n + 1) :: rho_mean, u_mean !<  mean density and velocity profiles
         real(kind(0d0)) :: p_mean !< mean pressure and number density
@@ -265,16 +285,16 @@ contains
         real(kind(0d0)), intent(in) :: p_mean !< mean pressure
         real(kind(0d0)), dimension(0:n + 1, 0:n + 1), intent(in) :: d !< differential operator in y dir
         real(kind(0d0)), intent(in) :: gam, pi_inf, mach, shift
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
 
         real(kind(0d0)), dimension(0:n + 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
-        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1) :: br, bi, ci !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5) :: hr, hi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*(n + 2) - 1, 0:mixlayer_nvar*(n + 2) - 1) :: ar, ai    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*(n + 2) - 1, 0:mixlayer_nvar*(n + 2) - 1) :: br, bi, ci !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5, 0:mixlayer_nvar*n - 5) :: hr, hi    !< matrices for eigenvalue problem
 
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5) :: zr, zi !< eigenvectors
-        real(kind(0d0)), dimension(0:5*n - 5) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:5*n - 5) :: fv1, fv2, fv3 !< temporary memory
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5, 0:mixlayer_nvar*n - 5) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5) :: fv1, fv2, fv3 !< temporary memory
 
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -298,23 +318,23 @@ contains
         bi = 0d0
         ci = 0d0
         do j = 0, n + 1
-            ii = 1; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
-            ii = 1; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*rho_mean(j); 
-            ii = 1; jj = 3; bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -drho_mean(j); 
-            ii = 1; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*rho_mean(j); 
-            ii = 2; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
-            ii = 2; jj = 3; bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -du_mean(j); 
-            ii = 2; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
-            ii = 3; jj = 3; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
-            ii = 4; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
-            ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
-            ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
-            ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
-            ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(1); jj = mixlayer_var(1); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(1); jj = mixlayer_var(2); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*rho_mean(j); 
+            ii = mixlayer_var(1); jj = mixlayer_var(3); bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -drho_mean(j); 
+            ii = mixlayer_var(1); jj = mixlayer_var(4); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*rho_mean(j); 
+            ii = mixlayer_var(2); jj = mixlayer_var(2); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(2); jj = mixlayer_var(3); bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -du_mean(j); 
+            ii = mixlayer_var(2); jj = mixlayer_var(5); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
+            ii = mixlayer_var(3); jj = mixlayer_var(3); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(4); jj = mixlayer_var(4); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(4); jj = mixlayer_var(5); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
+            ii = mixlayer_var(5); jj = mixlayer_var(2); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
+            ii = mixlayer_var(5); jj = mixlayer_var(4); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
+            ii = mixlayer_var(5); jj = mixlayer_var(5); br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             do k = 0, n + 1
-                ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
-                ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
-                ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
+                ii = mixlayer_var(1); jj = mixlayer_var(3); ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
+                ii = mixlayer_var(3); jj = mixlayer_var(5); ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
+                ii = mixlayer_var(5); jj = mixlayer_var(3); ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
             end do
         end do
         ar = br
@@ -327,7 +347,7 @@ contains
         end if
 
         ! Compute eigenvalues and eigenvectors
-        call cg(5*n - 4, 5*n - 4, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
+        call cg(mixlayer_nvar*n - 4, mixlayer_nvar*n - 4, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
         call s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
@@ -337,72 +357,72 @@ contains
     !> This subroutine applies non-reflecting subsonic buffer boundary condition
         !!              to the linear system of equations (i.e. matrix A).
     subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
-        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(out) :: hr, hi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*(n + 2) - 1, 0:mixlayer_nvar*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5, 0:mixlayer_nvar*n - 5), intent(out) :: hr, hi    !< matrices for eigenvalue problem
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean !<  mean density profiles
         real(kind(0d0)), intent(in) :: mach
-        real(kind(0d0)), dimension(0:5*n - 1, 0:5*n - 1) :: fr, fi    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 1) :: gr, gi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 1, 0:mixlayer_nvar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5, 0:mixlayer_nvar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
         integer :: i, j, k, l, ii, jj
 
         ! Condition 1: v = 0 at BC - no action required here
 
         ! Condition 2: du/dy = 0 at BC
-        do j = 0, 5*(n + 2) - 1
+        do j = 0, mixlayer_nvar*(n + 2) - 1
             ! at y_domain%beg
-            ii = (n + 2)
+            ii = mixlayer_var(1)*(n + 2) 
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             ! at y_domain%end
-            ii = 2*(n + 2) - 1
+            ii = mixlayer_var(1)*(n + 2) + (n + 1)
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
         end do
 
         ! Condition 3: dw/dy = 0 at BC
-        do j = 0, 5*(n + 2) - 1
+        do j = 0, mixlayer_nvar*(n + 2) - 1
             ! at y_domain%beg
-            ii = 3*(n + 2)
+            ii = (mixlayer_var(3))*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             ! at y_domain%end
-            ii = 4*(n + 2) - 1
+            ii = (mixlayer_var(3))*(n + 2) + (n + 1)
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
         end do
 
         ! Condition 4: dp/dy +- rho c dv/dy = 0 at BC
-        do j = 0, 5*(n + 2) - 1
+        do j = 0, mixlayer_nvar*(n + 2) - 1
             ! at y_domain%beg
-            ii = 4*(n + 2)
+            ii = mixlayer_var(4)*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-            jj = 2*(n + 2)
+            jj = mixlayer_var(2)*(n + 2)
             ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)/mach
             ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)/mach
             ! at y_domain%end
-            ii = 5*(n + 2) - 1
+            ii = mixlayer_var(4)*(n + 2) + (n + 1)
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
-            jj = 3*(n + 2) - 1
+            jj = mixlayer_var(2)*(n + 2) + (n + 1)
             ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii)*rho_mean(j)/mach
             ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii)*rho_mean(j)/mach
         end do
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
-        do j = 0, 5*(n + 2) - 1
+        do j = 0, mixlayer_nvar*(n + 2) - 1
             ! at y_domain%beg
             ii = 0
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-            jj = 2*(n + 2)
+            jj = mixlayer_var(2)*(n + 2)
             ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii)*rho_mean(j)*mach
             ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii)*rho_mean(j)*mach
             ! at y_domain%end
-            ii = (n + 2) - 1
+            ii = (n + 1)
             ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
             ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
-            jj = 3*(n + 2) - 1
+            jj = mixlayer_var(2)*(n + 2) + (n + 1)
             ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii)*rho_mean(j)*mach
             ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii)*rho_mean(j)*mach
         end do
@@ -410,8 +430,8 @@ contains
         ! Remove unnecessary rows of the matrix A (rho, u, v, w, p at the boundaries)
         fr = 0d0
         fi = 0d0
-        do ii = 1, 5
-            do jj = 1, 5
+        do ii = 1, mixlayer_nvar
+            do jj = 1, mixlayer_nvar
                 do k = 0, n - 1
                     do l = 0, n - 1
                         fr((ii - 1)*n + k, (jj - 1)*n + l) = ar((ii - 1)*(n + 2) + k + 1, (jj - 1)*(n + 2) + l + 1)
@@ -423,14 +443,14 @@ contains
 
         gr = 0d0
         gi = 0d0
-        do ii = 1, 5
-            do j = 0, 5*n - 1
-                if (ii < 3) then
+        do ii = 1, mixlayer_nvar
+            do j = 0, mixlayer_nvar*n - 1
+                if (ii <= mixlayer_var(2)) then
                     do k = 0, n - 1
                         gr((ii - 1)*n + k, j) = fr((ii - 1)*n + k, j)
                         gi((ii - 1)*n + k, j) = fi((ii - 1)*n + k, j)
                     end do
-                elseif (ii == 3) then
+                elseif (ii == mixlayer_var(3)) then
                     do k = 0, n - 5
                         gr((ii - 1)*n + k, j) = fr((ii - 1)*n + k + 2, j)
                         gi((ii - 1)*n + k, j) = fi((ii - 1)*n + k + 2, j)
@@ -446,14 +466,14 @@ contains
 
         hr = 0d0
         hi = 0d0
-        do i = 0, 5*n - 5
-            do jj = 1, 5
-                if (jj < 3) then
+        do i = 0, mixlayer_nvar*n - 5
+            do jj = 1, mixlayer_nvar
+                if (jj <= mixlayer_var(2)) then
                     do k = 0, n - 1
                         hr(i, (jj - 1)*n + k) = gr(i, (jj - 1)*n + k)
                         hi(i, (jj - 1)*n + k) = gi(i, (jj - 1)*n + k)
                     end do
-                elseif (jj == 3) then
+                elseif (jj == mixlayer_var(3)) then
                     do k = 0, n - 5
                         hr(i, (jj - 1)*n + k) = gr(i, (jj - 1)*n + k + 2)
                         hi(i, (jj - 1)*n + k) = gi(i, (jj - 1)*n + k + 2)
@@ -473,14 +493,14 @@ contains
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(kind(0d0)), dimension(0:5*n - 5), intent(in) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(in) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5), intent(in) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5, 0:mixlayer_nvar*n - 5), intent(in) :: zr, zi !< eigenvectors
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean
-        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
         real(kind(0d0)), intent(in) :: alpha, beta, mach, shift
-        real(kind(0d0)), dimension(0:5*n - 5) :: vr, vi, vnr, vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(0:5*(n + 2) - 1) :: xbr, xbi !< eigenvectors
-        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: xcr, xci !< eigenvectors
+        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 5) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(kind(0d0)), dimension(0:mixlayer_nvar*(n + 2) - 1) :: xbr, xbi !< eigenvectors
+        real(kind(0d0)), dimension(0:mixlayer_nvar*(n + 1) - 1) :: xcr, xci !< eigenvectors
         real(kind(0d0)) :: ang, norm
         real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
         real(kind(0d0)) :: xratio
@@ -491,7 +511,7 @@ contains
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0
-        do i = 1, 5*n - 5
+        do i = 1, mixlayer_nvar*n - 5
             if (wi(i) > wi(k)) then
                 k = i
             end if
@@ -501,7 +521,7 @@ contains
 
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0d0
-        do i = 0, 5*n - 5
+        do i = 0, mixlayer_nvar*n - 5
             if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
                 norm = dsqrt(vr(i)**2 + vi(i)**2)
@@ -510,7 +530,7 @@ contains
 
         tr = vr(idx)
         ti = vi(idx)
-        do i = 0, 5*n - 5
+        do i = 0, mixlayer_nvar*n - 5
             call cdiv(vr(i), vi(i), tr, ti, cr, ci)
             vnr(i) = cr
             vni(i) = ci
@@ -519,13 +539,13 @@ contains
         ! Reassign missing values at boundaries based on the boundary condition
         xbr = 0d0
         xbi = 0d0
-        do i = 1, 5
-            if (i < 3) then
+        do i = 1, mixlayer_nvar
+            if (i <= mixlayer_var(2)) then
                 do k = 0, n - 1
                     xbr((i - 1)*(n + 2) + k + 1) = vnr((i - 1)*n + k)
                     xbi((i - 1)*(n + 2) + k + 1) = vni((i - 1)*n + k)
                 end do
-            elseif (i == 3) then
+            elseif (i == mixlayer_var(3)) then
                 do k = 0, n - 5
                     xbr((i - 1)*(n + 2) + 2 + k + 1) = vnr((i - 1)*n + k)
                     xbi((i - 1)*(n + 2) + 2 + k + 1) = vni((i - 1)*n + k)
@@ -539,33 +559,33 @@ contains
         end do
 
         ! rho at boundaries
-        xbr(0*(n + 2) + 0) = xbr(0*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)*mach
-        xbi(0*(n + 2) + 0) = xbi(0*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)*mach
-        xbr(0*(n + 2) + n + 1) = xbr(0*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)*mach
-        xbi(0*(n + 2) + n + 1) = xbi(0*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)*mach
+        xbr(0) = xbr(1) + xbr(mixlayer_var(2)*(n + 2) + 1)*rho_mean(1)*mach
+        xbi(0) = xbi(1) + xbi(mixlayer_var(2)*(n + 2) + 1)*rho_mean(1)*mach
+        xbr(n + 1) = xbr(n) - xbr(mixlayer_var(2)*(n + 2) + n)*rho_mean(n)*mach
+        xbi(n + 1) = xbi(n) - xbi(mixlayer_var(2)*(n + 2) + n)*rho_mean(n)*mach
 
         ! u at boundaries
-        xbr(1*(n + 2) + 0) = xbr(1*(n + 2) + 1)
-        xbi(1*(n + 2) + 0) = xbi(1*(n + 2) + 1)
-        xbr(1*(n + 2) + n + 1) = xbr(1*(n + 2) + n)
-        xbi(1*(n + 2) + n + 1) = xbi(1*(n + 2) + n)
+        xbr(mixlayer_var(1)*(n + 2)) = xbr(mixlayer_var(1)*(n + 2) + 1)
+        xbi(mixlayer_var(1)*(n + 2)) = xbi(mixlayer_var(1)*(n + 2) + 1)
+        xbr(mixlayer_var(1)*(n + 2) + n + 1) = xbr(mixlayer_var(1)*(n + 2) + n)
+        xbi(mixlayer_var(1)*(n + 2) + n + 1) = xbi(mixlayer_var(1)*(n + 2) + n)
 
         ! w at boundaries
-        xbr(3*(n + 2) + 0) = xbr(3*(n + 2) + 1)
-        xbi(3*(n + 2) + 0) = xbi(3*(n + 2) + 1)
-        xbr(3*(n + 2) + n + 1) = xbr(3*(n + 2) + n)
-        xbi(3*(n + 2) + n + 1) = xbi(3*(n + 2) + n)
+        xbr((mixlayer_var(3))*(n + 2) + 0) = xbr((mixlayer_var(3))*(n + 2) + 1)
+        xbi((mixlayer_var(3))*(n + 2) + 0) = xbi((mixlayer_var(3))*(n + 2) + 1)
+        xbr((mixlayer_var(3))*(n + 2) + n + 1) = xbr((mixlayer_var(3))*(n + 2) + n)
+        xbi((mixlayer_var(3))*(n + 2) + n + 1) = xbi((mixlayer_var(3))*(n + 2) + n)
 
         ! p at boundaries
-        xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1)*rho_mean(1)/mach
-        xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1)*rho_mean(1)/mach
-        xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n)*rho_mean(n)/mach
-        xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n)*rho_mean(n)/mach
+        xbr(mixlayer_var(4)*(n + 2) + 0) = xbr(mixlayer_var(4)*(n + 2) + 1) + xbr(mixlayer_var(2)*(n + 2) + 1)*rho_mean(1)/mach
+        xbi(mixlayer_var(4)*(n + 2) + 0) = xbi(mixlayer_var(4)*(n + 2) + 1) + xbi(mixlayer_var(2)*(n + 2) + 1)*rho_mean(1)/mach
+        xbr(mixlayer_var(4)*(n + 2) + n + 1) = xbr(mixlayer_var(4)*(n + 2) + n) - xbr(mixlayer_var(2)*(n + 2) + n)*rho_mean(n)/mach
+        xbi(mixlayer_var(4)*(n + 2) + n + 1) = xbi(mixlayer_var(4)*(n + 2) + n) - xbi(mixlayer_var(2)*(n + 2) + n)*rho_mean(n)/mach
 
         ! Compute average to get cell-centered values
         xcr = 0d0
         xci = 0d0
-        do i = 1, 5
+        do i = 1, mixlayer_nvar
             do k = 0, n
                 xcr((i - 1)*(n + 1) + k) = 5d-1*(xbr((i - 1)*(n + 2) + k) + xbr((i - 1)*(n + 2) + k + 1))
                 xci((i - 1)*(n + 1) + k) = 5d-1*(xbi((i - 1)*(n + 2) + k) + xbi((i - 1)*(n + 2) + k + 1))
@@ -582,11 +602,11 @@ contains
                     else
                         ang = alpha*(x_cc(i)*xratio) + beta*(z_cc(k)*xratio) + shift
                     end if
-                    wave(1, i, j, k) = xcr(j)*cos(ang) - xci(j)*sin(ang) ! rho
-                    wave(2, i, j, k) = xcr((n + 1) + j)*cos(ang) - xci((n + 1) + j)*sin(ang) ! u
-                    wave(3, i, j, k) = xcr(2*(n + 1) + j)*cos(ang) - xci(2*(n + 1) + j)*sin(ang) ! v
-                    wave(4, i, j, k) = xcr(3*(n + 1) + j)*cos(ang) - xci(3*(n + 1) + j)*sin(ang) ! w
-                    wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
+                    wave(mixlayer_var(1), i, j, k) = xcr(j)*cos(ang) - xci(j)*sin(ang) ! rho
+                    wave(mixlayer_var(2), i, j, k) = xcr(mixlayer_var(1)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(1)*(n + 1) + j)*sin(ang) ! u
+                    wave(mixlayer_var(3), i, j, k) = xcr(mixlayer_var(2)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(2)*(n + 1) + j)*sin(ang) ! v
+                    wave(mixlayer_var(4), i, j, k) = xcr((mixlayer_var(3))*(n + 1) + j)*cos(ang) - xci((mixlayer_var(3))*(n + 1) + j)*sin(ang) ! w
+                    wave(mixlayer_var(5), i, j, k) = xcr(mixlayer_var(4)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(4)*(n + 1) + j)*sin(ang) ! p
                 end do
             end do
         end do

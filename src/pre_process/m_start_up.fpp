@@ -778,6 +778,7 @@ contains
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
         call s_initialize_initial_condition_module()
+        call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
         if (relax) call s_initialize_phasechange_module()
 
