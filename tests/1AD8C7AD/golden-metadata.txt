@@ -1,11 +1,11 @@
-This file was created on 2024-08-08 00:14:34.645503.
+This file was created on 2024-08-08 01:13:31.444862.
 
 mfc.sh:
 
-    Invocation: test --generate -o instability_wave -- -c delta
+    Invocation: test --generate -o instability_wave -j 4 -- -c delta
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -15,9 +15,9 @@ syscheck:
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -71,7 +71,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
@@ -81,9 +81,9 @@ simulation:
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -155,8 +155,8 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             2445.469
-    BogoMIPS:            4890.93
+    CPU MHz:             3233.845
+    BogoMIPS:            4891.06
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
