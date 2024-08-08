@@ -509,7 +509,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if len(dimInfo[0]) > 1:
             for bubbles in ['F', 'T']:
                 stack.push('mixlayer_perturb', {
-                    'm': 24, 'n': 25, 'num_patches': 1, 'num_fluids': 1,
+                    'm': 24, 'n': 35, 'num_patches': 1, 'num_fluids': 1,
                     'x_domain%beg': 0.0, 'x_domain%end': 360.0, 'y_domain%beg': -180.0, 'y_domain%end': 180.0,
                     'bc_x%beg': -3, 'bc_x%end': -3, 'bc_y%beg': -6, 'bc_y%end': -6,
                     'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
@@ -546,7 +546,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     })
 
                 if len(dimInfo[0]) == 3:
-                    stack.push('', {'p': 25, 'patch_icpp(1)%geometry': 9,
+                    stack.push('', {'p': 24, 'patch_icpp(1)%geometry': 9,
                         'z_domain%beg': 0.0, 'z_domain%end': 360.0, 'bc_z%beg': -3, 'bc_z%end': -3,
                         'patch_icpp(1)%z_centroid': 180.0, 'patch_icpp(1)%length_z': 360.0, 'patch_icpp(1)%vel(3)': 0.0,
                         'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 'patch_icpp(2)%vel(3)': -1e6,

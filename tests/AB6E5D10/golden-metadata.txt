@@ -1,11 +1,11 @@
-This file was created on 2024-08-08 05:35:28.295224.
+This file was created on 2024-08-08 05:07:01.683175.
 
 mfc.sh:
 
     Invocation: test -o mixlayer_perturb --gpu --generate -- -c delta
     Lock:       mpi=Yes & gpu=Yes & debug=No & gcov=No & unified=No
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ simulation:
         Fortran : NVHPC v22.11.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen/gcc-8.5.0/nvhpc-22.11-eionxjt/Linux_x86_64/22.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -71,7 +71,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -81,8 +81,8 @@ post_process:
         Fortran : NVHPC v22.11.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen/gcc-8.5.0/nvhpc-22.11-eionxjt/Linux_x86_64/22.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -155,7 +155,7 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             2413.549
+    CPU MHz:             3217.256
     BogoMIPS:            4891.22
     Virtualization:      AMD-V
     L1d cache:           32K
