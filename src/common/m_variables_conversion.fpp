@@ -182,6 +182,7 @@ contains
             end if
 
         #:else
+            !$acc loop seq
             do i = 1, num_species
                 Y_rs(i) = rhoYks(i)/rho
             end do
@@ -905,7 +906,7 @@ contains
             end if
         #:endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -993,6 +994,7 @@ contains
                     end do
 
                     if (chemistry) then
+                        !$acc loop seq
                         do i = 1, num_species
                             rhoYks(i) = qK_cons_vf(chemxb + i - 1)%sf(j, k, l)
                         end do

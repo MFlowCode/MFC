@@ -769,7 +769,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(4) gang vector default(present)
+        !$acc parallel loop default(present)
         do i = 1, sys_size
             rhs_vf(i)%sf(:, :, :) = 0d0
         end do

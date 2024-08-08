@@ -55,24 +55,25 @@ compiler (or a different version thereof), please:\n\
  - Install the compiler or load its module. (e.g. module load gcc/10.1)\n\
  - Set/Export the C, CXX, and FC environment variables. (e.g. 'export CC=gcc', \
  'export CXX=g++', and 'export FC=gfortran'.\n\
- - If using mfc.sh, delete the build/<code name> directory and try again. (e.g. 'rm -rf build/pre_process')\n")
+ - If using mfc.sh, delete the build/<code name> directory and try again. (e.g. 'rm -rf build/pre_process')")
 
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
-        message(FATAL_ERROR "${__err_msg}ERROR: GNU v5.0 or newer is required to build MFC.")
+        message(FATAL_ERROR "ERROR: GNU v5.0 or newer is required to build MFC.\n${__err_msg}")
     endif()
     if (MFC_OpenACC)
-        message(FATAL_ERROR "${__err_msg}ERROR: MFC with GPU processing is not currently compatible with GNU compilers. Please use NVIDIA or Cray compilers.")
+        message(FATAL_ERROR "ERROR: MFC with GPU processing is not currently compatible with GNU compilers. Please use NVIDIA or Cray compilers.\n${__err_msg}")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 21.7)
-        message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, v21.7 or newer is required to build MFC.")
+        message(FATAL_ERROR "ERROR: When using NVHPC, v21.7 or newer is required to build MFC.\n${__err_msg}")
     endif()
-    if ((CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
-        message(FATAL_ERROR "${__err_msg}ERROR: When using NVHPC, MFC with Debug and GPU options is unavailable.")
+
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.11) AND (CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
+        message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v23.11 or newer.\n${__err_msg}")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
-    message(FATAL_ERROR "${__err_msg}ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.")
+    message(FATAL_ERROR "ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.\n${__err_msg}")
 endif()
 
 # Fypp is required to build MFC. We try to locate it. The path to the binary is
@@ -188,7 +189,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -O0 -traceback -Mchkptr -Minform=inform -Mbounds)
+        add_compile_options(-C -g -O0 -traceback -Minform=inform -Mbounds)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})
