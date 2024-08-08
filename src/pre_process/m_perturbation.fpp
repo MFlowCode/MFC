@@ -370,7 +370,7 @@ contains
         ! Condition 2: du/dy = 0 at BC
         do j = 0, mixlayer_nvar*(n + 2) - 1
             ! at y_domain%beg
-            ii = mixlayer_var(1)*(n + 2) 
+            ii = mixlayer_var(1)*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
             ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
             ! at y_domain%end
