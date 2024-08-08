@@ -58,7 +58,7 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's modest set of dependencies:
 ```shell
-brew install wget python cmake gcc@14 mpich
+brew install wget python cmake boost gcc@14 mpich
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
@@ -68,7 +68,7 @@ cd MFC
 ```
 and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
 ```shell
-echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14" >> ~/.profile
+echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14\nexport BOOST_INCLUDE=/opt/homebrew/" >> ~/.profile
 source ~/.profile
 ```
 then you can build MFC and run the test suite!

@@ -49,11 +49,12 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run: |
-          brew install wget make python make cmake coreutils gcc@14
+          brew install wget make python make cmake coreutils gcc@14 boost
           echo "CC=gcc-14"      >> $GITHUB_ENV
           echo "CXX=g++-14"     >> $GITHUB_ENV
           echo "FC=gfortran-14" >> $GITHUB_ENV
-          
+          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
+
       - name: (MacOS) Build OpenMPI
         if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
         run: |
@@ -156,4 +157,3 @@ jobs:
         with:
           name: logs
           path: test-${{ matrix.device }}.out
-

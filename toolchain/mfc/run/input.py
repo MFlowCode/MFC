@@ -1,5 +1,8 @@
 import os, json, glob, typing, dataclasses
 
+import pyrometheus as pyro
+import cantera     as ct
+
 from ..printer import cons
 from ..        import common, build
 from ..state   import ARGS
@@ -30,6 +33,23 @@ class MFCInputFile(Case):
         cons.print("Writing a (new) custom case.fpp file.")
         common.file_write(fpp_path, contents, True)
 
+    def get_cantera_solution(self) -> ct.Solution:
+        cantera_file = self.params["cantera_file"]
+
+        candidates = [
+            cantera_file,
+            os.path.join(self.dirpath, cantera_file),
+            os.path.join(common.MFC_MECHANISMS_DIR, cantera_file),
+        ]
+
+        for candidate in candidates:
+            try:
+                return ct.Solution(candidate)
+            except Exception:
+                continue
+
+        raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
+
     def generate_fpp(self, target) -> None:
         if target.isDependency:
             return
@@ -39,6 +59,32 @@ class MFCInputFile(Case):
 
         # Case FPP file
         self.__save_fpp(target, self.get_fpp(target))
+
+        # Chemistry Rates FPP file
+        modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
+        common.create_directory(modules_dir)
+        thermochem_module = None
+
+        if self.params.get("chemistry", 'F') == 'T':
+            thermochem_module = pyro.codegen.fortran90.gen_thermochem_code(
+                self.get_cantera_solution(),
+                module_name="m_thermochem"
+            )
+        else:
+            thermochem_module = """\
+module m_thermochem
+
+    integer,                          parameter :: num_species   = 0
+    character(len=:), allocatable, dimension(:) :: species_names
+
+end module m_thermochem
+"""
+
+        common.file_write(
+            os.path.join(modules_dir, "m_thermochem.f90"),
+            thermochem_module,
+            True
+        )
 
         cons.unindent()
 

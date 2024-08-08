@@ -66,12 +66,12 @@ def test():
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
-        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
+        dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
         new_uuids = { case.get_uuid() for case in cases }
 
         for old_uuid in dir_uuids - new_uuids:
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
-            common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+            common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
         return
 

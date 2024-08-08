@@ -115,7 +115,21 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 if ! cmp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/requirements.txt" > /dev/null 2>&1; then
     log "(venv) (Re)Installing mfc.sh's Python dependencies (via Pip)."
 
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install -r "$(pwd)/toolchain/requirements.txt"; then
+    next_arg=0
+    nthreads=1
+    for arg in "$@"; do
+        if [ "$arg" == "-j" ] || [ "$arg" == "--jobs" ]; then
+            next_arg=1
+            continue
+        fi
+        if [ "$next_arg" == 1 ]; then
+            next_arg=0
+            nthreads=$arg
+            continue
+        fi
+    done
+
+    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install -r "$(pwd)/toolchain/requirements.txt"; then
         error "(venv) Installation failed."
 
         log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."

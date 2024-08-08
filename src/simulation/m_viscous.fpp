@@ -14,6 +14,8 @@ module m_viscous
     use m_weno
 
     use m_helper
+
+    use m_finite_differences
     ! ==========================================================================
 
     private; public s_get_viscous, &
@@ -522,7 +524,7 @@ contains
         end if
     end subroutine s_compute_viscous_stress_tensor
 
-!>  Computes viscous terms
+    !>  Computes viscous terms
     !!  @param q_cons_vf Cell-averaged conservative variables
     !!  @param q_prim_vf Cell-averaged primitive variables
     !!  @param rhs_vf Cell-averaged RHS variables
@@ -1015,7 +1017,6 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-
                 call s_weno(v_vf(iv%beg:iv%end), &
                             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
                             norm_dir, weno_dir, &
@@ -1027,7 +1028,6 @@ contains
                             is1_viscous, is2_viscous, is3_viscous)
             end if
         else
-
             call s_weno(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                         norm_dir, weno_dir, &
@@ -1305,195 +1305,7 @@ contains
 
     end subroutine s_apply_scalar_divergence_theorem
 
-    !>  Computes the scalar gradient fields via finite differences
-        !!  @param var Variable to compute derivative of
-        !!  @param grad_x First coordinate direction component of the derivative
-        !!  @param grad_y Second coordinate direction component of the derivative
-        !!  @param grad_z Third coordinate direction component of the derivative
-        !!  @param norm Norm of the gradient vector
-    subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
-                                     ix, iy, iz, buff_size_in)
-
-        type(scalar_field), intent(in) :: var
-        type(scalar_field), intent(inout) :: grad_x
-        type(scalar_field), intent(inout) :: grad_y
-        type(scalar_field), intent(inout) :: grad_z
-        type(int_bounds_info), intent(inout) :: ix, iy, iz
-        integer, intent(in) :: buff_size_in
-
-        integer :: j, k, l !< Generic loop iterators
-
-        ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
-        if (n > 0) then
-            iy%beg = -buff_size_in; iy%end = n + buff_size_in
-        else
-            iy%beg = -1; iy%end = 1
-        end if
-
-        if (p > 0) then
-            iz%beg = -buff_size_in; iz%end = p + buff_size_in
-        else
-            iz%beg = -1; iz%end = 1
-        end if
-
-        is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
-
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do l = is3_viscous%beg + 1, is3_viscous%end - 1
-            do k = is2_viscous%beg + 1, is2_viscous%end - 1
-                do j = is1_viscous%beg + 1, is1_viscous%end - 1
-                    grad_x%sf(j, k, l) = &
-                        (var%sf(j + 1, k, l) - var%sf(j - 1, k, l))/ &
-                        (x_cc(j + 1) - x_cc(j - 1))
-                end do
-            end do
-        end do
-
-        if (n > 0) then
-            !$acc parallel loop collapse(3) gang vector
-            do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                do k = is2_viscous%beg + 1, is2_viscous%end - 1
-                    do j = is1_viscous%beg + 1, is1_viscous%end - 1
-                        grad_y%sf(j, k, l) = &
-                            (var%sf(j, k + 1, l) - var%sf(j, k - 1, l))/ &
-                            (y_cc(k + 1) - y_cc(k - 1))
-                    end do
-                end do
-            end do
-        end if
-
-        if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector
-            do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                do k = is2_viscous%beg + 1, is2_viscous%end - 1
-                    do j = is1_viscous%beg + 1, is1_viscous%end - 1
-                        grad_z%sf(j, k, l) = &
-                            (var%sf(j, k, l + 1) - var%sf(j, k, l - 1))/ &
-                            (z_cc(l + 1) - z_cc(l - 1))
-                    end do
-                end do
-            end do
-        end if
-
-        is1_viscous%beg = -buff_size_in; is1_viscous%end = m + buff_size_in; 
-        if (n > 0) then
-            is2_viscous%beg = -buff_size_in; is2_viscous%end = n + buff_size_in
-        else
-            is2_viscous%beg = 0; is2_viscous%end = 0
-        end if
-
-        if (p > 0) then
-            is3_viscous%beg = -buff_size_in; is3_viscous%end = p + buff_size_in
-        else
-            is3_viscous%beg = 0; is3_viscous%end = 0
-        end if
-
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
-
-        !$acc parallel loop collapse(2) gang vector default(present)
-        do l = is3_viscous%beg, is3_viscous%end
-            do k = is2_viscous%beg, is2_viscous%end
-                grad_x%sf(is1_viscous%beg, k, l) = &
-                    (-3d0*var%sf(is1_viscous%beg, k, l) + 4d0*var%sf(is1_viscous%beg + 1, k, l) - var%sf(is1_viscous%beg + 2, k, l))/ &
-                    (x_cc(is1_viscous%beg + 2) - x_cc(is1_viscous%beg))
-                grad_x%sf(is1_viscous%end, k, l) = &
-                    (3d0*var%sf(is1_viscous%end, k, l) - 4d0*var%sf(is1_viscous%end - 1, k, l) + var%sf(is1_viscous%end - 2, k, l))/ &
-                    (x_cc(is1_viscous%end) - x_cc(is1_viscous%end - 2))
-            end do
-        end do
-        if (n > 0) then
-            !$acc parallel loop collapse(2) gang vector default(present)
-            do l = is3_viscous%beg, is3_viscous%end
-                do j = is1_viscous%beg, is1_viscous%end
-                    grad_y%sf(j, is2_viscous%beg, l) = &
-                        (-3d0*var%sf(j, is2_viscous%beg, l) + 4d0*var%sf(j, is2_viscous%beg + 1, l) - var%sf(j, is2_viscous%beg + 2, l))/ &
-                        (y_cc(is2_viscous%beg + 2) - y_cc(is2_viscous%beg))
-                    grad_y%sf(j, is2_viscous%end, l) = &
-                        (3d0*var%sf(j, is2_viscous%end, l) - 4d0*var%sf(j, is2_viscous%end - 1, l) + var%sf(j, is2_viscous%end - 2, l))/ &
-                        (y_cc(is2_viscous%end) - y_cc(is2_viscous%end - 2))
-                end do
-            end do
-            if (p > 0) then
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do k = is2_viscous%beg, is2_viscous%end
-                    do j = is1_viscous%beg, is1_viscous%end
-                        grad_z%sf(j, k, is3_viscous%beg) = &
-                            (-3d0*var%sf(j, k, is3_viscous%beg) + 4d0*var%sf(j, k, is3_viscous%beg + 1) - var%sf(j, k, is3_viscous%beg + 2))/ &
-                            (z_cc(is3_viscous%beg + 2) - z_cc(is3_viscous%beg))
-                        grad_z%sf(j, k, is3_viscous%end) = &
-                            (3d0*var%sf(j, k, is3_viscous%end) - 4d0*var%sf(j, k, is3_viscous%end - 1) + var%sf(j, k, is3_viscous%end - 2))/ &
-                            (z_cc(is3_viscous%end) - z_cc(is3_viscous%end - 2))
-                    end do
-                end do
-            end if
-        end if
-
-        if (bc_x%beg <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
-            do l = is3_viscous%beg, is3_viscous%end
-                do k = is2_viscous%beg, is2_viscous%end
-                    grad_x%sf(0, k, l) = (-3d0*var%sf(0, k, l) + 4d0*var%sf(1, k, l) - var%sf(2, k, l))/ &
-                                         (x_cc(2) - x_cc(0))
-                end do
-            end do
-        end if
-        if (bc_x%end <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
-            do l = is3_viscous%beg, is3_viscous%end
-                do k = is2_viscous%beg, is2_viscous%end
-                    grad_x%sf(m, k, l) = (3d0*var%sf(m, k, l) - 4d0*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
-                                         (x_cc(m) - x_cc(m - 2))
-                end do
-            end do
-        end if
-        if (n > 0) then
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = is3_viscous%beg, is3_viscous%end
-                    do j = is1_viscous%beg, is1_viscous%end
-                        grad_y%sf(j, 0, l) = (-3d0*var%sf(j, 0, l) + 4d0*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
-                                             (y_cc(2) - y_cc(0))
-                    end do
-                end do
-            end if
-            if (bc_y%end <= -3) then
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = is3_viscous%beg, is3_viscous%end
-                    do j = is1_viscous%beg, is1_viscous%end
-                        grad_y%sf(j, n, l) = (3d0*var%sf(j, n, l) - 4d0*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
-                                             (y_cc(n) - y_cc(n - 2))
-                    end do
-                end do
-            end if
-            if (p > 0) then
-                if (bc_z%beg <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do k = is2_viscous%beg, is2_viscous%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            grad_z%sf(j, k, 0) = &
-                                (-3d0*var%sf(j, k, 0) + 4d0*var%sf(j, k, 1) - var%sf(j, k, 2))/ &
-                                (z_cc(2) - z_cc(0))
-                        end do
-                    end do
-                end if
-                if (bc_z%end <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do k = is2_viscous%beg, is2_viscous%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            grad_z%sf(j, k, p) = &
-                                (3d0*var%sf(j, k, p) - 4d0*var%sf(j, k, p - 1) + var%sf(j, k, p - 2))/ &
-                                (z_cc(p) - z_cc(p - 2))
-                        end do
-                    end do
-                end if
-            end if
-        end if
-
-    end subroutine s_compute_fd_gradient
-
-    subroutine s_finalize_viscous_module
+    subroutine s_finalize_viscous_module()
 
         integer :: i
 

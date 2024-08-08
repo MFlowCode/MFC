@@ -2,7 +2,7 @@ import os, glob, typing, typing
 import rich.table
 
 from .state   import ARG
-from .common  import MFC_ROOTDIR, format_list_to_string, MFCException
+from .common  import MFC_ROOT_DIR, format_list_to_string, MFCException
 from .printer import cons
 
 def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, int], int]:
@@ -34,7 +34,7 @@ def count():
 
     total = 0
     for codedir in ['common'] + ARG("targets"):
-        dirfiles, dircount = handle_dir(MFC_ROOTDIR, codedir)
+        dirfiles, dircount = handle_dir(MFC_ROOT_DIR, codedir)
         table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
         table.add_column(f"File (in [magenta]{codedir}[/magenta])", justify="left")
         table.add_column(f"Lines ([cyan]{dircount}[/cyan])", justify="right")
@@ -57,16 +57,16 @@ def count_diff():
     cons.indent()
 
     total = 0
-    MFC_COMPAREDIR=os.getenv('MFC_PR')
-    if MFC_COMPAREDIR is None:
+    MFC_COMPARE_DIR=os.getenv('MFC_PR')
+    if MFC_COMPARE_DIR is None:
         raise MFCException("MFC_PR is not in your environment.")
 
-    print('compare dir', MFC_COMPAREDIR)
+    print('compare dir', MFC_COMPARE_DIR)
 
-    # MFC_COMPAREDIR="/Users/spencer/Downloads/MFC-shbfork"
+    # MFC_COMPARE_DIR="/Users/spencer/Downloads/MFC-shbfork"
     for codedir in ['common'] + ARG("targets"):
-        dirfiles_root, dircount_root = handle_dir(MFC_ROOTDIR, codedir)
-        dirfiles_pr, dircount_pr = handle_dir(MFC_COMPAREDIR, codedir)
+        dirfiles_root, dircount_root = handle_dir(MFC_ROOT_DIR, codedir)
+        dirfiles_pr, dircount_pr = handle_dir(MFC_COMPARE_DIR, codedir)
         table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
         table.add_column(f"File (in [magenta]{codedir}[/magenta])", justify="left")
         table.add_column(f"Lines [HEAD] ([cyan]{dircount_root}[/cyan])", justify="right")

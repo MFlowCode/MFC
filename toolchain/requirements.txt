@@ -1,13 +1,27 @@
-numpy
-pandas
+# General
 rich
-fypp
-mako
 wheel
 typing
 PyYAML
-pylint
 argparse
-fprettify
 dataclasses
 jsonschema
+
+# Build System
+fypp
+
+# Running Cases
+mako
+
+# Code Health
+typos
+pylint
+fprettify
+
+# Profiling
+numpy
+pandas
+
+# Chemistry
+cantera
+pyrometheus @ git+https://github.com/henryleberre/pyrometheus.git@multi-lang-part-2

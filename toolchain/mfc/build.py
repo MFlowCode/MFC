@@ -40,6 +40,9 @@ class MFCTarget:
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
 
+        if case.params.get('chemistry', 'F') == 'T':
+            m.update(case.get_cantera_solution().name.encode())
+
         return m.hexdigest()[:10]
 
     # Get path to directory that will store the build files

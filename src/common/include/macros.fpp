@@ -117,3 +117,19 @@
 
 #define t_vec3   real(kind(0d0)), dimension(1:3)
 #define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)
+
+#:def ASSERT(predicate, message = None)
+    if (.not. (${predicate}$)) then
+        call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
+                         "Assertion failed: ${predicate}$. " &
+                         //${message or '"No error description."'}$)
+    end if
+#:enddef
+
+#:def PROHIBIT(predicate, message = None)
+    if (${predicate}$) then
+        call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
+                         "Prohibited condition: ${predicate}$. " &
+                         //${message or '"No error description."'}$)
+    end if
+#:enddef
