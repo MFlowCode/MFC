@@ -263,15 +263,22 @@ contains
     end subroutine s_check_inputs_perturb_density
 
     !> Checks miscellaneous constraints
-        !! (vel_profile and instability_wave)
+        !! (mixlayer_vel_profile and mixlayer_perturb)
     subroutine s_check_inputs_misc
         ! Hypertangent velocity profile
-        if (vel_profile .and. (n == 0)) then
-            call s_mpi_abort('vel_profile requires n > 0. Exiting ...')
+        if (mixlayer_vel_profile .and. (n == 0)) then
+            call s_mpi_abort('mixlayer_vel_profile requires n > 0. Exiting ...')
         end if
         ! Instability wave
-        if (instability_wave .and. (n == 0)) then
-            call s_mpi_abort('instability_wave requires n > 0. Exiting ...')
+        if (mixlayer_perturb .and. (n == 0)) then
+            call s_mpi_abort('mixlayer_perturb requires n > 0. Exiting ...')
+        elseif (mixlayer_perturb .and. (model_eqns /= 2)) then
+            call s_mpi_abort('mixlayer_perturb requires model_eqns = 2. Exiting ...')
+        elseif (mixlayer_perturb .and. (num_fluids > 1)) then
+            call s_mpi_abort('mixlayer_perturb requires num_fluids = 1. Exiting ...')
+        elseif (mixlayer_perturb .and. (any((/bc_y%beg, bc_y%end/) /= -6))) then
+            call s_mpi_abort('mixlayer_perturb requires '// &
+                             'both bc_y%beg and bc_y%end to be 6. Exiting ...')
         end if
     end subroutine s_check_inputs_misc
 
