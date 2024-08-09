@@ -1,4 +1,4 @@
-This file was created on 2024-08-08 15:43:21.086271.
+This file was created on 2024-08-09 02:46:46.483220.
 
 mfc.sh:
 
@@ -38,7 +38,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -47,9 +47,9 @@ post_process:
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -104,7 +104,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -113,9 +113,9 @@ pre_process:
         C       : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gcc)
         Fortran : GNU v11.4.0 (/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -155,8 +155,8 @@ CPU:
     Model:               1
     Model name:          AMD EPYC 7763 64-Core Processor
     Stepping:            1
-    CPU MHz:             3238.304
-    BogoMIPS:            4890.93
+    CPU MHz:             3232.601
+    BogoMIPS:            4890.86
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
