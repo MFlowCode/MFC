@@ -38,8 +38,8 @@ contains
                 mixlayer_var(1) = contxb
                 mixlayer_var(2) = momxb
                 mixlayer_var(3) = momxb + 1
-                mixlayer_var(4) = momxe
-                mixlayer_var(5) = E_idx
+                mixlayer_var(4) = momxb + 2
+                mixlayer_var(5) = momxb + 3
             end if
         end if
 
@@ -59,7 +59,7 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
 
-                    perturb_alpha = q_prim_vf(mixlayer_var(5) + perturb_sph_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
@@ -67,7 +67,7 @@ contains
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(mixlayer_var(5) + l)%sf(i, j, k)*fluid_rho(l)
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
                         end do
 
                     end if
@@ -90,7 +90,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    perturb_alpha = q_prim_vf(mixlayer_var(5) + perturb_flow_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     ! IF (perturb_alpha == 1d0) THEN
                     ! Perturb partial density
                     !    CALL RANDOM_NUMBER(rand_real)
@@ -160,17 +160,17 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    q_prim_vf(mixlayer_var(1))%sf(i, j, k) = q_prim_vf(mixlayer_var(1))%sf(i, j, k) + wave(mixlayer_var(1), i, j, k) ! rho
-                    q_prim_vf(mixlayer_var(2))%sf(i, j, k) = q_prim_vf(mixlayer_var(2))%sf(i, j, k) + wave(mixlayer_var(2), i, j, k)/uratio ! u
-                    q_prim_vf(mixlayer_var(3))%sf(i, j, k) = q_prim_vf(mixlayer_var(3))%sf(i, j, k) + wave(mixlayer_var(3), i, j, k)/uratio ! v
+                    q_prim_vf(contxb)%sf(i, j, k) = q_prim_vf(contxb)%sf(i, j, k) + wave(mixlayer_var(1), i, j, k) ! rho
+                    q_prim_vf(momxb)%sf(i, j, k) = q_prim_vf(momxb)%sf(i, j, k) + wave(mixlayer_var(2), i, j, k)/uratio ! u
+                    q_prim_vf(momxb + 1)%sf(i, j, k) = q_prim_vf(momxb + 1)%sf(i, j, k) + wave(mixlayer_var(3), i, j, k)/uratio ! v
                     if (p > 0) then
-                        q_prim_vf(mixlayer_var(4))%sf(i, j, k) = q_prim_vf(mixlayer_var(4))%sf(i, j, k) + wave(mixlayer_var(4), i, j, k)/uratio ! w
+                        q_prim_vf(momxb + 2)%sf(i, j, k) = q_prim_vf(momxb + 2)%sf(i, j, k) + wave(mixlayer_var(4), i, j, k)/uratio ! w
                     end if
-                    q_prim_vf(mixlayer_var(5))%sf(i, j, k) = q_prim_vf(mixlayer_var(5))%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
+                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(mixlayer_var(5), i, j, k)/uratio**2 ! p
 
                     if (bubbles .and. (.not. qbmm)) then
                         do q = 1, nb
-                            call s_compute_equilibrium_state(q_prim_vf(mixlayer_var(5))%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
+                            call s_compute_equilibrium_state(q_prim_vf(E_idx)%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
                         end do
                     end if
                 end do
@@ -605,7 +605,7 @@ contains
                     wave(mixlayer_var(1), i, j, k) = xcr(j)*cos(ang) - xci(j)*sin(ang) ! rho
                     wave(mixlayer_var(2), i, j, k) = xcr(mixlayer_var(1)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(1)*(n + 1) + j)*sin(ang) ! u
                     wave(mixlayer_var(3), i, j, k) = xcr(mixlayer_var(2)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(2)*(n + 1) + j)*sin(ang) ! v
-                    wave(mixlayer_var(4), i, j, k) = xcr((mixlayer_var(3))*(n + 1) + j)*cos(ang) - xci((mixlayer_var(3))*(n + 1) + j)*sin(ang) ! w
+                    wave(mixlayer_var(4), i, j, k) = xcr(mixlayer_var(3)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(3)*(n + 1) + j)*sin(ang) ! w
                     wave(mixlayer_var(5), i, j, k) = xcr(mixlayer_var(4)*(n + 1) + j)*cos(ang) - xci(mixlayer_var(4)*(n + 1) + j)*sin(ang) ! p
                 end do
             end do
