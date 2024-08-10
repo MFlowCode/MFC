@@ -283,6 +283,8 @@ contains
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
+        real(kind(0d0)) :: G          !< Cell-avg. fluid shear modulus
+        real(kind(0d0)), dimension(num_fluids) :: Gs      !< Cell-avg. fluid shear moduli
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
         real(kind(0d0)) :: E          !< Cell-avg. energy
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
@@ -301,26 +303,32 @@ contains
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, pi_inf, qv, G, Gs, Re, fltr_dtheta, Nfq)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
                         alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                     end do
 
-                    if (bubbles) then
+                    if (elasticity) then
+                       call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
+                                                                       alpha_rho, Re, j, k, l, G, Gs)
+                    elseif (bubbles) then
                         call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
                     end if
 
+                    !$acc loop seq
                     do i = 1, num_dims
                         vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
                     end do
 
                     vel_sum = 0d0
+                    !$acc loop seq
                     do i = 1, num_dims
                         vel_sum = vel_sum + vel(i)**2d0
                     end do
@@ -329,17 +337,22 @@ contains
 
                     E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
 
+                    ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                    if (hyperelasticity) then
+                      E = E + G*q_prim_vf(xiend+1)%sf(j, k, l)
+                    end if
+
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
 
                     if (c /= c) then
-                        print *, 'crashed at processor: ', proc_rank, ', at j :: ', j, ', k :: ', k, ' l :: ', l
+                        !print *, 'crashed at processor: ', proc_rank, ', at j :: ', j, ', k :: ', k, ' l :: ', l
                         print *, 'alpha1 ::', alpha(1), 'and alpha2 ::', alpha(2), ' alpha3 :: ', alpha(3)
                         print *, 'alpha_rho1 ::', alpha_rho(1), ', alpha_rho2 ::', alpha_rho(2), ' alpha_rho3 :: ', alpha_rho(3)
                         print *, 'E :: ', E, ', pres :: ', pres, ', rho :: ', rho
-                        call s_mpi_abort('Exiting ...')
+                        !call s_mpi_abort('Exiting ...')
                     end if
 
                     if (grid_geometry == 3) then
@@ -419,6 +432,8 @@ contains
                 end do
             end do
         end do
+        !$acc end parallel loop
+
         ! end: Computing Stability Criteria at Current Time-step ===========
 
         ! Determining local stability criteria extrema at current time-step
@@ -448,7 +463,7 @@ contains
             !$acc end kernels
         end if
 #endif
-
+     
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
@@ -464,7 +479,7 @@ contains
             if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
             if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
         end if
-
+        
         ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
@@ -475,12 +490,12 @@ contains
 
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
+            print *, "icfl :: ",icfl_max_glb
             if (any(Re_size > 0)) then
                 write (1, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
-
             else
                 write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
                     t_step, t_step*dt, icfl_max_glb

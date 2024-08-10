@@ -131,29 +131,30 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
 
         real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
-        real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K
-        real(kind(0d0)) :: G_K
+        real(kind(0d0)), dimension(num_fluids) :: alpha_k, alpha_rho_k
+        real(kind(0d0)), dimension(2) :: Re
+        real(kind(0d0)) :: rho, gamma, pi_inf, qv
+        real(kind(0d0)) :: G
         integer :: j, k, l, i, r
 
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, & 
-        !$acc rho_K, gamma_K, pi_inf_K, qv_K, G_K, Re_K, tensora, tensorb)
+        !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
         do l = 0, p 
             do k = 0, n 
                 do j = 0, m 
                     !$acc loop seq
                     do i = 1, num_fluids
-                        alpha_rho_K(i) = q_cons_vf(i)%sf(j, k, l)
-                        alpha_K(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                        alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
+                        alpha_k(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
                     end do
                     ! If in simulation, use acc mixture subroutines
-                    call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                                                    alpha_rho_K, Re_K, j, k, l, G_K, Gs)
-                    rho_K = max(rho_K, sgm_eps)
-                    if ( G_K <= verysmall ) G_K = 0d0
+                    call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, &
+                                                                    alpha_rho_k, Re, j, k, l, G, Gs)
+                    rho = max(rho, sgm_eps)
+                    G = max(G, sgm_eps)
+                    !if ( G <= verysmall ) G_K = 0d0
 
-                    if ( G_K > verysmall ) then
+                    if ( G > verysmall ) then
                         !$acc loop seq
                         do i = 1, tensor_size
                             tensora(i) = 0d0
@@ -194,7 +195,7 @@ contains
                                                - tensora(2)*(tensora(4)*tensora(9) - tensora(6)*tensora(7)) &
                                                + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
 
-                        if (tensorb(tensor_size) > 0d0) then
+                        if (tensorb(tensor_size) > verysmall) then
                             ! STEP 2c: computing the inverse of grad_xi tensor = F
                             ! tensorb is the adjoint, tensora becomes F
                             !$acc loop seq
@@ -213,34 +214,34 @@ contains
                             tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
                             tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
                             ! STEP 4: update the btensor, this is consistent with Riemann solvers
-                            ! \tau_xx
+                            ! \b_xx
                             btensor%vf(1)%sf(j, k, l) = tensorb(1)
-                            ! \tau_xy
+                            ! \b_xy
                             btensor%vf(2)%sf(j, k, l) = tensorb(2)
-                            ! \tau_yy
+                            ! \b_yy
                             btensor%vf(3)%sf(j, k, l) = tensorb(5)
-                            ! \tau_xz
+                            ! \b_xz
                             btensor%vf(4)%sf(j, k, l) = tensorb(3)
-                            ! \tau_yz
+                            ! \b_yz
                             btensor%vf(5)%sf(j, k, l) = tensorb(6)
-                            ! \tau_zz
+                            ! \b_zz
                             btensor%vf(6)%sf(j, k, l) = tensorb(9)
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
-                            !if (hyper_model == 1) then
-                              call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)        
-                            !elseif (hyper_model == 2) then
-                            !  call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G_K, j, k, l)        
-                            !end if
+                            if (hyper_model == 1) then
+                              call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
+                            elseif (hyper_model == 2) then
+                              call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
+                            end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
-                                                           G_K*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma_K
+                                                           G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             !$acc loop seq
                             do i = 1, b_size - 1
                                 q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
-                                    rho_K*q_prim_vf(strxb + i - 1)%sf(j, k, l)
+                                    rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
                             end do
                         end if
                     end if
@@ -259,7 +260,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     subroutine s_neoHookean_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !!!!$acc routine seq
+        !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(kind(0d0)), intent(in) :: G
@@ -300,7 +301,7 @@ contains
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
         !! btensor is symmetric, save the data space
     subroutine s_Mooney_Rivlin_cauchy_solver(btensor, q_prim_vf, G, j, k, l)
-        !!!!$acc routine seq
+        !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
         real(kind(0d0)), intent(in) :: G
