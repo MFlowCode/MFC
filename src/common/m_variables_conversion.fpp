@@ -979,11 +979,16 @@ contains
                         end if
                     end if
 
+                    if (elasticity) then 
+                        !$acc loop seq
+                        do i = strxb, strxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                        end do
+                    end if
+
                     if (hypoelasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /rho_K
                             ! subtracting elastic contribution for pressure calculation
                             if (G_K > verysmall) then !TODO: check if stable for >0
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
@@ -1000,10 +1005,6 @@ contains
                     end if
 
                     if (hyperelasticity) then
-                        !$acc loop seq
-                        do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                        end do
                         !$acc loop seq
                         do i = xibeg, xiend
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
@@ -1148,9 +1149,16 @@ contains
                         end do
                     end if
 
-                    if (hypoelasticity) then
+                    if (elasticity) then 
+                        ! adding the elastic contribution
+                        ! Multiply \tau to \rho \tau
                         do i = strxb, strxe
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
+                    if (hypoelasticity) then
+                        do i = strxb, strxe
                             ! adding elastic contribution
                             if (G > verysmall) then
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
@@ -1168,11 +1176,6 @@ contains
 
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if (hyperelasticity) then
-                        ! adding the elastic contribution
-                        ! Multiply \tau to \rho \tau
-                        do i = strxb, strxe
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                        end do
                         ! Multiply \xi to \rho \xi
                         do i = xibeg, xiend
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
