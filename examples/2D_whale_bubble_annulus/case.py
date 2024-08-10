@@ -88,7 +88,6 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 1,
-    'adv_alphan'                   : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'weno_order'                   : 3,

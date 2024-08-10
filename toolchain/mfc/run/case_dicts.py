@@ -35,7 +35,6 @@ COMMON = {
     'm': ParamType.INT,
     'mpp_lim': ParamType.LOG,
     'R0ref': ParamType.REAL,
-    'adv_alphan': ParamType.LOG,
     'num_fluids': ParamType.INT,
     'model_eqns': ParamType.INT,
     'nb': ParamType.REAL,

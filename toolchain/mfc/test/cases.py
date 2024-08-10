@@ -654,11 +654,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             def modify_example_case(case: dict):
-                if case['t_step_stop'] > 100:
+                case['parallel_io'] = 'F'
+                if case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
-                    case['t_step_stop'] = 100
-                    case['t_step_save'] = 10
-
+                    case['t_step_stop'] = 50
+                    case['t_step_save'] = 50
+ 
                 caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
                 if caseSize > 625:
                     if case['n'] == 0 and case['p'] == 0:

@@ -1028,7 +1028,7 @@ contains
         end if
         call cpu_time(t_finish)
         if (t_step >= 4) then
-            time_avg = (abs(t_finish - t_start)/((ix%end - ix%beg)*(iy%end - iy%beg)*(iz%end - iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
+            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
         end if

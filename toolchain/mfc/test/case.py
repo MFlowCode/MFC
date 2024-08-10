@@ -5,7 +5,7 @@ from typing import List, Set, Union, Callable, Optional
 from ..run.input import MFCInputFile
 
 from ..      import case, common
-from ..state import ARG, CFG
+from ..state import ARG
 from ..run   import input
 from ..build import MFCTarget, get_target
 
@@ -26,7 +26,6 @@ BASE_CFG = {
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 1,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
@@ -167,7 +166,7 @@ class TestCase(case.Case):
 
         common.create_directory(dirpath)
 
-        fileContent = f"""\
+        common.file_write(self.get_filepath(), f"""\
 #!/usr/bin/env python3
 #
 # {self.get_filepath()}:
@@ -192,13 +191,14 @@ mods = {{}}
 
 if "post_process" in ARGS["dict"]["targets"]:
     mods = {{
-        'c_wrt'        : 'T', 'cons_vars_wrt'   : 'T',
+        'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
         'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
         'rho_wrt'      : 'T', 'mom_wrt(1)'      : 'T',
         'vel_wrt(1)'   : 'T', 'E_wrt'           : 'T',
         'pres_wrt'     : 'T', 'alpha_wrt(1)'    : 'T',
         'gamma_wrt'    : 'T', 'heat_ratio_wrt'  : 'T',
         'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
+        'c_wrt'        : 'T',
     }}
 
     if case['p'] != 0:
@@ -207,14 +207,8 @@ if "post_process" in ARGS["dict"]["targets"]:
         mods['omega_wrt(2)'] = 'T'
         mods['omega_wrt(3)'] = 'T'
 
-"""
-        if ('mpi', True) in CFG().items():
-            fileContent += "mods['parallel_io'] = 'T'\n"
-        else:
-            fileContent += "mods['parallel_io'] = 'F'\n"
-        fileContent += "print(json.dumps({**case, **mods}))"
-
-        common.file_write(self.get_filepath(), fileContent)
+print(json.dumps({{**case, **mods}}))
+""")
 
     def to_MFCInputFile(self) -> MFCInputFile:
         return MFCInputFile(self.get_filepath(), self.get_dirpath(), self.params)
