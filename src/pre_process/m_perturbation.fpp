@@ -36,7 +36,7 @@ contains
             mixlayer_bc_fd = 2
             nbp = n + 2
             if (model_eqns == 2 .and. num_fluids == 1) then
-                n_bc_skip = mixlayer_bc_fd * 2
+                n_bc_skip = mixlayer_bc_fd*2
                 mixlayer_nvar = 5 ! 1 continuity + 3 momentum + 1 energy
                 allocate (mixlayer_var(mixlayer_nvar))
 
