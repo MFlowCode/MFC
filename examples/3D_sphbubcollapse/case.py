@@ -54,9 +54,6 @@ print(json.dumps({
     'alt_soundspeed'               : 'F',
     # Two fluids: water and air
     'num_fluids'                   : 2,
-    # Advect both volume fractions
-    'adv_alphan'                   : 'T',
-    # Ensure the volume fractions sum to unity at the end of each
     # time step
     'mpp_lim'                      : 'T',
     # Correct errors when computing speed of sound

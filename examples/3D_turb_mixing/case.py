@@ -72,7 +72,6 @@ print(json.dumps({
     'num_patches'                   : 1,
     'model_eqns'                    : 2,
     'num_fluids'                    : 1,
-    'adv_alphan'                    : 'T',
     'time_stepper'                  : 3,
     'weno_order'                    : 5,
     'weno_eps'                      : 1.E-16,

@@ -263,9 +263,6 @@ contains
         elseif (model_eqns == 3 .and. num_fluids == dflt_int) then
             call s_mpi_abort('6-equation model (model_eqns = 3) '// &
                              'requires num_fluids to be set. Exiting ...')
-        elseif (model_eqns == 1 .and. adv_alphan) then
-            call s_mpi_abort('adv_alphan is not supported for '// &
-                             'model_eqns = 1. Exiting ...')
         elseif (model_eqns == 1 .and. mpp_lim) then
             call s_mpi_abort('mpp_lim is not supported for '// &
                              'model_eqns = 1. Exiting ...')

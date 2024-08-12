@@ -52,7 +52,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity', 'relax',    &
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax',                 &
             & 'parallel_io', 'perturb_flow', 'vel_profile', 'instability_wave',&
             & 'perturb_sph', 'bubbles', 'polytropic', 'polydisperse', 'qbmm',  &
             & 'file_per_process', 'adv_n', 'ib' ]
