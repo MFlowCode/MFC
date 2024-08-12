@@ -34,6 +34,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA RTX6000 (SP GPU)                      | 1 GPU           | 3.9            | NVHPC 22.11          | GT Phoenix  |
 | AMD EPYC 7763 (Milan)                        | 64/64 cores     | 4.1            | GNU 11.4.0           | NCSA Delta  |
 | AMD EPYC 7713 (Milan)                        | 64/64 cores     | 5.0            | GNU 12.3.0           | GT Phoenix  |
+| Intel Xeon Platinum 8480CL (Sapphire Rapids) | 56/56 cores     | 5.0            | NVHPC 24.5           | GT Phoenix  |
 | Intel Xeon Gold 6454S (Sapphire Rapids)      | 32/32 cores     | 5.6            | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon Platinum 8462Y+ (Sapphire Rapids) | 32/32 cores     | 6.2            | GNU 12.3.0           | GT ICE  |
 | Intel Xeon Gold 6548Y+ (Emerald Rapids)      | 32/32 cores     | 6.6            | Intel oneAPI 2021.9  | GT ICE  |
