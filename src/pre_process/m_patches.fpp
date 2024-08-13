@@ -30,7 +30,7 @@ module m_patches
 
     implicit none
 
-    private; 
+    private;
     public :: s_line_segment, &
               s_spiral, &
               s_circle, &
@@ -184,7 +184,7 @@ contains
             spiral_y_max = maxval((/f_r(th, 0.0d0, mya)*sin(th), &
                                     f_r(th, thickness, mya)*sin(th)/))
 
-            do j = 0, n; do i = 0, m; 
+            do j = 0, n; do i = 0, m;
                     if ((x_cc(i) > spiral_x_min) .and. (x_cc(i) < spiral_x_max) .and. &
                         (y_cc(j) > spiral_y_min) .and. (y_cc(j) < spiral_y_max)) then
                         logic_grid(i, j, 0) = 1
@@ -968,9 +968,6 @@ contains
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
-
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
 
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             !zero density, reassign according to Tait EOS

@@ -120,7 +120,7 @@ for p_id in range(1, 10+1):
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]:
+                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
@@ -158,6 +158,8 @@ for p_id in range(1, 10+1):
 
         for alter_id in range(1, p_id):
             PRE_PROCESS[f'patch_icpp({p_id})%alter_patch({alter_id})'] = ParamType.LOG
+
+    PRE_PROCESS[f'patch_icpp({p_id})%cf_val'] = ParamType.REAL.analytic()
 
 # NOTE: Currently unused.
 # for f_id in range(1, 10+1):
