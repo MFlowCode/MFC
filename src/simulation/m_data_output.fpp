@@ -1003,8 +1003,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        call MPI_FILE_CLOSE(ifile, ierr)
-
 #endif
 
     end subroutine s_write_parallel_data_files

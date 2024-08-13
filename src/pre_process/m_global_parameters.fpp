@@ -104,8 +104,10 @@ module m_global_parameters
     logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
 
-    logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
-    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
+    logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
+    real(kind(0d0)) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    real(kind(0d0)) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
+    logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
 
@@ -293,8 +295,10 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
-        vel_profile = .false.
-        instability_wave = .false.
+        mixlayer_vel_profile = .false.
+        mixlayer_vel_coef = 1d0
+        mixlayer_domain = 1d0
+        mixlayer_perturb = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_flow_mag = dflt_real
