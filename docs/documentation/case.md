@@ -652,15 +652,17 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 ### 10. Velocity Field Setup
 
-| Parameter           | Type    | Description |
-| ---:                | :----:  | :--- |
-| `perturb_flow`      | Logical | Perturb the initlal velocity field by random noise |
-| `perturb_flow_fluid`| Integer | Fluid density whose flow is to be perturbed |
-| `perturb_flow_mag`  | Real    | Set the magnitude of flow perturbations |
-| `perturb_sph`       | Logical | Perturb the initial partial density by random noise |
-| `perturb_sph_fluid` | Integer | Fluid component whose partial density is to be perturbed |
-| `vel_profile`       | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
-| `instability_wave`  | Logical | Perturb the initial velocity field by instability waves |
+| Parameter              | Type    | Description |
+| ---:                   | :----:  | :--- |
+| `perturb_flow`         | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_flow_fluid`   | Integer | Fluid density whose flow is to be perturbed |
+| `perturb_flow_mag`     | Real    | Set the magnitude of flow perturbations |
+| `perturb_sph`          | Logical | Perturb the initial partial density by random noise |
+| `perturb_sph_fluid`    | Integer | Fluid component whose partial density is to be perturbed |
+| `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
+| `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
+| `mixlayer_perturb`     | Logical | Perturb the initial velocity field by instability waves |
+| `mixlayer_domain`      | Real    | Domain size of a mixing layer for the linear stability analysis |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -675,9 +677,15 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
-- `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
+- `mixlayer_vel_profile` activates setting of the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and ``vel_profile = 'T'``.
+- `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
+
+$$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
+
+- `mixlayer_perturb` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -6`, `num_fluids = 1`, `model_eqns = 2` and `mixlayer_vel_profile = 'T'`.
+
+- `mixlayer_domain` defines the domain size to compute spatial eigenvalues of the linear instability analysis when `mixlayer_perturb = 'T'`. For example, the spatial eigenvalue in `x` direction in 2D problem will be $2 \pi \alpha / (mixlayer\_domain*patch\_icpp(1)\%length\_y)$ for $\alpha = 1$, $2$ and $4$.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
