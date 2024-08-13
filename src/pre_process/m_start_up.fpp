@@ -782,16 +782,16 @@ contains
         call s_initialize_assign_variables_module()
         if (relax) call s_initialize_phasechange_module()
 
+        ! Create the D directory if it doesn't exit, to store
+        ! the serial data files
+        call s_create_directory('D')
+
         ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
             s_generate_grid => s_generate_serial_grid
             s_read_grid_data_files => s_read_serial_grid_data_files
             s_read_ic_data_files => s_read_serial_ic_data_files
             s_write_data_files => s_write_serial_data_files
-
-            ! Create the D directory if it doesn't exit, to store
-            ! the serial data files
-            call s_create_directory('D')
         else
             s_generate_grid => s_generate_parallel_grid
             s_read_grid_data_files => s_read_parallel_grid_data_files
