@@ -4,7 +4,7 @@
 
 You can either download MFC's [latest release from GitHub](https://github.com/MFlowCode/MFC/releases/latest) or clone the repository:
 
-```console
+```shell
 git clone https://github.com/MFlowCode/MFC.git
 cd MFC
 ```
@@ -19,13 +19,14 @@ Please select your desired configuration from the list bellow:
 
 - **On supported clusters:** Load environment modules
 
-```console
+```shell
 . ./mfc.sh load
 ```
 
+<a id="via-aptitude"></a>
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
-```console
+```shell
 sudo apt update
 sudo apt upgrade
 sudo apt install tar wget make cmake gcc g++ \
@@ -36,7 +37,7 @@ sudo apt install tar wget make cmake gcc g++ \
 
 - **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
 
-```console
+```shell
 sudo pacman -Syu
 sudo pacman -S base-devel coreutils  \
                  git ninja gcc-fortran \
@@ -59,29 +60,52 @@ On Windows, you can either use Intel Compilers with the standard Microsoft toolc
 [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) for a Linux experience.
 
  <details>
-   <summary><h3>Windows + Intel (Native)</h3></summary>
+
+   <summary><h3>Windows + WSL (Recommended)</h3></summary>
+
+Install [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) on Windows 11:
+Either
+1. Open a terminal with administrator privileges and run the following command:
+```shell
+wsl --install
+```
+Or
+1. Open the Start menu, search for "Windows Features", and select "Turn Windows features on or off". Enable "Windows Subsystem for Linux" by checking the corresponding box.
+2. Open the Microsoft Store, search for "Linux", and install your preferred distribution (e.g., [Ubuntu](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV))
+
+Useful software to install for using WSL on Windows:
+- [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)
+- [Visual Studio Code](https://code.visualstudio.com/) and the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension
+
+Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see [Via Aptitude](#via-aptitude)).
+
+  </details>
+
+  <details>
+
+   <summary><h3>Native Windows (Intel)</h3></summary>
 
 Install the latest version of:
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
 - [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
 - [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
+- [Strawberry Perl](https://strawberryperl.com/) (Install and add `C:\strawberry\perl\bin\perl.exe` or your installation path to your [PATH](https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/))
+Please note that Visual Studio must be installed first, and the oneAPI Toolkits need to be configured with the installed Visual Studio, even if you plan to use a different IDE.
 
-Then, in order to initialize your development environment, open a terminal window and run:
-```console
+Then, in order to initialize your development environment, run the following command (or your installation path) in command prompt:
+```shell
 "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 ```
+Alternatively, you can run the following command in Powershell:
+```shell
+cmd.exe "/K" '"C:\Program Files (x86)\Intel\oneAPI\setvars.bat" && powershell'
+```
+You could verify the initialization by typing `where mpiexec` in the command prompt terminal (does not work in Powershell), which should return the path to the Intel MPI executable.
+To continue following this guide, please stay in the initialized terminal window. Replace `./mfc.sh` with `.\mfc.bat` for all commands.
 
-To follow this guide, please replace `./mfc.sh` with `mfc.bat` when running any commands. `./mfc.sh` is intended Unix-like systems.
+If `.\mfc.bat build` produces errors, please run the command again. Repeating this process three times should resolve all errors (once each for pre_process, simulation, and post_process). If the same error persists after each attempt, please verify that you have installed all required software and properly initialized the development environment. If uncertain, you could try deleting the build directory and starting over.
+
 You will also have access to the `.sln` Microsoft Visual Studio solution files for an IDE (Integrated Development Environment).
-
-  </details>
-
-  <details>
-     <summary><h3>Windows + WSL</h3></summary>
-
-Install the latest version of the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) as well as a distribution such as Ubuntu which can be found [here](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV). Acquiring an   interactive session is as simple as typing `wsl` in your command prompt, or alternatively, selecting the distribution from the dropdown menu available in the [Microsoft Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701).
-
-You can now follow the appropriate instructions for your distribution.
 
   </details>
 
@@ -92,14 +116,14 @@ You can now follow the appropriate instructions for your distribution.
 
   - **If you use [ZSH]** (Verify with `echo $SHELL`)
 
-```console
+```shell
 touch ~/.zshrc
 open ~/.zshrc
 ```
 
   - **If you use [BASH]** (Verify with `echo $SHELL`)
   
-```console
+```shell
 touch ~/.bash_profile
 open ~/.bash_profile
 ```
@@ -111,7 +135,7 @@ These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't
 Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9).
 We do *not* support `clang` due to conflicts with the Silo dependency.
 
-```console
+```shell
 export MFC_GCC_VER=13
 export CC=gcc-$MFC_GCC_VER
 export CXX=g++-$MFC_GCC_VER
@@ -120,7 +144,7 @@ export FC=gfortran-$MFC_GCC_VER
 
 **Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
 
-```console
+```shell
 brew install wget python cmake gcc@$MFC_GCC_VER mpich
 ```
 
@@ -138,14 +162,14 @@ First install Docker and Git:
 - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
 - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
 - Other systems:
-```console
+```shell
 sudo apt install git docker # Debian / Ubuntu via Aptitude
 sudo pacman -S git docker   # Arch Linux via Pacman
 ```
 
 Once Docker and Git are installed on your system, clone MFC with
 
-```console
+```shell
 git clone https://github.com/MFlowCode/MFC
 cd MFC 
 ```
@@ -153,7 +177,7 @@ cd MFC
 To fetch the prebuilt Docker image and enter an interactive bash session with the
 recommended settings applied, run
 
-```console
+```shell
   ./mfc.sh  docker # If on \*nix/macOS
   .\mfc.bat docker # If on Windows
 ```
@@ -172,11 +196,13 @@ session exit.
 
 MFC can be built with support for various (compile-time) features:
 
-| Feature   | Enable    | Disable      | Default | Description                                                     |
-| :-------: | :-------: | :----------: | :-----: | --------------------------------------------------------------- |
-| **MPI**   | `--mpi`   | `--no-mpi`   | On      | Lets MFC run on multiple processors (and nodes) simultaneously. |
-| **GPU**   | `--gpu`   | `--no-gpu`   | Off     | Enables GPU acceleration via OpenACC.                           |
-| **Debug** | `--debug` | `--no-debug` | Off     | Requests the compiler build MFC in debug mode.                  |
+| Feature            | Enable      | Disable        | Default | Description                                                     |
+| :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
+| **MPI**            | `--mpi`     | `--no-mpi`     | On      | Lets MFC run on multiple processors (and nodes) simultaneously. |
+| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC.                           |
+| **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
+| **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Builds MFC with coverage flags on.                              |
+| **Unified Memory** | `--unified` | `--no-unified` | Off     | Builds MFC with unified CPU/GPU memory (GH-200 superchip only)  |
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
@@ -190,7 +216,7 @@ To only select a subset, use the `-t` (i.e., `--targets`) argument.
 For a detailed list of options, arguments, and features, please refer to `./mfc.sh build --help`.
 
 Most first-time users will want to build MFC using 8 threads (or more!) with MPI support:
-```console
+```shell
 ./mfc.sh build -j 8
 ```
 
@@ -204,7 +230,7 @@ Examples:
 
 Run MFC's test suite with 8 threads:
 
-```console
+```shell
 ./mfc.sh test -j 8
 ```
 
@@ -214,7 +240,7 @@ Please refer to the [Testing](testing.md) document for more information.
 
 MFC has example cases in the `examples` folder. You can run such a case interactively using 2 tasks by typing:
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -n 2
 ```
 

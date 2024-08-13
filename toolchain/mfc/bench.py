@@ -1,4 +1,4 @@
-import os, sys, uuid, subprocess, dataclasses, typing
+import os, sys, uuid, subprocess, dataclasses, typing, math
 
 import rich.table
 
@@ -7,6 +7,7 @@ from .state   import ARG, CFG
 from .build   import get_targets, DEFAULT_TARGETS
 from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
 from .common  import file_load_yaml, file_dump_yaml, create_directory
+from .common  import MFCException
 
 
 @dataclasses.dataclass
@@ -56,10 +57,11 @@ def bench(targets = None):
 
         with open(log_filepath, "w") as log_file:
             system(
-                ["./mfc.sh", "run", case.path, ARG('mem'), "--case-optimization"] +
+                ["./mfc.sh", "run", case.path, "--case-optimization"] +
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
-                case.args,
+                case.args +
+                ["--", ARG('mem')],
                 stdout=log_file,
                 stderr=subprocess.STDOUT)
 
@@ -78,33 +80,38 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
-    cons.print(f"[bold]Comparing Bencharks: [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] is x times slower than [magenta]{os.path.relpath(ARG('rhs'))}[/magenta].[/bold]")
-
+    cons.print(f"[bold]Comparing Benchmarks: Numbers < 1 indicate the [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is faster than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta], > 1 indicate [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is slower.[/bold]")
     if lhs["metadata"] != rhs["metadata"]:
         def _lock_to_str(lock):
             return ' '.join([f"{k}={v}" for k, v in lock.items()])
 
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.")
-        cons.print(f" This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).")
-        cons.print(f" lhs:")
-        cons.print(f" * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]")
-        cons.print(f" * Modes:      {_lock_to_str(lhs['metadata']['lock'])}")
-        cons.print(f" rhs:")
-        cons.print(f" * Invocation: {' '.join(rhs['metadata']['invocation'])}")
-        cons.print(f" * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]")
+        cons.print(f"""\
+[bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
+    This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
+    lhs:
+    * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]
+    * Modes:      {_lock_to_str(lhs['metadata']['lock'])}
+    rhs:
+    * Invocation: {' '.join(rhs['metadata']['invocation'])}
+    * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]
+        """)
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
-        cons.print(f"[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.")
-        cons.print(f" * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.")
-        cons.print(f" * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.")
-        cons.print(f" Using intersection: {slugs} with {len(slugs)} elements.")
+        cons.print(f"""\
+[bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.
+    * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.
+    * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.
+    Using intersection: {slugs} with {len(slugs)} elements.
+        """)
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]",    justify="left")
     table.add_column("[bold]Pre Process[/bold]", justify="right")
     table.add_column("[bold]Simulation[/bold]", justify="right")
     table.add_column("[bold]Post Process[/bold]", justify="right")
+
+    err = 0
 
     for slug in slugs:
         lhs_summary = lhs["cases"][slug]["output_summary"]
@@ -113,11 +120,31 @@ def diff():
         speedups = ['N/A', 'N/A', 'N/A']
 
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
-            if target.name not in lhs_summary or target.name not in rhs_summary:
+            if (target.name not in lhs_summary) or (target.name not in rhs_summary):
+
+                err = 1
+
+                if target.name not in lhs_summary:
+                    cons.print(f"{target.name} not present in lhs_summary - Case: {slug}")
+
+                if target.name not in rhs_summary:
+                    cons.print(f"{target.name} not present in rhs_summary - Case: {slug}")
+
                 continue
+
+            if (float(f"{lhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{lhs_summary[target.name]}")):
+                err = 1
+                cons.print(f"lhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
+
+            if (float(f"{rhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{rhs_summary[target.name]}")):
+                err = 1
+                cons.print(f"rhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
 
             speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
     cons.raw.print(table)
+
+    if err != 0:
+        raise MFCException("Benchmarking failed")

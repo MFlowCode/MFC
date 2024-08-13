@@ -59,14 +59,18 @@ endif()
 
 # SILO
 if (MFC_SILO)
+    find_package(Git REQUIRED)
+
     # If we are using the CCE, HDF5 is not built, and we wish to find
     # the system's cray-hdf5. Otherwise, we point SILO to find HDF5 in
     # our common install directory using SILO_HDF5_DIR.
     ExternalProject_Add(silo
-        GIT_REPOSITORY "https://github.com/henryleberre/Silo"
-        GIT_TAG        af955eb5dd009caf00c41ca51611b37c052b042c
-        GIT_SHALLOW    ON
+        GIT_REPOSITORY "https://github.com/LLNL/Silo"
+        GIT_TAG        438477c80d32a3e1757d4584b993f382cace1535
         GIT_PROGRESS   ON
+        PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
+                       && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
+                       && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo-GNU-13.patch"
         CMAKE_ARGS      -DSILO_ENABLE_SHARED=OFF
                         -DSILO_ENABLE_SILOCK=OFF
                         -DSILO_ENABLE_BROWSER=OFF
@@ -86,7 +90,7 @@ if (MFC_HIPFORT)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         ExternalProject_Add(hipfort
             GIT_REPOSITORY "https://github.com/ROCmSoftwarePlatform/hipfort"
-            GIT_TAG        develop
+            GIT_TAG        rocm-6.0.2
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             CMAKE_ARGS     "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}"

@@ -1,4 +1,4 @@
-import re, os, sys, typing, dataclasses
+import re, os, sys, typing, dataclasses, shlex
 
 from glob import glob
 
@@ -70,7 +70,7 @@ def get_baked_templates() -> dict:
 def __job_script_filepath() -> str:
     return os.path.abspath(os.sep.join([
         os.path.dirname(ARG("input")),
-        f"{ARG('name')}.sh"
+        f"{ARG('name')}.{'bat' if os.name == 'nt' else 'sh'}"
     ]))
 
 
@@ -90,7 +90,7 @@ def __get_template() -> Template:
     raise MFCException(f"Failed to find a template for --computer '{computer}'. Baked-in templates are: {format_list_to_string(list(baked.keys()), 'magenta')}.")
 
 
-def __generate_job_script(targets):
+def __generate_job_script(targets, case: input.MFCInputFile):
     env = {}
     if ARG('gpus') is not None:
         env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
@@ -99,22 +99,21 @@ def __generate_job_script(targets):
         **{**ARGS(), 'targets': targets},
         ARG=ARG,
         env=env,
+        case=case,
         MFC_ROOTDIR=MFC_ROOTDIR,
         qsystem=queues.get_system(),
-        profiler=__profiler_prepend(),
+        profiler=shlex.join(__profiler_prepend())
     )
 
     file_write(__job_script_filepath(), content)
 
 
-def __generate_input_files(targets):
-    input_file = input.load()
-
+def __generate_input_files(targets, case: input.MFCInputFile):
     for target in targets:
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
         cons.indent()
         cons.print()
-        input_file.generate_inp(target)
+        case.generate_inp(target)
         cons.print()
         cons.unindent()
 
@@ -129,20 +128,27 @@ def __execute_job_script(qsystem: queues.QueueSystem):
         raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
-def run(targets = None):
+def run(targets = None, case = None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
+    case    = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
 
     cons.print("[bold]Run[/bold]")
     cons.indent()
 
+    if ARG("clean"):
+        cons.print("Cleaning up previous run...")
+        cons.indent()
+        case.clean(targets)
+        cons.unindent()
+
     qsystem = queues.get_system()
     cons.print(f"Using queue system [magenta]{qsystem.name}[/magenta].")
 
-    __generate_job_script(targets)
+    __generate_job_script(targets, case)
     __validate_job_options()
-    __generate_input_files(targets)
+    __generate_input_files(targets, case)
 
     if not ARG("dry_run"):
         if ARG("output_summary") is not None:

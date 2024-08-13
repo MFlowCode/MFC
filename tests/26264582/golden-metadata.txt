@@ -1,0 +1,149 @@
+This file was created on 2024-05-16 14:08:46.389458.
+
+mfc.sh:
+
+    Invocation: test --generate -o 53B7F84E 26264582
+    Lock:       mpi=Yes & gpu=No & debug=No
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : /opt/homebrew/bin/g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : /opt/homebrew/bin/g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : /opt/homebrew/bin/g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : GNU v13.2.0 (/opt/homebrew/bin/gcc-13)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/bin/gcc-13
+        CXX      : /opt/homebrew/bin/g++-13
+        FC       : /opt/homebrew/bin/gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M2
+

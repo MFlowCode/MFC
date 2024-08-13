@@ -34,6 +34,8 @@ module m_riemann_solvers
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< To get the bubble wall pressure function
+
+    use m_surface_tension      !< To get the capilary fluxes
     ! ==========================================================================
 
     implicit none
@@ -92,24 +94,24 @@ module m_riemann_solvers
 
             import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
 
-            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-            type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+            type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-            type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+            type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
             type(scalar_field), &
                 allocatable, dimension(:), &
-                intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                                  dqL_prim_dy_vf, dqR_prim_dy_vf, &
                                  dqL_prim_dz_vf, dqR_prim_dz_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+                intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-            integer, intent(IN) :: norm_dir
+            integer, intent(in) :: norm_dir
 
-            type(int_bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(in) :: ix, iy, iz
 
         end subroutine s_abstract_riemann_solver
 
@@ -118,7 +120,7 @@ module m_riemann_solvers
         !! For more information please refer to:
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
-        subroutine s_compute_abstract_viscous_source_flux(velL_vf, & ! -------------
+        subroutine s_compute_abstract_viscous_source_flux(velL_vf, &
                                                           dvelL_dx_vf, &
                                                           dvelL_dy_vf, &
                                                           dvelL_dz_vf, &
@@ -134,18 +136,18 @@ module m_riemann_solvers
 
             type(scalar_field), &
                 dimension(num_dims), &
-                intent(IN) :: velL_vf, velR_vf, &
+                intent(in) :: velL_vf, velR_vf, &
                               dvelL_dx_vf, dvelR_dx_vf, &
                               dvelL_dy_vf, dvelR_dy_vf, &
                               dvelL_dz_vf, dvelR_dz_vf
 
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(INOUT) :: flux_src_vf
+                intent(inout) :: flux_src_vf
 
-            integer, intent(IN) :: norm_dir
+            integer, intent(in) :: norm_dir
 
-            type(int_bounds_info), intent(IN) :: ix, iy, iz
+            type(int_bounds_info), intent(in) :: ix, iy, iz
 
         end subroutine s_compute_abstract_viscous_source_flux
 
@@ -264,7 +266,7 @@ contains
 
     @:s_compute_speed_of_sound()
 
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
@@ -277,24 +279,24 @@ contains
                                     flux_gsrc_vf, &
                                     norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(kind(0d0)) :: rho_L, rho_R
@@ -805,7 +807,7 @@ contains
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
-    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! ------
+    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
                                      qL_prim_vf, &
@@ -818,24 +820,24 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        type(scalar_field), allocatable, dimension(:), intent(INOUT) :: qL_prim_vf, qR_prim_vf
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(kind(0d0)) :: rho_L, rho_R
@@ -876,10 +878,12 @@ contains
         real(kind(0d0)) :: R3V2Lbar, R3V2Rbar
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: zcoef, pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -1106,6 +1110,11 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
+                                    if (.not. f_is_default(sigma)) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
+
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
@@ -1134,6 +1143,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
+
+                                    if (.not. f_is_default(sigma)) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                    end if
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1170,6 +1184,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+
+                                    if (.not. f_is_default(sigma)) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
 
                                     ! Compute right star solution state
                                 else
@@ -1208,6 +1227,11 @@ contains
                                                                                     dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
+
+                                    if (.not. f_is_default(sigma)) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                    end if
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
@@ -1488,10 +1512,10 @@ contains
                             end do
                         end do
                     end do
-
+                    !$acc end parallel loop
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1520,6 +1544,7 @@ contains
                                 pi_inf_L = 0d0
                                 qv_L = 0d0
 
+                                ! Retain this in the refactor
                                 if (mpp_lim .and. (num_fluids > 2)) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -1741,6 +1766,10 @@ contains
                                     end do
                                 end if
 
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
+                                end if
+
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -1787,6 +1816,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0d0
+                                end if
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1820,8 +1855,8 @@ contains
                                                        s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
                                                                   (1d0 - dir_flg(dir_idx(i)))* &
                                                                   vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -1835,7 +1870,8 @@ contains
                                     + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                        (s_R - vel_R(dir_idx(1))))) - E_R))
+                                                        (s_R - vel_R(dir_idx(1))))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
 
@@ -1859,7 +1895,7 @@ contains
                                                 dir_flg(dir_idx(i))* &
                                                 s_P*(xi_R - 1d0))
 
-                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(idxi)%sf(j,k,l) = 0d0
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
@@ -1945,7 +1981,7 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1983,6 +2019,8 @@ contains
                                 alpha_L_sum = 0d0
                                 alpha_R_sum = 0d0
 
+                                ! Change this by splitting it into the cases
+                                ! present in the bubbles
                                 if (mpp_lim) then
                                     !$acc loop seq
                                     do i = 1, num_fluids
@@ -2083,6 +2121,10 @@ contains
                                     end do
                                 end if
 
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
+                                end if
+
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
                                     s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
@@ -2130,6 +2172,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0d0
+                                end if
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2156,8 +2204,8 @@ contains
                                                        s_P*(xi_R*(dir_flg(idxi)*s_S + &
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                                                dir_flg(idxi)*(pres_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -2170,7 +2218,8 @@ contains
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(idx1)))) - E_R))
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
                                 !$acc loop seq
@@ -2253,6 +2302,7 @@ contains
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
                 end if
             end if
         #:endfor
@@ -2284,6 +2334,16 @@ contains
             end if
         end if
 
+        if (.not. f_is_default(sigma)) then
+            call s_compute_capilary_source_flux( &
+                q_prim_vf, &
+                vel_src_rsx_vf, &
+                vel_src_rsy_vf, &
+                vel_src_rsz_vf, &
+                flux_src_vf, &
+                norm_dir, isx, isy, isz)
+        end if
+
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
@@ -2293,7 +2353,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_riemann_solvers_module() ! ---------------------
+    subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the
         ! left, right, and average states of the Riemann problem, as well
@@ -2419,7 +2479,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-    end subroutine s_initialize_riemann_solvers_module ! -------------------
+    end subroutine s_initialize_riemann_solvers_module
 
     !>  The purpose of this subroutine is to populate the buffers
         !!      of the left and right Riemann states variables, depending
@@ -2446,7 +2506,7 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-    subroutine s_populate_riemann_states_variables_buffers( & ! ------------
+    subroutine s_populate_riemann_states_variables_buffers( &
         qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
         dqL_prim_dy_vf, &
         dqL_prim_dz_vf, &
@@ -2457,18 +2517,17 @@ contains
         qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
-            intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+            intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
                              dqL_prim_dy_vf, dqR_prim_dy_vf, &
                              dqL_prim_dz_vf, dqR_prim_dz_vf, &
                              qL_prim_vf, qR_prim_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterator
 
@@ -2811,7 +2870,7 @@ contains
         end if
         ! END: Population of Buffers in z-direction ========================
 
-    end subroutine s_populate_riemann_states_variables_buffers ! -----------
+    end subroutine s_populate_riemann_states_variables_buffers
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -2835,15 +2894,13 @@ contains
         flux_gsrc_vf, &
         norm_dir, ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l ! Generic loop iterators
 
@@ -2851,7 +2908,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2884,7 +2941,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2915,7 +2972,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
@@ -2945,7 +3002,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_initialize_riemann_solver ! ---------------------------
+    end subroutine s_initialize_riemann_solver
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -2963,7 +3020,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, &
                                                          dvelL_dx_vf, &
                                                          dvelL_dy_vf, &
                                                          dvelL_dz_vf, &
@@ -2977,18 +3034,18 @@ contains
 
         type(scalar_field), &
             dimension(num_dims), &
-            intent(IN) :: velL_vf, velR_vf, &
+            intent(in) :: velL_vf, velR_vf, &
                           dvelL_dx_vf, dvelR_dx_vf, &
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
-        integer, intent(IN) :: norm_dir
+        integer, intent(in) :: norm_dir
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -3472,7 +3529,7 @@ contains
         end if
         ! END: Viscous Stresses in theta-direction =============================
 
-    end subroutine s_compute_cylindrical_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cylindrical_viscous_source_flux
 
     !>  The goal of this subroutine is to evaluate and account
         !!      for the contribution of viscous stresses in the source
@@ -3490,7 +3547,7 @@ contains
         !!  @param ix Index bounds in  first coordinate direction
         !!  @param iy Index bounds in second coordinate direction
         !!  @param iz Index bounds in  third coordinate direction
-    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, & ! -------------
+    subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
                                                        dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
                                                        dvelL_dz_vf, &
@@ -3504,18 +3561,17 @@ contains
 
         type(scalar_field), &
             dimension(num_dims), &
-            intent(IN) :: velL_vf, velR_vf, &
+            intent(in) :: velL_vf, velR_vf, &
                           dvelL_dx_vf, dvelR_dx_vf, &
                           dvelL_dy_vf, dvelR_dy_vf, &
                           dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_src_vf
+            intent(inout) :: flux_src_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
@@ -3965,7 +4021,7 @@ contains
         end if
         ! END: Viscous Stresses in z-direction =============================
 
-    end subroutine s_compute_cartesian_viscous_source_flux ! -------------------------
+    end subroutine s_compute_cartesian_viscous_source_flux
 
     !>  Deallocation and/or disassociation procedures that are
         !!      needed to finalize the selected Riemann problem solver
@@ -3976,17 +4032,16 @@ contains
         !!  @param ix   Index bounds in  first coordinate direction
         !!  @param iy   Index bounds in second coordinate direction
         !!  @param iz   Index bounds in  third coordinate direction
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, & ! --------
+    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                          flux_gsrc_vf, &
                                          norm_dir, ix, iy, iz)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
+            intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        integer, intent(IN) :: norm_dir
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -4138,10 +4193,10 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_finalize_riemann_solver ! -----------------------------
+    end subroutine s_finalize_riemann_solver
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_riemann_solvers_module() ! -----------------------
+    subroutine s_finalize_riemann_solvers_module
 
         ! Disassociating procedural pointer to the subroutine which was
         ! utilized to calculate the solution of a given Riemann problem
@@ -4192,6 +4247,6 @@ contains
             @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
         end if
 
-    end subroutine s_finalize_riemann_solvers_module ! ---------------------
+    end subroutine s_finalize_riemann_solvers_module
 
 end module m_riemann_solvers

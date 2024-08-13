@@ -1,0 +1,25 @@
+From 7405f0dc998ac104b4b5c0536bbf9b0644d85a11 Mon Sep 17 00:00:00 2001
+From: Henry LE BERRE <hberre3@gatech.edu>
+Date: Mon, 1 Apr 2024 17:06:21 -0400
+Subject: [PATCH] CMake MFC Fixes
+
+---
+ CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 111eb42..9e460f7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -68,7 +68,7 @@ project(Silo VERSION ${SILO_VERSION} LANGUAGES CXX C)
+ ###-----------------------------------------------------------------------------
+ # location for Silo CMake includes
+ ###-----------------------------------------------------------------------------
+-set(CMAKE_MODULE_PATH ${Silo_SOURCE_DIR}/CMake)
++list(APPEND CMAKE_MODULE_PATH "${Silo_SOURCE_DIR}/CMake")
+ 
+ ###-----------------------------------------------------------------------------
+ # If not already set, use a default build type of Release
+-- 
+2.45.1
+

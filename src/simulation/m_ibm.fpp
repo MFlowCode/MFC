@@ -43,8 +43,9 @@ module m_ibm
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
+    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), inner_points)
 
-    !$acc declare link(levelset, levelset_norm, ghost_points)
+    !$acc declare link(levelset, levelset_norm, ghost_points, inner_points)
 #else
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
@@ -53,19 +54,21 @@ module m_ibm
     real(kind(0d0)), dimension(:, :, :, :, :), allocatable :: levelset_norm
     !! Matrix of normal vector to IB
     type(ghost_point), dimension(:), allocatable :: ghost_points
+    type(ghost_point), dimension(:), allocatable :: inner_points
     !! Matrix of normal vector to IB
 
-    !$acc declare create(levelset, levelset_norm, ghost_points)
+    !$acc declare create(levelset, levelset_norm, ghost_points, inner_points)
 #endif
 
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
-    !$acc declare create(gp_layers, num_gps)
+    integer :: num_inner_gps !< Number of ghost points
+    !$acc declare create(gp_layers, num_gps, num_inner_gps)
 
 contains
 
     !>  Initialize IBM module
-    subroutine s_initialize_ibm_module()
+    subroutine s_initialize_ibm_module
 
         gp_layers = 3
 
@@ -82,11 +85,11 @@ contains
         @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
         @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
 
-        !$acc enter data copyin(gp_layers, num_gps)
+        !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
 
     end subroutine s_initialize_ibm_module
 
-    subroutine s_ibm_setup()
+    subroutine s_ibm_setup
 
         integer :: i, j, k
 
@@ -95,14 +98,18 @@ contains
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
+        !$acc update host(ib_markers%sf)
+
         call s_find_num_ghost_points()
 
-        !$acc update device(num_gps)
+        !$acc update device(num_gps, num_inner_gps)
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
-        !$acc enter data copyin(ghost_points)
+        @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
 
-        call s_find_ghost_points(ghost_points)
-        !$acc update device(ghost_points)
+        !$acc enter data copyin(ghost_points, inner_points)
+
+        call s_find_ghost_points(ghost_points, inner_points)
+        !$acc update device(ghost_points, inner_points)
 
         call s_compute_levelset(levelset, levelset_norm)
         !$acc update device(levelset, levelset_norm)
@@ -116,18 +123,19 @@ contains
     end subroutine s_ibm_setup
 
     !>  Subroutine that updates the conservative variables at the ghost points
-        !!  @param q_cons_vf
+        !!  @param q_cons_vf Conservative variables
+        !!  @param q_prim_vf Primitive variables
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb, mv)
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf !< Primitive Variables
+            intent(inout) :: q_cons_vf !< Conservative Variables
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_prim_vf !< Primitive Variables
+            intent(inout) :: q_prim_vf !< Primitive Variables
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(inout) :: pb, mv
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -153,8 +161,9 @@ contains
         real(kind(0d0)) :: nbub
         real(kind(0d0)) :: buf
         type(ghost_point) :: gp
+        type(ghost_point) :: innerp
 
-        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, norm, buf, j, k, l, q, coeff)
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, innerp, norm, buf, j, k, l, q, coeff)
         do i = 1, num_gps
 
             gp = ghost_points(i)
@@ -288,18 +297,51 @@ contains
             end if
         end do
 
+        !Correct the state of the inner points in IBs
+        !$acc parallel loop gang vector private(physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, vel_g, rho, gamma, pi_inf, Re_K, innerp, j, k, l, q)
+        do i = 1, num_inner_gps
+
+            vel_g = 0d0
+            innerp = inner_points(i)
+            j = innerp%loc(1)
+            k = innerp%loc(2)
+            l = innerp%loc(3)
+            patch_id = inner_points(i)%ib_patch_id
+
+            ! Calculate physical location of GP
+            if (p > 0) then
+                physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
+            else
+                physical_loc = [x_cc(j), y_cc(k), 0d0]
+            end if
+
+            !$acc loop seq
+            do q = 1, num_fluids
+                q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+            end do
+
+            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                                            alpha_rho_IP, Re_K, j, k, l)
+
+            dyn_pres = 0d0
+
+            !$acc loop seq
+            do q = momxb, momxe
+                q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
+                dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
+                           vel_g(q - momxb + 1)/2d0
+            end do
+        end do
+
     end subroutine s_ibm_correct_state
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
     subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(IN) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(IN) :: levelset_norm
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(in) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(in) :: levelset_norm
 
         real(kind(0d0)) :: dist
         real(kind(0d0)), dimension(3) :: norm
@@ -366,6 +408,11 @@ contains
                         index = index + dir
                     end do
                     ghost_points(q)%ip_grid(dim) = index
+                    if (ghost_points(q)%DB(dim) == -1) then
+                        ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim) + 1
+                    else if (ghost_points(q)%DB(dim) == 1) then
+                        ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim) - 1
+                    end if
                 end if
             end do
 
@@ -397,7 +444,7 @@ contains
 
     end subroutine s_compute_image_points
 
-    subroutine s_find_num_ghost_points()
+    subroutine s_find_num_ghost_points
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
@@ -413,6 +460,8 @@ contains
                                         j - gp_layers:j + gp_layers, 0)
                         if (any(subsection_2D == 0)) then
                             num_gps = num_gps + 1
+                        else
+                            num_inner_gps = num_inner_gps + 1
                         end if
                     end if
                 else
@@ -424,6 +473,8 @@ contains
                                             k - gp_layers:k + gp_layers)
                             if (any(subsection_3D == 0)) then
                                 num_gps = num_gps + 1
+                            else
+                                num_inner_gps = num_inner_gps + 1
                             end if
                         end if
                     end do
@@ -433,18 +484,21 @@ contains
 
     end subroutine s_find_num_ghost_points
 
-    subroutine s_find_ghost_points(ghost_points)
+    subroutine s_find_ghost_points(ghost_points, inner_points)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
+        type(ghost_point), dimension(num_inner_gps), intent(inout) :: inner_points
+
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
         integer :: i, j, k !< Iterator variables
-        integer :: count
+        integer :: count, count_i
         integer :: patch_id
 
         count = 1
+        count_i = 1
 
         do i = 0, m
             do j = 0, n
@@ -459,7 +513,47 @@ contains
                             ghost_points(count)%ib_patch_id = &
                                 patch_id
                             ghost_points(count)%slip = patch_ib(patch_id)%slip
+
+                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                                ghost_points(count)%DB(1) = -1
+                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                                ghost_points(count)%DB(1) = 1
+                            else
+                                ghost_points(count)%DB(1) = 0
+                            end if
+
+                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                                ghost_points(count)%DB(2) = -1
+                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                                ghost_points(count)%DB(2) = 1
+                            else
+                                ghost_points(count)%DB(2) = 0
+                            end if
+
                             count = count + 1
+
+                        else
+                            inner_points(count_i)%loc = [i, j, 0]
+                            patch_id = ib_markers%sf(i, j, 0)
+                            inner_points(count_i)%ib_patch_id = &
+                                patch_id
+                            inner_points(count_i)%slip = patch_ib(patch_id)%slip
+                            if ((x_cc(i) - dx(i)) < x_domain%beg .or. &
+                                (x_cc(i) + dx(i)) > x_domain%end) then
+                                ghost_points(count)%DB(1) = 1
+                            else
+                                ghost_points(count)%DB(1) = 0
+                            end if
+
+                            if ((y_cc(j) - dy(j)) < y_domain%beg .or. &
+                                (y_cc(j) + dy(j)) > y_domain%end) then
+                                ghost_points(count)%DB(2) = 1
+                            else
+                                ghost_points(count)%DB(2) = 0
+                            end if
+
+                            count_i = count_i + 1
+
                         end if
                     end if
                 else
@@ -475,7 +569,64 @@ contains
                                 ghost_points(count)%ib_patch_id = &
                                     ib_markers%sf(i, j, k)
                                 ghost_points(count)%slip = patch_ib(patch_id)%slip
+
+                                if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                                    ghost_points(count)%DB(1) = -1
+                                else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                                    ghost_points(count)%DB(1) = 1
+                                else
+                                    ghost_points(count)%DB(1) = 0
+                                end if
+
+                                if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                                    ghost_points(count)%DB(2) = -1
+                                else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                                    ghost_points(count)%DB(2) = 1
+                                else
+                                    ghost_points(count)%DB(2) = 0
+                                end if
+
+                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                    ghost_points(count)%DB(3) = -1
+                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                    ghost_points(count)%DB(3) = 1
+                                else
+                                    ghost_points(count)%DB(3) = 0
+                                end if
+
                                 count = count + 1
+                            else
+                                inner_points(count_i)%loc = [i, j, k]
+                                patch_id = ib_markers%sf(i, j, k)
+                                inner_points(count_i)%ib_patch_id = &
+                                    ib_markers%sf(i, j, k)
+                                inner_points(count_i)%slip = patch_ib(patch_id)%slip
+
+                                if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                                    ghost_points(count)%DB(1) = -1
+                                else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                                    ghost_points(count)%DB(1) = 1
+                                else
+                                    ghost_points(count)%DB(1) = 0
+                                end if
+
+                                if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                                    ghost_points(count)%DB(2) = -1
+                                else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                                    ghost_points(count)%DB(2) = 1
+                                else
+                                    ghost_points(count)%DB(2) = 0
+                                end if
+
+                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                    ghost_points(count)%DB(3) = -1
+                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                    ghost_points(count)%DB(3) = 1
+                                else
+                                    ghost_points(count)%DB(3) = 0
+                                end if
+
+                                count_i = count_i + 1
                             end if
                         end if
                     end do
@@ -492,7 +643,7 @@ contains
         !!  @param fpb Internal bubble pressure
     subroutine s_compute_interpolation_coeffs(ghost_points)
 
-        type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points
+        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
 
         real(kind(0d0)), dimension(2, 2, 2) :: dist
         real(kind(0d0)), dimension(2, 2, 2) :: alpha
@@ -528,6 +679,7 @@ contains
                                 (y_cc(j2) - gp%ip_loc(2))**2)
 
                 interp_coeffs = 0d0
+
                 if (dist(1, 1, 1) <= 1d-16) then
                     interp_coeffs(1, 1, 1) = 1d0
                 else if (dist(2, 1, 1) <= 1d-16) then
@@ -643,18 +795,15 @@ contains
 
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb, mv, presb_IP, massv_IP)
         !$acc routine seq
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(IN) :: q_prim_vf !< Primitive Variables
-        real(kind(0d0)), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-
-        type(ghost_point), intent(IN) :: gp
-        real(kind(0d0)), intent(INOUT) :: pres_IP
-        real(kind(0d0)), dimension(3), intent(INOUT) :: vel_IP
-        real(kind(0d0)), dimension(num_fluids), intent(INOUT) :: alpha_IP, alpha_rho_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: r_IP, v_IP, pb_IP, mv_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: nmom_IP
-        real(kind(0d0)), optional, dimension(:), intent(INOUT) :: presb_IP, massv_IP
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf !< Primitive Variables
+        type(ghost_point), intent(in) :: gp
+        real(kind(0d0)), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
+        real(kind(0d0)), intent(inout) :: pres_IP
+        real(kind(0d0)), dimension(3), intent(inout) :: vel_IP
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: nmom_IP
+        real(kind(0d0)), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(kind(0d0)), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
 
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
@@ -753,15 +902,11 @@ contains
 
     end subroutine s_interpolate_image_point
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
     subroutine s_compute_levelset(levelset, levelset_norm)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(INOUT) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(INOUT) :: levelset_norm
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer :: i !< Iterator variables
         integer :: geometry
 
@@ -784,12 +929,8 @@ contains
 
     end subroutine s_compute_levelset
 
-    !>  Function that computes that bubble wall pressure for Gilmore bubbles
-        !!  @param fR0 Equilibrium bubble radius
-        !!  @param fR Current bubble radius
-        !!  @param fV Current bubble velocity
-        !!  @param fpb Internal bubble pressure
-    subroutine s_finalize_ibm_module()
+    !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
+    subroutine s_finalize_ibm_module
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE_GLOBAL(levelset)

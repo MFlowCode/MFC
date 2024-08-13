@@ -20,6 +20,8 @@ module m_global_parameters
 
     use m_derived_types        !< Definitions of the derived types
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -110,8 +112,6 @@ module m_global_parameters
     #:else
         integer :: num_dims       !< Number of spatial dimensions
     #:endif
-    integer :: num_fluids
-    logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
     logical :: prim_vars_wrt
@@ -119,17 +119,28 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
+        logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
+        logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
+        logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
+        logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: num_fluids     !< number of fluids in the simulation
+        logical :: wenojs         !< WENO-JS (default)
+        logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
+        logical :: wenoz          !< WENO-Z
+        logical :: teno           !< TENO (Targeted ENO)
     #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-    logical :: mapped_weno    !< WENO with mapping of nonlinear weights
+    real(kind(0d0)) :: teno_CT        !< Smoothness threshold for TENO
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
     integer :: riemann_solver !< Riemann solver algorithm
+    integer :: low_Mach       !< Low Mach number fix to HLLC Riemann solver
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
     logical :: alt_soundspeed !< Alternate mixture sound speed
@@ -138,13 +149,24 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
+    logical :: bodyForces
+    logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
+    !< amplitude, frequency, and phase shift sinusoid in each direction
+    #:for dir in {'x', 'y', 'z'}
+        #:for param in {'k','w','p','g'}
+            real(kind(0d0)) :: ${param}$_${dir}$
+        #:endfor
+    #:endfor
+    real(kind(0d0)), dimension(3) :: accel_bf
+    !$acc declare create(accel_bf)
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order)
+        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, num_fluids, model_eqns, mixture_err, alt_soundspeed, avg_state, mapped_weno, mp_weno, weno_eps, hypoelasticity)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -159,6 +181,7 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    type(bounds_info) :: x_domain, y_domain, z_domain
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -197,6 +220,7 @@ module m_global_parameters
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    integer :: c_idx         ! Index of the color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -391,13 +415,19 @@ module m_global_parameters
 
     !$acc declare create(mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
-    !> @name Acoustic monopole parameters
+    !> @name Acoustic acoustic_source parameters
     !> @{
-    logical :: monopole !< Monopole switch
-    type(mono_parameters), dimension(num_probes_max) :: mono !< Monopole parameters
-    integer :: num_mono !< Number of monopoles
+    logical :: acoustic_source !< Acoustic source switch
+    type(acoustic_parameters), dimension(num_probes_max) :: acoustic !< Acoustic source parameters
+    integer :: num_source !< Number of acoustic sources
     !> @}
-    !$acc declare create(monopole, mono, num_mono)
+    !$acc declare create(acoustic_source, acoustic, num_source)
+
+    !> @name Surface tension parameters
+    !> @{
+    real(kind(0d0)) :: sigma
+    !$acc declare create(sigma)
+    !> @}
 
     integer :: momxb, momxe
     integer :: advxb, advxe
@@ -418,7 +448,8 @@ module m_global_parameters
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
 
-    logical :: weno_flat, riemann_flat, cu_mpi
+    logical :: weno_flat, riemann_flat, rdma_mpi
+
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(pres_field), dimension(:), pb_ts)
 
@@ -439,7 +470,7 @@ contains
     !> Assigns default values to the user inputs before reading
         !!  them in. This enables for an easier consistency check of
         !!  these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs() ! ------------------
+    subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j !< Generic loop iterator
 
@@ -462,16 +493,15 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        num_fluids = dflt_int
-        adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_eps = dflt_real
-        mapped_weno = .false.
+        teno_CT = dflt_real
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
+        low_Mach = 0
         wave_speeds = dflt_int
         avg_state = dflt_int
         alt_soundspeed = .false.
@@ -487,7 +517,13 @@ contains
         hypoelasticity = .false.
         weno_flat = .true.
         riemann_flat = .true.
-        cu_mpi = .false.
+        rdma_mpi = .false.
+
+        #:if not MFC_CASE_OPTIMIZATION
+            mapped_weno = .false.
+            wenoz = .false.
+            teno = .false.
+        #:endif
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -500,9 +536,9 @@ contains
             #:endfor
         #:endfor
 
-        ! x_domain%beg =  dflt_int; x_domain%end =  dflt_int;
-        ! y_domain%beg =  dflt_int; y_domain%end =  dflt_int;
-        ! z_domain%beg =  dflt_int; z_domain%end =  dflt_int;
+        x_domain%beg = dflt_int; x_domain%end = dflt_int
+        y_domain%beg = dflt_int; y_domain%end = dflt_int
+        z_domain%beg = dflt_int; z_domain%end = dflt_int
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -541,6 +577,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
             weno_order = dflt_int
+            num_fluids = dflt_int
         #:endif
 
         R0_type = dflt_int
@@ -558,29 +595,49 @@ contains
         Web = dflt_real
         poly_sigma = dflt_real
 
-        ! Monopole source
-        monopole = .false.
-        num_mono = 1
+        ! Acoustic source
+        acoustic_source = .false.
+        num_source = dflt_int
 
+        ! Surface tension
+        sigma = dflt_real
+
+        ! Cuda aware MPI
         cu_tensor = .false.
 
+        bodyForces = .false.
+        bf_x = .false.; bf_y = .false.; bf_z = .false.
+        !< amplitude, frequency, and phase shift sinusoid in each direction
+        #:for dir in {'x', 'y', 'z'}
+            #:for param in {'k','w','p','g'}
+                ${param}$_${dir}$ = dflt_real
+            #:endfor
+        #:endfor
+
         do j = 1, num_probes_max
+            acoustic(j)%pulse = dflt_int
+            acoustic(j)%support = dflt_int
+            acoustic(j)%dipole = .false.
             do i = 1, 3
-                mono(j)%loc(i) = dflt_real
+                acoustic(j)%loc(i) = dflt_real
             end do
-            mono(j)%mag = dflt_real
-            mono(j)%length = dflt_real
-            mono(j)%delay = dflt_real
-            mono(j)%dir = 1.d0
-            mono(j)%npulse = 1.d0
-            mono(j)%pulse = 1
-            mono(j)%support = 1
-            mono(j)%foc_length = dflt_real
-            mono(j)%aperture = dflt_real
-            ! The author suggested the support width is typically on the order of
-            ! the width of the characteristic cells. Here, we choose 2.5 cell width
-            ! as the default value.
-            mono(j)%support_width = 2.5d0
+            acoustic(j)%mag = dflt_real
+            acoustic(j)%length = dflt_real
+            acoustic(j)%height = dflt_real
+            acoustic(j)%wavelength = dflt_real
+            acoustic(j)%frequency = dflt_real
+            acoustic(j)%gauss_sigma_dist = dflt_real
+            acoustic(j)%gauss_sigma_time = dflt_real
+            acoustic(j)%npulse = dflt_real
+            acoustic(j)%dir = dflt_real
+            acoustic(j)%delay = dflt_real
+            acoustic(j)%foc_length = dflt_real
+            acoustic(j)%aperture = dflt_real
+            acoustic(j)%element_spacing_angle = dflt_real
+            acoustic(j)%element_polygon_ratio = dflt_real
+            acoustic(j)%rotate_angle = dflt_real
+            acoustic(j)%num_elements = dflt_int
+            acoustic(j)%element_on = dflt_int
         end do
 
         fd_order = dflt_int
@@ -604,12 +661,12 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
-    end subroutine s_assign_default_values_to_user_inputs ! ----------------
+    end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_global_parameters_module() ! -------------------
+    subroutine s_initialize_global_parameters_module
 
         integer :: i, j, k
         integer :: fac
@@ -633,9 +690,6 @@ contains
 
         ! Gamma/Pi_inf Model ===============================================
         if (model_eqns == 1) then
-
-            ! Setting number of fluids
-            num_fluids = 1
 
             ! Annotating structure of the state and flux vectors belonging
             ! to the system of equations defined by the selected number of
@@ -764,7 +818,7 @@ contains
                             pv = fluid_pp(1)%pv
                             pv = pv/pref
                             @:ALLOCATE_GLOBAL(pb0(nb))
-                            if (Web == dflt_real) then
+                            if ((f_is_default(Web))) then
                                 pb0 = pref
                                 pb0 = pb0/pref
                                 pref = 1d0
@@ -781,6 +835,11 @@ contains
                     sys_size = stress_idx%end
                 end if
 
+                if (.not. f_is_default(sigma)) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
@@ -793,6 +852,12 @@ contains
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
+
+                if (.not. f_is_default(sigma)) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
@@ -909,6 +974,11 @@ contains
         wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
         !$acc update device(wa_flg)
 
+        ! Resort to default WENO-JS if no other WENO scheme is selected
+        #:if not MFC_CASE_OPTIMIZATION
+            wenojs = .not. (mapped_weno .or. wenoz .or. teno)
+        #:endif
+
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
 
@@ -981,8 +1051,12 @@ contains
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
         !$acc update device(m, n, p)
 
-        !$acc update device(alt_soundspeed, monopole, num_mono)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)
+        !$acc update device(alt_soundspeed, acoustic_source, num_source)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach)
+
+        #:if not MFC_CASE_OPTIMIZATION
+            !$acc update device(wenojs, mapped_weno, wenoz, teno)
+        #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc enter data copyin(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
@@ -1005,10 +1079,10 @@ contains
         @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
 
-    end subroutine s_initialize_global_parameters_module ! -----------------
+    end subroutine s_initialize_global_parameters_module
 
     !> Initializes parallel infrastructure
-    subroutine s_initialize_parallel_io() ! --------------------------------
+    subroutine s_initialize_parallel_io
 
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)
@@ -1036,10 +1110,10 @@ contains
 
 #endif
 
-    end subroutine s_initialize_parallel_io ! ------------------------------
+    end subroutine s_initialize_parallel_io
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_global_parameters_module() ! ---------------------
+    subroutine s_finalize_global_parameters_module
 
         integer :: i
 
@@ -1049,15 +1123,6 @@ contains
         if (any(Re_size > 0)) then
             @:DEALLOCATE_GLOBAL(Re_idx)
         end if
-
-        ! Deallocating grid variables for the x-, y- and z-directions
-        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
-
-        if (n == 0) return; 
-        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
-
-        if (p == 0) return; 
-        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
         deallocate (proc_coords)
         if (parallel_io) then
@@ -1072,6 +1137,15 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 
-    end subroutine s_finalize_global_parameters_module ! -------------------
+        ! Deallocating grid variables for the x-, y- and z-directions
+        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
+
+        if (n == 0) return; 
+        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
+
+        if (p == 0) return; 
+        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
+
+    end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

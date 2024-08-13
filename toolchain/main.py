@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import signal, getpass, platform, itertools, dataclasses
+import signal, getpass, platform, itertools
 
 from mfc         import args, lock, build, bench, state, count
 from mfc.state   import ARG
@@ -21,18 +21,19 @@ def __print_greeting():
     MFC_SIDEBAR_LINES = [
         f"[bold]{host_line}[/bold]",
         '-' * len(host_line),
-        f"[bold]--jobs [magenta]{ARG('jobs')}[/magenta][/bold]"
-    ] + [
-        f"[bold]--{'' if getattr(state.gCFG, field.name) else 'no-'}{field.name}[/bold]" for field in dataclasses.fields(state.gCFG)
-    ] + [
+        '',
+        f"[bold]--jobs [magenta]{ARG('jobs')}[/magenta][/bold]",
+        f"[bold]{' '.join(state.gCFG.make_options())}[/bold]",
         targets_line if ARG("command") != "test" else "",
+        '',
         '-' * len(help_line),
         f"[yellow]{help_line}[/yellow]",
     ]
 
     for a, b in itertools.zip_longest(MFC_LOGO_LINES, MFC_SIDEBAR_LINES):
+        a = a or ''
         lhs = a.ljust(max_logo_line_length)
-        rhs = b if b is not None else ''
+        rhs = b or ''
         cons.print(
             f"[bold]{lhs}[/bold] | {rhs}",
             highlight=False
@@ -48,7 +49,7 @@ def __checks():
 
 def __run():
     {"test":   test.test,     "run":        run.run,          "build":      build.build,
-     "clean":  build.clean,   "bench":      bench.bench,      "count":      count.count,
+     "bench":      bench.bench,      "count":      count.count,
      "packer": packer.packer, "count_diff": count.count_diff, "bench_diff": bench.diff
     }[ARG("command")]()
 

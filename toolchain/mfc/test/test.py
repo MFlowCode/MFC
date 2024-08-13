@@ -7,8 +7,9 @@ from ..printer import cons
 from ..        import common
 from ..state   import ARG
 from .case     import TestCase
-from .cases    import generate_cases
+from .cases    import list_cases
 from ..        import sched
+from ..run.input import MFCInputFile
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
@@ -18,7 +19,7 @@ from ..packer import packer
 
 nFAIL = 0
 
-def __filter(cases_):
+def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
 
     # Check "--from" and "--to" exist and are in the right order
@@ -38,17 +39,14 @@ def __filter(cases_):
         raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
     if len(ARG("only")) > 0:
-        for i, case in enumerate(cases[:]):
+        for case in cases[:]:
             case: TestCase
 
-            doKeep = False
-            for o in ARG("only"):
-                if str(o) == case.get_uuid():
-                    doKeep = True
-                    break
-
-            if not doKeep:
+            checkCase = case.trace.split(" -> ")
+            checkCase.append(case.get_uuid())
+            if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
+
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -64,7 +62,7 @@ def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL
 
-    cases = generate_cases()
+    cases = [ _.to_case() for _ in list_cases() ]
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
@@ -95,6 +93,10 @@ def test():
     codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
     if not ARG("case_optimization"):
         build(codes)
+
+    for case in cases:
+        if case.rebuild:
+            build(codes, MFCInputFile(os.path.basename(case.get_dirpath()), case.get_dirpath(), case.params))
 
     cons.print()
 
@@ -187,7 +189,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if not os.path.exists(silo_filepath):
                 silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
 
-            h5dump = f"{HDF5.get_install_dirpath()}/bin/h5dump"
+            h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
             if ARG("sys_hdf5"):
                 if not does_command_exist("h5dump"):
@@ -198,13 +200,13 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             output, err = get_program_output([h5dump, silo_filepath])
 
             if err != 0:
-                raise MFCException(f"""Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+                raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
             if "nan," in output:
-                raise MFCException(f"""Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+                raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
             if "inf," in output:
-                raise MFCException(f"""Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {os.path.join(test.get_dirpath(), "case.py")}.""")
+                raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
     case.delete_output()
 

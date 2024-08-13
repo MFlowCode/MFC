@@ -39,7 +39,7 @@ module m_rhs
 
     use m_hypoelastic
 
-    use m_monopole
+    use m_acoustic_src
 
     use m_viscous
 
@@ -50,6 +50,10 @@ module m_rhs
     use m_boundary_conditions
 
     use m_helper
+
+    use m_surface_tension
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -102,6 +106,14 @@ module m_rhs
     !$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 #endif
     !> @}
+
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
+    !$acc declare link(tau_Re_vf)
+#else
+    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
+    !$acc declare create(tau_Re_vf)
+#endif
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
@@ -216,7 +228,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_rhs_module() ! ---------------------------------
+    subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id !< Generic loop iterators
 
@@ -244,9 +256,19 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        do l = adv_idx%end + 1, sys_size
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        end do
+        if (.not. f_is_default(sigma)) then
+            ! This assumes that the color function advection equation is
+            ! the last equation. If this changes then this logic will
+            ! need updated
+            do l = adv_idx%end + 1, sys_size - 1
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+        else
+            do l = adv_idx%end + 1, sys_size
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+
+        end if
 
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
@@ -261,6 +283,27 @@ contains
             !$acc enter data copyin(q_prim_qp%vf(l)%sf)
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
+
+        if (.not. f_is_default(sigma)) then
+            q_prim_qp%vf(c_idx)%sf => &
+                q_cons_qp%vf(c_idx)%sf
+            !$acc enter data copyin(q_prim_qp%vf(c_idx)%sf)
+            !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+        end if
+
+        if (any(Re_size > 0)) then
+            @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
+            do i = 1, num_dims
+                @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
+                                                    &  iy%beg:iy%end, &
+                                                    &  iz%beg:iz%end))
+                @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
+            end do
+            @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
+                                        & iy%beg:iy%end, &
+                                        & iz%beg:iz%end))
+            @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+        end if
 
         ! ==================================================================
 
@@ -385,6 +428,23 @@ contains
 
             end if
 
+        else
+            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
+
+            do l = momxb, momxe
+                @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(0, 0, 0))
+                @:ACC_SETUP_VFs(dq_prim_dx_qp(1))
+                if (n > 0) then
+                    @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf(0, 0, 0))
+                    @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
+                    if (p > 0) then
+                        @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf(0, 0, 0))
+                        @:ACC_SETUP_VFs(dq_prim_dz_qp(1))
+                    end if
+                end if
+            end do
         end if
         ! END: Allocation of dq_prim_ds_qp =================================
 
@@ -518,7 +578,7 @@ contains
                             & iz%beg:iz%end))
                 end do
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
@@ -634,16 +694,20 @@ contains
             @:ALLOCATE_GLOBAL(nbub(0:m, 0:n, 0:p))
         end if
 
-    end subroutine s_initialize_rhs_module ! -------------------------------
+    end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step) ! -------
+    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
-        integer, intent(IN) :: t_step
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: time_avg
+
+        real(kind(0d0)) :: t_start, t_finish
+        real(kind(0d0)) :: gp_sum
 
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
@@ -667,6 +731,8 @@ contains
         integer :: i, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
 
+        call nvtxStartRange("Compute_RHS")
+
         ! Configuring Coordinate Direction Indexes =========================
         ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
 
@@ -676,7 +742,7 @@ contains
         ! ==================================================================
 
         !$acc update device(ix, iy, iz)
-
+        call cpu_time(t_start)
         ! Association/Population of Working Variables ======================
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -740,7 +806,11 @@ contains
                                                  q_prim_qp, &
                                                  dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                                  ix, iy, iz)
-        call nvtxEndRange()
+        call nvtxEndRange
+
+        call nvtxStartRange("Surface_Tension")
+        if (.not. f_is_default(sigma)) call s_get_capilary(q_prim_qp%vf)
+        call nvtxEndRange
 
         ! Dimensional Splitting Loop =======================================
 
@@ -755,18 +825,18 @@ contains
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
 
-            if (all(Re_size == 0)) then
+            call nvtxStartRange("RHS-WENO")
+
+            if (f_is_default(sigma)) then
+                ! Reconstruct densitiess
                 iv%beg = 1; iv%end = sys_size
-                call nvtxStartRange("RHS-WENO")
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-                call nvtxEndRange
             else
-                call nvtxStartRange("RHS-WENO")
-                iv%beg = 1; iv%end = contxe
+                iv%beg = 1; iv%end = E_idx - 1
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -774,64 +844,48 @@ contains
                     id)
 
                 iv%beg = E_idx; iv%end = E_idx
+                call s_reconstruct_cell_boundary_values_first_order( &
+                    q_prim_qp%vf(E_idx), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
+
+                iv%beg = E_idx + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
+            end if
 
-                iv%beg = advxb; iv%end = advxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                if (bubbles) then
-                    iv%beg = bubxb; iv%end = bubxe
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
-                end if
-
-                if (adv_n) then
-                    iv%beg = n_idx; iv%end = n_idx
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
-                end if
-
-                iv%beg = mom_idx%beg; iv%end = mom_idx%end
-                if (weno_Re_flux) then
+            ! Reconstruct viscous derivatives for viscosity
+            if (weno_Re_flux) then
+                iv%beg = momxb; iv%end = momxe
+                call s_reconstruct_cell_boundary_values_visc_deriv( &
+                    dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
+                    dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
+                    dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
+                    id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                    ix, iy, iz)
+                if (n > 0) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
-                        dq_prim_dx_qp(1)%vf(iv%beg:iv%end), &
+                        dq_prim_dy_qp(1)%vf(iv%beg:iv%end), &
                         dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                         dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                        id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                        id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
                         ix, iy, iz)
-                    if (n > 0) then
+                    if (p > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv( &
-                            dq_prim_dy_qp(1)%vf(iv%beg:iv%end), &
+                            dq_prim_dz_qp(1)%vf(iv%beg:iv%end), &
                             dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
                             dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                            id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                            id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
                             ix, iy, iz)
-                        if (p > 0) then
-                            call s_reconstruct_cell_boundary_values_visc_deriv( &
-                                dq_prim_dz_qp(1)%vf(iv%beg:iv%end), &
-                                dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, &
-                                dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-                                id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
-                                ix, iy, iz)
-                        end if
                     end if
                 end if
-                call nvtxEndRange
             end if
+
+            call nvtxEndRange ! WENO
 
             ! Configuring Coordinate Direction Indexes ======================
             if (id == 1) then
@@ -843,6 +897,7 @@ contains
             end if
             ix%end = m; iy%end = n; iz%end = p
             ! ===============================================================
+            call nvtxStartRange("RHS_riemann_solver")
 
             ! Computing Riemann Solver Flux and Source Flux =================
 
@@ -863,11 +918,6 @@ contains
                                   id, ix, iy, iz)
             call nvtxEndRange
 
-            ! ===============================================================
-
-            ! call nvtxStartRange("RHS_Flux_Add")
-            ! call nvtxEndRange
-
             ! Additional physics and source terms ==============================
 
             ! RHS addition for advection source
@@ -877,7 +927,7 @@ contains
                                                  q_cons_qp, &
                                                  q_prim_qp, &
                                                  flux_src_n(id))
-            call nvtxEndRange()
+            call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
@@ -887,15 +937,17 @@ contains
             call nvtxEndRange
 
             ! RHS additions for viscosity
-            call nvtxStartRange("RHS_viscous")
-            if (any(Re_size > 0d0)) call s_compute_viscous_rhs(id, &
-                                                               q_prim_qp%vf, &
-                                                               rhs_vf, &
-                                                               flux_src_n(id)%vf, &
-                                                               dq_prim_dx_qp(1)%vf, &
-                                                               dq_prim_dy_qp(1)%vf, &
-                                                               dq_prim_dz_qp(1)%vf, &
-                                                               ixt, iyt, izt)
+            call nvtxStartRange("RHS_add_phys")
+            if (any(Re_size > 0d0) .or. (.not. f_is_default(sigma))) then
+                call s_compute_additional_physics_rhs(id, &
+                                                      q_prim_qp%vf, &
+                                                      rhs_vf, &
+                                                      flux_src_n(id)%vf, &
+                                                      dq_prim_dx_qp(1)%vf, &
+                                                      dq_prim_dy_qp(1)%vf, &
+                                                      dq_prim_dz_qp(1)%vf, &
+                                                      ixt, iyt, izt)
+            end if
             call nvtxEndRange
 
             ! RHS additions for sub-grid bubbles
@@ -919,6 +971,7 @@ contains
             ! END: Additional physics and source terms =========================
 
         end do
+        ! END: Dimensional Splitting Loop =================================
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -935,16 +988,13 @@ contains
             end do
         end if
 
-        ! END: Dimensional Splitting Loop =================================
-
         ! Additional Physics and Source Temrs ==================================
-        ! Additions for monopole
-        call nvtxStartRange("RHS_monopole")
-        if (monopole) call s_monopole_calculations(q_cons_qp%vf(1:sys_size), &
-                                                   q_prim_qp%vf(1:sys_size), &
-                                                   t_step, &
-                                                   num_dims, &
-                                                   rhs_vf)
+        ! Additions for acoustic_source
+        call nvtxStartRange("RHS_acoustic_src")
+        if (acoustic_source) call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
+                                                              q_prim_qp%vf(1:sys_size), &
+                                                              t_step, &
+                                                              rhs_vf)
         call nvtxEndRange
 
         ! Add bubles source term
@@ -975,21 +1025,26 @@ contains
                     end do
                 end do
             end do
-
         end if
-
+        call cpu_time(t_finish)
+        if (t_step >= 4) then
+            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
         ! ==================================================================
 
-    end subroutine s_compute_rhs ! -----------------------------------------
+        call nvtxEndRange
+    end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
-        type(vector_field), intent(INOUT) :: q_cons_vf
-        type(vector_field), intent(INOUT) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(vector_field), intent(INOUT) :: flux_src_n_vf
-
         integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(vector_field), intent(inout) :: q_cons_vf
+        type(vector_field), intent(inout) :: q_prim_vf
+        type(vector_field), intent(inout) :: flux_src_n_vf
+
         integer :: i, j, k, l, q
 
         if (alt_soundspeed) then
@@ -1537,6 +1592,239 @@ contains
 
     end subroutine s_compute_advection_source_term
 
+    subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
+                                                dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
+
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
+        type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
+        type(int_bounds_info), intent(in) :: ixt, iyt, izt
+
+        integer :: i, j, k, l, q
+
+        if (idir == 1) then ! x-direction
+
+            if (.not. f_is_default(sigma)) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(c_idx)%sf(j, k, l) = &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
+                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                                (flux_src_n(advxb)%sf(j, k, l) - &
+                                 flux_src_n(advxb)%sf(j - 1, k, l))
+                        end do
+                    end do
+                end do
+            end if
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        !$acc loop seq
+                        do i = momxb, E_idx
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
+                                (flux_src_n(i)%sf(j - 1, k, l) &
+                                 - flux_src_n(i)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (idir == 2) then ! y-direction
+
+            if (.not. f_is_default(sigma)) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(c_idx)%sf(j, k, l) = &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dy(k)* &
+                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                                (flux_src_n(advxb)%sf(j, k, l) - &
+                                 flux_src_n(advxb)%sf(j, k - 1, l))
+                        end do
+                    end do
+                end do
+            end if
+
+            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+                if (any(Re_size > 0)) then
+                    if (p > 0) then
+                        call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                             tau_Re_vf, &
+                                                             ixt, iyt, izt)
+                    else
+                        call s_compute_viscous_stress_tensor(q_prim_vf, &
+                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                             tau_Re_vf, &
+                                                             ixt, iyt, izt)
+                    end if
+
+                    !$acc parallel loop collapse(2) gang vector default(present)
+                    do l = 0, p
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, 0, l) = &
+                                    rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
+                                    (tau_Re_vf(i)%sf(j, -1, l) &
+                                     - tau_Re_vf(i)%sf(j, 1, l))
+                            end do
+                        end do
+                    end do
+
+                end if
+
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 1, n
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    (flux_src_n(i)%sf(j, k - 1, l) &
+                                     - flux_src_n(i)%sf(j, k, l))
+                            end do
+                        end do
+                    end do
+                end do
+
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            !$acc loop seq
+                            do i = momxb, E_idx
+                                rhs_vf(i)%sf(j, k, l) = &
+                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    (flux_src_n(i)%sf(j, k - 1, l) &
+                                     - flux_src_n(i)%sf(j, k, l))
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Applying the geometrical viscous Riemann source fluxes calculated as average
+            ! of values at cell boundaries
+            if (cyl_coord) then
+                if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, n
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                         + flux_src_n(i)%sf(j, k, l))
+                                end do
+                            end do
+                        end do
+                    end do
+
+                    if (any(Re_size > 0)) then
+                        !$acc parallel loop collapse(2) gang vector default(present)
+                        do l = 0, p
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, 0, l) = &
+                                        rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
+                                        tau_Re_vf(i)%sf(j, 0, l)
+                                end do
+                            end do
+                        end do
+                    end if
+                else
+
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                !$acc loop seq
+                                do i = momxb, E_idx
+                                    rhs_vf(i)%sf(j, k, l) = &
+                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        (flux_src_n(i)%sf(j, k - 1, l) &
+                                         + flux_src_n(i)%sf(j, k, l))
+                                end do
+                            end do
+                        end do
+                    end do
+
+                end if
+            end if
+
+        elseif (idir == 3) then ! z-direction
+
+            if (.not. f_is_default(sigma)) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(c_idx)%sf(j, k, l) = &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dz(l)* &
+                                q_prim_vf(c_idx)%sf(j, k, l)* &
+                                (flux_src_n(advxb)%sf(j, k, l) - &
+                                 flux_src_n(advxb)%sf(j, k, l - 1))
+                        end do
+                    end do
+                end do
+            end if
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        !$acc loop seq
+                        do i = momxb, E_idx
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                (flux_src_n(i)%sf(j, k, l - 1) &
+                                 - flux_src_n(i)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end do
+
+            if (grid_geometry == 3) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(momxb + 1)%sf(j, k, l) = &
+                                rhs_vf(momxb + 1)%sf(j, k, l) + 5d-1* &
+                                (flux_src_n(momxe)%sf(j, k, l - 1) &
+                                 + flux_src_n(momxe)%sf(j, k, l))
+
+                            rhs_vf(momxe)%sf(j, k, l) = &
+                                rhs_vf(momxe)%sf(j, k, l) - 5d-1* &
+                                (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
+                                 + flux_src_n(momxb + 1)%sf(j, k, l))
+                        end do
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_compute_additional_physics_rhs
+
     !>  The purpose of this procedure is to infinitely relax
         !!      the pressures from the internal-energy equations to a
         !!      unique pressure, from which the corresponding volume
@@ -1544,9 +1832,9 @@ contains
         !!      purpose, this pressure is finally corrected using the
         !!      mixture-total-energy equation.
         !!  @param q_cons_vf Cell-average conservative variables
-    subroutine s_pressure_relaxation_procedure(q_cons_vf) ! ----------------
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
             !! derivative df(p), isentropic partial density, sum of volume fractions,
@@ -1788,7 +2076,7 @@ contains
             end do
         end do
 
-    end subroutine s_pressure_relaxation_procedure ! -----------------------
+    end subroutine s_pressure_relaxation_procedure
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
@@ -1800,14 +2088,13 @@ contains
         !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
@@ -1853,10 +2140,87 @@ contains
         end if
 
         ! ==================================================================
-    end subroutine s_reconstruct_cell_boundary_values ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values
+
+    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
+                                                              norm_dir)
+
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
+
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
+
+        integer :: i, j, k, l
+        ! Reconstruction in s1-direction ===================================
+
+        if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
+            recon_dir = 1; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        elseif (norm_dir == 2) then
+            is1 = iy; is2 = ix; is3 = iz
+            recon_dir = 2; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        else
+            is1 = iz; is2 = iy; is3 = ix
+            recon_dir = 3; is1%beg = is1%beg + weno_polyn
+            is1%end = is1%end - weno_polyn
+
+        end if
+
+#ifndef _CRAYFTN
+!$acc update device(is1, is2, is3, iv)
+#endif
+
+        if (recon_dir == 1) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        else if (recon_dir == 2) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        else if (recon_dir == 3) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        end if
+
+    end subroutine s_reconstruct_cell_boundary_values_first_order
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_rhs_module() ! -----------------------------------
+    subroutine s_finalize_rhs_module
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -2001,9 +2365,17 @@ contains
 
         @:DEALLOCATE_GLOBAL(flux_n, flux_src_n, flux_gsrc_n)
 
+        if (any(Re_size > 0) .and. cyl_coord) then
+            do i = 1, num_dims
+                @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
+            end do
+            @:DEALLOCATE(tau_re_vf(e_idx)%sf)
+            @:DEALLOCATE_GLOBAL(tau_re_vf)
+        end if
+
         s_riemann_solver => null()
         s_convert_to_mixture_variables => null()
 
-    end subroutine s_finalize_rhs_module ! ---------------------------------
+    end subroutine s_finalize_rhs_module
 
 end module m_rhs

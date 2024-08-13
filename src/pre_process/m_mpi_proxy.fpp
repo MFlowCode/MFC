@@ -33,7 +33,7 @@ contains
         !!       these are not available to the remaining processors. This
         !!       subroutine is then in charge of broadcasting the required
         !!       information.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -52,10 +52,10 @@ contains
         #:endfor
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity', 'relax',    &
-            & 'parallel_io', 'perturb_flow', 'vel_profile', 'instability_wave',&
-            & 'perturb_sph', 'bubbles', 'polytropic', 'polydisperse', 'qbmm',  &
-            & 'file_per_process', 'adv_n', 'ib' ]
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
+            & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
+            & 'mixlayer_perturb', 'bubbles', 'polytropic', 'polydisperse',     &
+            & 'qbmm', 'file_per_process', 'adv_n', 'ib' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -66,7 +66,8 @@ contains
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
-            & 'ptgalpha_eps', 'pi_fac']
+            & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef',          &
+            & 'mixlayer_domain' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -82,7 +83,7 @@ contains
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model%threshold']
+                & 'model%threshold', 'cf_val']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -112,14 +113,14 @@ contains
         end do
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !> Description: This subroutine takes care of efficiently distributing
         !!              the computational domain among the available processors
         !!             as well as recomputing some of the global parameters so
         !!              that they reflect the configuration of sub-domain that is
         !!              overseen by the local processor.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -529,6 +530,6 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
 end module m_mpi_proxy

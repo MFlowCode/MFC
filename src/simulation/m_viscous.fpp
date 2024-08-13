@@ -20,7 +20,6 @@ module m_viscous
  s_compute_viscous_stress_tensor, &
  s_initialize_viscous_module, &
  s_reconstruct_cell_boundary_values_visc_deriv, &
- s_compute_viscous_rhs, &
  s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
@@ -35,17 +34,9 @@ module m_viscous
     !$acc declare create(Re_viscous)
 #endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
-    !$acc declare link(tau_Re_vf)
-#else
-    type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
-    !$acc declare create(tau_Re_vf)
-#endif
-
 contains
 
-    subroutine s_initialize_viscous_module()
+    subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
         type(int_bounds_info) :: ix, iy, iz
@@ -68,18 +59,6 @@ contains
         !$acc update device(Res_viscous, Re_idx, Re_size)
         !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
 
-        @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
-        do i = 1, num_dims
-            @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(ix%beg:ix%end, &
-                                                   &  iy%beg:iy%end, &
-                                                   &  iz%beg:iz%end))
-            @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
-        end do
-        @:ALLOCATE(tau_Re_vf(E_idx)%sf(ix%beg:ix%end, &
-                                     & iy%beg:iy%end, &
-                                     & iz%beg:iz%end))
-        @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
-
     end subroutine s_initialize_viscous_module
 
     !> The purpose of this subroutine is to compute the viscous
@@ -93,12 +72,12 @@ contains
     !  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
     subroutine s_compute_viscous_stress_tensor(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, &
                                                tau_Re_vf, &
-                                               ix, iy, iz) ! ---
+                                               ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(scalar_field), dimension(num_dims), intent(IN) :: grad_x_vf, grad_y_vf, grad_z_vf
-
-        type(scalar_field), dimension(1:sys_size) :: tau_Re_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(kind(0d0)), dimension(2) :: Re_visc
@@ -107,8 +86,6 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
-
-        type(int_bounds_info) :: ix, iy, iz
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
@@ -543,7 +520,7 @@ contains
                 end do
             end do
         end if
-    end subroutine s_compute_viscous_stress_tensor ! ----------------------------------------
+    end subroutine s_compute_viscous_stress_tensor
 
 !>  Computes viscous terms
     !!  @param q_cons_vf Cell-averaged conservative variables
@@ -560,22 +537,21 @@ contains
                              ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
-            intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
+            intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
                              qL_prim_rsz_vf, qR_prim_rsz_vf
 
-        type(vector_field), dimension(num_dims), intent(INOUT) :: qL_prim, qR_prim
+        type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
 
-        type(vector_field) :: q_prim_qp
+        type(vector_field), intent(in) :: q_prim_qp
 
         type(vector_field), dimension(1:num_dims), &
-            intent(INOUT) :: dqL_prim_dx_n, dqR_prim_dx_n, &
+            intent(inout) :: dqL_prim_dx_n, dqR_prim_dx_n, &
                              dqL_prim_dy_n, dqR_prim_dy_n, &
                              dqL_prim_dz_n, dqR_prim_dz_n
 
-        type(vector_field), dimension(1), intent(INOUT) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
-
-        type(int_bounds_info), intent(IN) :: ix, iy, iz
+        type(vector_field), dimension(1), intent(inout) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
+        type(int_bounds_info), intent(inout) :: ix, iy, iz
 
         integer :: i, j, k, l
 
@@ -1002,205 +978,20 @@ contains
 
     end subroutine s_get_viscous
 
-    subroutine s_compute_viscous_rhs(idir, q_prim_vf, rhs_vf, flux_src_n, &
-                                     dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf, ixt, iyt, izt)
-
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, &
-                                                               flux_src_n, &
-                                                               dq_prim_dx_vf, &
-                                                               dq_prim_dy_vf, &
-                                                               dq_prim_dz_vf
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(int_bounds_info) :: ixt, iyt, izt
-        integer, intent(IN) :: idir
-        integer :: i, j, k, l, q
-
-        if (idir == 1) then ! x-direction
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        !$acc loop seq
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
-                                (flux_src_n(i)%sf(j - 1, k, l) &
-                                 - flux_src_n(i)%sf(j, k, l))
-                        end do
-                    end do
-                end do
-            end do
-
-        elseif (idir == 2) then ! y-direction
-
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
-                if (p > 0) then
-                    call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                         dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
-                                                         tau_Re_vf, &
-                                                         ixt, iyt, izt)
-                else
-                    call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                         dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                         tau_Re_vf, &
-                                                         ixt, iyt, izt)
-                end if
-
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 1, n
-                        do j = 0, m
-                            !$acc loop seq
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
-                                    (flux_src_n(i)%sf(j, k - 1, l) &
-                                     - flux_src_n(i)%sf(j, k, l))
-                            end do
-                        end do
-                    end do
-                end do
-
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = 0, p
-                    do j = 0, m
-                        !$acc loop seq
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, 0, l) = &
-                                rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
-                                (tau_Re_vf(i)%sf(j, -1, l) &
-                                 - tau_Re_vf(i)%sf(j, 1, l))
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            !$acc loop seq
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
-                                    (flux_src_n(i)%sf(j, k - 1, l) &
-                                     - flux_src_n(i)%sf(j, k, l))
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
-            ! Applying the geometrical viscous Riemann source fluxes calculated as average
-            ! of values at cell boundaries
-            if (cyl_coord) then
-                if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = 0, p
-                        do k = 1, n
-                            do j = 0, m
-                                !$acc loop seq
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
-                                        (flux_src_n(i)%sf(j, k - 1, l) &
-                                         + flux_src_n(i)%sf(j, k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do l = 0, p
-                        do j = 0, m
-                            !$acc loop seq
-                            do i = momxb, E_idx
-                                rhs_vf(i)%sf(j, 0, l) = &
-                                    rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
-                                    tau_Re_vf(i)%sf(j, 0, l)
-                            end do
-                        end do
-                    end do
-
-                else
-
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                !$acc loop seq
-                                do i = momxb, E_idx
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
-                                        (flux_src_n(i)%sf(j, k - 1, l) &
-                                         + flux_src_n(i)%sf(j, k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-
-                end if
-            end if
-
-        elseif (idir == 3) then ! z-direction
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        !$acc loop seq
-                        do i = momxb, E_idx
-                            rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
-                                (flux_src_n(i)%sf(j, k, l - 1) &
-                                 - flux_src_n(i)%sf(j, k, l))
-                        end do
-                    end do
-                end do
-            end do
-
-            if (grid_geometry == 3) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(momxb + 1)%sf(j, k, l) = &
-                                rhs_vf(momxb + 1)%sf(j, k, l) + 5d-1* &
-                                (flux_src_n(momxe)%sf(j, k, l - 1) &
-                                 + flux_src_n(momxe)%sf(j, k, l))
-
-                            rhs_vf(momxe)%sf(j, k, l) = &
-                                rhs_vf(momxe)%sf(j, k, l) - 5d-1* &
-                                (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
-                                 + flux_src_n(momxb + 1)%sf(j, k, l))
-                        end do
-                    end do
-                end do
-            end if
-        end if
-
-    end subroutine s_compute_viscous_rhs
-
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
-
-        integer, intent(IN) :: norm_dir
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
 
-        type(int_bounds_info) :: ix, iy, iz
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
@@ -1287,17 +1078,15 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_reconstruct_cell_boundary_values_visc ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values_visc
 
-    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
-
-        type(int_bounds_info) :: ix, iy, iz
-
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         integer, intent(IN) :: norm_dir
 
@@ -1389,7 +1178,7 @@ contains
         end if
         ! ==================================================================
 
-    end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
+    end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
     !>  The purpose of this subroutine is to employ the inputted
         !!      left and right cell-boundary integral-averaged variables
@@ -1400,27 +1189,25 @@ contains
         !!  @param vR_vf Right cell-boundary integral averages
         !!  @param dv_ds_vf Cell-average first-order spatial derivatives
         !!  @param norm_dir Splitting coordinate direction
-    subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, & ! --------
+    subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, &
                                                  dv_ds_vf, &
                                                  norm_dir, &
                                                  ix, iy, iz, iv_in, &
                                                  dL, dim, buff_size_in)
 
-        type(int_bounds_info), intent(IN) :: ix, iy, iz, iv_in
-        integer :: buff_size_in, dim
-
-        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in) :: dL
         ! arrays of cell widths
+        type(scalar_field), &
+            dimension(iv%beg:iv%end), &
+            intent(in) :: vL_vf, vR_vf
 
         type(scalar_field), &
             dimension(iv%beg:iv%end), &
-            intent(IN) :: vL_vf, vR_vf
+            intent(inout) :: dv_ds_vf
 
-        type(scalar_field), &
-            dimension(iv%beg:iv%end), &
-            intent(INOUT) :: dv_ds_vf
-
-        integer, intent(IN) :: norm_dir
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz, iv_in
+        integer, intent(in) :: dim, buff_size_in
+        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1516,7 +1303,7 @@ contains
         end if
         ! END: First-Order Spatial Derivatives in z-direction ==============
 
-    end subroutine s_apply_scalar_divergence_theorem ! ---------------------
+    end subroutine s_apply_scalar_divergence_theorem
 
     !>  Computes the scalar gradient fields via finite differences
         !!  @param var Variable to compute derivative of
@@ -1527,16 +1314,14 @@ contains
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z, &
                                      ix, iy, iz, buff_size_in)
 
-        type(scalar_field), intent(IN) :: var
-        type(scalar_field), intent(INOUT) :: grad_x
-        type(scalar_field), intent(INOUT) :: grad_y
-        type(scalar_field), intent(INOUT) :: grad_z
-
-        integer, intent(IN) :: buff_size_in
+        type(scalar_field), intent(in) :: var
+        type(scalar_field), intent(inout) :: grad_x
+        type(scalar_field), intent(inout) :: grad_y
+        type(scalar_field), intent(inout) :: grad_z
+        type(int_bounds_info), intent(inout) :: ix, iy, iz
+        integer, intent(in) :: buff_size_in
 
         integer :: j, k, l !< Generic loop iterators
-
-        type(int_bounds_info) :: ix, iy, iz
 
         ix%beg = -buff_size_in; ix%end = m + buff_size_in; 
         if (n > 0) then
@@ -1706,21 +1491,14 @@ contains
             end if
         end if
 
-    end subroutine s_compute_fd_gradient ! --------------------------------------
+    end subroutine s_compute_fd_gradient
 
-    subroutine s_finalize_viscous_module()
+    subroutine s_finalize_viscous_module
 
         integer :: i
 
         @:DEALLOCATE_GLOBAL(Res_viscous)
 
-        if (cyl_coord) then
-            do i = 1, num_dims
-                @:DEALLOCATE(tau_Re_vf(cont_idx%end + i)%sf)
-            end do
-            @:DEALLOCATE(tau_Re_vf(E_idx)%sf)
-            @:DEALLOCATE_GLOBAL(tau_Re_vf)
-        end if
     end subroutine s_finalize_viscous_module
 
 end module m_viscous

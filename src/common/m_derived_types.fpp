@@ -191,6 +191,8 @@ module m_derived_types
         integer :: hcid
         !! id for hard coded initial condition
 
+        real(kind(0d0)) :: cf_val !! color function value
+
     end type ic_patch_parameters
 
     type ib_patch_parameters
@@ -252,20 +254,30 @@ module m_derived_types
         real(kind(0d0)) :: zmax !< Max. boundary third coordinate direction
     end type integral_parameters
 
-    !> Monopole acoustic source parameters
-    type mono_parameters
+    !> Acoustic source parameters
+    type acoustic_parameters
+        integer :: pulse !< Type of pulse
+        integer :: support !< Type of support
+        logical :: dipole !< Whether the source is a dipole or monopole
         real(kind(0d0)), dimension(3) :: loc !< Physical location of acoustic source
-        real(kind(0d0)) :: mag !< Magnitude
-        real(kind(0d0)) :: length !< Length of line source
+        real(kind(0d0)) :: mag !< Acoustic pulse magnitude
+        real(kind(0d0)) :: length !< Length of planar source (2D/3D)
+        real(kind(0d0)) :: height !< Height of planar source (3D)
+        real(kind(0d0)) :: wavelength !< Wave length of pulse
+        real(kind(0d0)) :: frequency !< Frequency of pulse
+        real(kind(0d0)) :: gauss_sigma_dist !< sigma of Gaussian pulse multiplied by speed of sound
+        real(kind(0d0)) :: gauss_sigma_time !< sigma of Gaussian pulse
         real(kind(0d0)) :: npulse !< Number of cycles of pulse
         real(kind(0d0)) :: dir !< Direction of pulse
         real(kind(0d0)) :: delay !< Time-delay of pulse start
-        integer :: pulse
-        integer :: support
-        real(kind(0d0)) :: aperture
-        real(kind(0d0)) :: foc_length
-        real(kind(0d0)) :: support_width
-    end type mono_parameters
+        real(kind(0d0)) :: foc_length ! < Focal length of transducer
+        real(kind(0d0)) :: aperture ! < Aperture diameter of transducer
+        real(kind(0d0)) :: element_spacing_angle !< Spacing between aperture elements in 2D acoustic array
+        real(kind(0d0)) :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
+        real(kind(0d0)) :: rotate_angle !< Angle of rotation of the entire circular 3D acoustic array
+        integer :: num_elements !< Number of elements in the acoustic array
+        integer :: element_on !< Element in the acoustic array to turn on
+    end type acoustic_parameters
 
     !> Ghost Point for Immersed Boundaries
     type ghost_point
@@ -276,6 +288,7 @@ module m_derived_types
         real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
         logical :: slip
+        integer, dimension(3) :: DB
 
     end type ghost_point
 

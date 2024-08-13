@@ -1,0 +1,31 @@
+From 51f0a23e72b366358146bb272d6d5c297929b0b0 Mon Sep 17 00:00:00 2001
+From: Henry LE BERRE <hberre3@gatech.edu>
+Date: Thu, 30 May 2024 19:15:23 +0200
+Subject: [PATCH] Temporary GNU 13 Silo Build Fix
+
+---
+ src/hdf5_drv/silo_hdf5.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/hdf5_drv/silo_hdf5.c b/src/hdf5_drv/silo_hdf5.c
+index 9a00194..cc23fbf 100644
+--- a/src/hdf5_drv/silo_hdf5.c
++++ b/src/hdf5_drv/silo_hdf5.c
+@@ -1810,8 +1810,12 @@ db_hdf5_cwg(DBfile *_dbfile)
+         else                                                     \
+              *dscount = m.MEMCNT;                                \
+         *dsnames = (char **) calloc(*dscount, sizeof(char**));   \
+-        for (i = 0; i < *dscount; i++)                           \
+-            (*dsnames)[i] = strdup(m.MEMNAME[i]);                \
++        if (sizeof(m.MEMNAME[0]) >= sizeof(char)) {              \
++            for (i = 0; i < *dscount; i++)                       \
++                (*dsnames)[i] = strdup((char*)m.MEMNAME[i]);     \
++        } else {                                                 \
++            (*dsnames)[0] = strdup((char*)m.MEMNAME);            \
++        }                                                        \
+         break;                                                   \
+     }
+ 
+-- 
+2.45.1
+

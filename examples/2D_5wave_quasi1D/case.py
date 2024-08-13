@@ -15,8 +15,7 @@ mydt    = Tend/(1.*Nt)
 
 # Configuring case dictionary
 print(json.dumps({
-                    # Logistics ================================================
-                    'case_dir'                     : '\'.\'',                   
+                    # Logistics ================================================                 
                     'run_time_info'                : 'T',                       
                     # ==========================================================
                                                                                 
@@ -39,7 +38,6 @@ print(json.dumps({
                     'model_eqns'                   : 2,                        
                     'alt_soundspeed'               : 'F',                      
                     'num_fluids'                   : 1,                        
-		    'adv_alphan'                   : 'T',                      
 		    'mpp_lim'                      : 'F',                      
 		    'mixture_err'                  : 'F',                      
 		    'time_stepper'                 : 3,                                               

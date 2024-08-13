@@ -24,15 +24,13 @@ several supercomputer clusters, both interactively and through batch submission.
 >
 > If `-c <computer name>` is left unspecified, it defaults to `-c default`.
 
-Additional flags can be appended to the MPI executable call using the `-f` (i.e `--flags`) option.
-
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
 ## Interactive Execution
 
 To run all stages of MFC, that is [pre_process](https://github.com/MFlowCode/MFC/tree/master/src/pre_process/), [simulation](https://github.com/MFlowCode/MFC/tree/master/src/simulation/), and [post_process](https://github.com/MFlowCode/MFC/tree/master/src/post_process/) on the sample case [2D_shockbubble](https://github.com/MFlowCode/MFC/tree/master/examples/2D_shockbubble/),
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py
 ```
 
@@ -45,14 +43,14 @@ For example,
 
 - Running [pre_process](https://github.com/MFlowCode/MFC/tree/master/src/pre_process/) with 2 cores:
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -t pre_process -n 2
 ```
 
 - Running [simulation](https://github.com/MFlowCode/MFC/tree/master/src/simulation/) and [post_process](https://github.com/MFlowCode/MFC/tree/master/src/post_process/)
 using 4 cores:
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
@@ -64,7 +62,7 @@ The number of nodes can be specified with the `-N` (i.e., `--nodes`) option.
 
 We provide a list of (baked-in) submission batch scripts in the `toolchain/templates` folder.
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -t simulation -c <computer name>
 ```
 
@@ -167,14 +165,14 @@ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the sa
 	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
 	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
 
-```console
+```shell
 ./mfc.sh run case.py -t post_process
 ./mfc.sh run restart_case.py -t post_process
 ```	
 
 We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_vacuum_restart/`. This simulation is a duplicate of the `1D_vacuum` case. It demonstrates stopping at timestep 7000, adding a new patch, and restarting the simulation. To test this code, run:
 
-```console
+```shell
 ./mfc.sh run examples/1D_vacuum_restart/case.py -t pre_process simulation
 ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t pre_process simulation
 ./mfc.sh run examples/1D_vacuum_restart/case.py -t post_process
@@ -185,7 +183,7 @@ We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_va
 
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 
-```console
+```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
                -N 2 -n 4 -t simulation -a <redacted> -c summit
 ```

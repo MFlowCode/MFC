@@ -22,5 +22,7 @@ module m_constants
     integer, parameter :: num_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
+    real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
+    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
 
 end module m_constants

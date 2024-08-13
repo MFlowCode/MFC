@@ -24,17 +24,16 @@ echo
     ${helpers.run_prologue(target)}
 
     % if not mpi:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} "${target.get_install_binpath()}")
+        (set -x; ${rofiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; ${' '.join([f"'{x}'" for x in profiler ])} \
-            jsrun                                           \
-                ${'--smpiargs="-gpu"' if gpu else ''}       \
-                --nrs          ${tasks_per_node*nodes}      \
-                --cpu_per_rs   1                            \
-                --gpu_per_rs   ${1 if gpu else 0}           \
-                --tasks_per_rs 1                            \
-                ${' '.join([f"'{x}'" for x in ARG('--') ])} \
-                "${target.get_install_binpath()}")
+        (set -x; ${profiler} \
+            jsrun                                      \
+                ${'--smpiargs="-gpu"' if gpu else ''}  \
+                --nrs          ${tasks_per_node*nodes} \
+                --cpu_per_rs   1                       \
+                --gpu_per_rs   ${1 if gpu else 0}      \
+                --tasks_per_rs 1                       \
+                "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}

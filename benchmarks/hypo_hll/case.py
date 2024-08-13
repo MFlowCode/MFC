@@ -26,119 +26,111 @@ ncells = math.floor(ppg * procs * ARGS["gbpp"])
 s      = math.floor((ncells / 2.0) ** (1/3))
 Nx, Ny, Nz = 2*s, s, s
 
-Mu = 1.84E-05
-gam_a = 1.4
-
-D = 0.1
 
 # Configuring case dictionary
 print(json.dumps({
-    # Logistics ================================================================
-    'run_time_info'                : 'T',
-    # ==========================================================================
+                    # Logistics ================================================
+                    'run_time_info'                : 'T',
+                    # ==========================================================
 
-    # Computational Domain Parameters ==========================================
-    # x direction
-    'x_domain%beg'                 : -5*D,
-    'x_domain%end'                 : 5.0*D,
-    # y direction
-    'y_domain%beg'                 : -2.5*D,
-    'y_domain%end'                 : 2.5*D,
-    # z direction
-    'z_domain%beg'                 : -2.5*D,
-    'z_domain%end'                 : 2.5*D,
+                    # Computational Domain Parameters ==========================
+                    'x_domain%beg'                 : 0.E+00,
+                    'x_domain%end'                 : 1.E+00,
+                    'y_domain%beg'                 : 0.E+00,
+                    'y_domain%end'                 : 2.E+00,
+                    'z_domain%beg'                 : 0.E+00,
+                    'z_domain%end'                 : 1.E+00,
+                    'm'                            : Nx,
+                    'n'                            : Ny,
+                    'p'                            : Nz,
+                    'dt'                           : 1e-8,
+                    't_step_start'                 : 0,
+                    't_step_stop'                  : int(60*(95*size + 5)),
+                    't_step_save'                  : int(12*(95*size + 5)),
+		    # ==========================================================
 
-    'cyl_coord'                    : 'F',
-    'm'                            : Nx,
-    'n'                            : Ny,
-    'p'                            : Nz,
-    'dt'                           : 1.0E-7,
-    't_step_start'                 : 0,
-    't_step_stop'                  : int(20*(45*size + 5)),
-    't_step_save'                  : int(4*(45*size + 5)),
-    # ==========================================================================
-    
-    # Simulation Algorithm Parameters ==========================================
-    # Only one patches are necessary, the air tube
-    'num_patches'                  : 1,
-    # Use the 5 equation model
-    'model_eqns'                   : 2,
-    # 6 equations model does not need the K \div(u) term                    
-    'alt_soundspeed'               : 'F',
-    # One fluids: air
-    'num_fluids'                   : 1,
-    # Advect both volume fractions
-    'adv_alphan'                   : 'T',
-    # No need to ensure the volume fractions sum to unity at the end of each
-    # time step
-    'mpp_lim'                      : 'F',
-    # Correct errors when computing speed of sound
-    'mixture_err'                  : 'T',
-    # Use TVD RK3 for time marching
-    'time_stepper'                 : 3,
-    # Reconstruct the primitive variables to minimize spurious
-    # Use WENO5
-    'weno_order'                   : 5,
-    'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'T',
-    'weno_avg'                     : 'T',
-    'avg_state'                    : 2,
-    'mapped_weno'                  : 'T',
-    'null_weights'                 : 'F',
-    'mp_weno'                      : 'T',
-    'riemann_solver'               : 2,
-    'wave_speeds'                  : 1,
-    # We use ghost-cell extrapolation
-    'bc_x%beg'                     : -3,
-    'bc_x%end'                     : -3,
-    'bc_y%beg'                     : -3,
-    'bc_y%end'                     : -3,
-    'bc_z%beg'                     : -3,
-    'bc_z%end'                     : -3,
-    # Set IB to True and add 1 patch
-    'ib'                           : 'T',
-    'num_ibs'                      : 1,
-    # ==========================================================================
+                    # Simulation Algorithm Parameters ==========================
+                    'num_patches'                  : 2,
+                    'model_eqns'                   : 2,
+                    'alt_soundspeed'               : 'F',
+                    'num_fluids'                   : 2,
+		    'mpp_lim'                      : 'F',
+		    'mixture_err'                  : 'F',
+		    'time_stepper'                 : 3,
+                    'weno_order'                   : 3,
+                    'weno_eps'                     : 1.E-16,
+		    'weno_Re_flux'                 : 'F',
+                    'weno_avg'                     : 'F',
+                    'mapped_weno'                  : 'F',
+                    'null_weights'                 : 'F',
+                    'mp_weno'                      : 'F',
+		    'riemann_solver'               : 1,
+                    'wave_speeds'                  : 1,
+                    'avg_state'                    : 2,
+                    'bc_x%beg'                     : -3,
+                    'bc_x%end'                     : -3,
+                    'bc_y%beg'                     : -3,
+                    'bc_y%end'                     : -3,
+                    'bc_z%beg'                     : -3,
+                    'bc_z%end'                     : -3,
+                    # ==========================================================
 
-    # Formatted Database Files Structure Parameters ============================
-    'format'                       : 1,
-    'precision'                    : 2,
-    'prim_vars_wrt'                :'T',
-    'E_wrt'                        :'T',
-    'parallel_io'                  :'T',
-    # ==========================================================================
+                    # Turning on Hypoelasticity ================================
+                    'hypoelasticity'               : 'T',
+                    # ==========================================================
 
-    # Patch: Constant Tube filled with air =====================================
-    # Specify the cylindrical air tube grid geometry
-    'patch_icpp(1)%geometry'       : 9,
-    'patch_icpp(1)%x_centroid'     : 0.0,
-    # Uniform medium density, centroid is at the center of the domain
-    'patch_icpp(1)%y_centroid'     : 0.0,
-    'patch_icpp(1)%z_centroid'     : 0.0,
-    'patch_icpp(1)%length_x'       : 10*D,
-    'patch_icpp(1)%length_y'       : 5*D,
-    'patch_icpp(1)%length_z'       : 5*D,
-    # Specify the patch primitive variables 
-    'patch_icpp(1)%vel(1)'         : 527.2E+00,
-    'patch_icpp(1)%vel(2)'         : 0.0E+00,
-    'patch_icpp(1)%vel(3)'         : 0.0E+00,
-    'patch_icpp(1)%pres'           : 10918.2549,
-    'patch_icpp(1)%alpha_rho(1)'   : 0.2199,
-    'patch_icpp(1)%alpha(1)'       : 1.E+00,
-    # # ========================================================================
+                    # Formatted Database Files Structure Parameters ============
+                    'format'                       : 1,
+                    'precision'                    : 2,
+                    'prim_vars_wrt'                :'T',
+		    'parallel_io'                  :'F',
+		    # ==========================================================
 
-    # Patch: Sphere Immersed Boundary ========================================
-    'patch_ib(1)%geometry'       : 8,
-    'patch_ib(1)%x_centroid'     : -3.0E-3,
-    'patch_ib(1)%y_centroid'     : 0.0,
-    'patch_ib(1)%z_centroid'     : 0.0,
-    'patch_ib(1)%radius'         : D/2,
-    'patch_ib(1)%slip'           : 'T',
-    # ==========================================================================
+		    # Patch 1 L ================================================
+                    'patch_icpp(1)%geometry'       : 9,
+                    'patch_icpp(1)%x_centroid'     : 0.35,
+                    'patch_icpp(1)%y_centroid'     : 1.0,
+                    'patch_icpp(1)%z_centroid'     : 0.5,
+                    'patch_icpp(1)%length_x'       : 0.7,
+                    'patch_icpp(1)%length_y'       : 2,
+                    'patch_icpp(1)%length_z'       : 1,
+                    'patch_icpp(1)%vel(1)'         : 0.0,
+                    'patch_icpp(1)%vel(2)'         : 0.0,
+                    'patch_icpp(1)%vel(3)'         : 0.0,
+                    'patch_icpp(1)%pres'           : 1E+09,
+                    'patch_icpp(1)%alpha_rho(1)'   : 1000,
+                    'patch_icpp(1)%alpha_rho(2)'   : 0.,
+                    'patch_icpp(1)%alpha(1)'       : 1,
+                    'patch_icpp(1)%alpha(2)'       : 0.,
+                    'patch_icpp(1)%tau_e(1)'       : 0.0,
+                    # ==========================================================
 
-    # Fluids Physical Parameters ===============================================
-    'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),  # 2.50(Not 1.40)
-    'fluid_pp(1)%pi_inf'           : 0,
-    'fluid_pp(1)%Re(1)'            : 7535533.2,
-    # ==========================================================================
+                    # Patch 2 R ================================================
+                    'patch_icpp(2)%geometry'       : 9,
+                    'patch_icpp(2)%x_centroid'     : 0.85,
+                    'patch_icpp(2)%y_centroid'     : 1.0,
+                    'patch_icpp(2)%z_centroid'     : 0.5,
+                    'patch_icpp(2)%length_x'       : 0.3,
+                    'patch_icpp(2)%length_y'       : 2.0,
+                    'patch_icpp(2)%length_z'       : 1.0,
+                    'patch_icpp(2)%vel(1)'         : 0,
+                    'patch_icpp(2)%vel(2)'         : 0,
+                    'patch_icpp(2)%vel(3)'         : 0,
+                    'patch_icpp(2)%pres'           : 1E+05,
+                    'patch_icpp(2)%alpha_rho(1)'   : 0.,
+                    'patch_icpp(2)%alpha_rho(2)'   : 50.,
+                    'patch_icpp(2)%alpha(1)'       : 0,
+                    'patch_icpp(2)%alpha(2)'       : 1,
+                    'patch_icpp(2)%tau_e(1)'       : 0.0,
+                    # ==========================================================
+
+                    # Fluids Physical Parameters ===============================
+                    'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),
+                    'fluid_pp(1)%pi_inf'           : 4.4E+00*6.E+08/(4.4E+00 - 1.E+00),
+                    'fluid_pp(1)%G'                : 1.E+09,
+                    'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
+                    'fluid_pp(2)%pi_inf'           : 0.,
+                    'fluid_pp(2)%G'                : 0.,
+	            # ==========================================================
 }))
+# ==============================================================================

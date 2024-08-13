@@ -52,7 +52,7 @@ $$ R\_1, {\\dot R}\_1, \dots, R\_{N\_b}, {\\dot R}\_{N\_b} $$
 
 ### Step 1: Setting up your Environment
 
-Begin by downloading the `.zip` file [here](https://gatech.box.com/s/1diud4lgequvuie5fg2ac6hcvoelndu5).
+Begin by downloading the `.zip` file [here](https://www.dropbox.com/scl/fi/bdk8702oas8zqu0mk24vx/paceParaview.zip?rlkey=bov1s6lra0z7dhhrh6etniucx&st=2m9xvls4&dl=0).
 This file contains two things:
 
 - A bash script to automate the job submission process and provide instructions for remote connection
@@ -91,7 +91,7 @@ This is optional and defaults to whatever is set on line 52 of `pace-paraview-se
 Once you run `./pace-paraview-server <options>`, it'll take a bit to start up. 
 In the meantime, you'll see the below message:
 
-```console
+```shell
 Submitted batch job <job #>
 Waiting for ParaView server to start. This may take several minutes  ...
 ```
