@@ -94,8 +94,8 @@ print(json.dumps({
     'avg_state'                     : 2,
     'bc_x%beg'                      : -1,
     'bc_x%end'                      : -1,
-    'bc_y%beg'                      : -5,
-    'bc_y%end'                      : -5,
+    'bc_y%beg'                      : -6,
+    'bc_y%end'                      : -6,
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
