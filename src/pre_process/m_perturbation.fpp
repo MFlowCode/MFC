@@ -329,7 +329,7 @@ contains
             ii = mixlayer_var(5); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
             do k = 0, n + 1
                 ii = mixlayer_var(1); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -rho_mean*d(j, k); 
-                ii = mixlayer_var(3); jj = mixlayer_var(5); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -d(j, k)/rho_mean;
+                ii = mixlayer_var(3); jj = mixlayer_var(5); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -d(j, k)/rho_mean; 
                 ii = mixlayer_var(5); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -gam*(p_mean + pi_inf)*d(j, k); 
             end do
         end do
