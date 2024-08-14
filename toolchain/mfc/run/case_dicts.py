@@ -57,8 +57,10 @@ PRE_PROCESS.update({
     'old_ic': ParamType.LOG,
     't_step_old': ParamType.INT,
     't_step_start': ParamType.INT,
-    'vel_profile': ParamType.LOG,
-    'instability_wave': ParamType.LOG,
+    'mixlayer_vel_profile': ParamType.LOG,
+    'mixlayer_vel_coef': ParamType.REAL,
+    'mixlayer_domain': ParamType.REAL,
+    'mixlayer_perturb': ParamType.LOG,
     'perturb_flow': ParamType.LOG,
     'perturb_flow_fluid': ParamType.INT,
     'perturb_flow_mag': ParamType.REAL,
@@ -117,8 +119,8 @@ for p_id in range(1, 10+1):
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho", "a2",
                       "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
-                      "normal", "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp", "cf_val"]: 
+                      "normal", "smooth_coeff", "rho", "vel", "alpha", "gamma",
+                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]: 
 
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
@@ -151,6 +153,8 @@ for p_id in range(1, 10+1):
 
     for taue_id in range(1, 6+1):
         PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL.analytic()
+
+    PRE_PROCESS[f'patch_icpp({p_id})%cf_val'] = ParamType.REAL.analytic()
 
     if p_id >= 2:
         PRE_PROCESS[f'patch_icpp({p_id})%alter_patch'] = ParamType.LOG
