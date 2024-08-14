@@ -174,6 +174,7 @@ print(json.dumps({
     'num_patches'  : 3,        
     'model_eqns'   : 3,        
     'num_fluids'   : 3,        
+    'adv_alphan'   : 'T',      
     'mpp_lim'      : 'T',      
     'mixture_err'  : 'T',      
     'relax'        : 'T',      

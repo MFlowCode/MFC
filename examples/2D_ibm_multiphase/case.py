@@ -35,6 +35,8 @@ print(json.dumps({
     'model_eqns'                   : 3,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
+    # Advect both volume fractions
+    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     # Correct errors when computing speed of sound
     'mixture_err'                  : 'T',

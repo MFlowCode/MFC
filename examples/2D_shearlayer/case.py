@@ -30,6 +30,7 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'num_fluids'                   : 2,
     'num_patches'                  : 2,
+    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,

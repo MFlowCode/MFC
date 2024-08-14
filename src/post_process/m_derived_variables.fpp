@@ -686,6 +686,23 @@ contains
                                 q_cons_vf(i + E_idx)%sf(j, k, l)* &
                                 gm_rho_sf(j, k, l)/gm_rho_max(1)
                         end do
+
+                        if (adv_alphan .neqv. .true.) then
+
+                            alpha_unadv = 1d0
+
+                            do i = 1, num_fluids - 1
+                                alpha_unadv = alpha_unadv &
+                                              - q_cons_vf(i + E_idx)%sf(j, k, l)
+                            end do
+
+                            q_sf(j, k, l) = q_sf(j, k, l) &
+                                            - schlieren_alpha(num_fluids)* &
+                                            alpha_unadv*gm_rho_sf(j, k, l)/ &
+                                            gm_rho_max(1)
+
+                        end if
+
                     end do
                 end do
             end do

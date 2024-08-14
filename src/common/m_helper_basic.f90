@@ -14,8 +14,7 @@ module m_helper_basic
     private; 
     public :: f_approx_equal, &
               f_is_default, &
-              f_all_default, &
-              f_is_integer
+              f_all_default
 
 contains
 
@@ -68,14 +67,5 @@ contains
 
         res = all(res_array)
     end function f_all_default
-
-    !> Checks if a real(kind(0d0)) variable is an integer.
-    !! @param var Variable to check.
-    logical function f_is_integer(var) result(res)
-        !$acc routine seq
-        real(kind(0d0)), intent(in) :: var
-
-        res = f_approx_equal(var, real(nint(var), kind(0d0)))
-    end function f_is_integer
 
 end module m_helper_basic

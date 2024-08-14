@@ -98,8 +98,6 @@ contains
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
-        !$acc update host(ib_markers%sf)
-
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps, num_inner_gps)

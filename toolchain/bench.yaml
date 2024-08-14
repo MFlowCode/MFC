@@ -8,16 +8,16 @@
   path: benchmarks/5eq_rk3_weno3_hllc/case.py
   args: []
 
-# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_acoustic_T
+# Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_monopole_T
 # Additional Benchmarked Features
 # - viscosity enabled
 # - weno_Re_flux : T
 # - weno_order : 5
 # - bubbles : T
 # - bubble_model : 3
-# - acoustic_source : T
-- slug: viscous_weno5_sgb_acoustic
-  path: benchmarks/viscous_weno5_sgb_acoustic/case.py
+# - monopole : T
+- slug: viscous_weno5_sgb_mono
+  path: benchmarks/viscous_weno5_sgb_mono/case.py
   args: []
 
 # Benchmark ibm_T

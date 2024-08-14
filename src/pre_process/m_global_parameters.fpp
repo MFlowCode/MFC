@@ -81,6 +81,7 @@ module m_global_parameters
     real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
     real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
+    logical :: adv_alphan            !< Advection of the last volume fraction
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
@@ -107,10 +108,8 @@ module m_global_parameters
     logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
 
-    logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
-    logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
+    logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
+    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
 
@@ -285,6 +284,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
+        adv_alphan = .false.
         weno_order = dflt_int
 
         hypoelasticity = .false.
@@ -303,10 +303,8 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
-        mixlayer_vel_profile = .false.
-        mixlayer_vel_coef = 1d0
-        mixlayer_domain = 1d0
-        mixlayer_perturb = .false.
+        vel_profile = .false.
+        instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_flow_mag = dflt_real

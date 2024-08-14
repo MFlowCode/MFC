@@ -39,7 +39,7 @@ module m_rhs
 
     use m_hypoelastic
 
-    use m_acoustic_src
+    use m_monopole
 
     use m_viscous
 
@@ -994,12 +994,13 @@ contains
         end if
 
         ! Additional Physics and Source Temrs ==================================
-        ! Additions for acoustic_source
-        call nvtxStartRange("RHS_acoustic_src")
-        if (acoustic_source) call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                                              q_prim_qp%vf(1:sys_size), &
-                                                              t_step, &
-                                                              rhs_vf)
+        ! Additions for monopole
+        call nvtxStartRange("RHS_monopole")
+        if (monopole) call s_monopole_calculations(q_cons_qp%vf(1:sys_size), &
+                                                   q_prim_qp%vf(1:sys_size), &
+                                                   t_step, &
+                                                   num_dims, &
+                                                   rhs_vf)
         call nvtxEndRange
 
         ! Add bubles source term
@@ -1033,7 +1034,7 @@ contains
         end if
         call cpu_time(t_finish)
         if (t_step >= 4) then
-            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
+            time_avg = (abs(t_finish - t_start)/((ix%end - ix%beg)*(iy%end - iy%beg)*(iz%end - iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
         end if

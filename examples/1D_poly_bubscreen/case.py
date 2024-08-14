@@ -99,6 +99,7 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 1,
+    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 1,
@@ -205,14 +206,14 @@ print(json.dumps({
     # 'rhoRV'                 : 0.0,
     # ==========================================================================
     # Acoustic source ==========================================================
-    # 'acoustic_source'       : 'F',
-    # 'num_source'            : 1,
-    # 'acoustic(1)%loc(1)'    : -8.E-03/x0,
-    # 'acoustic(1)%npulse'    : 1,
-    # 'acoustic(1)%dir'       : 1.,
-    # 'acoustic(1)%pulse'     : 1,
-    # 'acoustic(1)%mag'       : 1*pa,
-    # 'acoustic(1)%length'    : (1./(300000.))*cact/x0,
+    # 'Monopole'              : 'F',
+    # 'num_mono'              : 1,
+    # 'Mono(1)%loc(1)'        : -8.E-03/x0,
+    # 'Mono(1)%npulse'        : 1,
+    # 'Mono(1)%dir'           : 1.,
+    # 'Mono(1)%pulse'         : 1,
+    # 'Mono(1)%mag'           : 1*pa,
+    # 'Mono(1)%length'        : (1./(300000.))*cact/x0,
     # ==========================================================================
 }))
 

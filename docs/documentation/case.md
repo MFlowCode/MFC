@@ -259,6 +259,7 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 
 - `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
+See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-algorithm).
 
 - `model%%scale`, `model%%rotate` and `model%%translate` define how the model should be transformed to domain-space by first scaling by `model%%scale`, then rotating about the Z, X, and Y axes (using `model%%rotate`), and finally translating by `model%%translate`.
 
@@ -338,6 +339,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `bc_[x,y,z]%%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
+| `adv_alphan`	         | Logical | Equations for all $N$ volume fractions (instead of $N-1$) |
 | `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	             | Logical | Mixture physical parameters limits |
 | `mixture_err`          | Logical | Mixture properties correction |
@@ -352,7 +354,6 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
-| `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
 | `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
 | `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
@@ -395,6 +396,14 @@ Note that some code parameters are only compatible with 5-equation model.
 - `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
 The effect and use of the source term are assessed by [Schmidmayer et al., 2019](references.md#Schmidmayer19).
 
+- `adv_alphan` activates the advection equations of all the components of fluid.
+If this parameter is set false, the void fraction of $N$-th component is computed as the residual of the void fraction of the other components at each cell:
+
+$$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
+
+where $\alpha_i$ is the void fraction of $i$-th component.
+When a single-component flow is simulated, it requires that ``adv_alphan = 'T'``.
+
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
 - `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that $\alpha_i>\varepsilon$ is satisfied at each time step.
@@ -425,8 +434,6 @@ Practically, `weno_eps` $<10^{-6}$ is used.
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 3.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md#Toro13)).
-
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md#Chen22)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md#Thornber08)). This feature requires `riemann_solver = 2` and `model_eqns = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
@@ -526,77 +533,53 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
 
-### 8. Acoustic Source {#acoustic-source}
+### 8. Acoustic Source
 
-| Parameter                             | Type    | Description |
-| ---:                                  | :----:  | :--- |
-| `acoustic_source`                     | Logical | Acoustic source module activation |
-| `num_source`                          | Integer | Number of acoustic sources |
-| `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source |
-| `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false for monopole) |
-| `acoustic(i)%%loc(j)`                 | Real    | $j$-th coordinate of the point that defines the acoustic source location |
-| `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
-| `acoustic(i)%%npulse`                 | Real    | Number of pulse cycles |
-| `acoustic(i)%%mag`                    | Real    | Pulse magnitude	|
-| `acoustic(i)%%frequency`              | Real    | Sine/Square - Frequency of the acoustic wave  (exclusive) |
-| `acoustic(i)%%wavelength`             | Real    | Sine/Square - Wavelength of the acoustic wave (exclusive) |
-| `acoustic(i)%%gauss_sigma_time`       | Real    | Gaussian - Gaussian pulse time width in terms of sigma  (exclusive) |
-| `acoustic(i)%%gauss_sigma_dist`       | Real    | Gaussian - Gaussian pulse spatial width in terms of sigma (exclusive) |
-| `acoustic(i)%%delay`                  | Real    | Time delay of the acoustic wave (optional for `%%pulse = 1` or `3`; default = 0) |
-| `acoustic(i)%%dir`                    | Real    | Planer - Direction of acoustic propagation |
-| `acoustic(i)%%length`                 | Real    | 2D/3D Planer - Spatial pulse length |
-| `acoustic(i)%%height`                 | Real    | 3D Planer - Spatial pulse height |
-| `acoustic(i)%%foc_length`             | Real    | Transducer - Focal length of the transducer |
-| `acoustic(i)%%aperture`               | Real    | Transducer - Aperture of the transducer |
-| `acoustic(i)%%num_elements`           | Integer | Transducer array - Number of transducer elements in a transducer array |
-| `acoustic(i)%%element_on`             | Integer | Transducer array - Element number that is on (optional; default = 0 for all elements) |
-| `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
-| `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
-| `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
+| Parameter                | Type    | Description |
+| ---:                     | :----:  | :--- |
+| `Monopole`               | Logical | Acoustic source |
+| `num_mono`               | Integer | Number of acoustic sources |
+| `Mono(i)%%pulse`          | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `Mono(i)%%npulse`         | Integer | Number of pulse cycles |
+| `Mono(i)%%support`        | Integer | Type of the spatial support of the acoustic source : [1] 1D [2] Finite width (2D) [3] Support for finite line/patch [4] General support for 3D simulation in cartesian systems [5] Support along monopole acoustic transducer [6] Support for cylindrical coordinate system along axial-dir |
+| `Mono(i)%%support_width`  | Real    | The width of the monopole support in terms of cell width |
+| `Mono(i)%%loc(j)`         | Real    | $j$-th coordinate of the point that consists of $i$-th source plane |
+| `Mono(i)%%dir`            | Real    | Direction of acoustic propagation	|
+| `Mono(i)%%mag`            | Real    | Pulse magnitude	|
+| `Mono(i)%%length`         | Real    | Spatial pulse length |
 
-Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
+The table lists acoustic source parameters.
+The parameters are optionally used to define a source plane in the domain that generates an acoustic wave that propagates in a specified direction normal to the source plane (one-way acoustic source).
+Details of the acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
 
-- `acoustic_source` activates the acoustic source module.
+- `Monopole` activates the acoustic source.
 
-- `num_source` defines the total number of source planes by an integer.
+- `num_mono` defines the total number of source planes by an integer.
 
-- `%%support` specifies the choice of the geometry of acoustic source distribution. See table [Acoustic Supports](#acoustic-supports) for details.
+- `Mono(i)%%pulse` specifies the choice of the acoustic waveform generated from $i$-th source plane by an integer.
+`Mono(i)%%pulse = 1`, `2`, and `3` correspond to sinusoidal wave, Gaussian wave, and square wave, respectively.
 
-- `%%dipole` changes the default monopole (one-sided) source to a dipole source. It is only available for planar waves.
+- `Mono(i)%%npulse` defines the number of cycles of the acoustic wave generated from $i$-th source plane by an integer.
 
-- `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc). 
+- `Mono(i)%%mag` defines the peak amplitude of the acoustic wave generated from $i$-th source plane with a given wave form.
 
-- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, and `3` correspond to sinusoidal wave, Gaussian wave, and square wave, respectively.
+- `Mono(i)%%length` defines the characteristic wavelength of the acoustic wave generated from $i$-th source plane.
 
-- `%%npulse` specifies the number of cycles of the acoustic wave generated. Only applies to `%%pulse = 1 and 3` (sine and square waves), and must be an integer for non-planar waves.
+- `Mono(i)%%support` specifies the choice of the geometry of acoustic source distribution of $i$-th source plane by an integer from 1 through 3:
 
-- `%%mag` specifies the peak amplitude of the acoustic wave.
+  - `Mono(i)%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `Mono(i)%%loc(1)` in 1-D simulation.
 
-- `%%frequency` and `%%wavelength` specify the frequency and wavelength of the acoustic wave, respectively. These parameters are exclusive and exactly one of them must be specified for `%%pulse = 1` or `3` (sine or square waves). They are related by the speed of sound in the medium: `frequency = speed_of_sound / wavelength`.
+  - `Mono(i)%%support = 2` specifies a semi-infinite source plane in 2-D simulation.
+The $i$-th source plane is determined by the point at [`Mono(i)%%loc(1)`, `Mono(i)%%loc(2)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%%dir`), $\mathrm{sin}$(`Mono(i)%%dir`)] that consists of this point.
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y\in$[-`Mono(i)%%length`/2, `Mono(i)%%length`/2].
 
-- `%%gauss_sigma_time` and `%%gauss_sigma_dist` specify the time and spatial widths of the Gaussian pulse in terms of sigma, respectively. In particular, `%%gauss_sigma_time` is the standard deviation in the Gaussian equation. These parameters are exclusive and exactly one of them must be specified for `%%pulse = 2` (Gaussian wave). They are related by the speed of sound in the medium: `gauss_sigma_dist = speed_of_sound * gauss_sigma_time`.
+  - `Mono(i)%%support = 3` specifies a semi-infinite source plane in 3-D simulation.
+The $i$-th source plane is determined by the point at [`Mono(i)%%loc(1)`, `Mono(i)%%loc(2)`, `Mono(i)%%loc(3)`] and the normal vector [$\mathrm{cos}$(`Mono(i)%%dir`), $\mathrm{sin}$(`Mono(i)%%dir`), 1] that consists of this point.
+The source plane is defined in the finite region of the domain: $x\in[-\infty,\infty]$ and $y,z\in$[-`Mono(i)%%length`/2, `Mono(i)%%length`/2].
+There are a few additional spatial support types available for special source types and coordinate systems tabulated in [Monopole supports](#monopole-supports).
 
-- `%%delay` specifies the time delay of the acoustic wave. This parameter is optional for `%%pulse = 1` or `3` (sine or square waves) and defaults to 0. It must be specified for `%%pulse = 2` (Gaussian wave). It is important to note that setting the delay to 0 for a Gaussian pulse results in a half-Gaussian pulse, and delays that are too small may result in the pulse being cut off at the start of the simulation. `4*gauss_sigma_time` is a typical value for the delay of a Gaussian pulse.
-
-- `%%dir` specifies the direction of acoustic wave propagation for planar waves. The direction is defined by the angle in degrees from the x-axis in the x-y plane. It applies to both 2D and 3D simulation of planar waves (support is infinite in z-direction for 3D).
-
-- `%%length` specifies the spatial length of the 2D or 3D planar wave. It is the length of the source plane perpendicular to the direction of wave propagation.
-
-- `%%height` specifies the spatial height of the planar wave. Since `%%dir` is in the x-y plane, the height is perpendicular to the direction of wave propagation.
-
-- `%%foc_length` specifies the focal length of the transducer for transducer waves. It is the distance from the transducer to the focal point.
-
-- `%%aperture` specifies the aperture of the transducer. It is the diameter of the projection of the transducer arc onto the y-axis (2D) or spherical cap onto the y-z plane (3D). To simulate a transducer enclosing half of the circle/sphere, set the aperture to double the focal length. For transducer array, it is the total aperture of the array.
-
-- `%%num_elements` specifies the number of transducer elements in a transducer array. 
-
-- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1. If all elements are on, set `%%element_on` to 0.
-
-- `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radian. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
-
-- `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcicle diameter, and `%%num_elements` as the number of sides of the polygon. The ratio is used specify the aperture size of each transducer element in the array, as a ratio of the total aperture. 
-
-- `%%rotate_angle` specifies the rotation angle of the 3D circular transducer array along the x-axis (principal axis). It is optional and defaults to 0.
+- `Mono(i)%%support_width` defines how many cell width the monopole support function extended by.
+Large `Mono(i)%%support_width` is preferred when `Mono(i)%%mag` is large.
 
 ### 9. Ensemble-Averaged Bubble Model
 
@@ -676,17 +659,15 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 ### 10. Velocity Field Setup
 
-| Parameter              | Type    | Description |
-| ---:                   | :----:  | :--- |
-| `perturb_flow`         | Logical | Perturb the initlal velocity field by random noise |
-| `perturb_flow_fluid`   | Integer | Fluid density whose flow is to be perturbed |
-| `perturb_flow_mag`     | Real    | Set the magnitude of flow perturbations |
-| `perturb_sph`          | Logical | Perturb the initial partial density by random noise |
-| `perturb_sph_fluid`    | Integer | Fluid component whose partial density is to be perturbed |
-| `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
-| `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
-| `mixlayer_perturb`     | Logical | Perturb the initial velocity field by instability waves |
-| `mixlayer_domain`      | Real    | Domain size of a mixing layer for the linear stability analysis |
+| Parameter           | Type    | Description |
+| ---:                | :----:  | :--- |
+| `perturb_flow`      | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_flow_fluid`       | Integer | Fluid density whose flow is to be perturbed |
+| `perturb_flow_mag`       | Real | Set the magnitude of flow perturbations |
+| `perturb_sph`       | Logical | Perturb the initial partial density by random noise |
+| `perturb_sph_fluid` | Integer | Fluid component whose partial density is to be perturbed |
+| `vel_profile`       | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
+| `instability_wave`  | Logical | Perturb the initial velocity field by instability waves |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -701,15 +682,9 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
-- `mixlayer_vel_profile` activates setting of the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
+- `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
-
-$$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
-
-- `mixlayer_perturb` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -6`, `num_fluids = 1`, `model_eqns = 2` and `mixlayer_vel_profile = 'T'`.
-
-- `mixlayer_domain` defines the domain size to compute spatial eigenvalues of the linear instability analysis when `mixlayer_perturb = 'T'`. For example, the spatial eigenvalue in `x` direction in 2D problem will be $2 \pi \alpha / (mixlayer\_domain*patch\_icpp(1)\%length\_y)$ for $\alpha = 1$, $2$ and $4$.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and ``vel_profile = 'T'``.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -737,13 +712,13 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 
 ### 13. Body Forces
 
-| Parameter         | Type    | Description                                |
-| ---:              | :---:   | :---                                       |
+| Parameter         | Type  | Description                                  |
+| ---:              | :---: | :---                                         |
 | `bf_x[y,z]`       | Logical | Enable body forces in the x[y,z] direction |
 | `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
 | `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
 | `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
-| `g_x[y,z]`        | Real    | Magnitude of background acceleration       |
+| `g_x[y,z]`        | Real    | Magnitude of background acceleration        |
 
 `k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
 
@@ -788,7 +763,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
-| 6    | N/A 		        | 2     | N      | No longer exists. Empty. |
+| 6    | N/A 		    | 2     | N      | No longer exists. Empty. |
 | 7    | 2D analytical 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
@@ -812,66 +787,31 @@ Each patch requires a different set of parameters, which are also listed in this
 
 ### Immersed Boundary Patch Types
 
-| #    | Name               | Dim.   | 
-| ---: | :----:             | :---   | 
-| 2    | 2D Circle          | 2      | 
-| 3    | 2D Rectangle       | 2      |   
-| 4    | 2D Airfoil         | 2      |      
-| 8    | 3D Sphere          | 3      |      
-| 10   | 3D Cylinder        | 3      |      
-| 11   | 3D Airfoil         | 3      |      
+| #    | Name               | Dim.   |
+| ---: | :----:             | :---  |
+| 2    | 2D Circle          | 2      |
+| 3    | 2D Rectangle       | 2      |
+| 4    | 2D Airfoil         | 2      |
+| 8    | 3D Sphere          | 3      |
+| 10   | 3D Cylinder        | 3      |
+| 11   | 3D Airfoil         | 3      |
 
-### Acoustic Supports {#acoustic-supports}
 
-| #    | Name                         | Dim.      | Requirements                                                                            |
-| ---: | :----:                       | :---:     | :---                                                                                    |
-|  1   | Planar source                | 1D        | `%%loc(1)`, `%%pulse`, `%%npulse`, `%%mag`, and `%%dir`                                 |
-|  2   | Planar source                | 2D        | #1 requirements, `%%loc(2)` and `%%length`                                              |
-|  3   | Planar source                | 3D        | #2 requirements and `%%height`                                                          |
-|  5   | Cylindrical Transducer       | 2D        | `%%loc(1)`, `%%loc(2)`, `%%pulse`, `%%npulse`, `%%mag`, `%%foc_length`, `%%aperture`    |
-|  6   | Spherical Transducer         | 2D-Axisym | #5 requirements                                                                         |
-|  7   | Spherical Transducer         | 3D        | #5 requirements and `%%loc(3)`                                                          |
-|  9   | Arcuate Transducer Array     | 2D        | #5 requirements, `%%num_elements`, `%%element_on`, `%%element_spacing_angle`            |
-| 10   | Annular Transducer Array     | 2D-Axisym | #9 requirements                                                                         |
-| 11   | Circular Transducer Array    | 3D        | #7 requirements, `%%element_polygon_ratio`, and `%%rotate_angle`(optional; default = 0) |
 
-Details of the required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
-The acoustic support number (`#`) corresponds to the acoustic support type `Acoustic(i)%%support`, where $i$ is the acoustic source index.
-For each `%%parameter`, prepend the parameter with `acoustic(i)%`.
+### Monopole Supports
 
-Additional requirements for all acoustic support types:
-- ``acoustic_source = 'T'`` must be used to activate the acoustic source module.
+| #    | Description |
+| ---- | ----        |
+|    1 | 1D normal to x-axis |
+|    2 | 2D semi-infinite source plane |
+|    3 | 3D semi-infinite source plane along some lines |
+|    4 | 3D semi-infinite source plane |
+|    5 | Transducer |
+|    6 | Cyl_coord along axial-dir |
 
-- `num_source` must be set to the total number of acoustic sources.
-
-- `%%support` must be set to the acoustic support number listed in the table.
-
-- `%%dipole` is only supported for planar sources.
-
-- `%%npulse = 1 or 3` requires exactly one of `%%frequency` or `%%wavelength` to be set. It accepts `%%delay` as an optional parameter (default = 0).
-
-- `%%npulse = 2` requires exactly one of `%%gauss_sigma_time` or `%%gauss_sigma_space` to be set. It requires `%%delay` to be set.
-
-Description of the acoustic support types:
-- `%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `%%loc(1)` in 1D simulation. `%%dir > 0` specifies a rightward propagating wave, and `%%dir < 0` specifies a leftward propagating wave. `%%dir = 0` is not allowed.
-
-- `%%support = 2` specifies a semi-infinite source plane in 2D simulation.
-The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`).
-
-- `%%support = 3` specifies a semi-infinite source plane in 3D simulation.
-The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`). Note that the plane is infinite in the $z$-direction, so `%%loc(3)` is not required.
-
-- `%%support = 5` specifies a circular transducer in 2D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the circular arc (intersection of the arc and the x-axis). The aperture is the length of the projection of the circular arc onto the y-axis. If a semi-circle is desired, set the aperture to double the focal length. Note that this is physically a cylindrical transducer, and due to the complexity of Green's function for 2D wave, no closed-form solution is available for the 2D circular transducer, and an approximate is used (see [Maeda and Colonius (2017)](references.md#Maeda17) for details). For the mass source term correction factor, the theoretical approximation factor of -0.5 in ($r_{foc}^{-0.5}$) is replaced by an empirically determined factor of -0.85.
-
-- `%%support = 6` specifies a spherical transducer in 2D axisymmetric simulation. It is identical to `%%support = 5` in terms of simulation parameters. Note that this is physically a spherical 3D transducer, so the equation is exact.
-
-- `%%support = 7` specifies a spherical transducer in 3D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`, `%%loc(3)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the spherical cap (intersection of the cap and the x-axis). The aperture is the diameter of the projection of the spherical cap onto the y-z plane. If a semi-sphere is desired, set the aperture to double the focal length. Again, the equation is exact.
-
-- `%%support = 9` specifies an arcuate transducer array in 2D simulation. The total aperture of the array is `%%aperture`, which is similar to `%%support = 5`. The parameters `%%num_elements` and `%%element_spacing_angle` specify the number of transducer elements and the spacing angle. The spacing angle is the angle of the gap between adjacent transducer elements in the array. Because the total aperture is set, each transducer element is smaller if the spacing angle is larger. Physically it represents curved panels. Note that similar to `%%support = 5`, the mass source term correction factor is empirically determined to be -0.85.
-
-- `%%support = 10` specifies an annular transducer array in 2D axisymmetric simulation. It is identical to `%%support = 9` in terms of simulation parameters. It physically represents the a annulus obtained by revolving the arc in `%%support = 9` around the x-axis.
-
-- `%%support = 11` specifies a circular transducer array in 3D simulation. The total aperture of the array is `%%aperture`, which is similar to `%%support = 7`. The parameters `%%num_elements`, `%%element_polygon_ratio`, and `%%rotate_angle` specify the number of transducer elements, the ratio of the polygon side length to the transducer element radius, and the rotation angle of the array. The polygon side length is calculated by using the total aperture as the circumcicle diameter, and the number of sides of the polygon as `%%num_elements`. The ratio is used specify the aperture size of each transducer element in the array, as a ratio of the total aperture. The rotation angle is optional and defaults to 0. Physically it represents a circular ring of transducer elements.
+The monopole support types available in MFC are listed in table [Monopole supports](#monopole-supports).
+This includes types exclusive to one-, two-, and three-dimensional problems with special sauce geometry like transducers as well as coordinate systems such as cylindrical coordinates.
+The monopole support number (`#`) corresponds to the input value in `input.py` labeled `Mono(i)%%support` where $i$ is the monopole source index.
 
 ### Conservative Variables Ordering
 
