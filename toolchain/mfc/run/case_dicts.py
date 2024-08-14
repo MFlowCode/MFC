@@ -31,7 +31,6 @@ COMMON = {
     'm': ParamType.INT,
     'mpp_lim': ParamType.LOG,
     'R0ref': ParamType.REAL,
-    'adv_alphan': ParamType.LOG,
     'num_fluids': ParamType.INT,
     'model_eqns': ParamType.INT,
     'nb': ParamType.REAL,
@@ -58,8 +57,10 @@ PRE_PROCESS.update({
     'old_ic': ParamType.LOG,
     't_step_old': ParamType.INT,
     't_step_start': ParamType.INT,
-    'vel_profile': ParamType.LOG,
-    'instability_wave': ParamType.LOG,
+    'mixlayer_vel_profile': ParamType.LOG,
+    'mixlayer_vel_coef': ParamType.REAL,
+    'mixlayer_domain': ParamType.REAL,
+    'mixlayer_perturb': ParamType.LOG,
     'perturb_flow': ParamType.LOG,
     'perturb_flow_fluid': ParamType.INT,
     'perturb_flow_mag': ParamType.REAL,
@@ -153,6 +154,8 @@ for p_id in range(1, 10+1):
     for taue_id in range(1, 6+1):
         PRE_PROCESS[f'patch_icpp({p_id})%tau_e({taue_id})'] = ParamType.REAL.analytic()
 
+    PRE_PROCESS[f'patch_icpp({p_id})%cf_val'] = ParamType.REAL.analytic()
+
     if p_id >= 2:
         PRE_PROCESS[f'patch_icpp({p_id})%alter_patch'] = ParamType.LOG
 
@@ -198,8 +201,8 @@ SIMULATION.update({
     'num_probes': ParamType.INT,
     'probe_wrt': ParamType.LOG,
     'bubble_model': ParamType.INT,
-    'Monopole': ParamType.LOG,
-    'num_mono': ParamType.INT,
+    'acoustic_source': ParamType.LOG,
+    'num_source': ParamType.INT,
     'qbmm': ParamType.LOG,
     'R0_type': ParamType.INT,
     'integral_wrt': ParamType.LOG,
@@ -215,6 +218,7 @@ SIMULATION.update({
     't_stop': ParamType.REAL,
     't_save': ParamType.REAL,
     'cfl_target': ParamType.REAL
+    'low_Mach': ParamType.INT,
 })
 
 # NOTE: Not currently present
@@ -270,15 +274,20 @@ for f_id in range(1,10+1):
         SIMULATION[f"fluid_pp({f_id})%Re({re_id})"] = ParamType.REAL
 
     for mono_id in range(1,4+1):
-        for int_attr in ["pulse", "support"]:
-            SIMULATION[f"Mono({mono_id})%{int_attr}"] = ParamType.INT
+        for int_attr in ["pulse", "support", "num_elements", "element_on"]:
+            SIMULATION[f"acoustic({mono_id})%{int_attr}"] = ParamType.INT
 
-        for real_attr in ["mag", "length", "dir", "npulse", "delay",
-                          "foc_length", "aperture", "support_width"]:
-            SIMULATION[f"Mono({mono_id})%{real_attr}"] = ParamType.REAL
+        SIMULATION[f"acoustic({mono_id})%dipole"] = ParamType.LOG
+
+        for real_attr in ["mag", "length", "height", "wavelength", "frequency",
+                          "gauss_sigma_dist", "gauss_sigma_time", "npulse",
+                          "dir", "delay", "foc_length", "aperture",
+                          "element_spacing_angle", "element_polygon_ratio",
+                          "rotate_angle"]:
+            SIMULATION[f"acoustic({mono_id})%{real_attr}"] = ParamType.REAL
 
         for cmp_id in range(1,3+1):
-            SIMULATION[f"Mono({mono_id})%loc({cmp_id})"] = ParamType.REAL
+            SIMULATION[f"acoustic({mono_id})%loc({cmp_id})"] = ParamType.REAL
 
     for int_id in range(1,5+1):
         for cmp in ["x", "y", "z"]:
