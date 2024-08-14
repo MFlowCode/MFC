@@ -10,7 +10,8 @@ from .run   import case_dicts
 
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
-    'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb'
+    'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
+    'cf_val': 'c_idx'
 }
 
 @dataclasses.dataclass(init=False)
