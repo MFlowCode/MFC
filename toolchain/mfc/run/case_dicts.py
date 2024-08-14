@@ -217,7 +217,7 @@ SIMULATION.update({
     'n_start': ParamType.INT,
     't_stop': ParamType.REAL,
     't_save': ParamType.REAL,
-    'cfl_target': ParamType.REAL
+    'cfl_target': ParamType.REAL,
     'low_Mach': ParamType.INT,
 })
 

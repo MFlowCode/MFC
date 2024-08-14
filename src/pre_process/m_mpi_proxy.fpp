@@ -52,11 +52,11 @@ contains
         #:endfor
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity', 'relax',    &
-            & 'parallel_io', 'perturb_flow', 'vel_profile', 'instability_wave',&
-            & 'perturb_sph', 'bubbles', 'polytropic', 'polydisperse', 'qbmm',  &
-            & 'file_per_process', 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt',&
-            & 'cfl_dt' ]
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
+            & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
+            & 'mixlayer_perturb', 'bubbles', 'polytropic', 'polydisperse',     &
+            & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
+            & 'cfl_const_dt', 'cfl_dt']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
