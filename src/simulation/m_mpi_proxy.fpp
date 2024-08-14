@@ -188,7 +188,7 @@ contains
 
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 't_step_start','t_step_stop','t_step_save','t_step_print',       &
-            & 'model_eqns','time_stepper', 'riemann_solver',                   &
+            & 'model_eqns','time_stepper', 'riemann_solver', 'low_Mach',       &
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
@@ -196,11 +196,11 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'run_time_info','cyl_coord', 'adv_alphan', 'mpp_lim',    &
+        #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',                   &
             & 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat',                &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
-            & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt',   &
+            & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
@@ -244,12 +244,20 @@ contains
 
         do j = 1, num_probes_max
             do i = 1, 3
-                call MPI_BCAST(mono(j)%loc(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(acoustic(j)%loc(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             end do
 
-            #:for VAR in [ 'mag', 'length', 'delay', 'dir', 'npulse', 'pulse',  &
-                'support', 'foc_length', 'aperture', 'support_width' ]
-                call MPI_BCAST(mono(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(acoustic(j)%dipole, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+
+            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on' ]
+                call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'mag', 'length', 'height', &
+                'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
+                'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
+                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
+                call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             #:for VAR in [ 'x','y','z' ]
