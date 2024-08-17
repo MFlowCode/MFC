@@ -47,6 +47,7 @@ examples/*/restart_data*
 examples/*/*.out
 examples/*/binary
 examples/*/fort.1
+examples/*/runtime_info.txt
 examples/*/*.sh
 examples/*/*.err
 examples/*/viz/
