@@ -1639,9 +1639,9 @@ contains
         real(kind(0d0)) :: run_time !< Run-time of the simulation
 
         character(len=*), parameter :: file_name = 'runtime_info.txt'
-        
+
         ! Reopen the file with the desired name associated with logical unit 1
-        open(unit=1, file=file_name, status='unknown', action='write')
+        open (unit=1, file=file_name, status='unknown', action='write')
 
         ! Writing the footer of and closing the run-time information file
         write (1, '(A)') '----------------------------------------'// &
