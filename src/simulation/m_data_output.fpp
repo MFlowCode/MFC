@@ -1657,7 +1657,6 @@ contains
               POSITION='append', &
               STATUS='unknown')
 
-
         ! Writing the footer of and closing the run-time information file
         write (1, '(A)') '----------------------------------------'// &
             '----------------------------------------'
