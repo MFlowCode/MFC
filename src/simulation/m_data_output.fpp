@@ -1638,6 +1638,26 @@ contains
 
         real(kind(0d0)) :: run_time !< Run-time of the simulation
 
+        character(LEN=name_len) :: file_name = 'run_time.inf' !<
+            !! Name of the run-time information file
+
+        character(LEN=path_len + name_len) :: file_path !<
+            !! Relative path to a file in the case directory
+
+        logical :: file_exist !<
+            !! Logical used to check existence of run-time information file
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+
+        inquire (FILE=trim(file_path), EXIST=file_exist)
+
+        open (1, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+
         ! Writing the footer of and closing the run-time information file
         write (1, '(A)') '----------------------------------------'// &
             '----------------------------------------'
