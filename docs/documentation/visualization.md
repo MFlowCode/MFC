@@ -8,7 +8,7 @@ Further remarks on parallel flow visualization, analysis, and processing of the 
 
 ## Procedure
 
-After the post-processing of simulation data (see section [Running](running.md#running-1)), a directory named `silo_hdf5` contains a silo-HDF5 database.
+After the post-processing of simulation data (see section [Running](running.md)), a directory named `silo_hdf5` contains a silo-HDF5 database.
 Here, `silo_hdf5/` includes a directory named `root/` that contains index files for flow field data at each saved time step.
 The user can launch VisIt and open the index files under `/silo_hdf5/root`.
 Once the database is loaded, flow field variables contained in the database can be added to the plot.
