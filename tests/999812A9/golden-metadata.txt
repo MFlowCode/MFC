@@ -1,63 +1,30 @@
-This file was created on 2024-08-09 20:06:27.643564.
+This file was created on 2024-08-15 23:52:28.884977.
 
 mfc.sh:
 
-    Invocation: test -j 8 -a --generate
+    Invocation: test -j 8 --generate -a -m 1
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
-        CMake v3.30.1 on bok
+        CMake v3.22.1 on 3930e9ced855
     
-        C       : GNU v14.1.1 (/usr/bin/cc)
-        Fortran : GNU v14.1.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.1 on bok
-    
-        C       : GNU v14.1.1 (/usr/bin/cc)
-        Fortran : GNU v14.1.1 (/usr/bin/gfortran)
+        C       : GNU v11.3.0 (/usr/bin/cc)
+        Fortran : GNU v11.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/me/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -75,10 +42,10 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.30.1 on bok
+        CMake v3.22.1 on 3930e9ced855
     
-        C       : GNU v14.1.1 (/usr/bin/cc)
-        Fortran : GNU v14.1.1 (/usr/bin/gfortran)
+        C       : GNU v11.3.0 (/usr/bin/cc)
+        Fortran : GNU v11.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -90,7 +57,7 @@ pre_process:
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/me/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -104,26 +71,59 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
-        CMake v3.30.1 on bok
+        CMake v3.22.1 on 3930e9ced855
     
-        C       : GNU v14.1.1 (/usr/bin/cc)
-        Fortran : GNU v14.1.1 (/usr/bin/gfortran)
+        C       : GNU v11.3.0 (/usr/bin/cc)
+        Fortran : GNU v11.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/me/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.22.1 on 3930e9ced855
+    
+        C       : GNU v11.3.0 (/usr/bin/cc)
+        Fortran : GNU v11.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/me/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -155,7 +155,6 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   49%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00
