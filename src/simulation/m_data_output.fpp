@@ -120,41 +120,30 @@ contains
         character(LEN=8) :: file_date !<
             !! Creation date of the run-time information file
 
-        logical :: file_exist !<
-            !! Logical used to check existence of run-time information file
-
         ! Opening the run-time information file
         file_path = trim(case_dir)//'/'//trim(file_name)
 
-        inquire (FILE=trim(file_path), EXIST=file_exist)
-
         open (3, FILE=trim(file_path), &
               FORM='formatted', &
-              POSITION='append', &
-              STATUS='unknown')
+              STATUS='replace')
 
-        ! Generating file header for a new run-time information file
-        if (file_exist .neqv. .true.) then
+        write (3, '(A)') 'Description: Stability information at '// &
+            'each time-step of the simulation. This'
+        write (3, '(13X,A)') 'data is composed of the inviscid '// &
+            'Courant–Friedrichs–Lewy (ICFL)'
+        write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
+            'the capillary CFL (CCFL)'
+        write (3, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
+            'number. Please note that only'
+        write (3, '(13X,A)') 'those stability conditions pertinent '// &
+            'to the physics included in'
+        write (3, '(13X,A)') 'the current computation are displayed.'
 
-            write (3, '(A)') 'Description: Stability information at '// &
-                'each time-step of the simulation. This'
-            write (3, '(13X,A)') 'data is composed of the inviscid '// &
-                'Courant–Friedrichs–Lewy (ICFL)'
-            write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
-                'the capillary CFL (CCFL)'
-            write (3, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
-                'number. Please note that only'
-            write (3, '(13X,A)') 'those stability conditions pertinent '// &
-                'to the physics included in'
-            write (3, '(13X,A)') 'the current computation are displayed.'
+        call date_and_time(DATE=file_date)
 
-            call date_and_time(DATE=file_date)
-
-            write (3, '(A)') 'Date: '//file_date(5:6)//'/'// &
-                file_date(7:8)//'/'// &
-                file_date(3:4)
-
-        end if
+        write (3, '(A)') 'Date: '//file_date(5:6)//'/'// &
+            file_date(7:8)//'/'// &
+            file_date(3:4)
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
