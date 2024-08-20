@@ -82,7 +82,7 @@ You can learn more about MFC's capabilities [via its documentation](https://mflo
 
 The shock-droplet interaction case above was run via
 ```shell
-./mfc.sh run ./examples/3d_shockdroplet/case.py -n $(nproc)
+./mfc.sh run -n $(nproc) ./examples/3d_shockdroplet/case.py 
 ```
 where `8` is the number of cores the example will run on.
 You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
