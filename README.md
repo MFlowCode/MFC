@@ -24,11 +24,11 @@
 
 Welcome to the home of MFC!
 MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
-MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
+MFC is written in Fortran and uses metaprogramming to keep the code short (about 20K lines).
 
 MFC is used on the latest leadership-class supercomputers.
 It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
-MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and made use of OLCF Frontier and LLNL El Capitan early access systems.
+MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
   
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
@@ -56,7 +56,7 @@ Another example is the high-Mach flow over an airfoil, shown below.
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
 We'll give a brief intro. here for MacOS.
-Using [brew](https://brew.sh), install MFC's modest set of dependencies:
+Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
 brew install wget python cmake gcc@14 mpich
 ```
@@ -82,15 +82,15 @@ You can learn more about MFC's capabilities [via its documentation](https://mflo
 
 The shock-droplet interaction case above was run via
 ```shell
-./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
+./mfc.sh run ./examples/3d_shockdroplet/case.py -n $(nproc)
 ```
 where `8` is the number of cores the example will run on.
-You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your other favorite software.
+You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
 
 ## Is this _really_ exascale?
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
-The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
+The weak scaling of MFC on this machine shows near-ideal utilization. 
 
 <p align="center">
     <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
