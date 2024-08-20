@@ -25,6 +25,8 @@ module m_qbmm
     ! ==========================================================================
 
     implicit none
+    integer, parameter :: mmom_length = 3
+    integer, parameter :: rrho_length = 2
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
@@ -1055,8 +1057,8 @@ contains
         real(kind(0d0)), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
         real(kind(0d0)), dimension(0:2, 0:2) :: moms
-        real(kind(0d0)), dimension(3) :: M1, M3
-        real(kind(0d0)), dimension(2) :: myrho, myrho3, up, up3, Vf
+        real(kind(0d0)), dimension(mmom_length) :: M1, M3
+        real(kind(0d0)), dimension(rrho_length) :: myrho, myrho3, up, up3, Vf
         real(kind(0d0)) :: bu, bv, d20, d11, d02, c20, c11, c02
         real(kind(0d0)) :: mu2avg, mu2, vp21, vp22, rho21, rho22
 
@@ -1118,8 +1120,8 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(2), intent(inout) :: frho, fup
-        real(kind(0d0)), dimension(3), intent(in) :: fmom
+        real(kind(0d0)), dimension(rrho_length), intent(inout) :: frho, fup
+        real(kind(0d0)), dimension(mmom_length), intent(in) :: fmom
 
         real(kind(0d0)) :: bu, d2, c2
 

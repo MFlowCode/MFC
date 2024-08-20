@@ -29,6 +29,7 @@ module m_patches
     ! ==========================================================================
 
     implicit none
+    integer, parameter :: grid_3D = 3
 
     private; 
     public :: s_line_segment, &
@@ -859,7 +860,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1378,7 +1379,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1449,7 +1450,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1593,7 +1594,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1692,7 +1693,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1791,7 +1792,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -1927,7 +1928,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
@@ -2039,7 +2040,7 @@ contains
                         point(3) = z_cc(k)
                     end if
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3D) then
                         point = f_convert_cyl_to_cart(point)
                     end if
 

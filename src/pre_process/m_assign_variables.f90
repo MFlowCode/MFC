@@ -170,6 +170,7 @@ contains
     !! @param q_prim_vf Primitive variables
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
+        integer, parameter :: atm = 101325
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -177,7 +178,7 @@ contains
         real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
         real(kind(0d0)) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        p0 = 101325
+        p0 = atm
         pres_mag = 1d-1
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
