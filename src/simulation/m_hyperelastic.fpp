@@ -214,18 +214,9 @@ contains
                             tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
                             tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
                             ! STEP 4: update the btensor, this is consistent with Riemann solvers
-                            ! \b_xx
-                            btensor%vf(1)%sf(j, k, l) = tensorb(1)
-                            ! \b_xy
-                            btensor%vf(2)%sf(j, k, l) = tensorb(2)
-                            ! \b_yy
-                            btensor%vf(3)%sf(j, k, l) = tensorb(5)
-                            ! \b_xz
-                            btensor%vf(4)%sf(j, k, l) = tensorb(3)
-                            ! \b_yz
-                            btensor%vf(5)%sf(j, k, l) = tensorb(6)
-                            ! \b_zz
-                            btensor%vf(6)%sf(j, k, l) = tensorb(9)
+                            #:for BIJ, TXY in [(1,1),(2,2),(3,5),(4,3),(5,6),(6,9)]
+                               btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
+                            #:endfor
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
