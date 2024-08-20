@@ -158,7 +158,7 @@ They are organized below. Just click the drop-downs!
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
 	* \>100 Regression tests with each PR.
- 		* Performed with GNU, Intel, and NVIDIA compilers on NVIDIA and AMD GPUs.
+ 		* Performed with GNU (GCC), Intel, Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
 * Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
@@ -201,7 +201,7 @@ If you use MFC, consider citing it as:
 
 ## License
  
-Copyright 2021-2024 Spencer Bryngelson and Tim Colonius.
+Copyright 2021 Spencer Bryngelson and Tim Colonius.
 MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 ## Acknowledgements
@@ -210,6 +210,7 @@ Multiple federal sponsors have supported MFC development, including the US Depar
 
 MFC computations have used many supercomputing systems. A partial list is below
   * OLCF Frontier and Summit, and testbed systems Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
+  * LLNL Lassen and El Capitan testbed system, Tioga
   * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI (allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson))
   * DOD systems Onyx, Carpenter, and Nautilus via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex
