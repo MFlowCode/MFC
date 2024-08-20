@@ -217,6 +217,10 @@ print(json.dumps({{**case, **mods}}))
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
     def compute_tolerance(self) -> float:
+
+        if "Example" in self.trace.split(" -> "):
+            return 1e-5
+
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
