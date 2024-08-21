@@ -21,6 +21,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | ---:                                         | ----:           | ----:          | :---                 | :---         | 
 | NVIDIA GH200 (GPU only)                      | 1 GPU           | 0.32           | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA H100                                  | 1 GPU           | 0.45           | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD MI300A                                   | 1 __GCD__       | 0.61           | CCE 18.0.0           | LLNL Tioga |
 | NVIDIA A100                                  | 1 GPU           | 0.62           | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA V100                                  | 1 GPU           | 0.99           | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA A30                                   | 1 GPU           | 1.1            | NVHPC 24.1           | GT Rogues Gallery  |
