@@ -603,7 +603,7 @@ contains
 
             if (model_eqns == 2) then
                 do i = 1, sys_size
-                    write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
+                    write (file_path, '(A," ",I0," ",A," ",I2.2," ",A," ",I6.6," ",A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
