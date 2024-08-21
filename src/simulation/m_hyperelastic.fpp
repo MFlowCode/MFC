@@ -261,15 +261,13 @@ contains
         real(kind(0d0)) :: f13 = 1d0/3d0
         integer :: i !< Generic loop iterators
 
-        !TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor(1)%sf(j, k, l) + btensor(3)%sf(j, k, l) + btensor(6)%sf(j, k, l)
 
         ! calculate the deviatoric of the tensor
-        btensor(1)%sf(j, k, l) = btensor(1)%sf(j, k, l) - f13*trace
-        btensor(3)%sf(j, k, l) = btensor(3)%sf(j, k, l) - f13*trace
-        btensor(6)%sf(j, k, l) = btensor(6)%sf(j, k, l) - f13*trace
-
+        #:for IJ in [1,3,6]
+           btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+        #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver
         !$acc loop seq
