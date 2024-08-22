@@ -76,7 +76,7 @@ END
 
     cd "${os.path.dirname(input)}"
 
-    t_${target.name}_start=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    t_${target.name}_start=$(python3 -c 'import time; print(time.time())')
 % else:
     echo ^:) Running ${target.name}.
     echo.
@@ -89,7 +89,7 @@ END
 % if os.name != 'nt':
     code=$?
 
-    t_${target.name}_stop=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    t_${target.name}_stop=$(python3 -c 'import time; print(time.time())')
 
     if [ $code -ne 0 ]; then
         echo
