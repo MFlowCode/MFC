@@ -19,8 +19,8 @@ module m_boundary_conditions
     implicit none
 
     private; 
-    public :: s_populate_primitive_variables_buffers, &
-              s_populate_capillary_buffers
+    public :: s_populate_primitive_variables_buffers,  &
+              s_populate_capillary_buffers 
 
 contains
 
