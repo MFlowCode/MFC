@@ -3,7 +3,6 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -100,8 +99,6 @@ module m_data_output
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
-
-    @:s_compute_speed_of_sound()
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
