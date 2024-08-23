@@ -8,8 +8,6 @@
 !!      volume fraction, specific heat ratio, liquid stiffness, speed of
 !!      sound, vorticity and the numerical Schlieren function.
 
-#:include 'inline_conversions.fpp'
-
 module m_derived_variables
 
     ! Dependencies =============================================================
@@ -560,8 +558,6 @@ contains
         end do
 
     end subroutine s_derive_qm
-
-    @:s_compute_speed_of_sound()
 
     !>  This subroutine gets as inputs the conservative variables
         !!      and density. From those inputs, it proceeds to calculate

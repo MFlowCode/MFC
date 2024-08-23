@@ -3,7 +3,6 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -101,8 +100,6 @@ module m_data_output
 
 contains
 
-    @:s_compute_speed_of_sound()
-
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
         !!      basic header information relevant to current simulation.
@@ -120,50 +117,39 @@ contains
         character(LEN=8) :: file_date !<
             !! Creation date of the run-time information file
 
-        logical :: file_exist !<
-            !! Logical used to check existence of run-time information file
-
         ! Opening the run-time information file
         file_path = trim(case_dir)//'/'//trim(file_name)
 
-        inquire (FILE=trim(file_path), EXIST=file_exist)
-
-        open (1, FILE=trim(file_path), &
+        open (3, FILE=trim(file_path), &
               FORM='formatted', &
-              POSITION='append', &
-              STATUS='unknown')
+              STATUS='replace')
 
-        ! Generating file header for a new run-time information file
-        if (file_exist .neqv. .true.) then
+        write (3, '(A)') 'Description: Stability information at '// &
+            'each time-step of the simulation. This'
+        write (3, '(13X,A)') 'data is composed of the inviscid '// &
+            'Courant–Friedrichs–Lewy (ICFL)'
+        write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
+            'the capillary CFL (CCFL)'
+        write (3, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
+            'number. Please note that only'
+        write (3, '(13X,A)') 'those stability conditions pertinent '// &
+            'to the physics included in'
+        write (3, '(13X,A)') 'the current computation are displayed.'
 
-            write (1, '(A)') 'Description: Stability information at '// &
-                'each time-step of the simulation. This'
-            write (1, '(13X,A)') 'data is composed of the inviscid '// &
-                'Courant–Friedrichs–Lewy (ICFL)'
-            write (1, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
-                'the capillary CFL (CCFL)'
-            write (1, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
-                'number. Please note that only'
-            write (1, '(13X,A)') 'those stability conditions pertinent '// &
-                'to the physics included in'
-            write (1, '(13X,A)') 'the current computation are displayed.'
+        call date_and_time(DATE=file_date)
 
-            call date_and_time(DATE=file_date)
+        write (3, '(A)') 'Date: '//file_date(5:6)//'/'// &
+            file_date(7:8)//'/'// &
+            file_date(3:4)
 
-            write (1, '(A)') 'Date: '//file_date(5:6)//'/'// &
-                file_date(7:8)//'/'// &
-                file_date(3:4)
-
-        end if
-
-        write (1, '(A)') ''; write (1, '(A)') ''
+        write (3, '(A)') ''; write (3, '(A)') ''
 
         ! Generating table header for the stability criteria to be outputted
         if (any(Re_size > 0)) then
-            write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
+            write (3, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
                 'Max ==== VCFL Max ====== Rc Min ======='
         else
-            write (1, '(A)') '=========== Time-steps ============== Time '// &
+            write (3, '(A)') '=========== Time-steps ============== Time '// &
                 '============== ICFL Max ============='
         end if
 
@@ -426,12 +412,12 @@ contains
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             if (any(Re_size > 0)) then
-                write (1, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                write (3, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
+                write (3, '(13X,I8,14X,F10.6,13X,F9.6)') &
                     t_step, t_step*dt, icfl_max_glb
             end if
 
@@ -1637,23 +1623,22 @@ contains
     subroutine s_close_run_time_information_file
 
         real(kind(0d0)) :: run_time !< Run-time of the simulation
-
         ! Writing the footer of and closing the run-time information file
-        write (1, '(A)') '----------------------------------------'// &
+        write (3, '(A)') '----------------------------------------'// &
             '----------------------------------------'
-        write (1, '(A)') ''
+        write (3, '(A)') ''
 
-        write (1, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (any(Re_size > 0)) write (1, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (any(Re_size > 0)) write (1, '(A,F10.6)') 'Rc Min: ', Rc_min
+        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (any(Re_size > 0)) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
+        if (any(Re_size > 0)) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
-        write (1, '(A)') ''
-        write (1, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
-        write (1, '(A)') '========================================'// &
+        write (3, '(A)') ''
+        write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
+        write (3, '(A)') '========================================'// &
             '========================================'
-        close (1)
+        close (3)
 
     end subroutine s_close_run_time_information_file
 
