@@ -1,8 +1,9 @@
 # Running
 
 MFC can be run using `mfc.sh`'s `run` command.
-It supports both interactive and batch execution, the latter being designed for multi-socket systems, namely supercomputers, equipped with a scheduler such as PBS, SLURM, and LSF.
-A full (and updated) list of available arguments can be acquired with `./mfc.sh run -h`.
+It supports interactive and batch execution.
+Batch mode is designed for multi-node distributed systems (supercomputers) equipped with a scheduler such as PBS, SLURM, or LSF.
+A full (and up-to-date) list of available arguments can be acquired with `./mfc.sh run -h`.
 
 MFC supports running simulations locally (Linux, MacOS, and Windows) as well as
 several supercomputer clusters, both interactively and through batch submission.
@@ -17,7 +18,7 @@ several supercomputer clusters, both interactively and through batch submission.
 >
 > Adding a new template file or modifying an existing one will most likely be required if:
 > - You are on a cluster that does not have a template yet.
-> - Your cluster is configured with SLURM but interactive job launches fail when
+> - Your cluster is configured with SLURM, but interactive job launches fail when
 >   using `srun`. You might need to invoke `mpirun` instead.
 > - Something in the existing default or computer template file is incompatible with
 >   your system or does not provide a feature you need.
@@ -88,7 +89,7 @@ MFC provides two different arguments to facilitate profiling with NVIDIA Nsight.
 - Nsight Systems (Nsys): `./mfc.sh run ... -t simulation --nsys [nsys flags]` allows one to visualize MFC's system-wide performance with [NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems).
 NSys is best for understanding the order and execution times of major subroutines (WENO, Riemann, etc.) in MFC.
 When used, `--nsys` will run the simulation and generate `.nsys-rep` files in the case directory for all targets.
-These files can then be imported into Nsight System's GUI, which can be downloaded [here](https://developer.nvidia.com/nsight-systems/get-started#latest-Platforms). It is best to run case files with a few timesteps to keep the report files small. Learn more about NVIDIA Nsight Systems [here](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
+These files can then be imported into Nsight System's GUI, which can be downloaded [here](https://developer.nvidia.com/nsight-systems/get-started#latest-Platforms). To keep the report files small, it is best to run case files with a few timesteps. Learn more about NVIDIA Nsight Systems [here](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
 - Nsight Compute (NCU): `./mfc.sh run ... -t simulation --ncu [ncu flags]` allows one to conduct kernel-level profiling with [NVIDIA Nsight Compute](https://developer.nvidia.com/nsight-compute).
 NCU provides profiling information for every subroutine called and is more detailed than NSys.
 When used, `--ncu` will output profiling information for all subroutines, including elapsed clock cycles, memory used, and more after the simulation is run.
@@ -101,11 +102,11 @@ Learn more about NVIDIA Nsight Compute [here](https://docs.nvidia.com/nsight-com
 When used, `--roc` will run the simulation and generate files in the case directory for all targets.
 `results.json` can then be imported in [Perfetto's UI](https://ui.perfetto.dev/).
 Learn more about AMD Rocprof [here](https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.5.1/rocprof.html)
-It is best to run case files with a few timesteps to keep the report files small.
-- Omniperf (OMNI): `./mfc.sh run ... -t simulation --omni [omniperf flags]`allows one to conduct kernel-level profiling with [AMD Omniperf](https://rocm.github.io/omniperf/introduction.html#what-is-omniperf).
-When used, `--omni` will output profiling information for all subroutines, including rooflines, cache usage, register usage, and more after the simulation is run.
+It is best to run case files with few timesteps to keep the report file sizes manageable.
+- Omniperf (OMNI): `./mfc.sh run ... -t simulation --omni [omniperf flags]` allows one to conduct kernel-level profiling with [AMD Omniperf](https://rocm.github.io/omniperf/introduction.html#what-is-omniperf).
+When used, `--omni` will output profiling information for all subroutines, including rooflines, cache usage, register usage, and more, after the simulation is run.
 Adding this argument will moderately slow down the simulation and run the MFC executable several times.
-For this reason it should only be used with case files that have a few timesteps.
+For this reason, it should only be used with case files with few timesteps.
 
 
 ### Restarting Cases
@@ -123,7 +124,7 @@ If you want to restart a simulation,
 in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
 - Run `pre_process` and `simulation` on the case.
     - `./mfc.sh run case.py -t pre_process simulation `
-- As the simulation runs, it will create Lustre files for each saved timestep in `./restart_data`.
+- As the simulation runs, Lustre files will be created for each saved timestep in `./restart_data`.
 - When the simulation stops, choose any Lustre file as the restarting point (lustre_ $t_s$.dat)
 - Create a new duplicate input file (e.g., `restart_case.py`), which should have:
 

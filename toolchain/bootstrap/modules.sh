@@ -66,8 +66,8 @@ fi
 
 log "Loading modules (& env variables) for $M$COMPUTER$CR on $M$CG$CR"'s:'
 
-# Reset modules to default system configuration (unless Phoenix or Carpenter)
-if [ "$u_c" != 'p' ] && [ "$u_c" != 'c' ]; then
+# Reset modules to default system configuration (unless Carpenter)
+if [ "$u_c" != 'c' ]; then
     module reset > /dev/null 2>&1
     code="$?"
 
@@ -79,28 +79,21 @@ else
     module purge > /dev/null 2>&1
 fi
 
-ELEMENTS=($(__extract "$u_c-all") $(__extract "$u_c-$cg"))
+ELEMENTS="$(__extract "$u_c-all") $(__extract "$u_c-$cg")"
+MODULES=`echo "$ELEMENTS" | tr ' ' '\n' | grep -v = | xargs`
+VARIABLES=`echo "$ELEMENTS" | tr ' ' '\n' | grep = | xargs`
 
-for element in ${ELEMENTS[@]}; do
-    if [[ "$element" != *'='* ]]; then
-        log " $ module load $M$element$CR"
-        module load "$element" > /dev/null 2>&1
+log " $ module load $MODULES"
+if ! module load $MODULES; then
+    error "Failed to load modules."
 
-        # Handle Success / Failure
-        code=$?
-        if [ "$code" != '0' ]; then
-            error "Failed to load module $M$element$CR:"
+    return
+fi
 
-            # Run load again to show error message
-            module load "$element"
-
-            return
-        fi
-    else
-        log " $ export $M$element$CR"
-        export $element
-    fi
-done
+if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
+    log " $ export $VARIABLES"
+    export $VARIABLES > /dev/null
+fi
 
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
 if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" != 'c' ]; then
