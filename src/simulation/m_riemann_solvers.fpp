@@ -20,7 +20,6 @@
 
 #:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
-#:include 'inline_conversions.fpp'
 
 module m_riemann_solvers
 
@@ -264,9 +263,7 @@ module m_riemann_solvers
 
 contains
 
-    @:s_compute_speed_of_sound()
-
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
