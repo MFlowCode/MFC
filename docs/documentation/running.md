@@ -1,8 +1,9 @@
 # Running
 
 MFC can be run using `mfc.sh`'s `run` command.
-It supports interactive and batch execution, the latter being designed for multi-socket systems, namely supercomputers, equipped with a scheduler such as PBS, SLURM, or LSF.
-A full (and updated) list of available arguments can be acquired with `./mfc.sh run -h`.
+It supports interactive and batch execution.
+Batch mode is designed for multi-node distributed systems (supercomputers) equipped with a scheduler such as PBS, SLURM, or LSF.
+A full (and up-to-date) list of available arguments can be acquired with `./mfc.sh run -h`.
 
 MFC supports running simulations locally (Linux, MacOS, and Windows) as well as
 several supercomputer clusters, both interactively and through batch submission.
