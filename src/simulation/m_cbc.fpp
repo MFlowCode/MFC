@@ -19,7 +19,6 @@
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 module m_cbc
 
@@ -143,8 +142,6 @@ module m_cbc
 #endif
 
 contains
-
-    @:s_compute_speed_of_sound()
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
