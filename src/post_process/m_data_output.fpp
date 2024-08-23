@@ -24,6 +24,7 @@ module m_data_output
     ! ==========================================================================
 
     implicit none
+    integer, parameter :: grid_3D = 3
 
     private; public :: s_initialize_data_output_module, &
  s_open_formatted_database_file, &
@@ -121,7 +122,7 @@ contains
         allocate (q_sf(-offset_x%beg:m + offset_x%end, &
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end))
-        if (grid_geometry == 3) then
+        if (grid_geometry == grid_3D) then
             allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, &
                                -offset_z%beg:p + offset_z%end, &
                                -offset_x%beg:m + offset_x%end))
@@ -131,7 +132,7 @@ contains
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
                              -offset_y%beg:n + offset_y%end, &
                              -offset_z%beg:p + offset_z%end))
-            if (grid_geometry == 3) then
+            if (grid_geometry == grid_3D) then
                 allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, &
                                      -offset_z%beg:p + offset_z%end, &
                                      -offset_x%beg:m + offset_x%end))
@@ -176,7 +177,7 @@ contains
         ! also set here.
         if (format == 1 .and. n > 0) then
             if (p > 0) then
-                if (grid_geometry == 3) then
+                if (grid_geometry == grid_3D) then
                     lo_offset = (/offset_y%beg, offset_z%beg, offset_x%beg/)
                     hi_offset = (/offset_y%end, offset_z%end, offset_x%end/)
                 else
@@ -184,7 +185,7 @@ contains
                     hi_offset = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
 
-                if (grid_geometry == 3) then
+                if (grid_geometry == grid_3D) then
                     dims = (/n + offset_y%beg + offset_y%end + 2, &
                              p + offset_z%beg + offset_z%end + 2, &
                              m + offset_x%beg + offset_x%end + 2/)
@@ -974,7 +975,7 @@ contains
         ! root variable is only deallocated in the case of a 1D computation.
         deallocate (q_sf)
         if (n == 0) deallocate (q_root_sf)
-        if (grid_geometry == 3) then
+        if (grid_geometry == grid_3D) then
             deallocate (cyl_q_sf)
         end if
 

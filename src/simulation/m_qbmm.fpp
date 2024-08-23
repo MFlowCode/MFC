@@ -1155,7 +1155,7 @@ contains
     function f_quad2D(abscX, abscY, wght_in, pow)
         !$acc routine seq
         real(kind(0.d0)), dimension(nnode), intent(in) :: abscX, abscY, wght_in
-        real(kind(0.d0)), dimension(3), intent(in) :: pow
+        real(kind(0.d0)), dimension(mmom), intent(in) :: pow
 
         real(kind(0.d0)) :: f_quad2D
 

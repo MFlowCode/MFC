@@ -58,6 +58,20 @@ module m_patches
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
 
+    enum, bind(c)
+        enumerator :: kLineSegmentPatch = 1
+        enumerator :: circularPatch = 2
+        enumerator :: rectangularPatch = 3
+        enumerator :: sweptLinePatch = 4
+        enumerator :: ellipticalPatch = 5
+        enumerator :: unimplementedPatch = 6
+        enumerator :: funcPatch = 7
+        enumerator :: spiralPatch = 17
+        enumerator :: modifiedCircularPatch = 18
+        enumerator :: taylorGreenVortexPatch = 20
+        enumerator :: stlPatch = 21
+    end enum
+
     integer :: smooth_patch_id
     real(kind(0d0)) :: smooth_coeff !<
     !! These variables are analogous in both meaning and use to the similarly

@@ -11,6 +11,7 @@ module m_compute_cbc
     ! ==========================================================================
 
     implicit none
+    integer, parameter :: lambda_dim = 3
 
     private; public :: s_compute_slip_wall_L, &
  s_compute_nonreflecting_subsonic_buffer_L, &
@@ -33,7 +34,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -105,7 +106,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -133,7 +134,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -175,7 +176,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -252,7 +253,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
@@ -277,7 +278,7 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(3), intent(in) :: lambda
+        real(kind(0d0)), dimension(lambda_dim), intent(in) :: lambda
         real(kind(0d0)), dimension(sys_size), intent(inout) :: L
         real(kind(0d0)), intent(in) :: rho, c
         real(kind(0d0)), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds

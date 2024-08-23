@@ -172,6 +172,7 @@ contains
 
         integer, parameter :: atm = 101325
         integer, intent(in) :: j, k, l
+        integer, parameter :: atm = 101325
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i
