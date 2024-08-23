@@ -39,15 +39,17 @@ module m_initial_condition
 
     implicit none
 
-    integer, parameter :: num_patch_types = 14
-    integer :: patch_types(num_patch_types)
-  
-    ! Initialize the array with the enumerator values
-    patch_types = [kLineSegmentPatch, circularPatch, rectangularPatch, sweptLinePatch, &
-                 ellipticalPatch, unimplementedPatch, funcPatch, spherePatch, &
-                 cuboidPatch, cylinderPatch, sweptPlanePatch, ellipsoidPatch, &
-                 analyticalFunctionPatch, sphericalHarmonicPatch, &
-                 modifiedCircular3DPatch, stlPatch]
+    integer, parameter :: num_patch_types = 21
+
+  ! Define and initialize an array to hold the enumerator values
+    integer, parameter :: patch_types(num_patch_types) = &
+        [kLineSegmentPatch, circularPatch, rectangularPatch, sweptLinePatch, &
+        ellipticalPatch, unimplementedPatch, funcPatch, spherePatch, &
+        cuboidPatch, cylinderPatch, sweptPlanePatch, ellipsoidPatch, &
+        analyticalFunctionPatch, sphericalHarmonicPatch, analytical1DPatch, &
+        bubble_pulse1D, spiralPatch, modifiedCircularPatch, &
+        modifiedCircular3DPatch, taylorGreenVortexPatch, stlPatch]
+
 
   
     ! NOTE: The abstract interface allows for the declaration of a pointer to
@@ -198,13 +200,13 @@ contains
                     print *, 'Processing 3D ib patch ', i
                 end if
 
-                if (patch_ib(i)%geometry == 8) then
+                if (patch_ib(i)%geometry == spherePatch) then
                     call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
                     ! Cylindrical patch
-                elseif (patch_ib(i)%geometry == 10) then
+                elseif (patch_ib(i)%geometry == cylinderPatch) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
 
-                elseif (patch_ib(i)%geometry == 11) then
+                elseif (patch_ib(i)%geometry == sweptPlanePatch) then
                     call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                 end if
             end do
@@ -278,10 +280,10 @@ contains
                     call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
 
                     ! Rectangular patch
-                elseif (patch_ib(i)%geometry == 3) then
+                elseif (patch_ib(i)%geometry == rectangularPatch) then
                     call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
 
-                elseif (patch_ib(i)%geometry == 4) then
+                elseif (patch_ib(i)%geometry == sweptLinePatch) then
                     call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                 end if
             end do
@@ -303,11 +305,11 @@ contains
                     call s_line_segment(i, patch_id_fp, q_prim_vf)
 
                     ! 1d analytical
-                elseif (patch_icpp(i)%geometry == 15) then
+                elseif (patch_icpp(i)%geometry == analytical1DPatch) then
                     call s_1d_analytical(i, patch_id_fp, q_prim_vf)
 
                     ! 1d bubble screen with sinusoidal pressure pulse
-                elseif (patch_icpp(i)%geometry == 16) then
+                elseif (patch_icpp(i)%geometry == bubble_pulse1D) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
 

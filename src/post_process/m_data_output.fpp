@@ -577,7 +577,7 @@ contains
                 call s_mpi_gather_spatial_extents(spatial_extents)
 
             elseif (p > 0) then
-                if (grid_geometry == 3) then
+                if (grid_geometry == grid_3D) then
                     spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
                                               minval(x_cb), maxval(y_cb), &
                                               maxval(z_cb), maxval(x_cb)/)

@@ -66,8 +66,18 @@ module m_patches
         enumerator :: ellipticalPatch = 5
         enumerator :: unimplementedPatch = 6
         enumerator :: funcPatch = 7
+        enumerator :: spherePatch = 8
+        enumerator :: cuboidPatch = 9
+        enumerator :: cylinderPatch = 10
+        enumerator :: sweptPlanePatch = 11
+        enumerator :: ellipsoidPatch = 12
+        enumerator :: analyticalFunctionPatch = 13
+        enumerator :: sphericalHarmonicPatch = 14
+        enumerator :: analytical1DPatch = 15
+        enumerator :: bubble_pulse1D = 16
         enumerator :: spiralPatch = 17
         enumerator :: modifiedCircularPatch = 18
+        enumerator :: modifiedCircular3DPatch = 19
         enumerator :: taylorGreenVortexPatch = 20
         enumerator :: stlPatch = 21
     end enum
