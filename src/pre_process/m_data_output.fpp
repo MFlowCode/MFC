@@ -2,8 +2,6 @@
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
-#:include 'inline_conversions.fpp'
-
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder
 !!              associated with the rank of the local processor, which is a sub-
