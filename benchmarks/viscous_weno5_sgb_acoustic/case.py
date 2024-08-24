@@ -93,8 +93,8 @@ Tpulse  = Lpulse/cact
 
 # Configuring case dictionary
 print(json.dumps({
-        # Logistics ================================================
-    'run_time_info'                : 'T',
+    # Logistics ================================================
+    'run_time_info'                : 'F',
     # ==========================================================
     
     # Computational Domain Parameters ==========================
@@ -112,9 +112,9 @@ print(json.dumps({
     'dt'                           : dt,
     't_step_start'                 : 0,
     't_step_stop'                  : int(30*(25*size + 5)),
-    't_step_save'                  : int(6*(25*size + 5)),
+    't_step_save'                  : int(30*(25*size + 5)),
     # ==========================================================
-    
+
     # Simulation Algorithm Parameters ==========================
     'num_patches'                  : 2,
     'model_eqns'                   : 2,
