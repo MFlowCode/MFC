@@ -4,7 +4,7 @@ import rich.table
 
 from .printer import cons
 from .state   import ARG, CFG
-from .build   import get_targets, DEFAULT_TARGETS
+from .build   import get_targets, DEFAULT_TARGETS, SIMULATION
 from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
 from .common  import file_load_yaml, file_dump_yaml, create_directory
 from .common  import MFCException
@@ -77,6 +77,9 @@ def bench(targets = None):
     cons.unindent()
 
 
+# TODO: This function is too long and not nicely written at all. Someone should
+#       refactor it...
+# pylint: disable=too-many-branches
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
@@ -132,15 +135,32 @@ def diff():
 
                 continue
 
-            if (float(f"{lhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{lhs_summary[target.name]}")):
+            if not math.isfinite(lhs_summary[target.name]["exec"]) or not math.isfinite(rhs_summary[target.name]["exec"]):
                 err = 1
-                cons.print(f"lhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
+                cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
 
-            if (float(f"{rhs_summary[target.name]}") <= 0.0) or math.isnan(float(f"{rhs_summary[target.name]}")):
+            exec_time_speedup = "N/A"
+            try:
+                exec_time_speedup = f'{lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]:.2f}'
+            except Exception as _:
                 err = 1
-                cons.print(f"rhs_summary reports non-positive or NaN runtime for {target.name} - Case: {slug}")
+                cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
 
-            speedups[i] = f"{lhs_summary[target.name] / rhs_summary[target.name]:.2f}x"
+            speedups[i] = f"Exec: {exec_time_speedup}"
+
+            if target == SIMULATION:
+                grind_time_speedup = "N/A"
+                if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
+                    err = 1
+                    cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
+
+                try:
+                    grind_time_speedup = f'{lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]:.2f}'
+                except Exception as _:
+                    err = 1
+                    cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
+
+                speedups[i] += f" & Grind: {grind_time_speedup}"
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
 
