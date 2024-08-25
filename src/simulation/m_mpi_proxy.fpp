@@ -43,32 +43,32 @@ module m_mpi_proxy
     !$acc declare link(ib_buff_send, ib_buff_recv)
     !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
 #else
-    real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_send !<
+    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    real(kind(0d0)), private, allocatable, dimension(:) :: q_cons_buff_recv !<
+    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_recv !<
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average conservative variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    real(kind(0d0)), private, allocatable, dimension(:) :: c_divs_buff_send !<
+    real(kind(0d0)), private, allocatable, dimension(:), target :: c_divs_buff_send !<
     !! c_divs_buff_send is utilized to send and unpack the buffer of the cell-
     !! centered color function derivatives, for a single computational domain
     !! boundary at the time, to the the relevant neighboring processor
 
-    real(kind(0d0)), private, allocatable, dimension(:) :: c_divs_buff_recv
+    real(kind(0d0)), private, allocatable, dimension(:), target :: c_divs_buff_recv
     !! c_divs_buff_recv is utilized to receiver and unpack the buffer of the cell-
     !! centered color function derivatives, for a single computational domain
     !! boundary at the time, from the relevant neighboring processor
 
-    integer, private, allocatable, dimension(:) :: ib_buff_send !<
+    integer, private, allocatable, dimension(:), target :: ib_buff_send !<
     !! This variable is utilized to pack and send the buffer of the immersed
     !! boundary markers, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    integer, private, allocatable, dimension(:) :: ib_buff_recv !<
+    integer, private, allocatable, dimension(:), target :: ib_buff_recv !<
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
@@ -860,6 +860,8 @@ contains
 
         integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
+        real(kind(0d0)), pointer :: p_send, p_recv
+        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
@@ -1059,19 +1061,23 @@ contains
         ! Send/Recv
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                p_send => q_cons_buff_send(0)
+                p_recv => q_cons_buff_recv(0)
                 #:if rdma_mpi
-                    !$acc host_data use_device(q_cons_buff_recv, q_cons_buff_send, ib_buff_recv, ib_buff_send)
+                    !$acc data attach(p_send, p_recv)
+                    !$acc host_data use_device(p_send, p_recv)
                 #:else
                     !$acc update host(q_cons_buff_send, ib_buff_send)
                 #:endif
 
                 call MPI_SENDRECV( &
-                    q_cons_buff_send(0), buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
-                    q_cons_buff_recv(0), buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
+                    p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
+                    p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                 #:if rdma_mpi
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 #:else
                     !$acc update device(q_cons_buff_recv)
@@ -1262,6 +1268,7 @@ contains
         integer, intent(in) :: gp_layers
 
         integer :: i, j, k, l, r !< Generic loop iterators
+        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
@@ -1303,19 +1310,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send, ib_buff_recv, ib_buff_send)
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1353,19 +1365,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1425,19 +1442,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1473,19 +1495,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(n + 1)*(p + 1), &
                         MPI_INTEGER, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1547,19 +1574,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1598,19 +1630,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1673,19 +1710,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1724,19 +1766,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
                         MPI_INTEGER, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1802,19 +1849,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1853,19 +1905,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1929,19 +1986,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -1980,19 +2042,24 @@ contains
 
 #if defined(MFC_OpenACC)
                 if (rdma_mpi) then
-                    !$acc host_data use_device( ib_buff_recv, ib_buff_send )
+                    p_i_send => ib_buff_send
+                    p_i_recv => ib_buff_recv
+
+                    !$acc data attach(p_i_send, p_i_recv)
+                    !$acc host_data use_device(p_i_send, p_i_recv)
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
-                        ib_buff_send(0), &
+                        p_i_send(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
+                        p_i_recv(0), &
                         gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
                         MPI_INTEGER, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 else
 #endif
@@ -2058,6 +2125,7 @@ contains
 
         integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
+        real(kind(0d0)), pointer :: p_send, p_recv
 
 #ifdef MFC_MPI
 
@@ -2152,19 +2220,24 @@ contains
         ! Send/Recv
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                p_send => c_divs_buff_send(0)
+                p_recv => c_divs_buff_recv(0)
+
                 #:if rdma_mpi
-                    !$acc host_data use_device(c_divs_buff_recv, c_divs_buff_send)
+                    !$acc data attach(p_send, p_recv)
+                    !$acc host_data use_device(p_send, p_recv)
                 #:else
                     !$acc update host(c_divs_buff_send)
                 #:endif
 
                 call MPI_SENDRECV( &
-                    c_divs_buff_send(0), buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
-                    c_divs_buff_recv(0), buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
+                    p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
+                    p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                 #:if rdma_mpi
                     !$acc end host_data
+                    !$acc end data
                     !$acc wait
                 #:else
                     !$acc update device(c_divs_buff_recv)

@@ -191,9 +191,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
             h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
-            if ARG("sys_hdf5"):
+            if not os.path.exists(h5dump or ""):
                 if not does_command_exist("h5dump"):
-                    raise MFCException("--sys-hdf5 was specified and h5dump couldn't be found.")
+                    raise MFCException("h5dump couldn't be found.")
 
                 h5dump = shutil.which("h5dump")
 

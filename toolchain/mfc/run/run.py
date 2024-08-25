@@ -93,7 +93,11 @@ def __get_template() -> Template:
 def __generate_job_script(targets, case: input.MFCInputFile):
     env = {}
     if ARG('gpus') is not None:
-        env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
+        gpu_ids = ','.join([str(_) for _ in ARG('gpus')])
+        env.update({
+            'CUDA_VISIBLE_DEVICES': gpu_ids,
+            'HIP_VISIBLE_DEVICES':  gpu_ids
+        })
 
     content = __get_template().render(
         **{**ARGS(), 'targets': targets},

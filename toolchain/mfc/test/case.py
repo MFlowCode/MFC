@@ -128,7 +128,7 @@ class TestCase(case.Case):
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
-        return common.system(command, print_cmd=False, text=True, capture_output=True)
+        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
