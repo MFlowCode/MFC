@@ -1134,6 +1134,8 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
+        real(kind(0d0)) :: grind_time
+
         call s_mpi_barrier()
 
         if (num_procs > 1) then
@@ -1152,28 +1154,32 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Performance: ", time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/))), " ns/gp/eq/rhs"
+
+            grind_time = time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+
+            print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
-                write (1, *) num_procs, time_final
-                close (1)
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, *) num_procs, time_final
-                close (1)
+                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
             end if
+
+            write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
+
+            close (1)
 
             inquire (FILE='io_time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='io_time_data.dat', position='append', status='old')
-                write (1, *) num_procs, io_time_final
-                close (1)
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, *) num_procs, io_time_final
-                close (1)
+                write (1, '(A10, A15)') "Ranks", "s/step"
             end if
+
+            write (1, '(I10, F15.8)') num_procs, io_time_final
+            close (1)
 
         end if
 

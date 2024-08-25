@@ -5,7 +5,7 @@ from glob import glob
 from mako.lookup   import TemplateLookup
 from mako.template import Template
 
-from ..build   import get_targets, build, REQUIRED_TARGETS
+from ..build   import get_targets, build, REQUIRED_TARGETS, SIMULATION
 from ..printer import cons
 from ..state   import ARG, ARGS, CFG
 from ..common  import MFCException, isspace, file_read, does_command_exist
@@ -101,6 +101,7 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         env=env,
         case=case,
         MFC_ROOTDIR=MFC_ROOTDIR,
+        SIMULATION=SIMULATION,
         qsystem=queues.get_system(),
         profiler=shlex.join(__profiler_prepend())
     )
