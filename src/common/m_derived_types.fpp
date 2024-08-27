@@ -279,6 +279,14 @@ module m_derived_types
         integer :: element_on !< Element in the acoustic array to turn on
     end type acoustic_parameters
 
+    !> Acoustic source source_spatial pre-calculated values
+    type source_spatial_type
+        integer, dimension(:, :), allocatable :: coord !< List of grid points indices with non-zero source_spatial values
+        real(kind(0d0)), dimension(:), allocatable :: val !< List of non-zero source_spatial values
+        real(kind(0d0)), dimension(:), allocatable :: angle !< List of angles with x-axis for mom source term vector
+        real(kind(0d0)), dimension(:, :), allocatable :: xyz_to_r_ratios !< List of [xyz]/r for mom source term vector
+    end type source_spatial_type
+
     !> Ghost Point for Immersed Boundaries
     type ghost_point
 
