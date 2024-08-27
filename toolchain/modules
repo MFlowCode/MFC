@@ -42,10 +42,9 @@ e-gpu gpu/0.15.4 cuda/11.0.2 nvhpc/22.2 openmpi/4.0.5 cmake/3.19.8
 e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 p     GT Phoenix
-p-all python/3.9.12-rkxvr6 
-p-cpu gcc/12.1.0-qgxpzk mvapich2/2.3.7-733lcv
-p-gpu cmake/3.23.1-327dbl cuda/11.7.0-7sdye3 nvhpc/22.11
-p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
+p-all python/3.10.10
+p-cpu gcc/12.3.0 openmpi/4.1.5
+p-gpu nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
 
 f     OLCF Frontier
 f-gpu rocm/5.5.1 craype-accel-amd-gfx90a

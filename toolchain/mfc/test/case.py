@@ -22,7 +22,6 @@ BASE_CFG = {
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 1,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
@@ -217,11 +216,11 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm']):
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             return 1e-10
 
-        if self.params.get("bubbles", 'F') == 'T':
-            return 2e-10
+        if self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
+            return 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
             if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave

@@ -50,7 +50,7 @@ print(json.dumps({
             'dt'                           : mydt,                      
             't_step_start'                 : 0,                         
             't_step_stop'                  : int(40*(95*size + 5)),
-            't_step_save'                  : int(8*(95*size + 5)),
+            't_step_save'                  : int(40*(95*size + 5)),
 		    # ==========================================================
                                                                                 
             # Simulation Algorithm Parameters ==========================
@@ -58,7 +58,6 @@ print(json.dumps({
             'model_eqns'                   : 2,                        
             'alt_soundspeed'               : 'F',                      
             'num_fluids'                   : 1,                        
-		    'adv_alphan'                   : 'T',                      
 		    'mpp_lim'                      : 'F',                      
 		    'mixture_err'                  : 'F',                      
 		    'time_stepper'                 : 3,                                               

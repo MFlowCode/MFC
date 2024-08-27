@@ -72,7 +72,6 @@ print(json.dumps({
     'num_patches'                   : 1,
     'model_eqns'                    : 2,
     'num_fluids'                    : 1,
-    'adv_alphan'                    : 'T',
     'time_stepper'                  : 3,
     'weno_order'                    : 5,
     'weno_eps'                      : 1.E-16,
@@ -84,8 +83,8 @@ print(json.dumps({
     'avg_state'                     : 2,
     'bc_x%beg'                      : -1,
     'bc_x%end'                      : -1,
-    'bc_y%beg'                      : -5,
-    'bc_y%end'                      : -5,
+    'bc_y%beg'                      : -6,
+    'bc_y%end'                      : -6,
     'bc_z%beg'                      : -1,
     'bc_z%end'                      : -1,
     # ==========================================================================

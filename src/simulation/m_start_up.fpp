@@ -134,11 +134,10 @@ contains
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, adv_alphan, &
-            mpp_lim, time_stepper, weno_eps, weno_flat, &
+            model_eqns, mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
             teno_CT, mp_weno, weno_avg, &
-            riemann_solver, wave_speeds, avg_state, &
+            riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
@@ -1135,6 +1134,8 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
+        real(kind(0d0)) :: grind_time
+
         call s_mpi_barrier()
 
         if (num_procs > 1) then
@@ -1153,28 +1154,32 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
+
+            grind_time = time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+
+            print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')
-                write (1, *) num_procs, time_final
-                close (1)
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, *) num_procs, time_final
-                close (1)
+                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
             end if
+
+            write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
+
+            close (1)
 
             inquire (FILE='io_time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='io_time_data.dat', position='append', status='old')
-                write (1, *) num_procs, io_time_final
-                close (1)
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, *) num_procs, io_time_final
-                close (1)
+                write (1, '(A10, A15)') "Ranks", "s/step"
             end if
+
+            write (1, '(I10, F15.8)') num_procs, io_time_final
+            close (1)
 
         end if
 
@@ -1400,7 +1405,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
