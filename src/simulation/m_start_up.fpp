@@ -1263,7 +1263,7 @@ contains
 #endif
 
         if (acoustic_source) then
-            call s_initialize_acoustic_src_module()
+            call s_initialize_acoustic_src()
         end if
 
         if (any(Re_size > 0)) then
@@ -1303,6 +1303,7 @@ contains
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
+        if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()

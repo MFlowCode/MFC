@@ -509,7 +509,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic_source`                     | Logical | Acoustic source module activation |
 | `num_source`                          | Integer | Number of acoustic sources |
 | `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source |
-| `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false for monopole) |
+| `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false -> monopole) |
 | `acoustic(i)%%loc(j)`                 | Real    | $j$-th coordinate of the point that defines the acoustic source location |
 | `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
 | `acoustic(i)%%npulse`                 | Real    | Number of pulse cycles |
@@ -525,7 +525,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%foc_length`             | Real    | Transducer - Focal length of the transducer |
 | `acoustic(i)%%aperture`               | Real    | Transducer - Aperture of the transducer |
 | `acoustic(i)%%num_elements`           | Integer | Transducer array - Number of transducer elements in a transducer array |
-| `acoustic(i)%%element_on`             | Integer | Transducer array - Element number that is on (optional; default = 0 for all elements) |
+| `acoustic(i)%%element_on`             | Integer | Transducer array - Element number that is on (optional; default = 0 -> all elements) |
 | `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
 | `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
 | `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
@@ -809,7 +809,7 @@ Each patch requires a different set of parameters, which are also listed in this
 |  7   | Spherical Transducer         | 3D        | #5 requirements and `%%loc(3)`                                                          |
 |  9   | Arcuate Transducer Array     | 2D        | #5 requirements, `%%num_elements`, `%%element_on`, `%%element_spacing_angle`            |
 | 10   | Annular Transducer Array     | 2D-Axisym | #9 requirements                                                                         |
-| 11   | Circular Transducer Array    | 3D        | #7 requirements, `%%element_polygon_ratio`, and `%%rotate_angle`(optional; default = 0) |
+| 11   | Circular Transducer Array    | 3D        | #7 requirements, `%%element_polygon_ratio`, and `%%rotate_angle`                        |
 
 Details of the required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
 The acoustic support number (`#`) corresponds to the acoustic support type `Acoustic(i)%%support`, where $i$ is the acoustic source index.
