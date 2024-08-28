@@ -214,8 +214,11 @@ contains
                 #:endif
 
                 if (.not. skip_check) then
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16, 'bc_${X}$%${BOUND}$ must be between -1 and -16')
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ == -14, 'bc_${X}$%${BOUND}$ must not be -14 for non-cylindrical coordinates')
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16), &
+                        'bc_${X}$%${BOUND}$ must be between -1 and -16')
+
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. bc_${X}$%${BOUND}$ == -14, &
+                        'bc_${X}$%${BOUND}$ must not be -14 for non-cylindrical coordinates')
                 end if
 
             #:endfor
