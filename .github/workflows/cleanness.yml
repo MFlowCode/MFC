@@ -38,5 +38,6 @@ jobs:
             /bin/bash mfc.sh build -j $(nproc) --debug > out.txt 2>&1 
       
       - name: Grep Results
+        run: |
             grep '\-W' out.txt
 
