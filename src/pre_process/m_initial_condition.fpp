@@ -153,33 +153,40 @@ contains
                 !> @{
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == spherePatch) then
+                if (patch_icpp(i)%geometry == spherePatch) then
                     call s_sphere(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Cuboidal patch
+                elseif (patch_icpp(i)%geometry == cuboidPatch) then
                 elseif (patch_icpp(i)%geometry == cuboidPatch) then
                     call s_cuboid(i, patch_id_fp, q_prim_vf)
 
                     ! Cylindrical patch
                 elseif (patch_icpp(i)%geometry == cylinderPatch) then
+                elseif (patch_icpp(i)%geometry == cylinderPatch) then
                     call s_cylinder(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Swept plane patch
-                elseif (patch_icpp(i)%geometry == sweptLinePatch) then
+                elseif (patch_icpp(i)%geometry == sweptPlanePatch) then
                     call s_sweep_plane(i, patch_id_fp, q_prim_vf)
 
                     ! Ellipsoidal patch
+                elseif (patch_icpp(i)%geometry == ellipsoidPatch) then
                 elseif (patch_icpp(i)%geometry == ellipsoidPatch) then
                     call s_ellipsoid(i, patch_id_fp, q_prim_vf)
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == analyticalFunctionPatch) then
+                elseif (patch_icpp(i)%geometry == analyticalFunctionPatch) then
                     call s_3D_analytical(i, patch_id_fp, q_prim_vf)
 
                     ! Spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == sphericalHarmonicPatch) then
+                elseif (patch_icpp(i)%geometry == sphericalHarmonicPatch) then
                     call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
 
                     ! 3D Modified circular patch
+                elseif (patch_icpp(i)%geometry == modifiedCircular3DPatch) then
                 elseif (patch_icpp(i)%geometry == modifiedCircular3DPatch) then
                     call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
 
@@ -204,8 +211,10 @@ contains
                     call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
                     ! Cylindrical patch
                 elseif (patch_ib(i)%geometry == cylinderPatch) then
+                elseif (patch_ib(i)%geometry == cylinderPatch) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
 
+                elseif (patch_ib(i)%geometry == sweptPlanePatch) then
                 elseif (patch_ib(i)%geometry == sweptPlanePatch) then
                     call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                 end if
@@ -227,42 +236,51 @@ contains
                 !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == circularPatch) then
+                if (patch_icpp(i)%geometry == circularPatch) then
                     call s_circle(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Rectangular patch
+                elseif (patch_icpp(i)%geometry == rectangularPatch) then
                 elseif (patch_icpp(i)%geometry == rectangularPatch) then
                     call s_rectangle(i, patch_id_fp, q_prim_vf, .false.)
 
                     ! Swept line patch
                 elseif (patch_icpp(i)%geometry == sweptLinePatch) then
+                elseif (patch_icpp(i)%geometry == sweptLinePatch) then
                     call s_sweep_line(i, patch_id_fp, q_prim_vf)
 
                     ! Elliptical patch
                 elseif (patch_icpp(i)%geometry == ellipticalPatch) then
+                elseif (patch_icpp(i)%geometry == ellipticalPatch) then
                     call s_ellipse(i, patch_id_fp, q_prim_vf)
 
                     ! Unimplemented patch (formerly isentropic vortex)
-                elseif (patch_icpp(i)%geometry == unimplementedPatch) then
+                elseif (patch_icpp(i)%geometry == un) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting ...')
 
                     ! Analytical function patch for testing purposes
                 elseif (patch_icpp(i)%geometry == funcPatch) then
+                elseif (patch_icpp(i)%geometry == funcPatch) then
                     call s_2D_analytical(i, patch_id_fp, q_prim_vf)
 
                     ! Spiral patch
+                elseif (patch_icpp(i)%geometry == spiralPatch) then
                 elseif (patch_icpp(i)%geometry == spiralPatch) then
                     call s_spiral(i, patch_id_fp, q_prim_vf)
 
                     ! Modified circular patch
                 elseif (patch_icpp(i)%geometry == modifiedCircularPatch) then
+                elseif (patch_icpp(i)%geometry == modifiedCircularPatch) then
                     call s_varcircle(i, patch_id_fp, q_prim_vf)
 
                     ! TaylorGreen vortex patch
                 elseif (patch_icpp(i)%geometry == taylorGreenVortexPatch) then
+                elseif (patch_icpp(i)%geometry == taylorGreenVortexPatch) then
                     call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
 
                     ! STL patch
+                elseif (patch_icpp(i)%geometry == stlPatch) then
                 elseif (patch_icpp(i)%geometry == stlPatch) then
                     call s_model(i, patch_id_fp, q_prim_vf)
 
@@ -277,12 +295,15 @@ contains
                     print *, 'Processing 2D ib patch ', i
                 end if
                 if (patch_ib(i)%geometry == circularPatch) then
+                if (patch_ib(i)%geometry == circularPatch) then
                     call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
 
                     ! Rectangular patch
                 elseif (patch_ib(i)%geometry == rectangularPatch) then
+                elseif (patch_ib(i)%geometry == rectangularPatch) then
                     call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
 
+                elseif (patch_ib(i)%geometry == sweptLinePatch) then
                 elseif (patch_ib(i)%geometry == sweptLinePatch) then
                     call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                 end if
@@ -302,13 +323,16 @@ contains
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == kLineSegmentPatch) then
+                if (patch_icpp(i)%geometry == kLineSegmentPatch) then
                     call s_line_segment(i, patch_id_fp, q_prim_vf)
 
                     ! 1d analytical
                 elseif (patch_icpp(i)%geometry == analytical1DPatch) then
+                elseif (patch_icpp(i)%geometry == analytical1DPatch) then
                     call s_1d_analytical(i, patch_id_fp, q_prim_vf)
 
                     ! 1d bubble screen with sinusoidal pressure pulse
+                elseif (patch_icpp(i)%geometry == bubble_pulse1D) then
                 elseif (patch_icpp(i)%geometry == bubble_pulse1D) then
                     call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if

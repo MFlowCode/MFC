@@ -402,7 +402,7 @@ contains
                         q_sf(j, k, l) = 0d0
 
                         do r = -fd_number, fd_number
-                            if (grid_geometry == 3) then
+                            if (grid_geometry == grid_3Dcylindrical) then
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + 1d0/y_cc(k)* &
                                     (fd_coeff_y(r, k)*y_cc(r + k)* &
@@ -431,7 +431,7 @@ contains
                         q_sf(j, k, l) = 0d0
 
                         do r = -fd_number, fd_number
-                            if (grid_geometry == 3) then
+                            if (grid_geometry == grid_3Dcylindrical) then
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)* &
                                     q_prim_vf(mom_idx%beg)%sf(j, k, r + l) &
@@ -621,7 +621,7 @@ contains
                         drho_dz = 0d0
 
                         do i = -fd_number, fd_number
-                            if (grid_geometry == 3) then
+                            if (grid_geometry == grid_3Dcylindrical) then
                                 drho_dz = drho_dz + fd_coeff_z(i, l)/y_cc(k)* &
                                           rho_sf(j, k, i + l)
                             else

@@ -201,7 +201,7 @@ contains
         end if
 
         ! Adding the partial densities to the formatted database file ----------
-        if ((model_eqns == 2) .or. (model_eqns == 3) .or. (model_eqns == 4)) then
+        if ((model_eqns == five_eqn_model) .or. (model_eqns == six_eqn_model) .or. (model_eqns == four_eqn_model)) then
             do i = 1, num_fluids
                 if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
 
@@ -209,7 +209,7 @@ contains
                                            -offset_y%beg:n + offset_y%end, &
                                            -offset_z%beg:p + offset_z%end)
 
-                    if (model_eqns /= 4) then
+                    if (model_eqns /= four_eqn_model) then
                         write (varname, '(A,I0)') 'alpha_rho', i
                     else
                         write (varname, '(A,I0)') 'rho', i
@@ -226,7 +226,7 @@ contains
         ! Adding the density to the formatted database file --------------------
         if (rho_wrt &
             .or. &
-            (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+            (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
             q_sf = rho_sf(-offset_x%beg:m + offset_x%end, &
                           -offset_y%beg:n + offset_y%end, &
@@ -338,8 +338,8 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the volume fraction(s) to the formatted database file ---------
-        if (((model_eqns == 2) .and. (bubbles .neqv. .true.)) &
-            .or. (model_eqns == 3) &
+        if (((model_eqns == five_eqn_model) .and. (bubbles .neqv. .true.)) &
+            .or. (model_eqns == six_eqn_model) &
             ) then
 
             do i = 1, num_fluids - 1
@@ -380,7 +380,7 @@ contains
         ! Adding specific heat ratio function to formatted database file -------
         if (gamma_wrt &
             .or. &
-            (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+            (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
             q_sf = gamma_sf(-offset_x%beg:m + offset_x%end, &
                             -offset_y%beg:n + offset_y%end, &
@@ -410,7 +410,7 @@ contains
         ! Adding liquid stiffness function to formatted database file ----------
         if (pi_inf_wrt &
             .or. &
-            (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+            (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
             q_sf = pi_inf_sf(-offset_x%beg:m + offset_x%end, &
                              -offset_y%beg:n + offset_y%end, &

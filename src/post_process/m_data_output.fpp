@@ -122,7 +122,7 @@ contains
         allocate (q_sf(-offset_x%beg:m + offset_x%end, &
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end))
-        if (grid_geometry == grid_3D) then
+        if (grid_geometry == grid_3Dcylindrical) then
             allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, &
                                -offset_z%beg:p + offset_z%end, &
                                -offset_x%beg:m + offset_x%end))
@@ -132,7 +132,7 @@ contains
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, &
                              -offset_y%beg:n + offset_y%end, &
                              -offset_z%beg:p + offset_z%end))
-            if (grid_geometry == grid_3D) then
+            if (grid_geometry == grid_3Dcylindrical) then
                 allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, &
                                      -offset_z%beg:p + offset_z%end, &
                                      -offset_x%beg:m + offset_x%end))
@@ -177,7 +177,7 @@ contains
         ! also set here.
         if (format == 1 .and. n > 0) then
             if (p > 0) then
-                if (grid_geometry == grid_3D) then
+                if (grid_geometry == grid_3Dcylindrical) then
                     lo_offset = (/offset_y%beg, offset_z%beg, offset_x%beg/)
                     hi_offset = (/offset_y%end, offset_z%end, offset_x%end/)
                 else
@@ -185,7 +185,7 @@ contains
                     hi_offset = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
 
-                if (grid_geometry == grid_3D) then
+                if (grid_geometry == grid_3Dcylindrical) then
                     dims = (/n + offset_y%beg + offset_y%end + 2, &
                              p + offset_z%beg + offset_z%end + 2, &
                              m + offset_x%beg + offset_x%end + 2/)
@@ -309,7 +309,7 @@ contains
             dbvars = 0
 
             ! Partial densities
-            if ((model_eqns == 2) .or. (model_eqns == 3)) then
+            if ((model_eqns == five_eqn_model) .or. (model_eqns == six_eqn_model)) then
                 do i = 1, num_fluids
                     if (alpha_rho_wrt(i) &
                         .or. &
@@ -322,7 +322,7 @@ contains
             ! Density
             if (rho_wrt &
                 .or. &
-                (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) &
                 then
                 dbvars = dbvars + 1
             end if
@@ -349,7 +349,7 @@ contains
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
             ! Volume fraction(s)
-            if ((model_eqns == 2) .or. (model_eqns == 3)) then
+            if ((model_eqns == five_eqn_model) .or. (model_eqns == six_eqn_model)) then
 
                 do i = 1, num_fluids - 1
                     if (alpha_wrt(i) &
@@ -371,7 +371,7 @@ contains
             ! Specific heat ratio function
             if (gamma_wrt &
                 .or. &
-                (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) &
                 then
                 dbvars = dbvars + 1
             end if
@@ -382,7 +382,7 @@ contains
             ! Liquid stiffness function
             if (pi_inf_wrt &
                 .or. &
-                (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                (model_eqns == gamma/pi_inf_model .and. (cons_vars_wrt .or. prim_vars_wrt))) &
                 then
                 dbvars = dbvars + 1
             end if
@@ -577,7 +577,7 @@ contains
                 call s_mpi_gather_spatial_extents(spatial_extents)
 
             elseif (p > 0) then
-                if (grid_geometry == grid_3D) then
+                if (grid_geometry == grid_3Dcylindrical) then
                     spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
                                               minval(x_cb), maxval(y_cb), &
                                               maxval(z_cb), maxval(x_cb)/)
@@ -645,7 +645,7 @@ contains
                         err = DBMKOPTLIST(2, optlist)
                         err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
                         err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
-                        if (grid_geometry == 3) then
+                        if (grid_geometry == grid_3Dcylindrical) then
                             err = DBPUTQM(dbfile, 'rectilinear_grid', 16, &
                                           'x', 1, 'y', 1, 'z', 1, &
                                           y_cb${SFX}$, z_cb${SFX}$, x_cb${SFX}$, dims, 3, &
@@ -858,7 +858,7 @@ contains
                     end do
                 end if
 
-                if (grid_geometry == 3) then
+                if (grid_geometry == grid_3Dcylindrical) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
@@ -871,7 +871,7 @@ contains
                 #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
                     if (precision == ${PRECISION}$) then
                         if (p > 0) then
-                            if (grid_geometry == 3) then
+                            if (grid_geometry == grid_3Dcylindrical) then
                                 err = DBPUTQV1(dbfile, trim(varname), &
                                                len_trim(varname), &
                                                'rectilinear_grid', 16, &
@@ -975,7 +975,7 @@ contains
         ! root variable is only deallocated in the case of a 1D computation.
         deallocate (q_sf)
         if (n == 0) deallocate (q_root_sf)
-        if (grid_geometry == grid_3D) then
+        if (grid_geometry == grid_3Dcylindrical) then
             deallocate (cyl_q_sf)
         end if
 
