@@ -108,9 +108,28 @@ jobs:
 =======
             /bin/bash mfc.sh build -j $(nproc) --debug > out.txt 2>&1 
       
-      - name: Grep Results
+      - name: Unused Variables
         run: |
-            grep '\-W' out.txt
+            grep -F 'Wunused-variable' out.txt -B 4
+      
+      - name: Unused Dummy Arguments
+        run: |
+            grep -F 'Wunused-dummy-argument' out.txt -B 4
+
+      - name: Unused Value
+        run: |
+            grep -F 'Wunused-value' out.txt -B 4
+    
+      - name: Maybe Uninitialized Variables
+        run: |
+            grep -F 'Wmaybe-uninitialized' out.txt -B 4
+
+      - name: Everything
+        run: |
+            grep '\-W' out.txt -B 4
+
+
+
 
 >>>>>>> 2e96b350 (test code cleanness CI)
 >>>>>>> 9fbfd684 (cleanness)
