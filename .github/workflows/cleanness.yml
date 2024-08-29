@@ -53,7 +53,7 @@ jobs:
         run: |
             grep -F 'Wmaybe-uninitialized' out.txt -B 4
 
-      - name: Everything else
+      - name: Everything
         run: |
             grep '\-W' out.txt -B 4
 
