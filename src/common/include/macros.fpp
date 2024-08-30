@@ -143,12 +143,12 @@
 #:def PROHIBIT(*args)
     #:set condition = args[0]
     #:if len(args) == 1
-        #:set message = ''
+        #:set message = '""'
     #:else
-        #:set message = '// ' + args[1]
+        #:set message = args[1]
     #:endif
     if (${condition}$) then
-        call s_mpi_abort('Prohibited condition: ${condition}$. '${message}$)
+        call s_prohibit_abort("${condition}$", ${message}$)
     end if
 #:enddef
 
