@@ -46,6 +46,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80/80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513             | Milan                     | CPU           | 32/32 cores     | 7.4              | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7452             | Rome                      | CPU           | 32/32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
+| IBM Power10               |                           | CPU           | 24/24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
 | AMD EPYC 7401             | Naples                    | CPU           | 24/24 cores     | 10               | GNU 10.3.1           | LLNL Corona  |
 | Apple M1 Pro              |                           | CPU           |  8/10 cores     | 14               | GNU 13.2.0           | N/A     |
 | Intel Xeon Gold 6226      | Cascade Lake              | CPU           | 12/12 cores     | 17               | GNU 12.3.0           | GT ICE  |
