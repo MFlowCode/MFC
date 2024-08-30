@@ -18,6 +18,8 @@ module m_global_parameters
     ! ==========================================================================
 
     implicit none
+    
+
 
     !> @name Logistics
     !> @{

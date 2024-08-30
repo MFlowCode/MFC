@@ -25,4 +25,33 @@ module m_constants
     real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
     real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
 
+    integer, parameter :: kLineSegmentPatch = 1
+    integer, parameter :: circularPatch = 2
+    integer, parameter :: rectangularPatch = 3
+    integer, parameter :: sweptLinePatch = 4
+    integer, parameter :: ellipticalPatch = 5
+    integer, parameter :: unimplementedPatch = 6
+    integer, parameter :: funcPatch = 7
+    integer, parameter :: spherePatch = 8
+    integer, parameter :: cuboidPatch = 9
+    integer, parameter :: cylinderPatch = 10
+    integer, parameter :: sweptPlanePatch = 11
+    integer, parameter :: ellipsoidPatch = 12
+    integer, parameter :: analyticalFunctionPatch = 13
+    integer, parameter :: sphericalHarmonicPatch = 14
+    integer, parameter :: analytical1DPatch = 15
+    integer, parameter :: bubble_pulse1D = 16
+    integer, parameter :: spiralPatch = 17
+    integer, parameter :: modifiedCircularPatch = 18
+    integer, parameter :: modifiedCircular3DPatch = 19
+    integer, parameter :: taylorGreenVortexPatch = 20
+    integer, parameter :: stlPatch = 21
+
+
+    integer, parameter :: gamma/pi_inf_model = 1
+    integer, parameter :: five_eqn_model = 2
+    integer, parameter :: six_eqn_model = 3
+    integer, parameter :: four_eqn_model = 4
+
+    integer, parameter :: grid_3Dcylindrical = 3
 end module m_constants

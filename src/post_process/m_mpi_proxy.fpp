@@ -1419,7 +1419,7 @@ contains
 
         ! Simulation is 3D
         if (p > 0) then
-            if (grid_geometry == 3) then
+            if (grid_geometry == grid_3Dcylindrical) then
                 ! Minimum spatial extent in the r-direction
                 call MPI_GATHERV(minval(y_cb), 1, MPI_DOUBLE_PRECISION, &
                                  spatial_extents(1, 0), recvcounts, 6*displs, &

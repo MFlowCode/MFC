@@ -27,5 +27,8 @@
         "${workspacefolder}/src/common",
         "${workspacefolder}/src/common/include"
     ],
-    "fortran.linter.extraArgs":    ["--free-form"]
+    "fortran.linter.extraArgs": [
+        "--free-form"
+    ],
+    "fortran.fortls.disabled": true
 }

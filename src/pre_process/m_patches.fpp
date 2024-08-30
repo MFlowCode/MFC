@@ -29,6 +29,7 @@ module m_patches
     ! ==========================================================================
 
     implicit none
+    integer, parameter :: grid_3D = 3
 
     private; 
     public :: s_line_segment, &
@@ -56,6 +57,30 @@ module m_patches
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
+
+    enum, bind(c)
+        enumerator :: kLineSegmentPatch = 1
+        enumerator :: circularPatch = 2
+        enumerator :: rectangularPatch = 3
+        enumerator :: sweptLinePatch = 4
+        enumerator :: ellipticalPatch = 5
+        enumerator :: unimplementedPatch = 6
+        enumerator :: funcPatch = 7
+        enumerator :: spherePatch = 8
+        enumerator :: cuboidPatch = 9
+        enumerator :: cylinderPatch = 10
+        enumerator :: sweptPlanePatch = 11
+        enumerator :: ellipsoidPatch = 12
+        enumerator :: analyticalFunctionPatch = 13
+        enumerator :: sphericalHarmonicPatch = 14
+        enumerator :: analytical1DPatch = 15
+        enumerator :: bubble_pulse1D = 16
+        enumerator :: spiralPatch = 17
+        enumerator :: modifiedCircularPatch = 18
+        enumerator :: modifiedCircular3DPatch = 19
+        enumerator :: taylorGreenVortexPatch = 20
+        enumerator :: stlPatch = 21
+    end enum
 
     integer :: smooth_patch_id
     real(kind(0d0)) :: smooth_coeff !<
@@ -859,7 +884,7 @@ contains
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
+                    if (grid_geometry == grid_3Dcylindrical) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)

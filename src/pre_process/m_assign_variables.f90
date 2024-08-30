@@ -12,6 +12,8 @@ module m_assign_variables
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
+    use m_constants
+
     ! one form to another
     ! ==========================================================================
 
@@ -66,6 +68,7 @@ module m_assign_variables
 contains
 
     subroutine s_initialize_assign_variables_module
+        integer, parameter :: gamma
 
         allocate (alf_sum%sf(0:m, 0:n, 0:p))
 
@@ -73,7 +76,7 @@ contains
         ! for assignment of the patch mixture or species primitive variables
         ! to a cell in the domain is targeted by the procedure pointer
 
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
+        if (model_eqns == gamma/pi_inf_model) then        ! Gamma/pi_inf model
             s_assign_patch_primitive_variables => &
                 s_assign_patch_mixture_primitive_variables
         else ! Volume fraction model
@@ -170,14 +173,16 @@ contains
     !! @param q_prim_vf Primitive variables
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
+        integer, parameter :: atm = 101325
         integer, intent(in) :: j, k, l
+        integer, parameter :: atm = 101325
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i
         real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
         real(kind(0d0)) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        p0 = 101325
+        p0 = atm
         pres_mag = 1d-1
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
@@ -338,7 +343,7 @@ contains
         end if
 
         ! Partial densities
-        if (model_eqns /= 4) then
+        if (model_eqns /= four_eqn_model) then
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
             end do
@@ -357,7 +362,7 @@ contains
 
         ! Computing Mixture Variables of Smoothing Patch ===================
 
-        if (model_eqns /= 4) then
+        if (model_eqns /= four_eqn_model) then
             ! Partial densities
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
@@ -470,7 +475,7 @@ contains
         end if
 
         ! Partial densities \alpha \rho
-        if (model_eqns /= 4) then
+        if (model_eqns /= four_eqn_model) then
             !mixture density is an input
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = &
@@ -509,7 +514,7 @@ contains
         end if
 
         ! Set partial pressures to mixture pressure for the 6-eqn model
-        if (model_eqns == 3) then
+        if (model_eqns == six_eqn_model) then
             do i = internalEnergies_idx%beg, internalEnergies_idx%end
                 q_prim_vf(i)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l)
             end do
