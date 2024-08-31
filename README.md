@@ -58,18 +58,13 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
-brew install wget python cmake gcc@14 mpich
+brew install coreutils python cmake fftw hdf5 gcc@14 open-mpi
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
 ```shell
 git clone https://github.com/MFlowCode/MFC
 cd MFC
-```
-and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
-```shell
-echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14" >> ~/.profile
-source ~/.profile
 ```
 then you can build MFC and run the test suite!
 ```shell
