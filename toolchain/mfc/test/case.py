@@ -128,13 +128,13 @@ class TestCase(case.Case):
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
-        return common.system(command, print_cmd=False, text=True, capture_output=True)
+        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
 
     def get_dirpath(self):
-        return os.path.join(common.MFC_TESTDIR, self.get_uuid())
+        return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
 
     def get_filepath(self):
         filepath = os.path.join(self.get_dirpath(), "case.py")

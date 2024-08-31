@@ -1,16 +1,18 @@
 import os, yaml, typing, shutil, subprocess
 
-from os.path import abspath, normpath, dirname, realpath
+from os.path import join, abspath, normpath, dirname, realpath
 
 from .printer import cons
 
 
-MFC_ROOTDIR        = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
-MFC_TESTDIR        = abspath(f"{MFC_ROOTDIR}/tests")
-MFC_SUBDIR         = abspath(f"{MFC_ROOTDIR}/build")
-MFC_TEMPLATEDIR    = abspath(f"{MFC_ROOTDIR}/toolchain/templates")
-MFC_LOCK_FILEPATH  = abspath(f"{MFC_SUBDIR}/lock.yaml")
-MFC_BENCH_FILEPATH = abspath(f"{MFC_ROOTDIR}/toolchain/bench.yaml")
+MFC_ROOT_DIR       = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
+MFC_TEST_DIR       = abspath(join(MFC_ROOT_DIR, "tests"))
+MFC_BUILD_DIR      = abspath(join(MFC_ROOT_DIR, "build"))
+MFC_TOOLCHAIN_DIR  = abspath(join(MFC_ROOT_DIR, "toolchain"))
+MFC_LOCK_FILEPATH  = abspath(join(MFC_BUILD_DIR, "lock.yaml"))
+MFC_TEMPLATE_DIR   = abspath(join(MFC_TOOLCHAIN_DIR, "templates"))
+MFC_BENCH_FILEPATH = abspath(join(MFC_TOOLCHAIN_DIR, "bench.yaml"))
+MFC_MECHANISMS_DIR = abspath(join(MFC_TOOLCHAIN_DIR, "mechanisms"))
 
 MFC_LOGO = """\
      .=++*:          -+*+=.
@@ -215,3 +217,13 @@ def get_cpuinfo():
         output = "No CPU info found"
 
     return f"CPU Info:\n{output}"
+
+def generate_git_tagline() -> str:
+    if not does_command_exist("git"):
+        return "Could not find git"
+
+    rev    = system(["git", "rev-parse",                 "HEAD"], print_cmd=False, stdout=subprocess.PIPE).stdout.decode().strip()
+    branch = system(["git", "rev-parse", "--abbrev-ref", "HEAD"], print_cmd=False, stdout=subprocess.PIPE).stdout.decode().strip()
+    dirty  = "dirty" if system(["git", "diff", "--quiet"], print_cmd=False).returncode != 0 else "clean"
+
+    return f"{rev} on {branch} ({dirty})"

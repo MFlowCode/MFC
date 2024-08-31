@@ -66,12 +66,12 @@ def test():
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
-        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
+        dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
         new_uuids = { case.get_uuid() for case in cases }
 
         for old_uuid in dir_uuids - new_uuids:
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
-            common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+            common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
         return
 
@@ -191,9 +191,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
             h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
-            if ARG("sys_hdf5"):
+            if not os.path.exists(h5dump or ""):
                 if not does_command_exist("h5dump"):
-                    raise MFCException("--sys-hdf5 was specified and h5dump couldn't be found.")
+                    raise MFCException("h5dump couldn't be found.")
 
                 h5dump = shutil.which("h5dump")
 

@@ -1,3 +1,6 @@
 #!/bin/bash
 
-./mfc.sh test -j 4 -a -- -c frontier
+gpus=`rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' '`
+ngpus=`echo "$gpus" | tr -d '[:space:]' | wc -c`
+
+./mfc.sh test -j $ngpus --sys-hdf5 --sys-fftw -- -c frontier
