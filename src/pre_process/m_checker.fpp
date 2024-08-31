@@ -2,6 +2,8 @@
 !!@file m_checker.f90
 !!@brief Contains module m_checker
 
+#:include 'macros.fpp'
+
 !> @brief The purpose of the module is to check for compatible input files
 module m_checker
 
@@ -35,11 +37,7 @@ contains
     !> Checks if mpi is enabled with parallel_io
     subroutine s_check_parallel_io
 #ifndef MFC_MPI
-        if (parallel_io) then
-            print '(A)', 'MFC built with --no-mpi requires parallel_io=F. '// &
-                'Exiting ...'
-            call s_mpi_abort()
-        end if
+        @:PROHIBIT(parallel_io, "MFC built with --no-mpi requires parallel_io=F")
 #endif
     end subroutine s_check_parallel_io
 
@@ -49,25 +47,17 @@ contains
         logical :: skip_check !< Flag to skip the check when iterating over
         !! x, y, and z directions, for special treatment of cylindrical coordinates
 
-        if ((.not. old_grid) .and. old_ic) then
-            call s_mpi_abort('old_ic can only be enabled with old_grid enabled. '// &
-                             'Exiting ...')
-        end if
+        @:PROHIBIT((.not. old_grid) .and. old_ic, &
+            "old_ic can only be enabled with old_grid enabled")
 
-        if (old_grid) then
-            if (t_step_old == dflt_int) then
-                call s_mpi_abort('old_grid is enabled, but t_step_old not set. '// &
-                                 'Exiting ...')
-            elseif ((.not. f_is_default(x_domain%beg)) .or. (.not. f_is_default(x_domain%end)) &
-                    .or. &
-                    (.not. f_is_default(y_domain%beg)) .or. (.not. f_is_default(y_domain%end)) &
-                    .or. &
-                    (.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))) then
-                call s_mpi_abort('x_domain, y_domain, and/or z_domain '// &
-                                 'are not supported with old_grid enabled. '// &
-                                 'Exiting ...')
-            end if
-        end if
+        @:PROHIBIT(old_grid .and. t_step_old == dflt_int, &
+            "old_grid requires t_step_old to be set")
+        @:PROHIBIT(old_grid .and. ((.not. f_is_default(x_domain%beg)) .or. (.not. f_is_default(x_domain%end))), &
+            "x_domain is not supported with old_grid enabled")
+        @:PROHIBIT(old_grid .and. ((.not. f_is_default(y_domain%beg)) .or. (.not. f_is_default(y_domain%end))), &
+            "y_domain is not supported with old_grid enabled")
+        @:PROHIBIT(old_grid .and. ((.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))), &
+            "z_domain is not supported with old_grid enabled")
 
         #:for DIR, VAR in [('x', 'm'), ('y', 'n'), ('z', 'p')]
             ! For cylindrical coordinates, the y and z directions use a different check
@@ -79,68 +69,33 @@ contains
 
             if (.not. skip_check) then
                 #:for BOUND in ['beg', 'end']
-                    if (${VAR}$ == 0) then
-                        if (.not. f_is_default((${DIR}$_domain%${BOUND}$))) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                             'be set when ${VAR}$ = 0. Exiting ...')
-                        end if
-                    else ! ${VAR}$ > 0
-                        if (old_grid .and. (.not. f_is_default(${DIR}$_domain%${BOUND}$))) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must not '// &
-                                             'be set when ${VAR}$ > 0 and '// &
-                                             'old_grid = T. Exiting ...')
-                        elseif (.not. old_grid .and. f_is_default(${DIR}$_domain%${BOUND}$)) then
-                            call s_mpi_abort('${DIR}$_domain%${BOUND}$ must be '// &
-                                             'set when ${VAR}$ > 0 and '// &
-                                             'old_grid = F. Exiting ...')
-                        elseif (${DIR}$_domain%beg >= ${DIR}$_domain%end) then
-                            call s_mpi_abort('${DIR}$_domain%beg must be less '// &
-                                             'than ${DIR}$_domain%end when '// &
-                                             'both are set. Exiting ...')
-                        end if
-                    end if
+                    @:PROHIBIT(${VAR}$ == 0 .and. (.not. f_is_default((${DIR}$_domain%${BOUND}$))), &
+                        "${DIR}$_domain%${BOUND}$ must not be set when ${VAR}$ = 0")
+                    @:PROHIBIT(${VAR}$ > 0 .and. old_grid .and. (.not. f_is_default(${DIR}$_domain%${BOUND}$)), &
+                        "${DIR}$_domain%${BOUND}$ must not be set when ${VAR}$ > 0 and old_grid = T")
+                    @:PROHIBIT(${VAR}$ > 0 .and. (.not. old_grid) .and. f_is_default(${DIR}$_domain%${BOUND}$), &
+                        "${DIR}$_domain%${BOUND}$ must be set when ${VAR}$ > 0 and old_grid = F")
+                    @:PROHIBIT(${VAR}$ > 0 .and. ${DIR}$_domain%beg >= ${DIR}$_domain%end, &
+                        "${DIR}$_domain%beg must be less than ${DIR}$_domain%end when both are set")
                 #:endfor
             end if
 
         #:endfor
 
-        ! Check for y and z directions for cylindrical coordinates
-        if (cyl_coord) then
-            if (n == 0) then
-                call s_mpi_abort('n must be positive for cylindrical '// &
-                                 'coordinates. Exiting ...')
-            elseif (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)) then
-                call s_mpi_abort('y_domain%beg and y_domain%end '// &
-                                 'must be set for n = 0 '// &
-                                 '(2D cylindrical coordinates). Exiting ...')
-            elseif (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0) then
-                call s_mpi_abort('y_domain%beg must be 0 and y_domain%end '// &
-                                 'must be positive for cylindrical '// &
-                                 'coordinates. Exiting ...')
-            end if
+        @:PROHIBIT(cyl_coord .and. n == 0, &
+            "n must be positive (2D or 3D) for cylindrical coordinates")
+        @:PROHIBIT(cyl_coord .and. (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)), &
+            "y_domain%beg and y_domain%end must be set for n = 0 (2D cylindrical coordinates)")
+        @:PROHIBIT(cyl_coord .and. (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0), &
+            "y_domain%beg must be 0 and y_domain%end must be positive for cylindrical coordinates")
+        @:PROHIBIT(cyl_coord .and. p == 0 .and. ((.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))), &
+            "z_domain%beg and z_domain%end are not supported for p = 0 (2D cylindrical coordinates)")
+        @:PROHIBIT(cyl_coord .and. p > 0 .and. (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi), &
+            "z_domain%beg must be 0 and z_domain%end must be 2*pi for 3D cylindrical coordinates")
 
-            if (p == 0) then
-                if ((.not. f_is_default(z_domain%beg)) &
-                    .or. &
-                    (.not. f_is_default(z_domain%end))) then
-                    call s_mpi_abort('z_domain%beg and z_domain%end '// &
-                                     'are not supported for p = 0 '// &
-                                     '(2D cylindrical coordinates). Exiting ...')
-                end if
-            else if (p > 0) then
-                if (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi) then
-                    call s_mpi_abort('z_domain%beg must be 0 and z_domain%end '// &
-                                     'must be 2*pi for 3D cylindrical '// &
-                                     'coordinates. Exiting ...')
-                end if
-            end if
-        end if
-
-        if (num_patches < 0 .or. &
-            (num_patches == 0 .and. t_step_old == dflt_int)) then
-            call s_mpi_abort('num_patches must be non-negative for the '// &
-                             'non-restart case. Exiting ...')
-        end if
+        @:PROHIBIT(num_patches < 0)
+        @:PROHIBIT(num_patches == 0 .and. t_step_old == dflt_int, &
+            "num_patches must be positive for the non-restart case")
 
     end subroutine s_check_inputs_restart
 
@@ -148,71 +103,42 @@ contains
         !! (loops_x[y,z], stretch_x[y,z], etc.)
     subroutine s_check_inputs_grid_stretching
         ! Constraints on loops for grid stretching
-        if (loops_z < 1) then
-            call s_mpi_abort('loops_z must be positive. Exiting ...')
-        elseif (loops_y < 1) then
-            call s_mpi_abort('loops_y must be positive. Exiting ...')
-        end if
+        @:PROHIBIT(loops_x < 1)
+        @:PROHIBIT(loops_y < 1)
 
         ! Constraints specific to stretch_y
-        if (stretch_y .and. n == 0) then
-            call s_mpi_abort('n must be positive if stretch_y = T. Exiting ...')
-        end if
+        @:PROHIBIT(stretch_y .and. n == 0)
 
         ! Constraints specific to stretch_z
-        if (stretch_z) then
-            if (cyl_coord) then
-                call s_mpi_abort('stretch_z is not supported for '// &
-                                 'cylindrical coordinates. Exiting ...')
-            elseif (p == 0) then
-                call s_mpi_abort('p must be positive if stretch_z = T. '// &
-                                 'Exiting ...')
-            end if
-        end if
+        @:PROHIBIT(stretch_z .and. p == 0)
+        @:PROHIBIT(stretch_z .and. cyl_coord)
 
         ! Common checks for all directions (stretch_x, stretch_y, and stretch_z)
         #:for X in ['x', 'y', 'z']
-            if (stretch_${X}$) then
-                if (old_grid) then
-                    call s_mpi_abort('old_grid and stretch_${X}$ are '// &
-                                     'incompatible. Exiting ...')
-                elseif (f_is_default(a_${X}$)) then
-                    call s_mpi_abort('a_${X}$ must be set with stretch_${X}$ '// &
-                                     'enabled. Exiting ...')
-                elseif (f_is_default(${X}$_a)) then
-                    call s_mpi_abort('${X}$_a must be set with stretch_${X}$ '// &
-                                     'enabled. Exiting ...')
-                elseif (f_is_default(${X}$_b)) then
-                    call s_mpi_abort('${X}$_b must be set with stretch_${X}$ '// &
-                                     'enabled. Exiting ...')
-                elseif (${X}$_a >= ${X}$_b) then
-                    call s_mpi_abort('${X}$_a must be less than ${X}$_b with '// &
-                                     'stretch_${X}$ enabled. Exiting ...')
-                end if
-                #:for BOUND in ['beg', 'end']
-                    ! Note: `!&` is used to prevent fprettify errors
-                    if ((a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_a))) & !&
-                                 + log(cosh(a_${X}$*(${X}$_domain%${BOUND}$ - ${X}$_b))) & !&
-                                 - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0) then !&
-                        call s_mpi_abort('${X}$_domain%${BOUND}$ is too close '// &
-                                         'to ${X}$_a and ${X}$_b for the given '// &
-                                         'a_${X}$. Exiting ...')
-                    end if
-                #:endfor
-            end if
+            @:PROHIBIT(stretch_${X}$ .and. old_grid, "old_grid and stretch_${X}$ are incompatible")
+            @:PROHIBIT(stretch_${X}$ .and. f_is_default(a_${X}$), "a_${X}$ must be set with stretch_${X}$ enabled")
+            @:PROHIBIT(stretch_${X}$ .and. f_is_default(${X}$_a), "${X}$_a must be set with stretch_${X}$ enabled")
+            @:PROHIBIT(stretch_${X}$ .and. f_is_default(${X}$_b), "${X}$_b must be set with stretch_${X}$ enabled")
+            @:PROHIBIT(stretch_${X}$ .and. ${X}$_a >= ${X}$_b, "${X}$_a must be less than ${X}$_b with stretch_${X}$ enabled")
+            !&< Deactivate prettify
+            @:PROHIBIT(stretch_${X}$ .and. (a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%beg - ${X}$_a))) &
+                                                    + log(cosh(a_${X}$*(${X}$_domain%beg - ${X}$_b))) &
+                                                    - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0, &
+                "${X}$_domain%beg is too close to ${X}$_a and ${X}$_b for the given a_${X}$")
+            @:PROHIBIT(stretch_${X}$ .and. (a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%end - ${X}$_a))) &
+                                                    + log(cosh(a_${X}$*(${X}$_domain%end - ${X}$_b))) &
+                                                    - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0, &
+                "${X}$_domain%end is too close to ${X}$_a and ${X}$_b for the given a_${X}$")
+            !&>
         #:endfor
     end subroutine s_check_inputs_grid_stretching
 
     !> Checks constraints on the QBMM and polydisperse bubble parameters
         !! (qbmm, polydisperse, dist_type, rhoRV, and R0_type)
     subroutine s_check_inputs_qbmm_and_polydisperse
-        if (qbmm .and. dist_type == dflt_int) then
-            call s_mpi_abort('dist_type must be set if using QBMM. Exiting ...')
-        else if (qbmm .and. (dist_type /= 1) .and. rhoRV > 0d0) then
-            call s_mpi_abort('rhoRV cannot be used with dist_type != 1. Exiting ...')
-        else if (polydisperse .and. R0_type == dflt_int) then
-            call s_mpi_abort('R0 type must be set if using Polydisperse. Exiting ...')
-        end if
+        @:PROHIBIT(qbmm .and. dist_type == dflt_int, "dist_type must be set if using QBMM")
+        @:PROHIBIT(qbmm .and. dist_type /= 1 .and. rhoRV > 0d0, "rhoRV cannot be used with dist_type != 1")
+        @:PROHIBIT(polydisperse .and. R0_type == dflt_int, "R0 type must be set if using Polydisperse")
     end subroutine s_check_inputs_qbmm_and_polydisperse
 
     !> Checks constraints on initial partial density perturbation
@@ -222,43 +148,25 @@ contains
         character(len=5) :: iStr !< for int to string conversion
         integer :: i
 
-        if (perturb_flow &
-            .and. &
-            (perturb_flow_fluid == dflt_int .or. f_is_default(perturb_flow_mag))) then
-            call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
-                             'must be set with perturb_flow = T. Exiting ...')
-        elseif ((.not. perturb_flow) &
-                .and. &
-                (perturb_flow_fluid /= dflt_int .or. (.not. f_is_default(perturb_flow_mag)))) then
-            call s_mpi_abort('perturb_flow_fluid and perturb_flow_mag '// &
-                             'must not be set with perturb_flow = F. Exiting ...')
-        elseif ((perturb_flow_fluid > num_fluids) &
-                .or. &
-                (perturb_flow_fluid < 0 .and. perturb_flow_fluid /= dflt_int)) then
-            call s_mpi_abort('perturb_flow_fluid must be between 0 and '// &
-                             'num_fluids. Exiting ...')
-        elseif (perturb_sph .and. perturb_sph_fluid == dflt_int) then
-            call s_mpi_abort('perturb_sph_fluid must be set with perturb_sph = T. '// &
-                             'Exiting ...')
-        elseif (.not. perturb_sph .and. perturb_sph_fluid /= dflt_int) then
-            call s_mpi_abort('perturb_sph_fluid must not be set with perturb_sph = F. '// &
-                             'Exiting ...')
-        elseif ((perturb_sph_fluid > num_fluids) &
-                .or. &
-                (perturb_sph_fluid < 0 .and. perturb_sph_fluid /= dflt_int)) then
-            call s_mpi_abort('perturb_sph_fluid must be between 0 and '// &
-                             'num_fluids. Exiting ...')
-        elseif ((.not. perturb_sph) .and. (.not. f_all_default(fluid_rho))) then
-            call s_mpi_abort('fluid_rho must not be set with perturb_sph = F. '// &
-                             'Exiting ...')
-        end if
+        @:PROHIBIT(perturb_flow .and. (perturb_flow_fluid == dflt_int .or. f_is_default(perturb_flow_mag)), &
+            "perturb_flow_fluid and perturb_flow_mag must be set with perturb_flow = T")
+        @:PROHIBIT((.not. perturb_flow) .and. (perturb_flow_fluid /= dflt_int .or. (.not. f_is_default(perturb_flow_mag))), &
+            "perturb_flow_fluid and perturb_flow_mag must not be set with perturb_flow = F")
+        @:PROHIBIT(perturb_flow_fluid > num_fluids .or. (perturb_flow_fluid < 0 .and. perturb_flow_fluid /= dflt_int), &
+            "perturb_flow_fluid must be between 0 and num_fluids")
+        @:PROHIBIT(perturb_sph .and. perturb_sph_fluid == dflt_int, &
+            "perturb_sph_fluid must be set with perturb_sph = T")
+        @:PROHIBIT((.not. perturb_sph) .and. perturb_sph_fluid /= dflt_int, &
+            "perturb_sph_fluid must not be set with perturb_sph = F")
+        @:PROHIBIT(perturb_sph_fluid > num_fluids .or. (perturb_sph_fluid < 0 .and. perturb_sph_fluid /= dflt_int), &
+            "perturb_sph_fluid must be between 0 and num_fluids")
+        @:PROHIBIT((.not. perturb_sph) .and. (.not. f_all_default(fluid_rho)), &
+            "fluid_rho must not be set with perturb_sph = F")
 
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            if (perturb_sph .and. f_is_default(fluid_rho(i))) then
-                call s_mpi_abort('fluid_rho('//trim(iStr)//') must be set '// &
-                                 'if perturb_sph = T. Exiting ...')
-            end if
+            @:PROHIBIT(perturb_sph .and. f_is_default(fluid_rho(i)), &
+                "fluid_rho("//trim(iStr)//") must be set if perturb_sph = T")
         end do
     end subroutine s_check_inputs_perturb_density
 
@@ -266,20 +174,15 @@ contains
         !! (mixlayer_vel_profile and mixlayer_perturb)
     subroutine s_check_inputs_misc
         ! Hypertangent velocity profile
-        if (mixlayer_vel_profile .and. (n == 0)) then
-            call s_mpi_abort('mixlayer_vel_profile requires n > 0. Exiting ...')
-        end if
+        @:PROHIBIT(mixlayer_vel_profile .and. (n == 0), &
+            "mixlayer_vel_profile requires n > 0")
+
         ! Instability wave
-        if (mixlayer_perturb .and. (n == 0)) then
-            call s_mpi_abort('mixlayer_perturb requires n > 0. Exiting ...')
-        elseif (mixlayer_perturb .and. (model_eqns /= 2)) then
-            call s_mpi_abort('mixlayer_perturb requires model_eqns = 2. Exiting ...')
-        elseif (mixlayer_perturb .and. (num_fluids > 1)) then
-            call s_mpi_abort('mixlayer_perturb requires num_fluids = 1. Exiting ...')
-        elseif (mixlayer_perturb .and. (any((/bc_y%beg, bc_y%end/) /= -6))) then
-            call s_mpi_abort('mixlayer_perturb requires '// &
-                             'both bc_y%beg and bc_y%end to be 6. Exiting ...')
-        end if
+        @:PROHIBIT(mixlayer_perturb .and. n == 0, "mixlayer_perturb requires n > 0")
+        @:PROHIBIT(mixlayer_perturb .and. model_eqns /= 2, "mixlayer_perturb requires model_eqns = 2")
+        @:PROHIBIT(mixlayer_perturb .and. num_fluids > 1, "mixlayer_perturb requires num_fluids = 1")
+        @:PROHIBIT(mixlayer_perturb .and. any((/bc_y%beg, bc_y%end/) /= -6), &
+            "mixlayer_perturb requires both bc_y%beg and bc_y%end to be 6")
     end subroutine s_check_inputs_misc
 
 end module m_checker
