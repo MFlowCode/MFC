@@ -84,7 +84,7 @@ The shock-droplet interaction case above was run via
 ```shell
 ./mfc.sh run -n $(nproc) ./examples/3d_shockdroplet/case.py 
 ```
-where `8` is the number of cores the example will run on.
+where `$(nproc)` is the number of cores the example will run on (and the number of physical cores on your CPU device).
 You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
 
 ## Is this _really_ exascale?
