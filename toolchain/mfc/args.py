@@ -81,10 +81,11 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with specified properties.")
-    test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
+    test.add_argument("-r", "--relentless",   action="store_true", default=True, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
-    test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
+    test.add_argument("-i", "--ci-mode",      action="store_true", default=False, help="Toggles CI mode.")
+    test.add_argument("-m", "--max-attempts", type=int, default=0, help="Maximum number of attempts to run a test.")
     test.add_argument(      "--no-build",     action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
     test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
 
@@ -181,3 +182,4 @@ started, run ./mfc.sh build -h.""",
             args[e] = os.path.abspath(args[e])
 
     return args
+git clone https://github.com/aricer123/MFC.git
