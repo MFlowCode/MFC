@@ -4,18 +4,17 @@ from random import sample
 import rich, rich.table
 
 from ..printer import cons
-from ..        import common
-from ..state   import ARG
-from .case     import TestCase
-from .cases    import list_cases
-from ..        import sched
+from .. import common
+from ..state import ARG
+from .case import TestCase
+from .cases import list_cases
+from .. import sched
 from ..run.input import MFCInputFile
-from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
+from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output
+from ..build import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
 from ..packer import tol as packtol
 from ..packer import packer
-
 
 nFAIL = 0
 nPASS = 0
@@ -29,11 +28,11 @@ def __filter(cases_) -> typing.List[TestCase]:
     from_i = -1
     for i, case in enumerate(cases):
         if case.get_uuid() == ARG("from"):
-            from_i     = i
+            from_i = i
             bFoundFrom = True
             # Do not "continue" because "--to" might be the same as "--from"
         if bFoundFrom and case.get_uuid() == ARG("to"):
-            cases    = cases[from_i:i+1]
+            cases = cases[from_i:i+1]
             bFoundTo = True
             break
 
@@ -57,7 +56,6 @@ def __filter(cases_) -> typing.List[TestCase]:
         return cases
 
     return sample(cases, k=int(len(cases)*ARG("percent")/100.0))
-
 
 def test():
     global nFAIL, nPASS, nSKIP
@@ -126,7 +124,6 @@ def test():
     else:
         exit(0)
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
@@ -211,7 +208,6 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
 
-
 def handle_case(case: TestCase, devices: typing.Set[int]):
     global nFAIL, nPASS, nSKIP
 
@@ -237,7 +233,6 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
             if ARG("relentless"):
                 cons.print(f"{exc}")
-                nSKIP += 1
             else:
                 raise exc
 
