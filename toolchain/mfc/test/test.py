@@ -119,10 +119,7 @@ def test():
     cons.unindent()
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
    
-    if nFAIL > 0:
-        exit(nFAIL)
-    else:
-        exit(0)
+    exit(nFail)
 
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
@@ -212,10 +209,6 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
     global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
-    maxAttempts = ARG("max_attempts")
-    
-    if ARG("ci_mode"):
-        maxAttempts = 3
     
     while True:
         nAttempts += 1
@@ -224,16 +217,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             _handle_case(case, devices)
             nPASS += 1
         except Exception as exc:
-            if nAttempts < maxAttempts:
+            if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
 
             nFAIL += 1
+            
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-
-            if ARG("relentless"):
-                cons.print(f"{exc}")
-            else:
-                raise exc
+            cons.print(f"{exc}")
 
         return
