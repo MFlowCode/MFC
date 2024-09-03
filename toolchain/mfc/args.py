@@ -182,4 +182,3 @@ started, run ./mfc.sh build -h.""",
             args[e] = os.path.abspath(args[e])
 
     return args
-git clone https://github.com/aricer123/MFC.git
