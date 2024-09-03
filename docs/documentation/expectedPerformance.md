@@ -39,21 +39,22 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA RTX6000            | Single-precision GPU      | GPU           | 1 GPU           | 3.9              | NVHPC 22.11          | GT Phoenix  |
 | AMD EPYC 7763             | Milan                     | CPU           | 64/64 cores     | 4.1              | GNU 11.4.0           | NCSA Delta  |
 | AMD EPYC 7713             | Milan                     | CPU           | 64/64 cores     | 5.0              | GNU 12.3.0           | GT Phoenix  |
-| Intel Xeon 8480CL         | Platinum, Sapphire Rapids | CPU           | 56/56 cores     | 5.0              | NVHPC 24.5           | GT Phoenix  |
-| Intel Xeon 6454S          | Gold, Sapphire Rapids     | CPU           | 32/32 cores     | 5.6              | NVHPC 24.5           | GT Rogues Gallery  |
-| Intel Xeon 8462Y+         | Platinum, Sapphire Rapids | CPU           | 32/32 cores     | 6.2              | GNU 12.3.0           | GT ICE  |
-| Intel Xeon 6548Y+         | Gold, Emerald Rapids      | CPU           | 32/32 cores     | 6.6              | Intel oneAPI 2021.9  | GT ICE  |
-| Intel Xeon 8352Y          | Platinum, Ice Lake        | CPU           | 32/32 cores     | 6.6              | NVHPC 24.5           | GT Rogues Gallery  |
+| Intel Xeon 8480CL         | Sapphire Rapids           | CPU           | 56/56 cores     | 5.0              | NVHPC 24.5           | GT Phoenix  |
+| Intel Xeon 6454S          | Sapphire Rapids           | CPU           | 32/32 cores     | 5.6              | NVHPC 24.5           | GT Rogues Gallery  |
+| Intel Xeon 8462Y+         | Sapphire Rapids           | CPU           | 32/32 cores     | 6.2              | GNU 12.3.0           | GT ICE  |
+| Intel Xeon 6548Y+         | Emerald Rapids            | CPU           | 32/32 cores     | 6.6              | Intel oneAPI 2021.9  | GT ICE  |
+| Intel Xeon 8352Y          | Ice Lake                  | CPU           | 32/32 cores     | 6.6              | NVHPC 24.5           | GT Rogues Gallery  |
 | Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80/80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513             | Milan                     | CPU           | 32/32 cores     | 7.4              | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7452             | Rome                      | CPU           | 32/32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
 | IBM Power10               |                           | CPU           | 24/24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
 | AMD EPYC 7401             | Naples                    | CPU           | 24/24 cores     | 10               | GNU 10.3.1           | LLNL Corona  |
 | Apple M1 Pro              |                           | CPU           |  8/10 cores     | 14               | GNU 13.2.0           | N/A     |
-| Intel Xeon Gold 6226      | Cascade Lake              | CPU           | 12/12 cores     | 17               | GNU 12.3.0           | GT ICE  |
+| Intel Xeon 6226           | Cascade Lake              | CPU           | 12/12 cores     | 17               | GNU 12.3.0           | GT ICE  |
 | Apple M1 Max              |                           | CPU           |  8/10 cores     | 18               | GNU 14.1.0           | N/A     |
 | IBM Power9                |                           | CPU           | 20/21 cores     | 21               | GNU 9.1.0            | OLCF Summit |
 | Intel Xeon E5-2650V4      | Broadwell                 | CPU           | 12/12 cores     | 27               | NVHPC 23.5           | GT CSE Internal  |
+| Intel Xeon E7-4850V3      | Haswell                   | CPU           | 14/14 cores     | 34               | GNU 9.4.0            | GT CSE Internal  |
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
