@@ -119,7 +119,7 @@ def test():
     cons.unindent()
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
    
-    exit(nFail)
+    exit(nFAIL)
 
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
