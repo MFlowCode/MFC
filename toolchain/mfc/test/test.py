@@ -18,6 +18,8 @@ from ..packer import packer
 
 
 nFAIL = 0
+nPASS = 0
+nSKIP = 0
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -47,7 +49,6 @@ def __filter(cases_) -> typing.List[TestCase]:
             if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
 
-
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
@@ -59,11 +60,10 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 
 def test():
-    # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL
+    global nFAIL, nPASS, nSKIP
 
     cases = [ _.to_case() for _ in list_cases() ]
-
+    
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
         dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
@@ -113,23 +113,18 @@ def test():
     cons.print(" tests/[bold magenta]UUID[/bold magenta]     (s)      Summary")
     cons.print()
 
-    # Select the correct number of threads to use to launch test cases
-    # We can't use ARG("jobs") when the --case-optimization option is set
-    # because running a test case may cause it to rebuild, and thus
-    # interfere with the other test cases. It is a niche feature so we won't
-    # engineer around this issue (for now).
     sched.sched(
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
     cons.print()
-    if nFAIL == 0:
-        cons.print("Tested Simulation [bold green]✓[/bold green]")
-    else:
-        raise MFCException(f"Testing: Encountered [bold red]{nFAIL}[/bold red] failure(s).")
-
     cons.unindent()
-
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+   
+    if nFAIL > 0:
+        exit(nFAIL)
+    else:
+        exit(0)
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def _handle_case(case: TestCase, devices: typing.Set[int]):
@@ -180,6 +175,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         case.delete_output()
+            
         cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
@@ -217,27 +213,31 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement
-    global nFAIL
+    global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
-
+    maxAttempts = ARG("max_attempts")
+    
+    if ARG("ci_mode"):
+        maxAttempts = 3
+    
     while True:
         nAttempts += 1
 
         try:
             _handle_case(case, devices)
+            nPASS += 1
         except Exception as exc:
-            if nAttempts < ARG("max_attempts"):
+            if nAttempts < maxAttempts:
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
 
             nFAIL += 1
-
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
 
             if ARG("relentless"):
                 cons.print(f"{exc}")
+                nSKIP += 1
             else:
                 raise exc
 
