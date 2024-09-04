@@ -24,8 +24,17 @@ jobs:
     needs: file-changes
     runs-on: "ubuntu-latest"
     steps:
-      - name: Checkouts
-        uses: actions/checkout@v4
+      - name: Clone - PR
+        uses: actions/checkout@v3
+        with:
+          path: pr
+
+      - name: Clone - Master
+        uses: actions/checkout@v3
+        with:
+          repository: MFlowCode/MFC
+          ref: master
+          path: master
 
       - name: Setup Ubuntu
         run: |
@@ -35,37 +44,47 @@ jobs:
       
       - name: Build
         run: |
-            /bin/bash mfc.sh build -j $(nproc) --debug > out.txt 2>&1 
+            (cd pr && /bin/bash mfc.sh build -j $(nproc) --debug > ../pr.txt 2>&1) 
+            (cd master && /bin/bash mfc.sh build -j $(nproc) --debug > ../master.txt 2>&1)
       
       - name: Unused Variables
         run: |
-            grep -F 'Wunused-variable' out.txt -B 4
+            grep -F 'Wunused-variable' pr.txt -B 4
       
       - name: Unused Dummy Arguments
         run: |
-            grep -F 'Wunused-dummy-argument' out.txt -B 4
+            grep -F 'Wunused-dummy-argument' pr.txt -B 4
 
       - name: Unused Value
         run: |
-            grep -F 'Wunused-value' out.txt -B 4
+            grep -F 'Wunused-value' pr.txt -B 4
     
       - name: Maybe Uninitialized Variables
         run: |
-            grep -F 'Wmaybe-uninitialized' out.txt -B 4
+            grep -F 'Wmaybe-uninitialized' pr.txt -B 4
 
       - name: Everything
         run: |
-            grep '\-W' out.txt -B 4
+            grep '\-W' pr.txt -B 4
 
       - name: Summary
-        run: |
-            echo "Unused Variable Count:" 
-            grep -c -F 'Wunused-variable' out.txt -B 4
-            echo "Unused Dummy Arguments Count: "
-            grep -c -F 'Wunused-dummy-argument' out.txt -B 4
-            echo "Unused Value Count: "
-            grep -c -F 'Wunused-value' out.txt -B 4
-            echo "Maybe Uninitialized Variables Count: "
-            grep -c -F 'Wmaybe-uninitialized' out.txt -B 4
-            echo "Everything"
-            grep -c '\-W' out.txt -B 4
+        run: |  
+            export pr_variable="$(grep -c -F 'Wunused-variable' pr.txt -B 4)"
+            export pr_argument="$(grep -c -F 'Wunused-dummy-argument' pr.txt -B 4)"
+            export pr_value="$(grep -c -F 'Wunused-value' pr.txt -B 4)"
+            export pr_uninit="$(grep -c -F 'Wmaybe-uninitialized' pr.txt -B 4)"
+            export pr_everything="$(grep -c '\-W' pr.txt -B 4)"
+
+            export master_variable="$(grep -c -F 'Wunused-variable' master.txt -B 4)"
+            export master_argument="$(grep -c -F 'Wunused-dummy-argument' master.txt -B 4)"
+            export master_value="$(grep -c -F 'Wunused-value' master.txt -B 4)"
+            export master_uninit="$(grep -c -F 'Wmaybe-uninitialized' master.txt -B 4)"
+            export master_everything="$(grep -c '\-W' master.txt -B 4)"
+
+            echo "Difference is how many warnings were added or removed from master to pr, negative numbers are better since you are removing warnings"
+            echo "Unused Variable Count:" ${pr_variable}, Difference: $((pr_variable - master_varaible))
+            echo "Unused Dummy Argument:" ${pr_argument}, Difference: $((pr_argument - master_argument))
+            echo "Unused Value:" ${pr_value}, Difference: $((pr_value - master_value))
+            echo "Maybe Uninitialized:" ${pr_uninit}, Difference: $((pr_uninit - master_uninit))
+            echo "Everything:" ${pr_everything}, Difference: $((pr_everything - master_everything))
+            
