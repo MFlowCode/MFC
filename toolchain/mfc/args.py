@@ -32,6 +32,7 @@ started, run ./mfc.sh build -h.""",
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     pack.add_argument("input", metavar="INPUT", type=str, default="", help="Input file of case to pack.")
     pack.add_argument("-o", "--output", metavar="OUTPUT", type=str, default=None, help="Base name of output file.")
+    
 
     compare = packers.add_parser(name="compare", help="Compare two cases.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     compare.add_argument("input1", metavar="INPUT1", type=str, default=None, help="First pack file.")
@@ -81,13 +82,12 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with specified properties.")
-    test.add_argument("-r", "--relentless",   action="store_true", default=False, help="Run all tests, even if multiple fail.")
     test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
-    test.add_argument("-m", "--max-attempts", type=int, default=3, help="Maximum number of attempts to run a test.")
+    test.add_argument("-m", "--max-attempts", type=int, default=1, help="Maximum number of attempts to run a test.")
     test.add_argument(      "--no-build",     action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
+    test.add_argument("--rdma", "--rdma-mpi",  action="store_true", default=False, help="Enable rdma tests for GPUs")
     test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
     test_meg.add_argument("--add-new-variables", action="store_true", default=False, help="(Test Generation) If new variables are found in D/ when running tests, add them to the golden files.")
@@ -118,6 +118,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
     run.add_argument("--omni",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM omniperf.")
     run.add_argument("--roc",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof.")
+    run.add_argument("--rdma", "--rdma-mpi",                     action="store_true", default=False, help="Enable rdma tests for GPUs")
 
     # === BENCH ===
     add_common_arguments(bench)
