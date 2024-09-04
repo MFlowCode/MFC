@@ -58,12 +58,11 @@ module m_time_steppers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), c_ijk)
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt, c_ijk)
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -292,7 +291,6 @@ contains
 
         if (cfl_dt) then
             @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
-            @:ALLOCATE_GLOBAL(c_ijk(0:m, 0:n, 0:p))
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -1016,7 +1014,6 @@ contains
                     else
                         !1D
                         max_dt(j, k, l) = cfl_target*(dx(j)/(abs(vel(1)) + c))
-                        c_ijk(j, 0, 0) = c
                     end if
                 end do
             end do
