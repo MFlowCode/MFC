@@ -3,7 +3,6 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
@@ -59,11 +58,12 @@ module m_time_steppers
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), c_ijk)
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt, c_ijk)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -90,8 +90,6 @@ module m_time_steppers
 #endif
 
 contains
-
-    @:s_compute_speed_of_sound()
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -294,6 +292,7 @@ contains
 
         if (cfl_dt) then
             @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(c_ijk(0:m, 0:n, 0:p))
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -626,6 +625,9 @@ contains
             if (t_step == t_step_stop) return
         end if
 
+        !$acc update host(dt)
+        print*, "dt = ", dt
+
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
             do l = 0, p
@@ -693,7 +695,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
             end if
         end if
-
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
@@ -769,7 +770,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
             end if
         end if
-
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
@@ -1016,21 +1016,16 @@ contains
                     else
                         !1D
                         max_dt(j, k, l) = cfl_target*(dx(j)/(abs(vel(1)) + c))
-
+                        c_ijk(j, 0, 0) = c
                     end if
                 end do
             end do
         end do
         ! END: Computing Stability Criteria at Current Time-step ===========
 
-#ifdef CRAY_ACC_WAR
-        !$acc update host(max_dt)
-        dt_local = minval(max_dt)
-#else
         !$acc kernels
         dt_local = minval(max_dt)
         !$acc end kernels
-#endif
 
         if (num_procs == 1) then
             dt = dt_local

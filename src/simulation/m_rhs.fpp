@@ -724,7 +724,7 @@ contains
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
         integer :: ndirs
 
-        real(kind(0d0)) :: mytime, sound
+        real(kind(0d0)) :: sound
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
@@ -1015,8 +1015,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size; 
-            if (p > 0) iz%beg = -buff_size; 
+            if (n > 0) iy%beg = -buff_size;
+            if (p > 0) iz%beg = -buff_size;
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 

@@ -61,8 +61,6 @@ program p_main
         finaltime = t_step_stop*dt
     end if
 
-    if (cfl_const_dt) call s_compute_dt()
-
     ! Time-stepping Loop =======================================================
     do
 
