@@ -369,6 +369,12 @@ contains
             end if
         end if
 
+        if (precision == 1) then
+            FMT = "(4F30.7)"
+        else
+            FMT = "(4F40.14)"
+        end if
+
         ! 3D
         if (p > 0) then
             do i = 1, sys_size

@@ -36,7 +36,8 @@ module m_helper
               f_create_bbox, &
               s_print_2D_array, &
               f_xor, &
-              f_logical_to_int
+              f_logical_to_int, &
+              s_prohibit_abort
 
 contains
 
@@ -531,5 +532,21 @@ contains
             int = 0
         end if
     end function f_logical_to_int
+
+    subroutine s_prohibit_abort(condition, message)
+        character(len=*), intent(in) :: condition, message
+
+        print *, ""
+        print *, "===================================================================================================="
+        print *, "                                          CASE FILE ERROR                                           "
+        print *, "----------------------------------------------------------------------------------------------------"
+        print *, "Prohibited condition: ", trim(condition)
+        if (len_trim(message) > 0) then
+            print *, "Note: ", trim(message)
+        end if
+        print *, "===================================================================================================="
+        print *, ""
+        call s_mpi_abort
+    end subroutine s_prohibit_abort
 
 end module m_helper

@@ -7,8 +7,8 @@
         "**/.git":      true,
         "**/.DS_Store": true,
         "**/build":     true,
-        "*.o":          true,
-        "*.mod":        true
+        "**/*.o":       true,
+        "**/*.mod":     true,
     },
 
     "cmake.configureOnOpen": false,
@@ -17,7 +17,7 @@
 
     "files.associations": {
         "*.f90": "FortranFreeForm",
-        "*.fpp": "FortranFreeForm"
+        "*.fpp": "FortranFreeForm",
     },
 
     "fortran.preferredCase":       "lowercase",
@@ -27,5 +27,5 @@
         "${workspacefolder}/src/common",
         "${workspacefolder}/src/common/include"
     ],
-    "fortran.linter.extraArgs":    ["--free-form"]
+    "fortran.linter.extraArgs":    ["--free-form"],
 }
