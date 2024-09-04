@@ -32,7 +32,6 @@ started, run ./mfc.sh build -h.""",
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     pack.add_argument("input", metavar="INPUT", type=str, default="", help="Input file of case to pack.")
     pack.add_argument("-o", "--output", metavar="OUTPUT", type=str, default=None, help="Base name of output file.")
-    
 
     compare = packers.add_parser(name="compare", help="Compare two cases.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     compare.add_argument("input1", metavar="INPUT1", type=str, default=None, help="First pack file.")
