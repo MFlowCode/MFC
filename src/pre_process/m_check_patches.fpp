@@ -167,7 +167,7 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be zero")
-        @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be zero")
+        @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be greater than zero")
         @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Circle patch "//trim(iStr)//": radius must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Circle patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Circle patch "//trim(iStr)//": y_centroid must be set")
@@ -358,17 +358,17 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Cylinder patch "//trim(iStr)//": radius must be greater than zero")
 
         ! Check if exactly one length is defined
-        @:PROHIBIT(count([                                                      &
-            patch_icpp(patch_id)%length_x > 0d0,                                &
-            patch_icpp(patch_id)%length_y > 0d0,                                &
-            patch_icpp(patch_id)%length_z > 0d0                                 &
+        @:PROHIBIT(count([ &
+            patch_icpp(patch_id)%length_x > 0d0, &
+            patch_icpp(patch_id)%length_y > 0d0, &
+            patch_icpp(patch_id)%length_z > 0d0 &
             ]) /= 1, "Cylinder patch "//trim(iStr)//": Exactly one of length_x, length_y, or length_z must be defined and positive")
 
         ! Ensure the defined length is positive
-        @:PROHIBIT(                                                             &
+        @:PROHIBIT( &
             (.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0d0) .or. &
             (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0d0) .or. &
-            (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0d0),     &
+            (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0d0), &
             "Cylinder patch "//trim(iStr)//": The defined length_{} must be greater than zero")
 
     end subroutine s_check_cylinder_patch_geometry
@@ -455,7 +455,8 @@ contains
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(any(patch_icpp(patch_id)%alter_patch(1:)), "Inactive patch "//trim(iStr)//": cannot have alter_patch enabled")
+        @:PROHIBIT(.not. patch_icpp(patch_id)%alter_patch(0), "Inactive patch "//trim(iStr)//": cannot have alter_patch(0) altered")
+        @:PROHIBIT(any(patch_icpp(patch_id)%alter_patch(1:)), "Inactive patch "//trim(iStr)//": cannot have any alter_patch(i) enabled")
 
     end subroutine s_check_inactive_patch_alteration_rights
 
