@@ -117,6 +117,7 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
+        rdma              = ["--rdma"] if gpus is not None and ARG("rdma_mpi") else []
         rebuild           = [] if self.rebuild or ARG("case_optimization") else ["--no-build"]
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
@@ -125,7 +126,7 @@ class TestCase(case.Case):
 
         command = [
             mfc_script, "run", filepath, *rebuild, *tasks, *case_optimization,
-            *jobs, "-t", *target_names, *gpus_select, *ARG("--")
+            *jobs, "-t", *target_names, *gpus_select, *rdma, *ARG("--")
         ]
 
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
