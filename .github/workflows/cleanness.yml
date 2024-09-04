@@ -57,6 +57,15 @@ jobs:
         run: |
             grep '\-W' out.txt -B 4
 
-
-
-
+      - name: Summary
+        run: |
+            echo "Unused Variable Count:" 
+            grep -c -F 'Wunused-variable' out.txt -B 4
+            echo "Unused Dummy Arguments Count: "
+            grep -c -F 'Wunused-dummy-argument' out.txt -B 4
+            echo "Unused Value Count: "
+            grep -c -F 'Wunused-value' out.txt -B 4
+            echo "Maybe Uninitialized Variables Count: "
+            grep -c -F 'Wmaybe-uninitialized' out.txt -B 4
+            echo "Everything"
+            grep -c '\-W' out.txt -B 4
