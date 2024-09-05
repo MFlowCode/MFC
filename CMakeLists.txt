@@ -124,6 +124,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
+            -Wall 
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
