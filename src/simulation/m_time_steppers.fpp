@@ -934,6 +934,8 @@ contains
 
         real(kind(0d0)) :: dt_local
 
+        real(kind(0d0)) :: vcfl_dt, icfl_dt
+
         integer :: Nfq
         real(kind(0d0)) :: fltr_dtheta   !<
          !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
@@ -995,23 +997,52 @@ contains
                     if (p > 0) then
                         !3D
                         if (grid_geometry == 3) then
-                            max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
+                            icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
                                                              dy(k)/(abs(vel(2)) + c), &
                                                              fltr_dtheta/(abs(vel(3)) + c))
                         else
-                            max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
+                            icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
                                                              dy(k)/(abs(vel(2)) + c), &
                                                              dz(l)/(abs(vel(3)) + c))
                         end if
 
+                        if (any(Re_size > 0)) then
+                            if (grid_geometry == 3) then
+                                vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2d0) &
+                                            / minval(1/(rho*Re))
+                            else
+                                vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2d0) &
+                                            / minval(1/(rho*Re))
+                            end if
+                        else
+                            vcfl_dt = dflt_vcfl_dt
+                        end if
+
                     elseif (n > 0) then
                         !2D
-                        max_dt(j, k, l) = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
+                        icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
                                                          dy(k)/(abs(vel(2)) + c))
+
+                         if (any(Re_size > 0)) then
+                            vcfl_dt = cfl_target*(min(dx(j), dy(k))**2d0)/maxval((1/Re)/rho)
+                        else
+                            vcfl_dt = dflt_vcfl_dt
+                        end if
+
                     else
                         !1D
-                        max_dt(j, k, l) = cfl_target*(dx(j)/(abs(vel(1)) + c))
+                        icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+
+                        if (any(Re_size > 0)) then
+                            vcfl_dt = cfl_target*(dx(j)**2d0)/minval(1/(rho*Re))
+                        else
+                            vcfl_dt = dflt_vcfl_dt
+                        end if
+
                     end if
+
+                    max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
+
                 end do
             end do
         end do

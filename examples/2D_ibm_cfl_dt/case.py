@@ -20,8 +20,8 @@ print(json.dumps({
     'y_domain%beg'                 : 0.0E+00,
     'y_domain%end'                 : 6.0E-03,
     'cyl_coord'                    : 'F',
-    'm'                            : 799,
-    'n'                            : 599,
+    'm'                            : 199,
+    'n'                            : 139,
     'p'                            : 0,
     'cfl_adap_dt'                  : 'T',
     'cfl_target'                   : 0.3,
@@ -38,8 +38,6 @@ print(json.dumps({
     'alt_soundspeed'               : 'F',
     # One fluids: air
     'num_fluids'                   : 1,
-    # Advect both volume fractions
-    'adv_alphan'                   : 'T',
     # No need to ensure the volume fractions sum to unity at the end of each
     # time step
     'mpp_lim'                      : 'F',
@@ -103,6 +101,6 @@ print(json.dumps({
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),  # 2.50(Not 1.40)
     'fluid_pp(1)%pi_inf'           : 0,
-    # 'fluid_pp(1)%Re(1)'            : 2500000,
+    'fluid_pp(1)%Re(1)'            : 250000,
     # ==========================================================================
 }))
