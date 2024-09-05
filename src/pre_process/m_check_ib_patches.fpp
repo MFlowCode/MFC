@@ -207,7 +207,11 @@ contains
             (patch_ib(patch_id)%length_x <= 0d0 .and. &
              patch_ib(patch_id)%length_y <= 0d0 .and. &
              patch_ib(patch_id)%length_z <= 0d0) &
-            .or. &
+             .or. &
+             patch_ib(patch_id)%radius <= 0d0, &
+            'in cylinder IB patch '//trim(iStr))
+
+        @:PROHIBIT( &
             (patch_ib(patch_id)%length_x > 0d0 .and. &
              ((.not. f_is_default(patch_ib(patch_id)%length_y)) .or. &
               (.not. f_is_default(patch_ib(patch_id)%length_z)))) &
@@ -218,9 +222,7 @@ contains
             .or. &
             (patch_ib(patch_id)%length_z > 0d0 .and. &
              ((.not. f_is_default(patch_ib(patch_id)%length_x)) .or. &
-              (.not. f_is_default(patch_ib(patch_id)%length_y)))) &
-            .or. &
-            patch_ib(patch_id)%radius <= 0d0, &
+              (.not. f_is_default(patch_ib(patch_id)%length_y)))), &
             'in cylinder IB patch '//trim(iStr))
 
     end subroutine s_check_cylinder_ib_patch_geometry
