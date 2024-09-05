@@ -57,9 +57,9 @@ module m_fftw
     @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
     !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #else
-    real(kind(0d0)), allocatable :: data_real_gpu(:)
-    complex(kind(0d0)), allocatable :: data_cmplx_gpu(:)
-    complex(kind(0d0)), allocatable :: data_fltr_cmplx_gpu(:)
+    real(kind(0d0)), allocatable, target :: data_real_gpu(:)
+    complex(kind(0d0)), allocatable, target :: data_cmplx_gpu(:)
+    complex(kind(0d0)), allocatable, target :: data_fltr_cmplx_gpu(:)
     !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 #endif
 
@@ -141,7 +141,8 @@ contains
     subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-
+        real(c_double), pointer :: p_real(:)
+        complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Restrict filter to processors that have cells adjacent to axis
@@ -166,11 +167,16 @@ contains
             end do
         end do
 
-!$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+        p_real => data_real_gpu
+        p_cmplx => data_cmplx_gpu
+        p_fltr_cmplx => data_fltr_cmplx_gpu
+
+!$acc data attach(p_real, p_cmplx, p_fltr_cmplx)
+!$acc host_data use_device(p_real, p_cmplx, p_fltr_cmplx)
 #if defined(__PGI)
         ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-        ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
+        ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
         call hipCheck(hipDeviceSynchronize())
 #endif
         !$acc end host_data
@@ -186,11 +192,11 @@ contains
             end do
         end do
 
-!$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+!$acc host_data use_device(p_real, p_fltr_cmplx)
 #if defined(__PGI)
         ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-        ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
+        ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
         call hipCheck(hipDeviceSynchronize())
 #endif
         !$acc end host_data
@@ -225,11 +231,11 @@ contains
                 end do
             end do
 
-!$acc host_data use_device(data_real_gpu, data_cmplx_gpu)
+!$acc host_data use_device(p_real, p_cmplx)
 #if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-            ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(data_real_gpu), c_loc(data_cmplx_gpu))
+            ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
             call hipCheck(hipDeviceSynchronize())
 #endif
             !$acc end host_data
@@ -246,11 +252,11 @@ contains
                 end do
             end do
 
-!$acc host_data use_device(data_real_gpu, data_fltr_cmplx_gpu)
+!$acc host_data use_device(p_real, p_fltr_cmplx)
 #if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-            ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(data_fltr_cmplx_gpu), c_loc(data_real_gpu))
+            ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
             call hipCheck(hipDeviceSynchronize())
 #endif
             !$acc end host_data
@@ -297,8 +303,8 @@ contains
             end do
         end do
 #endif
-
-    end subroutine s_apply_fourier_filter
+!$acc end data
+    end subroutine s_apply_fourier_filter ! --------------------------------
 
     !>  The purpose of this subroutine is to destroy the fftw plan
         !!      that will be used in the forward and backward DFTs when

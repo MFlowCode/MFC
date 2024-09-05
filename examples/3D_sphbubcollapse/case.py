@@ -45,7 +45,7 @@ print(json.dumps({
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
-    # Only two patches are necesssary, the background liquid and the
+    # Only two patches are necessary, the background liquid and the
     # gas bubble
     'num_patches'                  : 2,
     # Use the 6 equation model
