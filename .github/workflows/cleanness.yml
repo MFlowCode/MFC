@@ -24,6 +24,7 @@ jobs:
     needs: file-changes
     runs-on: "ubuntu-latest"
     steps:
+<<<<<<< HEAD
       - name: Clone - PR
         uses: actions/checkout@v3
         with:
@@ -35,6 +36,10 @@ jobs:
           repository: MFlowCode/MFC
           ref: master
           path: master
+=======
+      - name: Checkouts
+        uses: actions/checkout@v4
+>>>>>>> 2e96b350 (test code cleanness CI)
 
       - name: Setup Ubuntu
         run: |
@@ -44,6 +49,7 @@ jobs:
       
       - name: Build
         run: |
+<<<<<<< HEAD
             (cd pr && /bin/bash mfc.sh build -j $(nproc) --debug > ../pr.txt 2>&1) 
             (cd master && /bin/bash mfc.sh build -j $(nproc) --debug > ../master.txt 2>&1)
       
@@ -96,4 +102,15 @@ jobs:
             echo "Maybe Uninitialized:" ${pr_uninit}, Difference: $((pr_uninit - master_uninit))
             echo "Everything:" ${pr_everything}, Difference: $((pr_everything - master_everything))
             
+<<<<<<< HEAD
 >>>>>>> 746ebed3 (added summary to workflow)
+=======
+=======
+            /bin/bash mfc.sh build -j $(nproc) --debug > out.txt 2>&1 
+      
+      - name: Grep Results
+        run: |
+            grep '\-W' out.txt
+
+>>>>>>> 2e96b350 (test code cleanness CI)
+>>>>>>> 9fbfd684 (cleanness)
