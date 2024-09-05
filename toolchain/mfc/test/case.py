@@ -180,12 +180,17 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+parser.add_argument("--rdma", action='store_true', help="Enable RDMA MPI if passed")
 
 ARGS = vars(parser.parse_args())
 
 ARGS["dict"] = json.loads(ARGS["dict"])
 
 case = {self.gen_json_dict_str()}
+
+if ARGS['rdma']:
+    case['rdma_mpi'] = 'T'
+
 mods = {{}}
 
 if "post_process" in ARGS["dict"]["targets"]:
