@@ -82,9 +82,18 @@ jobs:
             export master_everything="$(grep -c '\-W' master.txt -B 4)"
 
             echo "Difference is how many warnings were added or removed from master to pr, negative numbers are better since you are removing warnings"
+<<<<<<< HEAD
             echo "Unused Variable Count:" ${pr_variable}, Difference: $((pr_variable-master_variable))
             echo "Unused Dummy Argument:" ${pr_argument}, Difference: $((pr_argument-master_argument))
             echo "Unused Value:" ${pr_value}, Difference: $((pr_value-master_value))
             echo "Maybe Uninitialized:" ${pr_uninit}, Difference: $((pr_uninit-master_uninit))
             echo "Everything:" ${pr_everything}, Difference: $((pr_everything-master_everything))
             
+=======
+            echo "Unused Variable Count:" ${pr_variable}, Difference: $((pr_variable - master_varaible))
+            echo "Unused Dummy Argument:" ${pr_argument}, Difference: $((pr_argument - master_argument))
+            echo "Unused Value:" ${pr_value}, Difference: $((pr_value - master_value))
+            echo "Maybe Uninitialized:" ${pr_uninit}, Difference: $((pr_uninit - master_uninit))
+            echo "Everything:" ${pr_everything}, Difference: $((pr_everything - master_everything))
+            
+>>>>>>> 746ebed3 (added summary to workflow)
