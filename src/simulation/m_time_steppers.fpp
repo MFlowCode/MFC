@@ -998,21 +998,21 @@ contains
                         !3D
                         if (grid_geometry == 3) then
                             icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                             dy(k)/(abs(vel(2)) + c), &
-                                                             fltr_dtheta/(abs(vel(3)) + c))
+                                                     dy(k)/(abs(vel(2)) + c), &
+                                                     fltr_dtheta/(abs(vel(3)) + c))
                         else
                             icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                             dy(k)/(abs(vel(2)) + c), &
-                                                             dz(l)/(abs(vel(3)) + c))
+                                                     dy(k)/(abs(vel(2)) + c), &
+                                                     dz(l)/(abs(vel(3)) + c))
                         end if
 
                         if (any(Re_size > 0)) then
                             if (grid_geometry == 3) then
                                 vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2d0) &
-                                            / minval(1/(rho*Re))
+                                          /minval(1/(rho*Re))
                             else
                                 vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2d0) &
-                                            / minval(1/(rho*Re))
+                                          /minval(1/(rho*Re))
                             end if
                         else
                             vcfl_dt = dflt_vcfl_dt
@@ -1021,9 +1021,9 @@ contains
                     elseif (n > 0) then
                         !2D
                         icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
-                                                         dy(k)/(abs(vel(2)) + c))
+                                                 dy(k)/(abs(vel(2)) + c))
 
-                         if (any(Re_size > 0)) then
+                        if (any(Re_size > 0)) then
                             vcfl_dt = cfl_target*(min(dx(j), dy(k))**2d0)/maxval((1/Re)/rho)
                         else
                             vcfl_dt = dflt_vcfl_dt
