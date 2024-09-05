@@ -207,8 +207,8 @@ contains
             (patch_ib(patch_id)%length_x <= 0d0 .and. &
              patch_ib(patch_id)%length_y <= 0d0 .and. &
              patch_ib(patch_id)%length_z <= 0d0) &
-             .or. &
-             patch_ib(patch_id)%radius <= 0d0, &
+            .or. &
+            patch_ib(patch_id)%radius <= 0d0, &
             'in cylinder IB patch '//trim(iStr))
 
         @:PROHIBIT( &
