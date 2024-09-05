@@ -1,9 +1,43 @@
-This file was created on 2024-07-10 11:11:15.358711.
+This file was created on 2024-09-04 20:39:19.446143.
 
 mfc.sh:
 
-    Invocation: test --generate -o B54BB9D8 53A15FFC 07C54EDD 121D4ECA 6B1AD553 D80F2162 AE02324F 37FA2CEF 0501B3DA
+    Invocation: test --generate -o cfl_adap_dt=T
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
+    Git:        23ee7b6c702ed08bc2b7281173943308d43772af on CFLDT (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 simulation:
 
@@ -31,9 +65,42 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+documentation:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-65-129.vpn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : ON
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : /opt/homebrew/bin/doxygen
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : gcc
+        CXX      : g++
+        FC       : gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -64,9 +131,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -97,42 +164,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

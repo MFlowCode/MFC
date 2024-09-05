@@ -1,42 +1,10 @@
-This file was created on 2024-07-11 13:58:14.710990.
+This file was created on 2024-09-04 20:40:03.147021.
 
 mfc.sh:
 
-    Invocation: test --generate -o 07C54EDD 53A15FFC 6B1AD553 D80F2162 0501B3DA 37FA2CEF
+    Invocation: test --generate -o cfl_const_dt=T
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        23ee7b6c702ed08bc2b7281173943308d43772af on CFLDT (dirty)
 
 post_process:
 
@@ -64,9 +32,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -97,9 +65,42 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -163,9 +164,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/gcc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/g++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

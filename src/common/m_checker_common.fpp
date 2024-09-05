@@ -61,8 +61,8 @@ contains
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_time_stepping
         if (cfl_dt) then
-            @:PROHIBIT(cfl_tart < 0 .or. cfl_target > 1d0)
-            @:PROHIBIT(t_stp <= 0)
+            @:PROHIBIT(cfl_target < 0 .or. cfl_target > 1d0)
+            @:PROHIBIT(t_stop <= 0)
             @:PROHIBIT(t_save <= 0)
             @:PROHIBIT(t_save > t_stop)
             @:PROHIBIT(n_start < 0)

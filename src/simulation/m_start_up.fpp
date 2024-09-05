@@ -1099,9 +1099,16 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
+        real(kind(0d0)) :: dt_init
+
         integer :: i, j, k, l
 
+        if (cfl_const_dt .and. t_step == 1) call s_compute_dt()
         if (cfl_adap_dt) call s_compute_dt()
+
+        if (t_step == 0) dt_init = dt
+
+        if (dt < 1d-3*dt_init) call s_mpi_abort("Delta t has become too small")
 
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) dt = t_stop - mytime

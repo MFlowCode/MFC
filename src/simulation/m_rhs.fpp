@@ -791,7 +791,7 @@ contains
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
-        if (cfl_adap_dt) then
+        if (cfl_dt) then
             if (mytime >= t_stop) return
         else
             if (t_step == t_step_stop) return
@@ -1015,8 +1015,8 @@ contains
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) iy%beg = -buff_size;
-            if (p > 0) iz%beg = -buff_size;
+            if (n > 0) iy%beg = -buff_size; 
+            if (p > 0) iz%beg = -buff_size; 
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             !$acc update device(ix, iy, iz)
 

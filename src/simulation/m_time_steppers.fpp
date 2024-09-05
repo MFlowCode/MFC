@@ -327,7 +327,7 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (cfl_adap_dt) then
+        if (cfl_dt) then
             if (mytime >= t_stop) return
         else
             if (t_step == t_step_stop) return
@@ -432,7 +432,7 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (cfl_adap_dt) then
+        if (cfl_dt) then
             if (mytime >= t_stop) return
         else
             if (t_step == t_step_stop) return
@@ -617,14 +617,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (cfl_adap_dt) then
+        if (cfl_dt) then
             if (mytime >= t_stop) return
         else
             if (t_step == t_step_stop) return
         end if
-
-        !$acc update host(dt)
-        print*, "dt = ", dt
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
