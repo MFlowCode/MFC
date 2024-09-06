@@ -938,7 +938,7 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re, fltr_dtheta, Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
