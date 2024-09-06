@@ -26,6 +26,8 @@ module m_data_output
 
     use m_helper
 
+    use m_sim_helpers
+
     use m_delay_file_access
 
     use m_ibm
@@ -259,107 +261,15 @@ contains
             do k = 0, n
                 do j = 0, m
 
-                    do i = 1, num_fluids
-                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-                    end do
-
-                    if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
-                    else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
-                    end if
-
-                    do i = 1, num_dims
-                        vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
-                    end do
-
-                    vel_sum = 0d0
-                    do i = 1, num_dims
-                        vel_sum = vel_sum + vel(i)**2d0
-                    end do
-
-                    pres = q_prim_vf(E_idx)%sf(j, k, l)
-
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
-
-                    H = (E + pres)/rho
+                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
 
-                    if (grid_geometry == 3) then
-                        if (k == 0) then
-                            fltr_dtheta = 2d0*pi*y_cb(0)/3d0
-                        elseif (k <= fourier_rings) then
-                            Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                            fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
-                        else
-                            fltr_dtheta = y_cb(k - 1)*dz(l)
-                        end if
-                    end if
-
-                    if (p > 0) then
-                        !3D
-                        if (grid_geometry == 3) then
-                            icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      fltr_dtheta/(abs(vel(3)) + c))
-                        else
-                            icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      dz(l)/(abs(vel(3)) + c))
-                        end if
-
-                        if (any(Re_size > 0)) then
-
-                            if (grid_geometry == 3) then
-                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
-                                                   /min(dx(j), dy(k), fltr_dtheta)**2d0
-
-                                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                     dy(k)*(abs(vel(2)) + c), &
-                                                     fltr_dtheta*(abs(vel(3)) + c)) &
-                                                 /maxval(1d0/Re)
-                            else
-                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
-                                                   /min(dx(j), dy(k), dz(l))**2d0
-
-                                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                     dy(k)*(abs(vel(2)) + c), &
-                                                     dz(l)*(abs(vel(3)) + c)) &
-                                                 /maxval(1d0/Re)
-                            end if
-
-                        end if
-
-                    elseif (n > 0) then
-                        !2D
-                        icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                  dy(k)/(abs(vel(2)) + c))
-
-                        if (any(Re_size > 0)) then
-
-                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/min(dx(j), dy(k))**2d0
-
-                            Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                 dy(k)*(abs(vel(2)) + c)) &
-                                             /maxval(1d0/Re)
-
-                        end if
-
+                    if (any(Re_size > 0)) then
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
                     else
-                        !1D
-                        icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
-
-                        if (any(Re_size > 0)) then
-
-                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/dx(j)**2d0
-
-                            Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re)
-
-                        end if
-
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
                     end if
 
                 end do
