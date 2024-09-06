@@ -17,6 +17,20 @@ module m_sim_helpers
 
     contains
 
+        !> Computes enthalpy
+        !! @param q_prim_vf cell centered primitive variables
+        !! @param pres mixture pressure
+        !! @param rho mixture density
+        !! @param gamma mixture gamma
+        !! @param pi_inf mixture pi_inf
+        !! @param Re mixture reynolds number
+        !! @param H mixture enthalpy
+        !! @param alpha component alphas
+        !! @param vel directional velocities
+        !! @param vel_sum squard sum of velocity components
+        !! @param j x index
+        !! @param k y index
+        !! @param l z index
         subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
             type(scalar_field), dimension(sys_size) :: q_prim_vf
@@ -55,6 +69,16 @@ module m_sim_helpers
 
         end subroutine s_compute_enthalpy
 
+        !> Computes stability criterion for a specified dt
+        !! @param vel directional velocities
+        !! @param c mixture speed of sound
+        !! @param Re_l mixture Reynolds number
+        !! @param j x index
+        !! @param k y index
+        !! @param l z index
+        !! @param icfl_sf cell centered inviscid cfl number
+        !! @param vcfl_sf (optional) cell centered viscous cfl number
+        !! @param Rc_sf (optional) cell centered Rc
         subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
 
             real(kind(0d0)), dimension(num_dims) :: vel
@@ -143,6 +167,14 @@ module m_sim_helpers
 
         end subroutine s_compute_stability_from_dt
 
+        !> Computes dt for a specified CFL number
+        !! @param vel directional velocities
+        !! @param max_dt cell centered maximum dt
+        !! @param rho cell centered density
+        !! @param Re_l cell centered Reynolds number
+        !! @param j x coordinate
+        !! @param k y coordinate
+        !! @param l z coordinate
         subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
 
             real(kind(0d0)), dimension(num_dims) :: vel
