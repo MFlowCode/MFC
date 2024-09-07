@@ -31,7 +31,7 @@ contains
         !! @param k y index
         !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-
+        !$acc routine seq
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho
         real(kind(0d0)), dimension(num_fluids) :: alpha
@@ -79,7 +79,7 @@ contains
         !! @param vcfl_sf (optional) cell centered viscous cfl number
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
-
+        !$acc routine seq
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: icfl_sf
@@ -175,7 +175,7 @@ contains
         !! @param k y coordinate
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
-
+        !$acc routine seq
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: max_dt
