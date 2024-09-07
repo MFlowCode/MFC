@@ -1,5 +1,8 @@
 !> @brief This module contains subroutines that read, and check consistency
 !!              of, the user provided inputs and data.
+
+#:include 'macros.fpp'
+
 module m_check_ib_patches
 
     ! Dependencies =============================================================
@@ -40,6 +43,7 @@ contains
             if (i <= num_ibs) then
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
+
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then
                     call s_check_circle_ib_patch_geometry(i)
@@ -50,21 +54,24 @@ contains
                 else if (patch_ib(i)%geometry == 4) then
                     call s_check_airfoil_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == 11) then
-                    call s_check_3D_airfoil_ib_patch_geometry(i)
+                    call s_check_3d_airfoil_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == 10) then
                     call s_check_cylinder_ib_patch_geometry(i)
+                else if (patch_ib(i)%geometry == dflt_int) then
+                    call s_prohibit_abort("IB patch undefined", &
+                                          "patch_ib("//trim(iStr)//")%geometry must be set.")
                 else
-                    call s_mpi_abort('Unsupported choice of the '// &
-                                     'geometry of active patch '//trim(iStr)// &
-                                     ' detected. Exiting ...')
+                    call s_prohibit_abort("Invalid IB patch", &
+                                          "patch_ib("//trim(iStr)//")%geometry must be "// &
+                                          "2-4, 8, 10, or 11.")
                 end if
             else
                 if (patch_ib(i)%geometry == dflt_int) then
                     call s_check_inactive_ib_patch_geometry(i)
                 else
-                    call s_mpi_abort('Unsupported choice of the '// &
-                                     'geometry of inactive patch '//trim(iStr)// &
-                                     ' detected. Exiting ...')
+                    call s_prohibit_abort("Inactive IB patch defined", &
+                                          "patch_ib("//trim(iStr)//")%geometry "// &
+                                          "must not be set for inactive patches.")
                 end if
             end if
         end do
@@ -81,18 +88,11 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the circle patch
-        if (n == 0 .or. p > 0 .or. patch_ib(patch_id)%radius <= 0d0 &
-            .or. &
-            f_is_default(patch_ib(patch_id)%x_centroid) &
-            .or. &
-            f_is_default(patch_ib(patch_id)%y_centroid)) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of circle '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+        @:PROHIBIT(n == 0 .or. p > 0 &
+            .or. patch_ib(patch_id)%radius <= 0d0 &
+            .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+            .or. f_is_default(patch_ib(patch_id)%y_centroid), &
+            'in circle IB patch '//trim(iStr))
 
     end subroutine s_check_circle_ib_patch_geometry
 
@@ -106,17 +106,14 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the airfoil patch
-        if (n == 0 .or. p > 0 .or. patch_ib(patch_id)%c <= 0d0 &
-            .or. patch_ib(patch_id)%p <= 0d0 .or. patch_ib(patch_id)%t <= 0d0 &
-            .or. patch_ib(patch_id)%m <= 0d0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-            .or. f_is_default(patch_ib(patch_id)%y_centroid)) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of airfoil '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+        @:PROHIBIT(n == 0 .or. p > 0 &
+            .or. patch_ib(patch_id)%c <= 0d0 &
+            .or. patch_ib(patch_id)%p <= 0d0 &
+            .or. patch_ib(patch_id)%t <= 0d0 &
+            .or. patch_ib(patch_id)%m <= 0d0 &
+            .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+            .or. f_is_default(patch_ib(patch_id)%y_centroid), &
+            'in airfoil IB patch '//trim(iStr))
 
     end subroutine s_check_airfoil_ib_patch_geometry
 
@@ -130,18 +127,16 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the 3d airfoil patch
-        if (n == 0 .or. p == 0 .or. patch_ib(patch_id)%c <= 0d0 &
-            .or. patch_ib(patch_id)%p <= 0d0 .or. patch_ib(patch_id)%t <= 0d0 &
-            .or. patch_ib(patch_id)%m <= 0d0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-            .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
-            .or. f_is_default(patch_ib(patch_id)%length_z)) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of airfoil '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+        @:PROHIBIT(n == 0 .or. p == 0 &
+            .or. patch_ib(patch_id)%c <= 0d0 &
+            .or. patch_ib(patch_id)%p <= 0d0 &
+            .or. patch_ib(patch_id)%t <= 0d0 &
+            .or. patch_ib(patch_id)%m <= 0d0 &
+            .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+            .or. f_is_default(patch_ib(patch_id)%y_centroid) &
+            .or. f_is_default(patch_ib(patch_id)%z_centroid) &
+            .or. f_is_default(patch_ib(patch_id)%length_z), &
+            'in 3d airfoil IB patch '//trim(iStr))
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
 
@@ -155,8 +150,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the rectangle patch
-        if (n == 0 .or. p > 0 &
+        @:PROHIBIT(n == 0 .or. p > 0 &
             .or. &
             f_is_default(patch_ib(patch_id)%x_centroid) &
             .or. &
@@ -164,13 +158,8 @@ contains
             .or. &
             patch_ib(patch_id)%length_x <= 0d0 &
             .or. &
-            patch_ib(patch_id)%length_y <= 0d0) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of rectangle '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+            patch_ib(patch_id)%length_y <= 0d0, &
+            'in rectangle IB patch '//trim(iStr))
 
     end subroutine s_check_rectangle_ib_patch_geometry
 
@@ -184,8 +173,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the sphere patch
-        if (n == 0 .or. p == 0 &
+        @:PROHIBIT(n == 0 .or. p == 0 &
             .or. &
             f_is_default(patch_ib(patch_id)%x_centroid) &
             .or. &
@@ -193,13 +181,8 @@ contains
             .or. &
             f_is_default(patch_ib(patch_id)%z_centroid) &
             .or. &
-            patch_ib(patch_id)%radius <= 0d0) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of rectangle '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+            patch_ib(patch_id)%radius <= 0d0, &
+            'in sphere IB patch '//trim(iStr))
 
     end subroutine s_check_sphere_ib_patch_geometry
 
@@ -213,8 +196,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the cylinder patch
-        if (p == 0 &
+        @:PROHIBIT(p == 0 &
             .or. &
             f_is_default(patch_ib(patch_id)%x_centroid) &
             .or. &
@@ -226,6 +208,10 @@ contains
              patch_ib(patch_id)%length_y <= 0d0 .and. &
              patch_ib(patch_id)%length_z <= 0d0) &
             .or. &
+            patch_ib(patch_id)%radius <= 0d0, &
+            'in cylinder IB patch '//trim(iStr))
+
+        @:PROHIBIT( &
             (patch_ib(patch_id)%length_x > 0d0 .and. &
              ((.not. f_is_default(patch_ib(patch_id)%length_y)) .or. &
               (.not. f_is_default(patch_ib(patch_id)%length_z)))) &
@@ -236,15 +222,8 @@ contains
             .or. &
             (patch_ib(patch_id)%length_z > 0d0 .and. &
              ((.not. f_is_default(patch_ib(patch_id)%length_x)) .or. &
-              (.not. f_is_default(patch_ib(patch_id)%length_y)))) &
-            .or. &
-            patch_ib(patch_id)%radius <= 0d0) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of cylinder '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+              (.not. f_is_default(patch_ib(patch_id)%length_y)))), &
+            'in cylinder IB patch '//trim(iStr))
 
     end subroutine s_check_cylinder_ib_patch_geometry
 
@@ -257,8 +236,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        ! Constraints on the geometric parameters of the inactive patch
-        if ((.not. f_is_default(patch_ib(patch_id)%x_centroid)) &
+        @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%x_centroid)) &
             .or. &
             (.not. f_is_default(patch_ib(patch_id)%y_centroid)) &
             .or. &
@@ -270,13 +248,8 @@ contains
             .or. &
             (.not. f_is_default(patch_ib(patch_id)%length_z)) &
             .or. &
-            (.not. f_is_default(patch_ib(patch_id)%radius))) then
-
-            call s_mpi_abort('Inconsistency(ies) detected in '// &
-                             'geometric parameters of inactive '// &
-                             'patch '//trim(iStr)//'. Exiting ...')
-
-        end if
+            (.not. f_is_default(patch_ib(patch_id)%radius)), &
+            'in inactive IB patch '//trim(iStr))
 
     end subroutine s_check_inactive_ib_patch_geometry
 

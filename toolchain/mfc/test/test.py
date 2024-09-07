@@ -18,6 +18,8 @@ from ..packer import packer
 
 
 nFAIL = 0
+nPASS = 0
+nSKIP = 0
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -60,7 +62,7 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL
+    global nFAIL, nPASS, nSKIP
 
     cases = [ _.to_case() for _ in list_cases() ]
 
@@ -123,12 +125,9 @@ def test():
         ARG("jobs"), ARG("gpus"))
 
     cons.print()
-    if nFAIL == 0:
-        cons.print("Tested Simulation [bold green]✓[/bold green]")
-    else:
-        raise MFCException(f"Testing: Encountered [bold red]{nFAIL}[/bold red] failure(s).")
-
     cons.unindent()
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+    exit(nFAIL)
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
@@ -217,8 +216,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement
-    global nFAIL
+    # pylint: disable=global-statement, global-variable-not-assigned
+    global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
 
@@ -227,18 +226,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
         try:
             _handle_case(case, devices)
+            nPASS += 1
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
-
             nFAIL += 1
-
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-
-            if ARG("relentless"):
-                cons.print(f"{exc}")
-            else:
-                raise exc
+            cons.print(f"{exc}")
 
         return
