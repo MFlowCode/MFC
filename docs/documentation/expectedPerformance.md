@@ -35,6 +35,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA P100               |                           | GPU           | 1 GPU           | 2.4              | NVHPC 23.5           | GT CSE Internal  |
 | AMD EPYC 9534             | Genoa                     | CPU           | 64/64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | Single-precision GPU      | GPU           | 1 GPU           | 3.3              | NVHPC 22.11          | NCSA Delta  |
+| Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48/48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
 | NVIDIA Grace CPU          | Arm, Neoverse V2          | CPU           | 72/72 cores     | 3.7              | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000            | Single-precision GPU      | GPU           | 1 GPU           | 3.9              | NVHPC 22.11          | GT Phoenix  |
 | AMD EPYC 7763             | Milan                     | CPU           | 64/64 cores     | 4.1              | GNU 11.4.0           | NCSA Delta  |
