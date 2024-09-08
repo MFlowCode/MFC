@@ -23,7 +23,6 @@ Please select your desired configuration from the list bellow:
 . ./mfc.sh load
 ```
 
-<a id="via-aptitude"></a>
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
 ```shell
@@ -35,7 +34,7 @@ sudo apt install tar wget make cmake gcc g++ \
                    python3-venv
 ```
 
-- **Via [Pacman](https://wiki.archlinux.org/title/pacman):**
+- **Via Pacman (Arch):**
 
 ```shell
 sudo pacman -Syu
@@ -77,7 +76,7 @@ Useful software to install for using WSL on Windows:
 - [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)
 - [Visual Studio Code](https://code.visualstudio.com/) and the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension
 
-Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see [Via Aptitude](#via-aptitude)).
+Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see `Via Aptitude` section).
 
   </details>
 
@@ -87,12 +86,12 @@ Once you have WSL installed, you can follow the instructions for *nix systems ab
 
 Install the latest version of:
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
-- [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
-- [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
+- Intel® oneAPI Base Toolkit
+- Intel® oneAPI HPC Toolkit
 - [Strawberry Perl](https://strawberryperl.com/) (Install and add `C:\strawberry\perl\bin\perl.exe` or your installation path to your [PATH](https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/))
 Please note that Visual Studio must be installed first, and the oneAPI Toolkits need to be configured with the installed Visual Studio, even if you plan to use a different IDE.
 
-Then, in order to initialize your development environment, run the following command (or your installation path) in command prompt:
+Then, to initialize your development environment, run the following command (or your installation path) in the command prompt:
 ```shell
 "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 ```
@@ -130,8 +129,8 @@ open ~/.bash_profile
   
 An editor should open.
 Please paste the following lines into it before saving the file.
-If you wish to use a version of GNU's GCC other than 13, modify the first assignment.
-These lines ensure that LLVM's Clang, and Apple's modified version of GCC, won't be used to compile MFC.
+Modify the first assignment if you wish to use a different version of GNU's GCC.
+These lines ensure that LLVM's Clang and Apple's modified version of GCC are not used to compile MFC.
 Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9).
 We do *not* support `clang` due to conflicts with the Silo dependency.
 
@@ -158,7 +157,7 @@ They will download the dependencies MFC requires to build itself.
 Docker is a lightweight, cross-platform, and performant alternative to Virtual Machines (VMs).
 We build a Docker Image that contains the packages required to build and run MFC on your local machine.
   
-First install Docker and Git:
+First, install Docker and Git:
 - Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
 - macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
 - Other systems:
@@ -182,13 +181,11 @@ recommended settings applied, run
   .\mfc.bat docker # If on Windows
 ```
 
-We automatically mount and configure the proper permissions in order for you to
-access your local copy of MFC, available at `~/MFC`. You will be logged-in as the
-`me` user with root permissions.
+We automatically mount and configure the proper permissions for you to access your local copy of MFC, available at `~/MFC`.
+You will be logged in as the `me` user with root permissions.
 
 :warning: The state of your container is entirely transient, except for the MFC mount.
-Thus, any modification outside of `~/MFC` should be considered as permanently lost upon
-session exit.
+Thus, any modification outside of `~/MFC` should be considered permanently lost upon session exit.
 
 </details>
 
@@ -207,10 +204,10 @@ MFC can be built with support for various (compile-time) features:
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
 When these options are given to `mfc.sh`, they will be remembered when you issue future commands.
-You can enable and disable features at any time by passing any of the arguments above.
-For example, if you have previously built MFC with MPI support and no longer wish to run using MPI, you can pass `--no-mpi` once, for the change to be permanent.
+You can enable and disable features anytime by passing any of the arguments above.
+For example, if you previously built MFC with MPI support and no longer wish to run using MPI, you can pass `--no-mpi` once, making the change permanent.
 
-MFC is composed of three codes, each being a separate _target_.
+MFC comprises three codes, each being a separate _target_.
 By default, all targets (`pre_process`, `simulation`, and `post_process`) are selected.
 To only select a subset, use the `-t` (i.e., `--targets`) argument.
 For a detailed list of options, arguments, and features, please refer to `./mfc.sh build --help`.

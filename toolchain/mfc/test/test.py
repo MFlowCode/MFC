@@ -18,6 +18,8 @@ from ..packer import packer
 
 
 nFAIL = 0
+nPASS = 0
+nSKIP = 0
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -60,18 +62,18 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL
+    global nFAIL, nPASS, nSKIP
 
     cases = [ _.to_case() for _ in list_cases() ]
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
-        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
+        dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
         new_uuids = { case.get_uuid() for case in cases }
 
         for old_uuid in dir_uuids - new_uuids:
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
-            common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+            common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
         return
 
@@ -123,12 +125,9 @@ def test():
         ARG("jobs"), ARG("gpus"))
 
     cons.print()
-    if nFAIL == 0:
-        cons.print("Tested Simulation [bold green]✓[/bold green]")
-    else:
-        raise MFCException(f"Testing: Encountered [bold red]{nFAIL}[/bold red] failure(s).")
-
     cons.unindent()
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+    exit(nFAIL)
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
@@ -191,9 +190,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
             h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
 
-            if ARG("sys_hdf5"):
+            if not os.path.exists(h5dump or ""):
                 if not does_command_exist("h5dump"):
-                    raise MFCException("--sys-hdf5 was specified and h5dump couldn't be found.")
+                    raise MFCException("h5dump couldn't be found.")
 
                 h5dump = shutil.which("h5dump")
 
@@ -217,8 +216,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement
-    global nFAIL
+    # pylint: disable=global-statement, global-variable-not-assigned
+    global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
 
@@ -227,18 +226,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
         try:
             _handle_case(case, devices)
+            nPASS += 1
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
-
             nFAIL += 1
-
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-
-            if ARG("relentless"):
-                cons.print(f"{exc}")
-            else:
-                raise exc
+            cons.print(f"{exc}")
 
         return

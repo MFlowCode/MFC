@@ -6,7 +6,7 @@
     #> The MFC prologue prints a summary of the running job and starts a timer.
     #>
 
-    . "${MFC_ROOTDIR}/toolchain/util.sh"
+    . "${MFC_ROOT_DIR}/toolchain/util.sh"
 
     TABLE_FORMAT_LINE="| * %-14s $MAGENTA%-35s$COLOR_RESET * %-14s $MAGENTA%-35s$COLOR_RESET |\\n"
     TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
@@ -74,9 +74,9 @@ END
         export CRAY_ACC_MODULE='${target.get_staging_dirpath(case)}/simulation-wg256.lld.exe'
     fi
 
-    cd "${os.path.dirname(input)}"
+    cd '${os.path.dirname(input)}'
 
-    t_${target.name}_start=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    t_${target.name}_start=$(python3 -c 'import time; print(time.time())')
 % else:
     echo ^:) Running ${target.name}.
     echo.
@@ -89,7 +89,7 @@ END
 % if os.name != 'nt':
     code=$?
 
-    t_${target.name}_stop=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    t_${target.name}_stop=$(python3 -c 'import time; print(time.time())')
 
     if [ $code -ne 0 ]; then
         echo
@@ -102,10 +102,14 @@ END
 
     % if output_summary:
 
-        cd "${MFC_ROOTDIR}"
+        cd '${MFC_ROOT_DIR}'
 
-        cat >>"${output_summary}" <<EOL
-${target.name}: $(echo "$t_${target.name}_stop - $t_${target.name}_start" | bc -l)
+        cat >>'${output_summary}' <<EOL
+${target.name}:
+    exec:  $(echo "$t_${target.name}_stop - $t_${target.name}_start" | bc -l)
+% if target == SIMULATION:
+    grind: $(cat '${os.path.join(os.path.dirname(input), 'time_data.dat')}' | tail -n 1 | awk '{print $NF}')
+% endif
 EOL
 
         cd - > /dev/null

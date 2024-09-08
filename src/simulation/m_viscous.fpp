@@ -1491,7 +1491,7 @@ contains
 
     end subroutine s_compute_fd_gradient
 
-    subroutine s_finalize_viscous_module
+    subroutine s_finalize_viscous_module()
 
         integer :: i
 

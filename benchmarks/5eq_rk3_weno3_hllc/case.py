@@ -176,7 +176,7 @@ tend = Nt * dt
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
-    'run_time_info'                : 'T',
+    'run_time_info'                : 'F',
     # ==========================================================
 
     # Computational Domain Parameters ==========================
@@ -193,7 +193,7 @@ print(json.dumps({
     'dt'                           : dt,
     't_step_start'                 : 0,
     't_step_stop'                  : int(60*(95*size + 5)),
-    't_step_save'                  : int(12*(95*size + 5)),
+    't_step_save'                  : int(60*(95*size + 5)),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================

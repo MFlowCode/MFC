@@ -4,6 +4,7 @@ rich
 fypp
 mako
 wheel
+typos
 typing
 PyYAML
 pylint
