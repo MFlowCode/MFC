@@ -116,7 +116,6 @@ contains
         real(kind(0d0)) :: gamma  !< specific heat ratio function
         real(kind(0d0)) :: x_centroid, y_centroid
         real(kind(0d0)) :: epsilon, beta
-        integer :: test
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
