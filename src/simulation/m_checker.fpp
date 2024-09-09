@@ -92,7 +92,9 @@ contains
 
     !> Checks constraints on time stepping parameters
     subroutine s_check_inputs_time_stepping
-        @:PROHIBIT(dt <= 0)
+        if (.not. cfl_dt) then
+            @:PROHIBIT(dt <= 0)
+        end if
         @:PROHIBIT(time_stepper < 1 .or. time_stepper > 5)
     end subroutine s_check_inputs_time_stepping
 

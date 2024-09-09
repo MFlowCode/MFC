@@ -161,7 +161,8 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z
+            g_x, g_y, g_z, n_start, t_save, t_stop, &
+            cfl_adap_dt, cfl_const_dt, cfl_target
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -192,6 +193,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -261,8 +264,13 @@ contains
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
-        write (t_step_dir, '(A,I0,A,I0)') &
-            trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        if (cfl_dt) then
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
+        else
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        end if
 
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
@@ -559,9 +567,14 @@ contains
         end if
 
         if (file_per_process) then
-            call s_int_to_str(t_step_start, t_step_start_string)
-            ! Open the file to read conservative variables
-            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                call s_int_to_str(n_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                call s_int_to_str(t_step_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
+
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -646,9 +659,12 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         else
-
             ! Open the file to read conservative variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -1083,16 +1099,43 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
+        real(kind(0d0)) :: dt_init
+
         integer :: i, j, k, l
 
-        if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
-                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                t_step - t_step_start + 1, &
-                t_step_stop - t_step_start + 1, &
-                t_step
+        if (cfl_dt) then
+            if (cfl_const_dt .and. t_step == 1) call s_compute_dt()
+
+            if (cfl_adap_dt) call s_compute_dt()
+
+            if (t_step == 0) dt_init = dt
+
+            if (dt < 1d-3*dt_init) call s_mpi_abort("Delta t has become too small")
         end if
-        mytime = mytime + dt
+
+        if (cfl_dt) then
+            if ((mytime + dt) >= t_stop) dt = t_stop - mytime
+        else
+            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+        end if
+
+        if (cfl_dt) then
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
+                    int(ceiling(100d0*(mytime/t_stop))), &
+                    mytime, &
+                    dt, &
+                    t_step
+            end if
+        else
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    t_step - t_step_start + 1, &
+                    t_step_stop - t_step_start + 1, &
+                t_step
+            end if
+        end if
 
         if (probe_wrt) then
             do i = 1, sys_size
@@ -1106,6 +1149,8 @@ contains
         print *, 'Computed derived vars'
 #endif
 
+        mytime = mytime + dt
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -1116,9 +1161,10 @@ contains
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
+
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
-        if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
@@ -1189,41 +1235,52 @@ contains
         integer, intent(inout) :: t_step
         real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
-        
+
         integer :: i, j, k, l
 
-        if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
+        integer :: save_count
 
-            call cpu_time(start)
-            !  call nvtxStartRange("I/O")
-            do i = 1, sys_size
-                !$acc update host(q_cons_ts(1)%vf(i)%sf)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                                error stop "NaN(s) in timestep output."
-                            end if
-                        end do
+        call cpu_time(start)
+        !  call nvtxStartRange("I/O")
+        do i = 1, sys_size
+            !$acc update host(q_cons_ts(1)%vf(i)%sf)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                            error stop "NaN(s) in timestep output."
+                        end if
                     end do
                 end do
             end do
+        end do
 
-            if (qbmm .and. .not. polytropic) then
-                !$acc update host(pb_ts(1)%sf)
-                !$acc update host(mv_ts(1)%sf)
-            end if
+        if (qbmm .and. .not. polytropic) then
+            !$acc update host(pb_ts(1)%sf)
+            !$acc update host(mv_ts(1)%sf)
+        end if
 
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
-            !  call nvtxEndRange
-            call cpu_time(finish)
+        if (cfl_dt) then
+            save_count = int(mytime/t_save)
+        else
+            save_count = t_step
+        end if
+
+        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+
+        !  call nvtxEndRange
+        call cpu_time(finish)
+        if (cfl_dt) then
+            nt = mytime/t_save
+        else
             nt = int((t_step - t_step_start)/(t_step_save))
-            if (nt == 1) then
-                io_time_avg = abs(finish - start)
-            else
-                io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
-            end if
+        end if
+
+        if (nt == 1) then
+            io_time_avg = abs(finish - start)
+        else
+            io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
         end if
 
     end subroutine s_save_data

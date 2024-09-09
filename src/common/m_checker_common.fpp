@@ -60,9 +60,17 @@ contains
     !> Checks constraints on the time-stepping parameters.
         !! Called by s_check_inputs_common for simulation and post-processing
     subroutine s_check_inputs_time_stepping
-        @:PROHIBIT(t_step_start < 0)
-        @:PROHIBIT(t_step_stop <= t_step_start)
-        @:PROHIBIT(t_step_save > t_step_stop - t_step_start)
+        if (cfl_dt) then
+            @:PROHIBIT(cfl_target < 0 .or. cfl_target > 1d0)
+            @:PROHIBIT(t_stop <= 0)
+            @:PROHIBIT(t_save <= 0)
+            @:PROHIBIT(t_save > t_stop)
+            @:PROHIBIT(n_start < 0)
+        else
+            @:PROHIBIT(t_step_start < 0)
+            @:PROHIBIT(t_step_stop <= t_step_start)
+            @:PROHIBIT(t_step_save > t_step_stop - t_step_start)
+        end if
     end subroutine s_check_inputs_time_stepping
 
     !> Checks constraints on the finite difference parameters.
