@@ -30,6 +30,7 @@ jobs:
             - name: Build
               run: |
                 (cd pr && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../pr.txt) 
+                python -m pip cache purge
                 (cd master && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../master.txt)
                 sed -i '/\/pr\//d' pr.txt
                 sed -i '/\/master\//d' master.txt
