@@ -38,6 +38,10 @@ module m_time_steppers
     use m_nvtx
 
     use m_body_forces
+
+    use ieee_arithmetic
+
+    use m_sim_helpers
     ! ==========================================================================
 
     implicit none
@@ -391,6 +395,8 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -498,6 +504,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -572,6 +580,8 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
+
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 2)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -683,6 +693,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -758,6 +770,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 2)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -831,6 +845,8 @@ contains
         if (model_eqns == 3 .and. (.not. relax)) then
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
+
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 3)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -994,6 +1010,68 @@ contains
 
     end subroutine s_apply_bodyforces
 
+    subroutine s_comprehensive_debug(q_cons_vf, q_prim_vf, t_step, stage)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf
+        integer, intent(in) :: t_step, stage
+        integer :: j, k, l, i
+        integer errors
+
+        errors = 0
+
+        ! Check all variables for NaNs
+        do i = 1, sys_size
+            !$acc update host(q_cons_vf(i)%sf)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                            print *, "NaN(s) in conservative variables after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            errors = errors + 1
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        ! Check for invalid volume fractions
+        do i = advxb, advxe
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (q_cons_vf(i)%sf(j, k, l) < 0d0) then
+                            print *, "Volume Fraction is Negative after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            errors = errors + 1
+                        elseif (q_cons_Vf(i)%sf(j, k, l) > 1d0) then
+                            print *, "Volume Fraction is greater than 1 after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            errors = errors + 1
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        ! Check for invalid densities
+        do i = contxb, contxe
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (q_cons_vf(advxb + i -1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) > 0d0) then
+                            print *, "Density is negative after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            errors = errors + 1
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        if (errors /= 0) then
+            call s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+            call s_mpi_abort("Errors found in conservative variables")
+        endif
+
+    end subroutine s_comprehensive_debug
+
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step
@@ -1033,6 +1111,7 @@ contains
         end if
 
     end subroutine s_time_step_cycling
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 

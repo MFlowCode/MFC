@@ -219,6 +219,7 @@ SIMULATION.update({
     't_save': ParamType.REAL,
     'cfl_target': ParamType.REAL,
     'low_Mach': ParamType.INT,
+    'comp_debug': ParamType.LOG,
 })
 
 # NOTE: Not currently present

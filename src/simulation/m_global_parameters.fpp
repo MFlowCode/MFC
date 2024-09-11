@@ -158,6 +158,7 @@ module m_global_parameters
     logical :: mixture_err    !< Mixture properties correction
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
+    logical :: comp_debug     !< Variable checking at every RK step
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -624,6 +625,9 @@ contains
         ! Cuda aware MPI
         cu_tensor = .false.
 
+        ! Comprehensive debugging
+        comp_debug = .false.
+
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
         !< amplitude, frequency, and phase shift sinusoid in each direction
@@ -1088,12 +1092,12 @@ contains
         @:ALLOCATE_GLOBAL(x_cc(-buff_size:m + buff_size))
         @:ALLOCATE_GLOBAL(dx(-buff_size:m + buff_size))
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE_GLOBAL(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE_GLOBAL(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE_GLOBAL(dy(-buff_size:n + buff_size))
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE_GLOBAL(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
@@ -1159,10 +1163,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

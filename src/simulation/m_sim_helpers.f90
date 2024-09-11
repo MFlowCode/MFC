@@ -6,6 +6,8 @@ module m_sim_helpers
     use m_global_parameters
 
     use m_variables_conversion
+
+    use m_mpi_proxy
     ! ==========================================================================
 
     implicit none
