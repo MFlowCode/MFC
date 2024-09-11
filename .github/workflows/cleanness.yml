@@ -38,32 +38,32 @@ jobs:
               run: |
                 grep -F 'Wunused-variable' master.txt -B 4 > mUnused.txt
                 grep -F 'Wunused-variable' pr.txt -B 4 > prUnused.txt
-                diff --changed-group-format='%<' --unchanged-group-format='' prUnused.txt mUnused.txt || true
+                diff prUnused.txt mUnused.txt || true
             
             - name: Unused Dummy Arguments Diff
               run: |
                 grep -F 'Wunused-dummy-argument' pr.txt -B 4 > prDummy.txt
                 grep -F 'Wunused-dummy-argument' master.txt -B 4 > mDummy.txt
-                diff --changed-group-format='%<' --unchanged-group-format='' prDummy.txt mDummy.txt || true
+                diff prDummy.txt mDummy.txt || true
 
             - name: Unused Value Diff
               run: |
                 grep -F 'Wunused-value' pr.txt -B 4 > prUnused_val.txt
                 grep -F 'Wunused-value' master.txt -B 4 > mUnused_val.txt
-                diff --changed-group-format='%<' --unchanged-group-format='' prUnused_val.txt mUnused_val.txt || true
+                diff prUnused_val.txt mUnused_val.txt || true
 
             - name: Maybe Uninitialized Variables Diff
               run: |
                 grep -F 'Wmaybe-uninitialized' pr.txt -B 4 > prMaybe.txt
                 grep -F 'Wmaybe-uninitialized' master.txt -B 4 > mMaybe.txt
-                diff --changed-group-format='%<' --unchanged-group-format='' prMaybe.txt mMaybe.txt || true
+                diff prMaybe.txt mMaybe.txt || true
 
 
             - name: Everything Diff
               run: |
                 grep '\-W' pr.txt -B 4 > pr_every.txt 
                 grep '\-W' master.txt -B 4 > m_every.txt
-                diff --changed-group-format='%<' --unchanged-group-format='' pr_every.txt m_every.txt || true
+                diff pr_every.txt m_every.txt || true
 
             - name: List of Warnings
               run: |
