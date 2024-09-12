@@ -115,5 +115,42 @@
 #endif
 #:enddef
 
+#:def ACC_SETUP_source_spatials(*args)
+#ifdef CRAY_ACC_WAR
+    block
+
+        @:LOG({'@:ACC_SETUP_source_spatials(${', '.join(args)}$)'})
+
+        #:for arg in args
+            !$acc enter data copyin(${arg}$)
+            if (allocated(${arg}$%coord)) then
+                !$acc enter data create(${arg}$%coord)
+            end if
+            if (allocated(${arg}$%val)) then
+                !$acc enter data create(${arg}$%val)
+            end if
+            if (allocated(${arg}$%angle)) then
+                !$acc enter data create(${arg}$%angle)
+            end if
+            if (allocated(${arg}$%xyz_to_r_ratios)) then
+                !$acc enter data create(${arg}$%xyz_to_r_ratios)
+            end if
+        #:endfor
+    end block
+#endif
+#:enddef
+
+#:def PROHIBIT(*args)
+    #:set condition = args[0]
+    #:if len(args) == 1
+        #:set message = '""'
+    #:else
+        #:set message = args[1]
+    #:endif
+    if (${condition}$) then
+        call s_prohibit_abort("${condition}$", ${message}$)
+    end if
+#:enddef
+
 #define t_vec3   real(kind(0d0)), dimension(1:3)
 #define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)

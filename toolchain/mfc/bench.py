@@ -5,7 +5,7 @@ import rich.table
 from .printer import cons
 from .state   import ARG, CFG
 from .build   import get_targets, DEFAULT_TARGETS, SIMULATION
-from .common  import system, MFC_BENCH_FILEPATH, MFC_SUBDIR, format_list_to_string
+from .common  import system, MFC_BENCH_FILEPATH, MFC_BUILD_DIR, format_list_to_string
 from .common  import file_load_yaml, file_dump_yaml, create_directory
 from .common  import MFCException
 
@@ -23,7 +23,7 @@ def bench(targets = None):
 
     targets = get_targets(targets)
 
-    bench_dirpath = os.path.join(MFC_SUBDIR, "benchmarks", str(uuid.uuid4())[:4])
+    bench_dirpath = os.path.join(MFC_BUILD_DIR, "benchmarks", str(uuid.uuid4())[:4])
     create_directory(bench_dirpath)
 
     cons.print()
@@ -83,7 +83,7 @@ def bench(targets = None):
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
 
-    cons.print(f"[bold]Comparing Benchmarks: Numbers < 1 indicate the [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is faster than [magenta]{os.path.relpath(ARG('lhs'))}[/magenta], > 1 indicate [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] is slower.[/bold]")
+    cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
     if lhs["metadata"] != rhs["metadata"]:
         def _lock_to_str(lock):
             return ' '.join([f"{k}={v}" for k, v in lock.items()])

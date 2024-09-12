@@ -101,6 +101,16 @@ module m_global_parameters
     integer :: t_step_start, t_step_stop, t_step_save
     !> @}
 
+    !> @name Starting time, stopping time, and time between backups, simulation time,
+    !! and prescribed cfl respectively
+    !> @{
+    real(kind(0d0)) :: t_stop, t_save, cfl_target
+    integer :: n_start
+    !> @}
+    !$acc declare create(cfl_target)
+
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
+
     integer :: t_step_print !< Number of time-steps between printouts
 
     ! ==========================================================================
@@ -486,10 +496,19 @@ contains
 
         dt = dflt_real
 
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
+        cfl_dt = .false.
+        cfl_target = dflt_real
+
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
         t_step_print = 1
+
+        n_start = dflt_int
+        t_stop = dflt_real
+        t_save = dflt_real
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
@@ -1049,7 +1068,7 @@ contains
         intxe = internalEnergies_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
-        !$acc update device(m, n, p)
+        !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach)
