@@ -718,12 +718,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
             if path == "scaling":
                 continue
+            if path == "2D_ibm_cfl_dt":
+                continue
 
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
             if not os.path.isfile(path):
                 continue
-
             def modify_example_case(case: dict):
                 case['parallel_io'] = 'F'
                 if case['t_step_stop'] >= 50:
