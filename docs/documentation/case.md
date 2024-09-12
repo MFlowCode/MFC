@@ -110,11 +110,6 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
 | `n`                      | Integer | Number of grid cells in the $y$-coordinate direction |
 | `p`                      | Integer | Number of grid cells in the $z$-coordinate direction |
-| `dt`                     | Real    | Time step size |
-| `t_step_start`           | Integer | Simulation starting time step |
-| `t_step_stop`            | Integer | Simulation stopping time step |
-| `t_step_save`            | Integer | Frequency to output data |
-| `t_step_print`           | Integer | Frequency to print the current step number to standard output (default 1) |
 
 The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
@@ -124,7 +119,7 @@ $$ x \in \left[ x \\_ domain \\% beg, x \\_ domain \\% end \right], y \in \left[
 
 - $m$, $n$, and $p$ define the number of finite volume cells that uniformly discretize the domain along the $x$, $y$, and $z$ axes, respectively.
 Note that the actual number of cells in each coordinate axis is given as $[m,n,p]+1$.
-For example, $m=n=p=499$ discretizes the domain into $500^3$ cells. 
+For example, $m=n=p=499$ discretizes the domain into $500^3$ cells.
 When the simulation is 2D/axi-symmetric or 1D, it requires that $p=0$ or $p=n=0$, respectively.
 
 - `stretch_[x,y,z]` activates grid stretching in the $[x,y,z]$ directions.
@@ -148,15 +143,6 @@ Domain discretization is accordingly conducted along the axes of cylindrical coo
 When $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates.
 In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes.
 MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
-
-- `dt` specifies the constant time step size that is used in simulation.
-The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
-
-- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
-`t_step_save` is the time step interval for data output during simulation.
-To newly start the simulation, set `t_step_start = 0`.
-To restart simulation from $k$-th time step, set `t_step_start = k`, do not run `pre_process`, and run `simulation` directly (`./mfc.sh run [...] -t simulation`).
-Ensure the data for the $k$-th time step is stored in the `restart_data/` directory within the case repository.
 
 ### 3. Patches
 
@@ -184,7 +170,7 @@ Ensure the data for the $k$-th time step is stored in the `restart_data/` direct
 | `model%%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
 | `model%%threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
 
-*: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index. 
+*: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index.
 
 The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
@@ -205,7 +191,7 @@ Some parameters, as described above, can be defined by analytical functions in t
 'patch_icpp(2)%alpha(1)'    : 1.,
 ```
 
-where `alpha_rho` is defined with the `1 + 0.1*sin(20*x*pi)` function. 
+where `alpha_rho` is defined with the `1 + 0.1*sin(20*x*pi)` function.
 
 The expressions are interpreted as Fortran code, in the execution context and scope of the function that defines the patch.
 Additionally, the following variables are made available as shorthand:
@@ -279,19 +265,19 @@ These physical parameters must be consistent with fluid material's parameters de
 ### 4. Immersed Boundary Patches
 
 | Parameter            | Type    | Description |
-| ---:                 | :----:  | :---                | 
+| ---:                 | :----:  | :---                |
 | `geometry`             | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`      | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`        | Real    | Length, if applicable, in the [x,y,z]-direction. |
 | `radius`               | Real    | Radius, if applicable, of the applied geometry. |
 | `theta`                | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                    | Real    | NACA airfoil parameters (see below) | 
+| `c`                    | Real    | NACA airfoil parameters (see below) |
 | `t`                    | Real    | NACA airfoil parameters (see below) |
 | `m`                    | Real    | NACA airfoil parameters (see below) |
 | `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
 
-These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
+These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
 #### Parameter Descriptions
 
@@ -362,7 +348,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
 | `wenoz`	             | Logical | WENO-Z |
 | `teno`                 | Logical | TENO (Targeted ENO) |
-| `teno_CT`              | Real    | TENO threshold for smoothness detection | 
+| `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
@@ -371,6 +357,17 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
 | `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
+| `dt`                   | Real    | Time step size |
+| `t_step_start`         | Integer | Simulation starting time step |
+| `t_step_stop`          | Integer | Simulation stopping time step |
+| `t_step_save`          | Integer | Frequency to output data |
+| `t_step_print`         | Integer | Frequency to print the current step number to standard output (default 1) |
+| `cfl_adap_dt`          | Logical | CFL based adaptive time-stepping |
+| `cfl_const_dt`         | Logical | CFL based non-adaptive time-stepping |
+| `cfl_target`           | Real    | Specified CFL value |
+| `n_start`              | Integer | Save file from which to start simulation |
+| `t_save`               | Real    | Time duration between data output |
+| `t_stop`               | Real    | Simulation stop time |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -390,7 +387,7 @@ Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = 
 - `bc_[x,y,z]%%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%end = -16`.
 Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
 
-- `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3. 
+- `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3.
 `model_eqns = 1`, `2`, and `3` correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md#Johnsen08)), 5-equation model ([Allaire et al., 2002](references.md#Allaire02)), and 6-equation model ([Saurel et al., 2009](references.md#Saurel09)), respectively.
 The difference of the two models is assessed by ([Schmidmayer et al., 2019](references.md#Schmidmayer19)).
 Note that some code parameters are only compatible with 5-equation model.
@@ -404,7 +401,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 
 - `mixture_err` activates correction of solutions to avoid imaginary speed of sound at each grid cell.
 
-- `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
+- `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
 
 - `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
@@ -420,7 +417,7 @@ Practically, `weno_eps` $<10^{-6}$ is used.
 
 - `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5`. Requires `teno_CT` to be set.
 
-- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`. 
+- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`.
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]%%beg[end]} = -4`).
 
@@ -443,6 +440,33 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
+#### Constant Time-Stepping
+
+- `dt` specifies the constant time step size that is used in simulation.
+The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
+
+- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
+
+`t_step_save` is the time step interval for data output during simulation.
+To newly start the simulation, set `t_step_start = 0`.
+To restart simulation from $k$-th time step, set `t_step_start = k`, see [Restarting Cases](running.md#restarting-cases).
+
+##### Adaptive Time-Stepping
+
+- `cfl_adap_dt` enables adaptive time stepping with a constant CFL when true
+
+- `cfl_const_dt` enables constant dt time-stepping where dt results in a specified CFL for the initial condition
+
+- `cfl_target` specifies the target CFL value
+
+- `n_start` specifies the save file to start at
+
+- `t_save` specifies the time interval between data output during simulation
+
+- `t_stop` specifies at what time the simulation should stop
+
+To newly start the simulation, set `n_start = 0`.
+To restart simulation from $k$-th time step, see [Restarting Cases](running.md#restarting-cases).
 
 ### 7. Formatted Output
 
@@ -592,7 +616,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 | `Re_inv` 		   | Real		  | Inverse Reynolds number |
 | `mu_l0` *	     | Real 		|	Liquid viscosity (only specify in liquid phase)  |
 | `ss` *		     | Real 		|	Surface tension (only specify in liquid phase) |
-| `pv` *		     | Real 		|	Vapor pressure (only specify in liquid phase) | 
+| `pv` *		     | Real 		|	Vapor pressure (only specify in liquid phase) |
 | `gamma_v` † 	 | Real 	  |	Specific heat ratio |
 | `M_v` †     	 | Real 		| Molecular weight |
 | `mu_v` †	     | Real 		|	Viscosity |
@@ -619,7 +643,7 @@ This table lists the ensemble-averaged bubble model parameters.
 - `polytropic` activates polytropic gas compression in the bubble.
 When `polytropic` is set `False`, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md#Preston07)).
 
-- `polydisperse` activates polydispersity in the bubble model by means of a probability density function (PDF) of the equiliibrium bubble radius. 
+- `polydisperse` activates polydispersity in the bubble model by means of a probability density function (PDF) of the equiliibrium bubble radius.
 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md#Preston07), respectively.
@@ -629,26 +653,26 @@ When `polytropic` is set `False`, the gas compression is modeled as non-polytrop
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
 
 - `R0_type` specifies the quadrature rule for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-`R0_type = 1` corresponds to Simpson's rule. 
+`R0_type = 1` corresponds to Simpson's rule.
 
-- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations. 
+- `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
 - `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
 - `mu_l0`, `ss`, and `pv`, `gamma_v`, `M_v`, `mu_v`, and `k_v` specify simulation parameters for the non-polytropic gas compression model.
-`mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively. 
+`mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively.
 `gamma_v`, `M_v`, `mu_v`, and `k_v` specify the specific heat ratio, molecular weight, viscosity, and thermal conductivity of a chosen component.
 Implementation of the parameters into the model follow [Ando (2010)](references.md#Ando10).
 
-- `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity. 
+- `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity.
 
-- `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type = 1`  and `2` correspond to binormal and lognormal-normal distributions respectively. 
+- `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type = 1`  and `2` correspond to binormal and lognormal-normal distributions respectively.
 
-- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.  
+- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.
 
-- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.  
+- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.
 
-- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.  
+- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.
 
 ### 10. Velocity Field Setup
 
@@ -673,7 +697,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
-- `perturb_sph` activates the perturbation of initial partial density by random noise. 
+- `perturb_sph` activates the perturbation of initial partial density by random noise.
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
@@ -699,9 +723,9 @@ $$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
 
 - `relax_model` Specifies the phase change model to be used: [5] enables pT-equilibrium, while [6] activates pTg-equilibrium (if criteria are met).
 
-- `palpha_eps` Specifies the tolerance used for the Newton Solvers used in the pT-equilibrium model. 
+- `palpha_eps` Specifies the tolerance used for the Newton Solvers used in the pT-equilibrium model.
 
-- `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model. 
+- `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model.
 
 ### 12. Artificial Mach Number
 | Parameter              | Type    | Description                                    |
@@ -731,7 +755,7 @@ Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]
 
 ### Boundary conditions
 
-| #    | Type           | Description | 
+| #    | Type           | Description |
 | ---: | :----:         | :---        |
 |  -1  | Normal         | Periodic |
 |  -2  | Normal         | Reflective |
@@ -772,7 +796,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 3D analytical 	    | 3     | N      | Assigns the primitive variables as analytical functions |
-| 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |   
+| 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
 | 15   | 1D analytical      | 1     | N      | Assigns the primitive variables as analytical functions  |
 | 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
