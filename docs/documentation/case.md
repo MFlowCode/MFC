@@ -182,7 +182,7 @@ The code outputs error messages when an empty region is left in the domain.
 Some parameters, as described above, can be defined by analytical functions in the input file. For example, one can define the following patch:
 
 ```shell
-'patch_icpp(2)%geometry'    : 15,
+'patch_icpp(2)%geometry'    : 1,
 'patch_icpp(2)%x_centroid'  : 0.25,
 'patch_icpp(2)%length_x'    : 9.5,
 'patch_icpp(2)%vel(1)'      : 0.,
@@ -789,15 +789,15 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
 | 6    | N/A 		        | 2     | N      | No longer exists. Empty. |
-| 7    | 2D analytical 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
+| 7    | 2D Hardcoded 	    | 2     | N      | Assigns the primitive variables as analytical functions. |
 | 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
 | 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | 3D analytical 	    | 3     | N      | Assigns the primitive variables as analytical functions |
+| 13   | 3D Hardcoded 	    | 3     | N      | Assigns the primitive variables as analytical functions |
 | 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
-| 15   | 1D analytical      | 1     | N      | Assigns the primitive variables as analytical functions  |
+| 15   | 1D Hardcoded      | 1     | N      | Assigns the primitive variables as analytical functions  |
 | 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
 | 18   | 2D Varcircle       | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
