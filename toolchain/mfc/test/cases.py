@@ -725,7 +725,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
             def modify_example_case(case: dict):
                 case['parallel_io'] = 'F'
-                if 't_step_stop' in case['t_step_stop'] >= 50:
+                if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50
                     case['t_step_save'] = 50
