@@ -1,7 +1,7 @@
 import re, sys, os.path, argparse, dataclasses
 
 from .run.run      import get_baked_templates
-from .build        import TARGETS, DEFAULT_TARGETS, DEPENDENCY_TARGETS
+from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
 from .test.cases   import list_cases
 
@@ -60,10 +60,6 @@ started, run ./mfc.sh build -h.""",
 
         if "v" not in mask:
             p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
-
-        if "n" not in mask:
-            for target in DEPENDENCY_TARGETS:
-                p.add_argument(f"--sys-{target.name}", action="store_true", help=f"Do not build the {target.name} dependency. Use the system's instead.")
 
         if "g" not in mask:
             p.add_argument("-g", "--gpus", nargs="+", type=int, default=None, help="(Optional GPU override) List of GPU #s to use (environment default if unspecified).")

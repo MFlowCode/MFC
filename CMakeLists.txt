@@ -89,7 +89,10 @@ find_program(FYPP_EXE fypp REQUIRED)
 
 link_libraries("${CMAKE_DL_LIBS}")
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
-list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake")
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/regular")
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/cce")
+endif()
 
 
 # Compiler Flags: Here, we specify our own compiler flags for both release and
@@ -526,15 +529,6 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI OpenACC FFTW)
-
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND MFC_OpenACC)
-        add_custom_command(TARGET simulation POST_BUILD
-            COMMAND           "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cce_simulation_workgroup_256.sh"
-                              "${CMAKE_CURRENT_BINARY_DIR}"
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            COMMENT           "Patching & Rebuilding with Cray hacks"
-        )
-    endif()
 endif()
 
 if (MFC_POST_PROCESS)
