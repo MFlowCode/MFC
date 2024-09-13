@@ -419,7 +419,7 @@ contains
         ! Generic string used to store the address of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !<
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -543,7 +543,7 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -562,7 +562,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ_ALL(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_READ_ALL(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -587,7 +587,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ_ALL(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_READ_ALL(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -612,7 +612,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ_ALL(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_READ_ALL(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
                     call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting... ')
@@ -706,10 +706,10 @@ contains
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                        'native', mpi_info_int, ierr)
                 call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                   MPI_DOUBLE_PRECISION, status, ierr)
+                                   mpi_p, status, ierr)
             end do
 
             if (qbmm .and. .not. polytropic) then
@@ -719,10 +719,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                       MPI_DOUBLE_PRECISION, status, ierr)
+                                       mpi_p, status, ierr)
                 end do
             end if
 
@@ -828,9 +828,9 @@ contains
 
     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
 
-        real(kind(0d0)), intent(inout) :: start, finish
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: start, finish
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), intent(inout) :: time_avg, time_final
         logical, intent(inout) :: file_exists
 
         ! Setting up the grid and the initial condition. If the grid is read in from
@@ -865,8 +865,8 @@ contains
 
     subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), intent(inout) :: time_avg, time_final
         logical, intent(inout) :: file_exists
 
         call s_mpi_barrier()

@@ -40,14 +40,14 @@ module m_cbc
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
     !! which the CBC is applied.
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), q_prim_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), q_prim_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), q_prim_rsz_vf)
     !$acc declare link(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 #endif
 
 #ifdef CRAY_ACC_WAR
@@ -60,65 +60,65 @@ module m_cbc
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsx_vf, F_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsy_vf, F_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsz_vf, F_src_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), F_rsx_vf, F_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), F_rsy_vf, F_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), F_rsz_vf, F_src_rsz_vf)
     !$acc declare link(F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
     !$acc declare link(flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
 #endif
 
-    real(kind(0d0)) :: c           !< Cell averaged speed of sound
-    real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
+    real(wp) :: c           !< Cell averaged speed of sound
+    real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
     !$acc declare create(c, Re)
 
-    real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
+    real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
 !$acc declare create(dpres_ds)
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ds)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), ds)
     !$acc declare link(ds)
 #else
-    real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
+    real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 #endif
 
     ! CBC Coefficients =========================================================
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), fd_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), fd_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), fd_coef_z)
     !$acc declare link(fd_coef_x, fd_coef_y, fd_coef_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
 #endif
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
     ! Bug with NVHPC when using nullified pointers in a declare create
-    !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+    !    real(wp), pointer, dimension(:, :) :: fd_coef => null()
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), pi_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), pi_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), pi_coef_z)
     !$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
 #endif
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
@@ -440,7 +440,7 @@ contains
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
-        real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
+        real(wp), dimension(0:buff_size + 1) :: s_cb
 
         ! Generic loop iterator
         integer :: i
@@ -632,35 +632,35 @@ contains
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
         ! ratio and liquid stiffness functions
-        real(kind(0d0)), dimension(num_fluids) :: dalpha_rho_dt
-        real(kind(0d0)) :: drho_dt
-        real(kind(0d0)), dimension(num_dims) :: dvel_dt
-        real(kind(0d0)) :: dpres_dt
-        real(kind(0d0)), dimension(num_fluids) :: dadv_dt
-        real(kind(0d0)) :: dgamma_dt
-        real(kind(0d0)) :: dpi_inf_dt
-        real(kind(0d0)) :: dqv_dt
-        real(kind(0d0)), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
-        real(kind(0d0)), dimension(2) :: Re_cbc
-        real(kind(0d0)), dimension(num_dims) :: vel, dvel_ds
-        real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
-        real(kind(0d0)), dimension(sys_size) :: L
-        real(kind(0d0)), dimension(3) :: lambda
+        real(wp), dimension(num_fluids) :: dalpha_rho_dt
+        real(wp) :: drho_dt
+        real(wp), dimension(num_dims) :: dvel_dt
+        real(wp) :: dpres_dt
+        real(wp), dimension(num_fluids) :: dadv_dt
+        real(wp) :: dgamma_dt
+        real(wp) :: dpi_inf_dt
+        real(wp) :: dqv_dt
+        real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
+        real(wp), dimension(2) :: Re_cbc
+        real(wp), dimension(num_dims) :: vel, dvel_ds
+        real(wp), dimension(num_fluids) :: adv, dadv_ds
+        real(wp), dimension(sys_size) :: L
+        real(wp), dimension(3) :: lambda
 
-        real(kind(0d0)) :: rho         !< Cell averaged density
-        real(kind(0d0)) :: pres        !< Cell averaged pressure
-        real(kind(0d0)) :: E           !< Cell averaged energy
-        real(kind(0d0)) :: H           !< Cell averaged enthalpy
-        real(kind(0d0)) :: gamma       !< Cell averaged specific heat ratio
-        real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
-        real(kind(0d0)) :: qv          !< Cell averaged fluid reference energy
-        real(kind(0d0)) :: c
+        real(wp) :: rho         !< Cell averaged density
+        real(wp) :: pres        !< Cell averaged pressure
+        real(wp) :: E           !< Cell averaged energy
+        real(wp) :: H           !< Cell averaged enthalpy
+        real(wp) :: gamma       !< Cell averaged specific heat ratio
+        real(wp) :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp) :: qv          !< Cell averaged fluid reference energy
+        real(wp) :: c
 
-        real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
+        real(wp) :: vel_K_sum, vel_dv_dt_sum
 
         integer :: i, j, k, r, q !< Generic loop iterators
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+        real(wp) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
 
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
@@ -1073,7 +1073,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsx_vf(j, k, r, momxb) = &
                             q_prim_vf(momxb)%sf(dj*(m - 2*j) + j, k, r)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1d0, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1085,7 +1085,7 @@ contains
                         do j = -1, buff_size
                             flux_rsx_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1120,7 +1120,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsx_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1149,7 +1149,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsy_vf(j, k, r, momxb + 1) = &
                             q_prim_vf(momxb + 1)%sf(k, dj*(n - 2*j) + j, r)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1d0, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1161,7 +1161,7 @@ contains
                         do j = -1, buff_size
                             flux_rsy_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1196,7 +1196,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsy_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1225,7 +1225,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsz_vf(j, k, r, momxe) = &
                             q_prim_vf(momxe)%sf(r, k, dj*(p - 2*j) + j)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1d0, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1237,7 +1237,7 @@ contains
                         do j = -1, buff_size
                             flux_rsz_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1272,7 +1272,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsz_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1322,7 +1322,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_rsx_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1356,7 +1356,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_src_rsx_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1373,7 +1373,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_rsy_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1408,7 +1408,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_src_rsy_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1426,7 +1426,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_rsz_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1461,7 +1461,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_src_rsz_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1d0, -real(cbc_loc, wp))
                         end do
                     end do
                 end do

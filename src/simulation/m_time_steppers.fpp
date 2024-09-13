@@ -55,11 +55,11 @@ module m_time_steppers
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_pb)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :, :), rhs_pb)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :, :), rhs_mv)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension( :, :, :), max_dt)
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
@@ -78,11 +78,11 @@ module m_time_steppers
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_pb
+    real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
+    real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: max_dt
+    real(wp), allocatable, dimension(:, :, :) :: max_dt
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
@@ -302,10 +302,10 @@ contains
     subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: nR3bar
+        real(wp) :: nR3bar
 
         ! Stage 1 of 1 =====================================================
 
@@ -412,11 +412,11 @@ contains
     subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
+        real(wp) :: start, finish
+        real(wp) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -595,12 +595,12 @@ contains
     subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
+        real(wp) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
+        real(wp) :: start, finish
+        real(wp) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
@@ -859,10 +859,10 @@ contains
     subroutine s_strang_splitting(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         call cpu_time(start)
 
@@ -914,18 +914,18 @@ contains
 
     subroutine s_compute_dt()
 
-        real(kind(0d0)) :: rho        !< Cell-avg. density
-        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
-        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
-        real(kind(0d0)) :: pres       !< Cell-avg. pressure
-        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
-        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
-        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        real(wp) :: rho        !< Cell-avg. density
+        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp) :: vel_sum    !< Cell-avg. velocity sum
+        real(wp) :: pres       !< Cell-avg. pressure
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp) :: gamma      !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: c          !< Cell-avg. sound speed
+        real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
-        real(kind(0d0)) :: dt_local
+        real(wp) :: dt_local
         type(int_bounds_info) :: ix, iy, iz
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -974,7 +974,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
 
-        real(kind(0d0)), intent(in) :: ldt !< local dt
+        real(wp), intent(in) :: ldt !< local dt
 
         integer :: i, j, k, l
 

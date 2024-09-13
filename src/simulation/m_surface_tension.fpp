@@ -40,12 +40,12 @@ module m_surface_tension
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:,:), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:,:,:,:), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
     !$acc declare link(gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
 #else
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
+    real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 #endif
@@ -92,18 +92,18 @@ contains
                                               id, isx, isy, isz)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf !> unused so unsure what intent to give it
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
-        real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
-        real(kind(0d0)) :: normWL, normWR, normW
+        real(wp), dimension(num_dims, num_dims) :: Omega
+        real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
+        real(wp) :: normWL, normWR, normW
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
@@ -324,8 +324,8 @@ contains
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

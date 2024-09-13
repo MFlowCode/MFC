@@ -36,15 +36,15 @@ module m_derived_variables
     !! active coordinate directions, the centered family of the finite-difference
     !! schemes is used.
     !> @{
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_x
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_y
-    real(kind(0d0)), public, allocatable, dimension(:, :) :: fd_coeff_z
+    real(wp), public, allocatable, dimension(:, :) :: fd_coeff_x
+    real(wp), public, allocatable, dimension(:, :) :: fd_coeff_y
+    real(wp), public, allocatable, dimension(:, :) :: fd_coeff_z
     !> @}
 
     ! @name Variables for computing acceleration
     !> @{
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: accel_mag
-    real(kind(0d0)), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
+    real(wp), public, allocatable, dimension(:, :, :) :: accel_mag
+    real(wp), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
     !> @}
 
 contains
@@ -185,7 +185,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(out) :: q_sf
+        real(wp), dimension(0:m, 0:n, 0:p), intent(out) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
 

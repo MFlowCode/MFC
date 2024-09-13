@@ -27,10 +27,10 @@ module m_viscous
 !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), Res_viscous)
     !$acc declare link(Res_viscous)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
+    real(wp), allocatable, dimension(:, :) :: Res_viscous
     !$acc declare create(Re_viscous)
 #endif
 
@@ -79,11 +79,11 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_visc
-        real(kind(0d0)), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
+        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
+        real(wp), dimension(2) :: Re_visc
+        real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
+        real(wp), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
 
@@ -536,7 +536,7 @@ contains
                              dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                              ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
+        real(wp), dimension(startx:, starty:, startz:, 1:), &
             intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
                              qL_prim_rsz_vf, qR_prim_rsz_vf
@@ -984,7 +984,7 @@ contains
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
@@ -1084,7 +1084,7 @@ contains
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
@@ -1207,7 +1207,7 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz, iv_in
         integer, intent(in) :: dim, buff_size_in
-        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
+        real(wp), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
 
         integer :: i, j, k, l !< Generic loop iterators
 

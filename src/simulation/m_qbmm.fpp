@@ -29,10 +29,10 @@ module m_qbmm
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :, :), momrhs)
     !$acc declare link(momrhs)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
+    real(wp), allocatable, dimension(:, :, :, :, :) :: momrhs
     !$acc declare create(momrhs)
 #endif
     #:if MFC_CASE_OPTIMIZATION
@@ -431,12 +431,12 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
 
         integer :: i, j, k, l, q
 
-        real(kind(0d0)) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
+        real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
 
         if (idir == 1) then
 
@@ -834,17 +834,17 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(:), intent(inout) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(inout) :: moms3d
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(kind(0d0)), dimension(startx:, starty:, startz:) :: nbub_sc !> Unused Variable not sure what to put as intent
+        real(wp), dimension(startx:, starty:, startz:) :: nbub_sc !> Unused Variable not sure what to put as intent
 
-        real(kind(0d0)), dimension(nmom) :: moms, msum
-        real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: n_tait, B_tait
+        real(wp), dimension(nmom) :: moms, msum
+        real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        real(wp), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
+        real(wp) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
+        real(wp) :: start, finish
+        real(wp) :: n_tait, B_tait
 
         integer :: j, k, l, q, r, s !< Loop variables
         integer :: id1, id2, id3
@@ -1051,14 +1051,14 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(nmom), intent(in) :: momin
-        real(kind(0d0)), dimension(nnode), intent(inout) :: wght, abscX, abscY
+        real(wp), dimension(nmom), intent(in) :: momin
+        real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
-        real(kind(0d0)), dimension(0:2, 0:2) :: moms
-        real(kind(0d0)), dimension(3) :: M1, M3
-        real(kind(0d0)), dimension(2) :: myrho, myrho3, up, up3, Vf
-        real(kind(0d0)) :: bu, bv, d20, d11, d02, c20, c11, c02
-        real(kind(0d0)) :: mu2avg, mu2, vp21, vp22, rho21, rho22
+        real(wp), dimension(0:2, 0:2) :: moms
+        real(wp), dimension(3) :: M1, M3
+        real(wp), dimension(2) :: myrho, myrho3, up, up3, Vf
+        real(wp) :: bu, bv, d20, d11, d02, c20, c11, c02
+        real(wp) :: mu2avg, mu2, vp21, vp22, rho21, rho22
 
         moms(0, 0) = momin(1)
         moms(1, 0) = momin(2)
@@ -1118,10 +1118,10 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), dimension(2), intent(inout) :: frho, fup
-        real(kind(0d0)), dimension(3), intent(in) :: fmom
+        real(wp), dimension(2), intent(inout) :: frho, fup
+        real(wp), dimension(3), intent(in) :: fmom
 
-        real(kind(0d0)) :: bu, d2, c2
+        real(wp) :: bu, d2, c2
 
         bu = fmom(2)/fmom(1)
         d2 = fmom(3)/fmom(1)

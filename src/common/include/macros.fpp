@@ -152,5 +152,5 @@
     end if
 #:enddef
 
-#define t_vec3   real(kind(0d0)), dimension(1:3)
-#define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)
+#define t_vec3   real(wp), dimension(1:3)
+#define t_mat4x4 real(wp), dimension(1:4,1:4)

@@ -454,12 +454,12 @@ contains
         t_vec3, intent(in) :: spacing
         integer, intent(in) :: spc
 
-        real(kind(0d0)) :: fraction
+        real(wp) :: fraction
 
         type(t_ray) :: ray
         integer :: i, j, nInOrOut, nHits
 
-        real(kind(0d0)), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
+        real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
         do i = 1, spc
             call random_number(ray_origins(i, :))
@@ -501,8 +501,8 @@ contains
 
         logical :: intersects
 
-        real(kind(0d0)) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
-        real(kind(0d0)) :: area2, d, t, NdotRayDirection
+        real(wp) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+        real(wp) :: area2, d, t, NdotRayDirection
 
         intersects = .false.
 

@@ -40,8 +40,8 @@ module m_ibm
 !$acc declare create(ib_markers)
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), levelset)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), levelset_norm)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), levelset)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :, :), levelset_norm)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
     @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), inner_points)
 
@@ -49,9 +49,9 @@ module m_ibm
 #else
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
-    real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
+    real(wp), dimension(:, :, :, :), allocatable :: levelset
     !! Matrix of distance to IB
-    real(kind(0d0)), dimension(:, :, :, :, :), allocatable :: levelset_norm
+    real(wp), dimension(:, :, :, :, :), allocatable :: levelset_norm
     !! Matrix of normal vector to IB
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
@@ -135,31 +135,31 @@ contains
             dimension(sys_size), &
             intent(inout) :: q_prim_vf !< Primitive Variables
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(inout) :: pb, mv
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), optional, intent(inout) :: pb, mv
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
-        real(kind(0d0)) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: G_K
-        real(kind(0d0)) :: qv_K
-        real(kind(0d0)), dimension(num_fluids) :: Gs
+        real(wp) :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
+        real(wp), dimension(2) :: Re_K
+        real(wp) :: G_K
+        real(wp) :: qv_K
+        real(wp), dimension(num_fluids) :: Gs
 
-        real(kind(0d0)) :: pres_IP, coeff
-        real(kind(0d0)), dimension(3) :: vel_IP, vel_norm_IP
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
-        real(kind(0d0)), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
-        real(kind(0d0)), dimension(nb*nmom) :: nmom_IP
-        real(kind(0d0)), dimension(nb*nnode) :: presb_IP, massv_IP
+        real(wp) :: pres_IP, coeff
+        real(wp), dimension(3) :: vel_IP, vel_norm_IP
+        real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
+        real(wp), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
+        real(wp), dimension(nb*nmom) :: nmom_IP
+        real(wp), dimension(nb*nnode) :: presb_IP, massv_IP
         !! Primitive variables at the image point associated with a ghost point,
         !! interpolated from surrounding fluid cells.
 
-        real(kind(0d0)), dimension(3) :: norm !< Normal vector from GP to IP
-        real(kind(0d0)), dimension(3) :: physical_loc !< Physical loc of GP
-        real(kind(0d0)), dimension(3) :: vel_g !< Velocity of GP
+        real(wp), dimension(3) :: norm !< Normal vector from GP to IP
+        real(wp), dimension(3) :: physical_loc !< Physical loc of GP
+        real(wp), dimension(3) :: vel_g !< Velocity of GP
 
-        real(kind(0d0)) :: nbub
-        real(kind(0d0)) :: buf
+        real(wp) :: nbub
+        real(wp) :: buf
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
@@ -340,14 +340,14 @@ contains
     subroutine s_compute_image_points(ghost_points, levelset, levelset_norm)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(in) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(in) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(in) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(in) :: levelset_norm
 
-        real(kind(0d0)) :: dist
-        real(kind(0d0)), dimension(3) :: norm
-        real(kind(0d0)), dimension(3) :: physical_loc
-        real(kind(0d0)) :: temp_loc
-        real(kind(0d0)), pointer, dimension(:) :: s_cc => null()
+        real(wp) :: dist
+        real(wp), dimension(3) :: norm
+        real(wp), dimension(3) :: physical_loc
+        real(wp) :: temp_loc
+        real(wp), pointer, dimension(:) :: s_cc => null()
         integer :: bound
         type(ghost_point) :: gp
 
@@ -645,11 +645,11 @@ contains
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points
 
-        real(kind(0d0)), dimension(2, 2, 2) :: dist
-        real(kind(0d0)), dimension(2, 2, 2) :: alpha
-        real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs
-        real(kind(0d0)) :: buf
-        real(kind(0d0)), dimension(2, 2, 2) :: eta
+        real(wp), dimension(2, 2, 2) :: dist
+        real(wp), dimension(2, 2, 2) :: alpha
+        real(wp), dimension(2, 2, 2) :: interp_coeffs
+        real(wp) :: buf
+        real(wp), dimension(2, 2, 2) :: eta
         type(ghost_point) :: gp
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Grid indexes
@@ -797,17 +797,17 @@ contains
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf !< Primitive Variables
         type(ghost_point), intent(in) :: gp
-        real(kind(0d0)), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
-        real(kind(0d0)), intent(inout) :: pres_IP
-        real(kind(0d0)), dimension(3), intent(inout) :: vel_IP
-        real(kind(0d0)), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
-        real(kind(0d0)), optional, dimension(:), intent(inout) :: nmom_IP
-        real(kind(0d0)), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
-        real(kind(0d0)), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
+        real(wp), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
+        real(wp), intent(inout) :: pres_IP
+        real(wp), dimension(3), intent(inout) :: vel_IP
+        real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
+        real(wp), optional, dimension(:), intent(inout) :: nmom_IP
+        real(wp), optional, dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
 
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
-        real(kind(0d0)) :: coeff
+        real(wp) :: coeff
 
         i1 = gp%ip_grid(1); i2 = i1 + 1
         j1 = gp%ip_grid(2); j2 = j1 + 1
@@ -905,8 +905,8 @@ contains
     !>  Subroutine that computes that bubble wall pressure for Gilmore bubbles
     subroutine s_compute_levelset(levelset, levelset_norm)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer :: i !< Iterator variables
         integer :: geometry
 

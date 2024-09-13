@@ -55,11 +55,11 @@ contains
                                                         fd_number_in, fd_order_in, offset_s)
 
         integer, intent(in) :: q
-        real(kind(0d0)), allocatable, dimension(:, :), intent(inout) :: fd_coeff_s
+        real(wp), allocatable, dimension(:, :), intent(inout) :: fd_coeff_s
         integer, intent(in) :: buff_size, fd_number_in, fd_order_in
         type(int_bounds_info), optional, intent(in) :: offset_s
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-buff_size:q + buff_size), &
             intent(IN) :: s_cc
 
@@ -144,7 +144,7 @@ contains
 
     subroutine s_print_2D_array(A, div)
 
-        real(kind(0d0)), dimension(:, :), intent(in) :: A
+        real(wp), dimension(:, :), intent(in) :: A
         real, optional, intent(in) :: div
 
         integer :: i, j
@@ -373,8 +373,8 @@ contains
     !! @return The cross product of the two vectors.
     function f_cross(a, b) result(c)
 
-        real(kind(0d0)), dimension(3), intent(in) :: a, b
-        real(kind(0d0)), dimension(3) :: c
+        real(wp), dimension(3), intent(in) :: a, b
+        real(wp), dimension(3) :: c
 
         c(1) = a(2)*b(3) - a(3)*b(2)
         c(2) = a(3)*b(1) - a(1)*b(3)
@@ -386,8 +386,8 @@ contains
     !! @param rhs Right-hand side.
     subroutine s_swap(lhs, rhs)
 
-        real(kind(0d0)), intent(inout) :: lhs, rhs
-        real(kind(0d0)) :: ltemp
+        real(wp), intent(inout) :: lhs, rhs
+        real(wp) :: ltemp
 
         ltemp = lhs
         lhs = rhs
@@ -444,7 +444,7 @@ contains
         t_vec3, intent(inout) :: vec
         t_mat4x4, intent(in) :: matrix
 
-        real(kind(0d0)), dimension(1:4) :: tmp
+        real(wp), dimension(1:4) :: tmp
 
         tmp = matmul(matrix, [vec(1), vec(2), vec(3), 1d0])
         vec = tmp(1:3)
@@ -461,7 +461,7 @@ contains
 
         integer :: i
 
-        real(kind(0d0)), dimension(1:4) :: tmp
+        real(wp), dimension(1:4) :: tmp
 
         do i = 1, 3
             call s_transform_vec(triangle%v(i, :), matrix)

@@ -71,31 +71,31 @@ module m_data_output
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), icfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), vcfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), ccfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), Rc_sf)
     !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
+    real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 #endif
 
-    real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
-    real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-    real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+    real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+    real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+    real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+    real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
     !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(kind(0d0)) :: icfl_max !< ICFL criterion maximum
-    real(kind(0d0)) :: vcfl_max !< VCFL criterion maximum
-    real(kind(0d0)) :: ccfl_max !< CCFL criterion maximum
-    real(kind(0d0)) :: Rc_min !< Rc criterion maximum
+    real(wp) :: icfl_max !< ICFL criterion maximum
+    real(wp) :: vcfl_max !< VCFL criterion maximum
+    real(wp) :: ccfl_max !< CCFL criterion maximum
+    real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
@@ -228,31 +228,31 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
-        real(kind(0d0)) :: rho        !< Cell-avg. density
-        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
-        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
-        real(kind(0d0)) :: pres       !< Cell-avg. pressure
-        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
-        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
-        real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: E          !< Cell-avg. energy
-        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
-        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        real(wp), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
+        real(wp) :: rho        !< Cell-avg. density
+        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp) :: vel_sum    !< Cell-avg. velocity sum
+        real(wp) :: pres       !< Cell-avg. pressure
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp) :: gamma      !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: qv         !< Cell-avg. fluid reference energy
+        real(wp) :: c          !< Cell-avg. sound speed
+        real(wp) :: E          !< Cell-avg. energy
+        real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
 
         ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
         ! time-step and located on both the local (loc) and the global (glb)
         ! computational domains
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
+        real(wp) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
         integer :: Nfq
-        real(kind(0d0)) :: fltr_dtheta   !<
+        real(wp) :: fltr_dtheta   !<
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         ! Computing Stability Criteria at Current Time-step ================
@@ -384,12 +384,12 @@ contains
 
         integer :: i, j, k, l, ii, r!< Generic loop iterators
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
-        real(kind(0d0)) :: E_e                          !< Temp. elastic energy contribution
+        real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
+        real(wp) :: nbub, nR3, vftmp                         !< Temporary bubble number density
+        real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
+        real(wp) :: rho                          !< Temporary density
+        real(wp), dimension(2) :: Re !< Temporary Reynolds number
+        real(wp) :: E_e                          !< Temp. elastic energy contribution
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -813,7 +813,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -821,7 +821,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -829,7 +829,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -872,10 +872,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -885,10 +885,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -898,10 +898,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -920,53 +920,53 @@ contains
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
+        real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
-        real(kind(0d0)), dimension(-1:m) :: distx
-        real(kind(0d0)), dimension(-1:n) :: disty
-        real(kind(0d0)), dimension(-1:p) :: distz
+        real(wp), dimension(-1:m) :: distx
+        real(wp), dimension(-1:n) :: disty
+        real(wp), dimension(-1:p) :: distz
 
         ! The cell-averaged partial densities, density, velocity, pressure,
         ! volume fractions, specific heat ratio function, liquid stiffness
         ! function, and sound speed.
-        real(kind(0d0)) :: lit_gamma, nbub
-        real(kind(0d0)) :: rho
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: pres
-        real(kind(0d0)) :: ptilde
-        real(kind(0d0)) :: ptot
-        real(kind(0d0)) :: alf
-        real(kind(0d0)) :: alfgr
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: qv
-        real(kind(0d0)) :: c
-        real(kind(0d0)) :: M00, M10, M01, M20, M11, M02
-        real(kind(0d0)) :: varR, varV
-        real(kind(0d0)), dimension(Nb) :: nR, R, nRdot, Rdot
-        real(kind(0d0)) :: nR3
-        real(kind(0d0)) :: accel
-        real(kind(0d0)) :: int_pres
-        real(kind(0d0)) :: max_pres
-        real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: E_e
-        real(kind(0d0)), dimension(6) :: tau_e
-        real(kind(0d0)) :: G
-        real(kind(0d0)) :: dyn_p
+        real(wp) :: lit_gamma, nbub
+        real(wp) :: rho
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: pres
+        real(wp) :: ptilde
+        real(wp) :: ptot
+        real(wp) :: alf
+        real(wp) :: alfgr
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: qv
+        real(wp) :: c
+        real(wp) :: M00, M10, M01, M20, M11, M02
+        real(wp) :: varR, varV
+        real(wp), dimension(Nb) :: nR, R, nRdot, Rdot
+        real(wp) :: nR3
+        real(wp) :: accel
+        real(wp) :: int_pres
+        real(wp) :: max_pres
+        real(wp), dimension(2) :: Re
+        real(wp) :: E_e
+        real(wp), dimension(6) :: tau_e
+        real(wp) :: G
+        real(wp) :: dyn_p
 
         integer :: i, j, k, l, s, q !< Generic loop iterator
 
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
+        real(wp) :: nondim_time !< Non-dimensional time
 
-        real(kind(0d0)) :: tmp !<
+        real(wp) :: tmp !<
             !! Temporary variable to store quantity for mpi_allreduce
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
+        real(wp) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
 
         integer :: npts !< Number of included integral points
-        real(kind(0d0)) :: rad, thickness !< For integral quantities
+        real(wp) :: rad, thickness !< For integral quantities
         logical :: trigger !< For integral quantities
 
         ! Non-dimensional time calculation
@@ -974,9 +974,9 @@ contains
             nondim_time = mytime
         else
             if (t_step_old /= dflt_int) then
-                nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+                nondim_time = real(t_step + t_step_old, wp)*dt
             else
-                nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
+                nondim_time = real(t_step, wp)*dt !*1.d-5/10.0761131451d0
             end if
         end if
 
@@ -1541,7 +1541,7 @@ contains
         !!      all of the time-steps and the simulation run-time.
     subroutine s_close_run_time_information_file
 
-        real(kind(0d0)) :: run_time !< Run-time of the simulation
+        real(wp) :: run_time !< Run-time of the simulation
         ! Writing the footer of and closing the run-time information file
         write (3, '(A)') '----------------------------------------'// &
             '----------------------------------------'

@@ -470,7 +470,7 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -498,7 +498,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -529,7 +529,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -550,7 +550,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
                     call s_mpi_abort('File '//trim(file_loc)//'is missing. Exiting...')
@@ -608,7 +608,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -616,7 +616,7 @@ contains
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                         end do
                     end if
                 else
@@ -624,7 +624,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                 end if
 
@@ -702,10 +702,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -714,10 +714,10 @@ contains
                             ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                    'native', mpi_info_int, ierr)
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                         end do
                     end if
                 else
@@ -727,10 +727,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
 
                     end do
                 end if
@@ -788,10 +788,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
 
                     end if
 
@@ -805,10 +805,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end if
 
                     do i = 1, Np
@@ -1052,13 +1052,13 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
 
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: qv
-        real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: pres
+        real(wp) :: rho
+        real(wp) :: dyn_pres
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: qv
+        real(wp), dimension(2) :: Re
+        real(wp) :: pres
 
         integer :: i, j, k, l
 
@@ -1091,15 +1091,15 @@ contains
 
     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
-        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        real(wp), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: io_time_avg, io_time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), dimension(:), intent(inout) :: io_proc_time
         logical, intent(inout) :: file_exists
-        real(kind(0d0)), intent(inout) :: start, finish
+        real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(kind(0d0)) :: dt_init
+        real(wp) :: dt_init
 
         integer :: i, j, k, l
 
@@ -1172,15 +1172,15 @@ contains
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
-        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        real(wp), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: io_time_avg, io_time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), dimension(:), intent(inout) :: io_proc_time
         logical, intent(inout) :: file_exists
-        real(kind(0d0)), intent(inout) :: start, finish
+        real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(kind(0d0)) :: grind_time
+        real(wp) :: grind_time
 
         call s_mpi_barrier()
 
@@ -1233,7 +1233,7 @@ contains
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
+        real(wp), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
 
         integer :: i, j, k, l
@@ -1384,7 +1384,7 @@ contains
     subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_OpenACC
-        real(kind(0d0)) :: starttime, endtime
+        real(wp) :: starttime, endtime
         integer :: num_devices, local_size, num_nodes, ppn, my_device_num
         integer :: dev, devNum, local_rank
 #ifdef MFC_MPI
