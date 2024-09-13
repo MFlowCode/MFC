@@ -228,7 +228,7 @@ For example, to add a 2D Hardcoded patch with an id of 200, one would add the fo
 
 and use `patch_icpp(i)%%geometry = 7` and `patch_icpp(i)%%hcid = 200` in the input file.
 Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`.
-As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indites the number of dimensions.
+As a convention, any hard coded patches that are part of the MFC master branch should be identified as 1[2,3]xx where the first digit indicates the number of dimensions.
 
 #### Parameter Descriptions
 
@@ -353,9 +353,9 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
 | `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
-| `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
+| `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
-| `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
+| `weno_Re_flux`         | Logical | Compute velocity gradient using scalar divergence theorem	 |
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                   | Real    | Time step size |
 | `t_step_start`         | Integer | Simulation starting time step |
@@ -434,7 +434,7 @@ Practically, `weno_eps` $<10^{-6}$ is used.
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds = 1` and `2` correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
 
-- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
+- `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
@@ -592,7 +592,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1. If all elements are on, set `%%element_on` to 0.
 
-- `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radian. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
+- `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radians. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
 
 - `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcicle diameter, and `%%num_elements` as the number of sides of the polygon. The ratio is used specify the aperture size of each transducer element in the array, as a ratio of the total aperture. 
 
@@ -678,7 +678,7 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 | Parameter              | Type    | Description |
 | ---:                   | :----:  | :--- |
-| `perturb_flow`         | Logical | Perturb the initlal velocity field by random noise |
+| `perturb_flow`         | Logical | Perturb the initlial velocity field by random noise |
 | `perturb_flow_fluid`   | Integer | Fluid density whose flow is to be perturbed |
 | `perturb_flow_mag`     | Real    | Set the magnitude of flow perturbations |
 | `perturb_sph`          | Logical | Perturb the initial partial density by random noise |
