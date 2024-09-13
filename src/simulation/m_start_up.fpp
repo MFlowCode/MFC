@@ -127,8 +127,6 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
-        CHARACTER(len=511) :: CRAY_ACC_MODULE
-
         character(len=1000) :: line
 
         ! Namelist of the global parameters which may be specified by user
@@ -199,16 +197,6 @@ contains
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
-
-#ifdef _CRAYFTN
-#ifdef MFC_OpenACC
-        call get_environment_variable("CRAY_ACC_MODULE", CRAY_ACC_MODULE)
-
-        if (CRAY_ACC_MODULE == "") then
-            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
-        end if
-#endif
-#endif
 
     end subroutine s_read_input_file
 
