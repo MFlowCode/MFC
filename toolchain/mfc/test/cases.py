@@ -718,8 +718,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
             if path == "scaling":
                 continue
-            if path == "2D_ibm_cfl_dt":
-                continue
 
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
@@ -727,7 +725,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
             def modify_example_case(case: dict):
                 case['parallel_io'] = 'F'
-                if case['t_step_stop'] >= 50:
+                if 't_step_stop' in case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50
                     case['t_step_save'] = 50
