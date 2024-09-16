@@ -557,11 +557,11 @@ contains
                                 pres_SR = pres_SL
 
                                 Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
-                                                     (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                     ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                       (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                                       ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
                                 Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
-                                                     (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                     ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                       (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                                       ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                 s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                 s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -1066,11 +1066,11 @@ contains
                                     pres_SR = pres_SL
 
                                     Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
-                                                         (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                         ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
                                     Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
-                                                         (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                         ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -1358,11 +1358,11 @@ contains
                                     pres_SR = pres_SL
 
                                     Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
-                                                         (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                         ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
                                     Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
-                                                         (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                         ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -1785,11 +1785,11 @@ contains
                                     pres_SR = pres_SL
 
                                     Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
-                                                         (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                         ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
                                     Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
-                                                         (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                         ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -2141,11 +2141,11 @@ contains
                                     pres_SR = pres_SL
 
                                     Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
-                                                         (pres_SL/pres_L - 1._wp)*pres_L/ &
-                                                         ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                           (pres_SL/pres_L - 1._wp)*pres_L/ &
+                                                           ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
                                     Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
-                                                         (pres_SR/pres_R - 1._wp)*pres_R/ &
-                                                         ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                           (pres_SR/pres_R - 1._wp)*pres_R/ &
+                                                           ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(idx1) - c_L*Ms_L
                                     s_R = vel_R(idx1) + c_R*Ms_R
@@ -3134,7 +3134,7 @@ contains
                                                    + dvelR_dx_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2._wp/3._wp)*(dvel_avg_dy(2) + &
-                                                       avg_vel(2)/y_cc(k))/ &
+                                                           avg_vel(2)/y_cc(k))/ &
                                            Re_avg_rsx_vf(j, k, l, 1)
 
                             tau_Re(1, 2) = (dvel_avg_dy(1) + dvel_avg_dx(2))/ &

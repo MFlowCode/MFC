@@ -713,9 +713,9 @@ contains
         real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
 
         real(wp) :: tmp1, tmp2, tmp3, tmp4, &
-                           c_gas, c_liquid, &
-                           Cpbw, Cpinf, Cpinf_dot, &
-                           myH, myHdot, rddot, alf_gas
+                    c_gas, c_liquid, &
+                    Cpbw, Cpinf, Cpinf_dot, &
+                    myH, myHdot, rddot, alf_gas
 
         real(wp) :: n_tait, B_tait, angle, angle_z
 

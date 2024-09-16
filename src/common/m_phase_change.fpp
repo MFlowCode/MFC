@@ -382,7 +382,7 @@ contains
 
             ! updating common pressure for the newton solver
             pS = pO + ((1.0_wp - gp)/gpp)/(1.0_wp - (1.0_wp - gp + DABS(1.0_wp - gp)) &
-                                          /(2.0_wp*gpp)*hp)
+                                           /(2.0_wp*gpp)*hp)
         end do
 
         ! common temperature
@@ -430,8 +430,8 @@ contains
         p_infpTg = p_infpT
 
         if (((pS < 0.0_wp) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
-                                  + q_cons_vf(vp + contxb - 1)%sf(j, k, l)) > ((rhoe &
-                                                                                - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. &
+                                   + q_cons_vf(vp + contxb - 1)%sf(j, k, l)) > ((rhoe &
+                                                                                 - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. &
             ((pS >= 0.0_wp) .and. (pS < 1.0d-1))) then
 
             ! improve this initial condition
