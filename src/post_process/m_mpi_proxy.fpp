@@ -106,8 +106,8 @@ contains
 
             ! Initially zeroing out the vectorized buffer region variables
             ! to avoid possible underflow from any unused allocated memory
-            q_cons_buffer_in = 0d0
-            q_cons_buffer_out = 0d0
+            q_cons_buffer_in = 0._wp
+            q_cons_buffer_out = 0._wp
 
         end if
 
@@ -261,7 +261,7 @@ contains
                     tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
                                        - (n + 1)/tmp_num_procs_y)
 
                     ! Searching for optimal computational domain distribution
@@ -305,9 +305,9 @@ contains
                     tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
                                        - (n + 1)/tmp_num_procs_y) &
-                              + 10d0*abs((n + 1)/tmp_num_procs_y &
+                              + 10._wp*abs((n + 1)/tmp_num_procs_y &
                                          - (p + 1)/tmp_num_procs_z)
 
                     ! Searching for optimal computational domain distribution
@@ -447,7 +447,7 @@ contains
                 ! Computing minimization variable for these initial values
                 tmp_num_procs_x = num_procs_x
                 tmp_num_procs_y = num_procs_y
-                fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
+                fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
                                    - (n + 1)/tmp_num_procs_y)
 
                 ! Searching for optimal computational domain distribution

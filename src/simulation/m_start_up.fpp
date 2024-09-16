@@ -283,7 +283,7 @@ contains
         end if
 
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (ib) then
             do i = 1, num_ibs
@@ -312,7 +312,7 @@ contains
             end if
 
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
         end if
         ! ==================================================================
@@ -335,7 +335,7 @@ contains
             end if
 
             dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-            z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+            z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
         end if
         ! ==================================================================
@@ -497,7 +497,7 @@ contains
         ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         ! Computing the cell center locations
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (ib) then
             do i = 1, num_ibs
@@ -528,7 +528,7 @@ contains
             ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
             ! Computing the cell center locations
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
                 ! Read in cell boundary locations in z-direction
@@ -549,7 +549,7 @@ contains
                 ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
                 ! Computing the cell center locations
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
             end if
         end if
@@ -584,8 +584,8 @@ contains
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8d0, MPI_OFFSET_KIND)
-                MOK = int(1d0, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -677,8 +677,8 @@ contains
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8d0, MPI_OFFSET_KIND)
-                MOK = int(1d0, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -857,7 +857,7 @@ contains
         ! Computing the cell-center locations buffer, at the beginning of
         ! the coordinate direction, from the cell-width distribution buffer
         do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
+            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer, at the end of the
@@ -888,7 +888,7 @@ contains
         ! Populating the cell-center locations buffer, at the end of the
         ! coordinate direction, from buffer of the cell-width distribution
         do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
+            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
 
         ! END: Population of Buffers in x-direction ========================
@@ -925,7 +925,7 @@ contains
         ! Computing the cell-center locations buffer, at the beginning of
         ! the coordinate direction, from the cell-width distribution buffer
         do i = 1, buff_size
-            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
+            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer, at the end of the
@@ -956,7 +956,7 @@ contains
         ! Populating the cell-center locations buffer, at the end of the
         ! coordinate direction, from buffer of the cell-width distribution
         do i = 1, buff_size
-            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
+            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
 
         ! END: Population of Buffers in y-direction ========================
@@ -993,7 +993,7 @@ contains
         ! Computing the cell-center locations buffer, at the beginning of
         ! the coordinate direction, from the cell-width distribution buffer
         do i = 1, buff_size
-            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
+            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer, at the end of the
@@ -1024,7 +1024,7 @@ contains
         ! Populating the cell-center locations buffer, at the end of the
         ! coordinate direction, from buffer of the cell-width distribution
         do i = 1, buff_size
-            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
+            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
         end do
 
         ! END: Population of Buffers in z-direction ========================
@@ -1056,13 +1056,13 @@ contains
 
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
-                    dyn_pres = 0d0
+                    dyn_pres = 0._wp
                     do i = mom_idx%beg, mom_idx%end
                         dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
+                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
                                             dyn_pres, pi_inf, gamma, rho, qv, pres)
 
                     do i = 1, num_fluids
@@ -1110,7 +1110,7 @@ contains
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
                 print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
-                    int(ceiling(100d0*(mytime/t_stop))), &
+                    int(ceiling(100._wp*(mytime/t_stop))), &
                     mytime, &
                     dt, &
                     t_step
@@ -1118,7 +1118,7 @@ contains
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
                 print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
-                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                   int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
                 t_step
@@ -1179,8 +1179,8 @@ contains
         end if
 
         if (proc_rank == 0) then
-            time_final = 0d0
-            io_time_final = 0d0
+            time_final = 0._wp
+            io_time_final = 0._wp
             if (num_procs == 1) then
                 time_final = time_avg
                 io_time_final = io_time_avg
@@ -1285,9 +1285,9 @@ contains
         end if
         !Initialize pb based on surface tension for qbmm (polytropic)
         if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0 = pref + 2d0*fluid_pp(1)%ss/(R0*R0ref)
+            pb0 = pref + 2._wp*fluid_pp(1)%ss/(R0*R0ref)
             pb0 = pb0/pref
-            pref = 1d0
+            pref = 1._wp
         end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)

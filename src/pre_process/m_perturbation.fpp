@@ -68,7 +68,7 @@ contains
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
                     !    IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-                    if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
+                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -97,10 +97,10 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -120,35 +120,35 @@ contains
         real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
 
-        uratio = 1d0/patch_icpp(1)%vel(1)
+        uratio = 1._wp/patch_icpp(1)%vel(1)
         Ldomain = mixlayer_domain*patch_icpp(1)%length_y
 
-        wave = 0d0
-        wave1 = 0d0
-        wave2 = 0d0
+        wave = 0._wp
+        wave1 = 0._wp
+        wave2 = 0._wp
 
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*4.0/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*2.0/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*1.0/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, 2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, 2*pi*11._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, 2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, 2*pi*13._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, 2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, 2*pi*17._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, 2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, 2*pi*19._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, 2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, 2*pi*23._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, 2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, 2*pi*29._wp/31._wp)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -184,14 +184,14 @@ contains
         real(wp) :: gam_b
         integer :: ii, jj
 
-        gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
+        gam_b = 1._wp + 1._wp/fluid_pp(num_fluids + 1)%gamma
 
         ! Loop
         ii = 1
         do while (.true.)
 
-            f0 = (Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b) - 2d0/(Web*fR) + 1d0 - Ca - fP
-            f1 = -3d0*gam_b*(Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b + 1d0) + 2d0/(Web*fR**2d0)
+            f0 = (Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b) - 2._wp/(Web*fR) + 1._wp - Ca - fP
+            f1 = -3._wp*gam_b*(Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b + 1._wp) + 2._wp/(Web*fR**2._wp)
 
             if (abs(f0) <= 1e-10) then
                 ! Converged
@@ -205,7 +205,7 @@ contains
             if (ieee_is_nan(f0) .or. &
                 ieee_is_nan(f1) .or. &
                 ii > 1000 .or. &
-                fR < 0d0) then
+                fR < 0._wp) then
 
                 print *, "Failed to compute equilibrium radius"
 
@@ -235,20 +235,20 @@ contains
         integer :: i, j !<  generic loop iterators
 
         xratio = mixlayer_vel_coef
-        uratio = 1d0/patch_icpp(1)%vel(1)
+        uratio = 1._wp/patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
         if (bubbles) then
             adv = patch_icpp(1)%alpha(num_fluids)
         else
-            adv = 0d0
+            adv = 0._wp
         end if
-        gam = 1d0 + 1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam*uratio**2
+        gam = 1._wp + 1._wp/fluid_pp(1)%gamma
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1._wp)/gam*uratio**2
         rho_mean = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
-        c1 = sqrt((gam*(p_mean + pi_inf))/(rho_mean*(1d0 - adv)))
-        mach = 1d0/c1
+        c1 = sqrt((gam*(p_mean + pi_inf))/(rho_mean*(1._wp - adv)))
+        mach = 1._wp/c1
 
         ! Assign mean profiles
         do j = 0, n + 1
@@ -257,15 +257,15 @@ contains
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
-        d = 0d0
-        d(0, 0) = -1d0/((y_cb(0) - y_cb(-1))*xratio)
-        d(0, 1) = 1d0/((y_cb(0) - y_cb(-1))*xratio)
+        d = 0._wp
+        d(0, 0) = -1._wp/((y_cb(0) - y_cb(-1))*xratio)
+        d(0, 1) = 1._wp/((y_cb(0) - y_cb(-1))*xratio)
         do j = 1, n
-            d(j, j - 1) = -1d0/((y_cb(j) - y_cb(j - 2))*xratio)
-            d(j, j + 1) = 1d0/((y_cb(j) - y_cb(j - 2))*xratio)
+            d(j, j - 1) = -1._wp/((y_cb(j) - y_cb(j - 2))*xratio)
+            d(j, j + 1) = 1._wp/((y_cb(j) - y_cb(j - 2))*xratio)
         end do
-        d(n + 1, n) = -1d0/((y_cb(n) - y_cb(n - 1))*xratio)
-        d(n + 1, n + 1) = 1d0/((y_cb(n) - y_cb(n - 1))*xratio)
+        d(n + 1, n) = -1._wp/((y_cb(n) - y_cb(n - 1))*xratio)
+        d(n + 1, n + 1) = 1._wp/((y_cb(n) - y_cb(n - 1))*xratio)
 
         ! Compute
         call s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
@@ -301,7 +301,7 @@ contains
             drho_mean(j) = 0
             du_mean(j) = 0
             do k = 0, nbp - 1
-                drho_mean(j) = 0d0
+                drho_mean(j) = 0._wp
                 du_mean(j) = du_mean(j) + d(j, k)*u_mean(k)
             end do
         end do
@@ -310,9 +310,9 @@ contains
         ! systems of equation (i.e. we are going to solve x for Ax = lambda x).
         ! Here, B includes components of A without differential operator, and
         ! C includes components of A with differential operator.
-        br = 0d0
-        bi = 0d0
-        ci = 0d0
+        br = 0._wp
+        bi = 0._wp
+        ci = 0._wp
         do j = 0, nbp - 1
             ii = mixlayer_var(1); jj = mixlayer_var(1); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
             ii = mixlayer_var(1); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*rho_mean; 
@@ -424,8 +424,8 @@ contains
         end do
 
         ! Remove unnecessary rows of the matrix A (rho, u, v, w, p at the boundaries)
-        fr = 0d0
-        fi = 0d0
+        fr = 0._wp
+        fi = 0._wp
         do ii = 1, mixlayer_nvar
             do jj = 1, mixlayer_nvar
                 do k = 0, n - 1
@@ -437,8 +437,8 @@ contains
             end do
         end do
 
-        gr = 0d0
-        gi = 0d0
+        gr = 0._wp
+        gi = 0._wp
         do ii = 1, mixlayer_nvar
             do j = 0, mixlayer_nvar*n - 1
                 if (ii <= mixlayer_var(2)) then
@@ -460,8 +460,8 @@ contains
             end do
         end do
 
-        hr = 0d0
-        hi = 0d0
+        hr = 0._wp
+        hi = 0._wp
         do i = 0, mixlayer_nvar*n - n_bc_skip - 1
             do jj = 1, mixlayer_nvar
                 if (jj <= mixlayer_var(2)) then
@@ -516,7 +516,7 @@ contains
         vi = zi(:, k)
 
         ! Normalize the eigenvector by its component with the largest modulus.
-        norm = 0d0
+        norm = 0._wp
         do i = 0, mixlayer_nvar*n - n_bc_skip - 1
             if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
@@ -533,8 +533,8 @@ contains
         end do
 
         ! Reassign missing values at boundaries based on the boundary condition
-        xbr = 0d0
-        xbi = 0d0
+        xbr = 0._wp
+        xbi = 0._wp
         do i = 1, mixlayer_nvar
             if (i <= mixlayer_var(2)) then
                 do k = 0, n - 1
@@ -579,8 +579,8 @@ contains
         xbi(mixlayer_var(4)*nbp + nbp - 1) = xbi(mixlayer_var(4)*nbp + n) - xbi(mixlayer_var(2)*nbp + n)*rho_mean/mach
 
         ! Compute average to get cell-centered values
-        xcr = 0d0
-        xci = 0d0
+        xcr = 0._wp
+        xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
                 xcr((i - 1)*(nbp - 1) + k) = 5d-1*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))

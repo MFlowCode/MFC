@@ -638,8 +638,8 @@ contains
         @:ALLOCATE_GLOBAL(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
 
         do i = 1, num_fluids
-            gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
-            pres_inf(i) = fluid_pp(i)%pi_inf/(1d0 + fluid_pp(i)%gamma)
+            gamma_min(i) = 1._wp/fluid_pp(i)%gamma + 1._wp
+            pres_inf(i) = fluid_pp(i)%pi_inf/(1._wp + fluid_pp(i)%gamma)
         end do
         !$acc update device(gamma_min, pres_inf)
 
@@ -683,7 +683,7 @@ contains
                 do l = startz, p - startz
                     do k = starty, n - starty
                         do j = startx, m - startx
-                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0d0
+                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
                         end do
                     end do
                 end do
@@ -764,14 +764,14 @@ contains
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
-                        alf_sum%sf(j, k, l) = 0d0
+                        alf_sum%sf(j, k, l) = 0._wp
                         !$acc loop seq
                         do i = advxb, advxe - 1
                             alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
                         end do
                         !$acc loop seq
                         do i = advxb, advxe - 1
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1.d0 - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
+                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
                                                           /alf_sum%sf(j, k, l)
                         end do
                     end do
@@ -943,7 +943,7 @@ contains
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
-            if (any(Re_size > 0d0) .or. (.not. f_is_default(sigma))) then
+            if (any(Re_size > 0._wp) .or. (.not. f_is_default(sigma))) then
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
@@ -985,7 +985,7 @@ contains
                     do j = 0, m
                         if (ib_markers%sf(j, k, l) /= 0) then
                             do i = 1, sys_size
-                                rhs_vf(i)%sf(j, k, l) = 0d0
+                                rhs_vf(i)%sf(j, k, l) = 0._wp
                             end do
                         end if
                     end do
@@ -1035,7 +1035,7 @@ contains
         if (t_step >= 4) then
             time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
         else
-            time_avg = 0d0
+            time_avg = 0._wp
         end if
         ! ==================================================================
 
@@ -1057,9 +1057,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        blkmod1(j, k, l) = ((gammas(1) + 1d0)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
+                        blkmod1(j, k, l) = ((gammas(1) + 1._wp)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
                                             pi_infs(1))/gammas(1)
-                        blkmod2(j, k, l) = ((gammas(2) + 1d0)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
+                        blkmod2(j, k, l) = ((gammas(2) + 1._wp)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
                                             pi_infs(2))/gammas(2)
                         alpha1(j, k, l) = q_cons_vf%vf(advxb)%sf(j, k, l)
 
@@ -1093,7 +1093,7 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            rhs_vf(j)%sf(k, l, q) = 1d0/dx(k)* &
+                            rhs_vf(j)%sf(k, l, q) = 1._wp/dx(k)* &
                                                     (flux_n(1)%vf(j)%sf(k - 1, l, q) &
                                                      - flux_n(1)%vf(j)%sf(k, l, q))
                         end do
@@ -1108,7 +1108,7 @@ contains
                         do j = 0, m
                             do i = 1, num_fluids
                                 rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dx(j)* &
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1._wp/dx(j)* &
                                     q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
@@ -1126,7 +1126,7 @@ contains
                         do l = 0, n
                             do k = 0, m
                                 rhs_vf(j)%sf(k, l, q) = &
-                                    rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
+                                    rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
                                     q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
                                     (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
                                      - flux_src_n(1)%vf(j)%sf(k, l, q))
@@ -1143,7 +1143,7 @@ contains
                                 do l = 0, n
                                     do k = 0, m
                                         rhs_vf(j)%sf(k, l, q) = &
-                                            rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
+                                            rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
                                             (q_cons_vf%vf(j)%sf(k, l, q) - Kterm(k, l, q))* &
                                             (flux_src_n(1)%vf(j)%sf(k, l, q) &
                                              - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
@@ -1156,7 +1156,7 @@ contains
                                 do l = 0, n
                                     do k = 0, m
                                         rhs_vf(j)%sf(k, l, q) = &
-                                            rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
+                                            rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
                                             (q_cons_vf%vf(j)%sf(k, l, q) + Kterm(k, l, q))* &
                                             (flux_src_n(1)%vf(j)%sf(k, l, q) &
                                              - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
@@ -1172,7 +1172,7 @@ contains
                             do l = 0, n
                                 do k = 0, m
                                     rhs_vf(j)%sf(k, l, q) = &
-                                        rhs_vf(j)%sf(k, l, q) + 1d0/dx(k)* &
+                                        rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
                                         q_cons_vf%vf(j)%sf(k, l, q)* &
                                         (flux_src_n(1)%vf(j)%sf(k, l, q) &
                                          - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
@@ -1203,7 +1203,7 @@ contains
                     do k = 0, n
                         do q = 0, m
                             rhs_vf(j)%sf(q, k, l) = &
-                                rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                 (flux_n(2)%vf(j)%sf(q, k - 1, l) &
                                  - flux_n(2)%vf(j)%sf(q, k, l))
                         end do
@@ -1218,7 +1218,7 @@ contains
                         do j = 0, m
                             do i = 1, num_fluids
                                 rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dy(k)* &
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1._wp/dy(k)* &
                                     q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
@@ -1270,7 +1270,7 @@ contains
                         do k = 0, n
                             do q = 0, m
                                 rhs_vf(j)%sf(q, k, l) = &
-                                    rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                    rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                     q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
                                     (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
                                      - flux_src_n(2)%vf(j)%sf(q, k, l))
@@ -1288,7 +1288,7 @@ contains
                                 do k = 0, n
                                     do q = 0, m
                                         rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                            rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                             (q_cons_vf%vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
                                             (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                              - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1302,7 +1302,7 @@ contains
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
                                                 rhs_vf(j)%sf(q, k, l) - &
-                                                (Kterm(q, k, l)/2d0/y_cc(k))* &
+                                                (Kterm(q, k, l)/2._wp/y_cc(k))* &
                                                 (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                  + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
                                         end do
@@ -1315,7 +1315,7 @@ contains
                                 do k = 0, n
                                     do q = 0, m
                                         rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                            rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                             (q_cons_vf%vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
                                             (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                              - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1329,7 +1329,7 @@ contains
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
                                                 rhs_vf(j)%sf(q, k, l) + &
-                                                (Kterm(q, k, l)/2d0/y_cc(k))* &
+                                                (Kterm(q, k, l)/2._wp/y_cc(k))* &
                                                 (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                  + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
                                         end do
@@ -1345,7 +1345,7 @@ contains
                             do k = 0, n
                                 do q = 0, m
                                     rhs_vf(j)%sf(q, k, l) = &
-                                        rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                        rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                         q_cons_vf%vf(j)%sf(q, k, l)* &
                                         (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                          - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1378,7 +1378,7 @@ contains
                         do q = 0, n
                             do l = 0, m
                                 rhs_vf(j)%sf(l, q, k) = &
-                                    rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)/y_cc(q)* &
+                                    rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)/y_cc(q)* &
                                     q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
                                     (flux_n(3)%vf(j)%sf(l, q, k - 1) &
                                      - flux_n(3)%vf(j)%sf(l, q, k))
@@ -1408,7 +1408,7 @@ contains
                         do q = 0, n
                             do l = 0, m
                                 rhs_vf(j)%sf(l, q, k) = &
-                                    rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                                    rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                     (flux_n(3)%vf(j)%sf(l, q, k - 1) &
                                      - flux_n(3)%vf(j)%sf(l, q, k))
                             end do
@@ -1424,7 +1424,7 @@ contains
                         do j = 0, m
                             do i = 1, num_fluids
                                 rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dz(l)* &
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1._wp/dz(l)* &
                                     q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
@@ -1443,7 +1443,7 @@ contains
                             do k = 0, n
                                 do q = 0, m
                                     rhs_vf(j)%sf(q, k, l) = &
-                                        rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                        rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                         q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
                                         (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
                                          - flux_src_n(2)%vf(j)%sf(q, k, l))
@@ -1461,7 +1461,7 @@ contains
                                     do k = 0, n
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
-                                                rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                                rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                                 (q_cons_vf%vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
                                                 (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                  - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1475,7 +1475,7 @@ contains
                                             do q = 0, m
                                                 rhs_vf(j)%sf(q, k, l) = &
                                                     rhs_vf(j)%sf(q, k, l) - &
-                                                    (Kterm(q, k, l)/2d0/y_cc(k))* &
+                                                    (Kterm(q, k, l)/2._wp/y_cc(k))* &
                                                     (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                      + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
                                             end do
@@ -1488,7 +1488,7 @@ contains
                                     do k = 0, n
                                         do q = 0, m
                                             rhs_vf(j)%sf(q, k, l) = &
-                                                rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                                rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                                 (q_cons_vf%vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
                                                 (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                  - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1502,7 +1502,7 @@ contains
                                             do q = 0, m
                                                 rhs_vf(j)%sf(q, k, l) = &
                                                     rhs_vf(j)%sf(q, k, l) + &
-                                                    (Kterm(q, k, l)/2d0/y_cc(k))* &
+                                                    (Kterm(q, k, l)/2._wp/y_cc(k))* &
                                                     (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                                      + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
                                             end do
@@ -1518,7 +1518,7 @@ contains
                                 do k = 0, n
                                     do q = 0, m
                                         rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
+                                            rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                             q_cons_vf%vf(j)%sf(q, k, l)* &
                                             (flux_src_n(2)%vf(j)%sf(q, k, l) &
                                              - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
@@ -1536,7 +1536,7 @@ contains
                             do q = 0, n
                                 do l = 0, m
                                     rhs_vf(j)%sf(l, q, k) = &
-                                        rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                         q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
                                         (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
                                          - flux_src_n(3)%vf(j)%sf(l, q, k))
@@ -1553,7 +1553,7 @@ contains
                                     do q = 0, n
                                         do l = 0, m
                                             rhs_vf(j)%sf(l, q, k) = &
-                                                rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                                                rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                                 (q_cons_vf%vf(j)%sf(l, q, k) - Kterm(l, q, k))* &
                                                 (flux_src_n(3)%vf(j)%sf(l, q, k) &
                                                  - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
@@ -1566,7 +1566,7 @@ contains
                                     do q = 0, n
                                         do l = 0, m
                                             rhs_vf(j)%sf(l, q, k) = &
-                                                rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                                                rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                                 (q_cons_vf%vf(j)%sf(l, q, k) + Kterm(l, q, k))* &
                                                 (flux_src_n(3)%vf(j)%sf(l, q, k) &
                                                  - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
@@ -1582,7 +1582,7 @@ contains
                                 do q = 0, n
                                     do l = 0, m
                                         rhs_vf(j)%sf(l, q, k) = &
-                                            rhs_vf(j)%sf(l, q, k) + 1d0/dz(k)* &
+                                            rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                             q_cons_vf%vf(j)%sf(l, q, k)* &
                                             (flux_src_n(3)%vf(j)%sf(l, q, k) &
                                              - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
@@ -1617,7 +1617,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j - 1, k, l))
@@ -1633,7 +1633,7 @@ contains
                         !$acc loop seq
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dx(j)* &
+                                rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)* &
                                 (flux_src_n(i)%sf(j - 1, k, l) &
                                  - flux_src_n(i)%sf(j, k, l))
                         end do
@@ -1649,7 +1649,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dy(k)* &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j, k - 1, l))
@@ -1682,7 +1682,7 @@ contains
                             !$acc loop seq
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, 0, l) = &
-                                    rhs_vf(i)%sf(j, 0, l) + 1d0/(y_cc(1) - y_cc(-1))* &
+                                    rhs_vf(i)%sf(j, 0, l) + 1._wp/(y_cc(1) - y_cc(-1))* &
                                     (tau_Re_vf(i)%sf(j, -1, l) &
                                      - tau_Re_vf(i)%sf(j, 1, l))
                             end do
@@ -1698,7 +1698,7 @@ contains
                             !$acc loop seq
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                     (flux_src_n(i)%sf(j, k - 1, l) &
                                      - flux_src_n(i)%sf(j, k, l))
                             end do
@@ -1714,7 +1714,7 @@ contains
                             !$acc loop seq
                             do i = momxb, E_idx
                                 rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                    rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                     (flux_src_n(i)%sf(j, k - 1, l) &
                                      - flux_src_n(i)%sf(j, k, l))
                             end do
@@ -1750,7 +1750,7 @@ contains
                                 !$acc loop seq
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, 0, l) = &
-                                        rhs_vf(i)%sf(j, 0, l) - 1d0/y_cc(0)* &
+                                        rhs_vf(i)%sf(j, 0, l) - 1._wp/y_cc(0)* &
                                         tau_Re_vf(i)%sf(j, 0, l)
                                 end do
                             end do
@@ -1784,7 +1784,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(c_idx)%sf(j, k, l) = &
-                                rhs_vf(c_idx)%sf(j, k, l) + 1d0/dz(l)* &
+                                rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)* &
                                 q_prim_vf(c_idx)%sf(j, k, l)* &
                                 (flux_src_n(advxb)%sf(j, k, l) - &
                                  flux_src_n(advxb)%sf(j, k, l - 1))
@@ -1800,7 +1800,7 @@ contains
                         !$acc loop seq
                         do i = momxb, E_idx
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
                                 (flux_src_n(i)%sf(j, k, l - 1) &
                                  - flux_src_n(i)%sf(j, k, l))
                         end do
@@ -1871,19 +1871,19 @@ contains
 
                     ! Numerical correction of the volume fractions
                     if (mpp_lim) then
-                        sum_alpha = 0d0
+                        sum_alpha = 0._wp
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0d0) .or. &
-                                (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0d0)) then
-                                q_cons_vf(i + contxb - 1)%sf(j, k, l) = 0d0
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 0d0
-                                q_cons_vf(i + intxb - 1)%sf(j, k, l) = 0d0
+                            if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0._wp) .or. &
+                                (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0._wp)) then
+                                q_cons_vf(i + contxb - 1)%sf(j, k, l) = 0._wp
+                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 0._wp
+                                q_cons_vf(i + intxb - 1)%sf(j, k, l) = 0._wp
                             end if
 
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > 1d0) &
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 1d0
+                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > 1._wp) &
+                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 1._wp
                             sum_alpha = sum_alpha + q_cons_vf(i + advxb - 1)%sf(j, k, l)
                         end do
 
@@ -1900,12 +1900,12 @@ contains
 
                     !$acc loop seq
                     do i = 1, num_fluids
-                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1d0 - sgm_eps)) relax = 0
+                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1._wp - sgm_eps)) relax = 0
                     end do
 
                     if (relax == 1) then
                         ! Initial state
-                        pres_relax = 0d0
+                        pres_relax = 0._wp
 
                         !$acc loop seq
                         do i = 1, num_fluids
@@ -1915,10 +1915,10 @@ contains
                                      q_cons_vf(i + advxb - 1)%sf(j, k, l) &
                                      - pi_infs(i))/gammas(i)
 
-                                if (pres_K_init(i) <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                    pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
+                                if (pres_K_init(i) <= -(1._wp - 1d-8)*pres_inf(i) + 1d-8) &
+                                    pres_K_init(i) = -(1._wp - 1d-8)*pres_inf(i) + 1d-8
                             else
-                                pres_K_init(i) = 0d0
+                                pres_K_init(i) = 0._wp
                             end if
                             pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
                         end do
@@ -1929,7 +1929,7 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            rho_K_s(i) = 0d0
+                            rho_K_s(i) = 0._wp
                         end do
 
                         !$acc loop seq
@@ -1940,13 +1940,13 @@ contains
 
                                 ! Physical pressure
                                 do i = 1, num_fluids
-                                    if (pres_relax <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                        pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
+                                    if (pres_relax <= -(1._wp - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_relax = -(1._wp - 1d-8)*pres_inf(i) + 1._wp
                                 end do
 
                                 ! Newton-Raphson method
-                                f_pres = -1d0
-                                df_pres = 0d0
+                                f_pres = -1._wp
+                                df_pres = 0._wp
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
@@ -1954,7 +1954,7 @@ contains
                                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
                                                      max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
                                                      *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                                   pres_inf(i)))**(1d0/gamma_min(i))
+                                                                                   pres_inf(i)))**(1._wp/gamma_min(i))
 
                                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
                                                  /rho_K_s(i)
@@ -1993,9 +1993,9 @@ contains
                     end do
 
                     if (bubbles) then
-                        rho = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
+                        rho = 0._wp
+                        gamma = 0._wp
+                        pi_inf = 0._wp
 
                         if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
                             !$acc loop seq
@@ -2017,17 +2017,17 @@ contains
                             pi_inf = pi_infs(1)
                         end if
                     else
-                        rho = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
+                        rho = 0._wp
+                        gamma = 0._wp
+                        pi_inf = 0._wp
 
-                        sum_alpha = 0d0
+                        sum_alpha = 0._wp
 
                         if (mpp_lim) then
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho(i) = max(0d0, alpha_rho(i))
-                                alpha(i) = min(max(0d0, alpha(i)), 1d0)
+                                alpha_rho(i) = max(0._wp, alpha_rho(i))
+                                alpha(i) = min(max(0._wp, alpha(i)), 1._wp)
                                 sum_alpha = sum_alpha + alpha(i)
                             end do
 
@@ -2047,20 +2047,20 @@ contains
                             do i = 1, 2
                                 Re(i) = dflt_real
 
-                                if (Re_size(i) > 0) Re(i) = 0d0
+                                if (Re_size(i) > 0) Re(i) = 0._wp
                                 !$acc loop seq
                                 do q = 1, Re_size(i)
                                     Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
                                             + Re(i)
                                 end do
 
-                                Re(i) = 1d0/max(Re(i), sgm_eps)
+                                Re(i) = 1._wp/max(Re(i), sgm_eps)
 
                             end do
                         end if
                     end if
 
-                    dyn_pres = 0d0
+                    dyn_pres = 0._wp
 
                     !$acc loop seq
                     do i = momxb, momxe

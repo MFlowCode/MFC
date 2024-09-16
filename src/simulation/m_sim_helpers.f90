@@ -55,9 +55,9 @@ contains
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
-        vel_sum = 0d0
+        vel_sum = 0._wp
         do i = 1, num_dims
-            vel_sum = vel_sum + vel(i)**2d0
+            vel_sum = vel_sum + vel(i)**2._wp
         end do
 
         pres = q_prim_vf(E_idx)%sf(j, k, l)
@@ -92,10 +92,10 @@ contains
 
         if (grid_geometry == 3) then
             if (k == 0) then
-                fltr_dtheta = 2d0*pi*y_cb(0)/3d0
+                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, wp)*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, wp)
+                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if
@@ -117,20 +117,20 @@ contains
 
                 if (grid_geometry == 3) then
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), fltr_dtheta)**2d0
+                                       /min(dx(j), dy(k), fltr_dtheta)**2._wp
 
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          fltr_dtheta*(abs(vel(3)) + c)) &
-                                     /maxval(1d0/Re_l)
+                                     /maxval(1._wp/Re_l)
                 else
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), dz(l))**2d0
+                                       /min(dx(j), dy(k), dz(l))**2._wp
 
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          dz(l)*(abs(vel(3)) + c)) &
-                                     /maxval(1d0/Re_l)
+                                     /maxval(1._wp/Re_l)
                 end if
 
             end if
@@ -142,11 +142,11 @@ contains
 
             if (any(Re_size > 0)) then
 
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2d0
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
 
                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                      dy(k)*(abs(vel(2)) + c)) &
-                                 /maxval(1d0/Re_l)
+                                 /maxval(1._wp/Re_l)
 
             end if
 
@@ -156,9 +156,9 @@ contains
 
             if (any(Re_size > 0)) then
 
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2d0
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
 
-                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re_l)
+                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
 
             end if
 
@@ -187,10 +187,10 @@ contains
 
         if (grid_geometry == 3) then
             if (k == 0) then
-                fltr_dtheta = 2d0*pi*y_cb(0)/3d0
+                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, wp)*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, wp)
+                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if
@@ -210,10 +210,10 @@ contains
 
             if (any(Re_size > 0)) then
                 if (grid_geometry == 3) then
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2d0) &
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
                               /minval(1/(rho*Re_l))
                 else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2d0) &
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
                               /minval(1/(rho*Re_l))
                 end if
             end if
@@ -224,7 +224,7 @@ contains
                                      dy(k)/(abs(vel(2)) + c))
 
             if (any(Re_size > 0)) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2d0)/maxval((1/Re_l)/rho)
+                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             end if
 
         else
@@ -232,7 +232,7 @@ contains
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
             if (any(Re_size > 0)) then
-                vcfl_dt = cfl_target*(dx(j)**2d0)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
             end if
 
         end if

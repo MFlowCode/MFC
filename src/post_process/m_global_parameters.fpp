@@ -312,8 +312,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -321,9 +321,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
         end do
 
@@ -485,12 +485,12 @@ contains
                 end if
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
                     !call s_simpson
-                    V0(:) = 0d0
+                    V0(:) = 0._wp
                 else
                     stop 'Invalid value of nb'
                 end if
@@ -498,8 +498,8 @@ contains
                 if (polytropic .neqv. .true.) then
                     !call s_initialize_nonpoly
                 else
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
 
             end if
@@ -580,18 +580,18 @@ contains
                 end do
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
-                    V0(:) = 0d0
+                    V0(:) = 0._wp
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic) then
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
             end if
         end if

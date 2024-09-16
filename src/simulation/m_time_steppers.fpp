@@ -521,7 +521,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -537,7 +537,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2d0
+                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -555,7 +555,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2d0
+                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -564,7 +564,7 @@ contains
         end if
 
         call nvtxStartRange("body_forces")
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
         call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
@@ -704,9 +704,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -720,9 +720,9 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
-                                    (3d0*pb_ts(1)%sf(j, k, l, q, i) &
+                                    (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -738,9 +738,9 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
-                                    (3d0*mv_ts(1)%sf(j, k, l, q, i) &
+                                    (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -749,7 +749,7 @@ contains
         end if
 
         call nvtxStartRange("body_forces")
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
         call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
@@ -779,8 +779,8 @@ contains
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -795,8 +795,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
+                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -813,8 +813,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
+                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -823,7 +823,7 @@ contains
         end if
 
         call nvtxStartRange("body_forces")
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
         call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)

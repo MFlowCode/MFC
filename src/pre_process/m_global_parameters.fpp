@@ -295,8 +295,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -304,8 +304,8 @@ contains
         file_per_process = .false.
         precision = 2
         mixlayer_vel_profile = .false.
-        mixlayer_vel_coef = 1d0
-        mixlayer_domain = 1d0
+        mixlayer_vel_coef = 1._wp
+        mixlayer_domain = 1._wp
         mixlayer_perturb = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
@@ -319,11 +319,11 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model%scale(:) = 1d0
-            patch_icpp(i)%model%translate(:) = 0d0
+            patch_icpp(i)%model%scale(:) = 1._wp
+            patch_icpp(i)%model%translate(:) = 0._wp
             patch_icpp(i)%model%filepath(:) = ' '
             patch_icpp(i)%model%spc = 10
-            patch_icpp(i)%model%threshold = 0.9d0
+            patch_icpp(i)%model%threshold = 0.9_wp
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
@@ -347,10 +347,10 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
-            patch_icpp(i)%cv = 0d0
-            patch_icpp(i)%qv = 0d0
-            patch_icpp(i)%qvp = 0d0
-            patch_icpp(i)%tau_e = 0d0
+            patch_icpp(i)%cv = 0._wp
+            patch_icpp(i)%qv = 0._wp
+            patch_icpp(i)%qvp = 0._wp
+            patch_icpp(i)%tau_e = 0._wp
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
@@ -385,7 +385,7 @@ contains
         nmom = 1
         sigR = dflt_real
         sigV = dflt_real
-        rhoRV = 0d0
+        rhoRV = 0._wp
         dist_type = dflt_int
         R0_type = dflt_int
 
@@ -398,7 +398,7 @@ contains
 
         ! surface tension modeling
         sigma = dflt_real
-        pi_fac = 1d0
+        pi_fac = 1._wp
 
         ! Immersed Boundaries
         ib = .false.
@@ -432,10 +432,10 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
+            fluid_pp(i)%G = 0._wp
         end do
 
     end subroutine s_assign_default_values_to_user_inputs
@@ -554,11 +554,11 @@ contains
                 end if
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 1d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 1._wp
                 else if (nb > 1) then
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                     !R0 and weight initialized in s_simpson
                 else
                     stop 'Invalid value of nb'
@@ -567,8 +567,8 @@ contains
                 !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                 if (.not. qbmm) then
                     if (polytropic) then
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
 
@@ -579,9 +579,9 @@ contains
                         if ((f_is_default(Web))) then
                             pb0 = pref
                             pb0 = pb0/pref
-                            pref = 1d0
+                            pref = 1._wp
                         end if
-                        rhoref = 1d0
+                        rhoref = 1._wp
                     end if
                 end if
             end if
@@ -664,18 +664,18 @@ contains
                 end do
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic) then
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
 
             end if

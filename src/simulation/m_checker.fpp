@@ -65,9 +65,9 @@ contains
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(weno_order /= 1 .and. f_is_default(weno_eps), &
             "weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6")
-        @:PROHIBIT(weno_eps <= 0d0, "weno_eps must be positive. A typical value of weno_eps is 1e-6")
+        @:PROHIBIT(weno_eps <= 0._wp, "weno_eps must be positive. A typical value of weno_eps is 1e-6")
         @:PROHIBIT(teno .and. f_is_default(teno_CT), "teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6")
-        @:PROHIBIT(teno .and. teno_CT <= 0d0, "teno_CT must be positive. A typical value of teno_CT is 1e-6")
+        @:PROHIBIT(teno .and. teno_CT <= 0._wp, "teno_CT must be positive. A typical value of teno_CT is 1e-6")
         @:PROHIBIT(count([mapped_weno, wenoz, teno]) >= 2, "Only one of mapped_weno, wenoz, or teno can be set to true")
         @:PROHIBIT(weno_order == 1 .and. mapped_weno)
         @:PROHIBIT(weno_order == 1 .and. wenoz)
@@ -180,7 +180,7 @@ contains
                 "acoustic("//trim(jStr)//")%dipole is not supported for support >= 5 (non-planar supports)")
             @:PROHIBIT(acoustic(j)%support < 5 .and. f_is_default(acoustic(j)%dir), &
                 "acoustic("//trim(jStr)//")%dir must be specified for support < 5 (planer support)")
-            @:PROHIBIT(acoustic(j)%support == 1 .and. f_approx_equal(acoustic(j)%dir, 0d0), &
+            @:PROHIBIT(acoustic(j)%support == 1 .and. f_approx_equal(acoustic(j)%dir, 0._wp), &
                 "acoustic("//trim(jStr)//")dir must be non-zero for support = 1")
             @:PROHIBIT(acoustic(j)%pulse == 2 .and. f_is_default(acoustic(j)%delay), &
                 "acoustic("//trim(jStr)//")%delay must be specified for pulse = 2 (Gaussian)")
@@ -189,20 +189,20 @@ contains
 
             @:PROHIBIT((acoustic(j)%support == 2 .or. acoustic(j)%support == 3) .and. f_is_default(acoustic(j)%length), &
                 "acoustic("//trim(jStr)//")%length must be specified for support = 2 or 3")
-            @:PROHIBIT((acoustic(j)%support == 2 .or. acoustic(j)%support == 3) .and. acoustic(j)%length <= 0d0, &
+            @:PROHIBIT((acoustic(j)%support == 2 .or. acoustic(j)%support == 3) .and. acoustic(j)%length <= 0._wp, &
                 "acoustic("//trim(jStr)//")%length must be positive for support = 2 or 3")
             @:PROHIBIT(acoustic(j)%support == 3 .and. f_is_default(acoustic(j)%height), &
                 "acoustic("//trim(jStr)//")%height must be specified for support = 3")
-            @:PROHIBIT(acoustic(j)%support == 3 .and. acoustic(j)%height <= 0d0, &
+            @:PROHIBIT(acoustic(j)%support == 3 .and. acoustic(j)%height <= 0._wp, &
                 "acoustic("//trim(jStr)//")%height must be positive for support = 3")
 
             @:PROHIBIT(acoustic(j)%support >= 5 .and. f_is_default(acoustic(j)%foc_length), &
                 "acoustic("//trim(jStr)//")%foc_length must be specified for support >= 5 (non-planar supports)")
-            @:PROHIBIT(acoustic(j)%support >= 5 .and. acoustic(j)%foc_length <= 0d0, &
+            @:PROHIBIT(acoustic(j)%support >= 5 .and. acoustic(j)%foc_length <= 0._wp, &
                 "acoustic("//trim(jStr)//")%foc_length must be positive for support >= 5 (non-planar supports)")
             @:PROHIBIT(acoustic(j)%support >= 5 .and. f_is_default(acoustic(j)%aperture), &
                 "acoustic("//trim(jStr)//")%aperture must be specified for support >= 5 (non-planar supports)")
-            @:PROHIBIT(acoustic(j)%support >= 5 .and. acoustic(j)%aperture <= 0d0, &
+            @:PROHIBIT(acoustic(j)%support >= 5 .and. acoustic(j)%aperture <= 0._wp, &
                 "acoustic("//trim(jStr)//")%aperture must be positive for support >= 5 (non-planar supports)")
 
             @:PROHIBIT(any(acoustic(j)%support == (/9, 10, 11/)) .and. acoustic(j)%num_elements == dflt_int, &
@@ -215,11 +215,11 @@ contains
                 "acoustic("//trim(jStr)//")%element_on must be less than or equal to num_elements for support = 9, 10, or 11 (transducer array)")
             @:PROHIBIT(any(acoustic(j)%support == (/9, 10/)) .and. f_is_default(acoustic(j)%element_spacing_angle), &
                 "acoustic("//trim(jStr)//")%element_spacing_angle must be specified for support = 9 or 10 (2D transducer array)")
-            @:PROHIBIT(any(acoustic(j)%support == (/9, 10/)) .and. acoustic(j)%element_spacing_angle < 0d0, &
+            @:PROHIBIT(any(acoustic(j)%support == (/9, 10/)) .and. acoustic(j)%element_spacing_angle < 0._wp, &
                 "acoustic("//trim(jStr)//")%element_spacing_angle must be non-negative for support = 9 or 10 (2D transducer array)")
             @:PROHIBIT(acoustic(j)%support == 11 .and. f_is_default(acoustic(j)%element_polygon_ratio), &
                 "acoustic("//trim(jStr)//")%element_polygon_ratio must be specified for support = 11 (3D transducer array)")
-            @:PROHIBIT(acoustic(j)%support == 11 .and. acoustic(j)%element_polygon_ratio <= 0d0, &
+            @:PROHIBIT(acoustic(j)%support == 11 .and. acoustic(j)%element_polygon_ratio <= 0._wp, &
                 "acoustic("//trim(jStr)//")%element_polygon_ratio must be positive for support = 11 (3D transducer array)")
         end do
 
@@ -262,7 +262,7 @@ contains
         do i = 1, num_fluids
             do j = 1, 2
                 call s_int_to_str(j, jStr)
-                @:PROHIBIT((.not. f_is_default(fluid_pp(i)%Re(j))) .and. fluid_pp(i)%Re(j) <= 0d0, &
+                @:PROHIBIT((.not. f_is_default(fluid_pp(i)%Re(j))) .and. fluid_pp(i)%Re(j) <= 0._wp, &
                     "fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//") must be positive.")
                 @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
                     "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")

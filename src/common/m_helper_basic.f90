@@ -40,7 +40,7 @@ contains
 
         if (a == b) then
             res = .true.
-        else if (a == 0d0 .or. b == 0d0 .or. (abs(a) + abs(b) < tiny(a))) then
+        else if (a == 0._wp .or. b == 0._wp .or. (abs(a) + abs(b) < tiny(a))) then
             res = (abs(a - b) < (tol*tiny(a)))
         else
             res = (abs(a - b)/min(abs(a) + abs(b), huge(a)) < tol)
