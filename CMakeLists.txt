@@ -340,6 +340,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_CASE_OPTIMIZATION=False
+                                 -D chemistry=False
                                  --line-numbering
                                  --no-folding
                                  "${fpp}" "${f90}"

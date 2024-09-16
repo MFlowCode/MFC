@@ -49,8 +49,9 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
-          brew install coreutils python cmake fftw hdf5 gcc@14 open-mpi
+          brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
           echo "FC=gfortran-14" >> $GITHUB_ENV
+          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false
@@ -138,4 +139,3 @@ jobs:
         with:
           name: logs
           path: test-${{ matrix.device }}.out
-
