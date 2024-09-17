@@ -335,6 +335,7 @@ POST_PROCESS.update({
     't_save': ParamType.REAL,
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
+    'comp_debug': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):

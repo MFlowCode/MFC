@@ -1016,6 +1016,19 @@ contains
         integer, intent(in) :: t_step, stage
         integer :: j, k, l, i
         integer errors
+        logical :: exists
+
+        character(LEN=name_len) :: file_name = 'comp_debug.txt'
+        character(LEN=path_len + name_len) :: file_path
+        character(100) :: str_format
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+
+        str_format = "(I9, A, I3, A, I4, I4, I4, A, I2, A, I5, A, I5, I5, I5)"
+
+        open (12, FILE=trim(file_path), &
+          STATUS='replace')
 
         errors = 0
 
@@ -1026,7 +1039,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                            print *, "NaN(s) in conservative variables after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            write(12, str_format) t_step, " NaN(s) in conservative variables after RK stage ", &
+                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                " (m, n, p)", m, n, p
                             errors = errors + 1
                         end if
                     end do
@@ -1040,10 +1055,14 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (q_cons_vf(i)%sf(j, k, l) < 0d0) then
-                            print *, "Volume Fraction is Negative after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                            write(12, str_format) t_step, " Volume fraction < 0 after RK stage ", &
+                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                " (m, n, p)", m, n, p
                             errors = errors + 1
-                        elseif (q_cons_Vf(i)%sf(j, k, l) > 1d0) then
-                            print *, "Volume Fraction is greater than 1 after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                        elseif (q_cons_vf(i)%sf(j, k, l) > 1d0 + verysmall) then
+                            write(12, str_format) t_step, " Volume fraction > 1 after RK stage ", &
+                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                " (m, n, p)", m, n, p
                             errors = errors + 1
                         end if
                     end do
@@ -1056,8 +1075,12 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (q_cons_vf(advxb + i -1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) > 0d0) then
-                            print *, "Density is negative after RK stage", stage, "at", j, k, l, i, proc_rank, t_step, m, n, p
+                        if (q_cons_vf(advxb + i -1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) < 0d0 .or. &
+                            q_cons_vf(advxb + i -1)%sf(j, k, l) > 0d0 .and. q_cons_Vf(i)%sf(j, k, l) < 0d0) then
+                            print*, q_cons_vf(advxb + i - 1)%sf(j, k, l), q_cons_vf(i)%sf(j, k, l)
+                            write(12, str_format) t_step, " Density is negative after RK stage ", &
+                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                " (m, n, p)", m, n, p
                             errors = errors + 1
                         end if
                     end do
@@ -1066,9 +1089,13 @@ contains
         end do
 
         if (errors /= 0) then
+            close(12)
             call s_write_data_files(q_cons_vf, q_prim_vf, t_step)
             call s_mpi_abort("Errors found in conservative variables")
         endif
+
+        write(12, "(I3)") -1
+        close(12)
 
     end subroutine s_comprehensive_debug
 

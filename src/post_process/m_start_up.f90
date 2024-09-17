@@ -76,7 +76,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target
+            cfl_target, comp_debug
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -175,6 +175,56 @@ contains
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
     end subroutine s_perform_time_step
+
+    subroutine s_perform_comprehensive_debug(varname, pres, c, H)
+
+        real(kind(0d0)) :: pres
+        real(kind(0d0)) :: c
+        real(kind(0d0)) :: H
+        integer :: t_fail, ios
+        logical :: exists
+        character(LEN=name_len) :: varname !<
+        character(LEN=name_len) :: file_name = 'comp_debug.txt'
+        character(LEN=path_len + name_len) :: file_path
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+
+        inquire(file=file_path, exist=exists)
+        if (exists) then
+            open(12, file=file_path)
+              ! Read the file line by line
+              do
+                 read(12, '(I9)', iostat=ios) t_fail
+                 if (ios /= 0) exit  ! Exit loop on error or end-of-file
+              end do
+              if (t_fail == -1) return
+        else
+            return
+        end if
+
+        if (proc_rank == 0) then
+            print("(A, I6)"), " Post Processing suspicious time-step: ", t_fail
+        end if
+
+        ! Populating the grid and conservative variables
+        call s_read_data_files(t_fail)
+        ! Populating the buffer regions of the grid variables
+        if (buff_size > 0) then
+            call s_populate_grid_variables_buffer_regions()
+        end if
+
+        ! Populating the buffer regions of the conservative variables
+        if (buff_size > 0) then
+            call s_populate_conservative_variables_buffer_regions()
+        end if
+
+        ! Converting the conservative variables to the primitive ones
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+
+        call s_save_data(t_fail, varname, pres, c, H)
+
+    end subroutine s_perform_comprehensive_debug
 
     subroutine s_save_data(t_step, varname, pres, c, H)
 

@@ -104,6 +104,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
+    logical :: comp_debug      !< Turn on comprehensive debug
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -305,6 +306,7 @@ contains
         relax = .false.
         relax_model = dflt_int
         hypoelasticity = .false.
+        comp_debug = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
