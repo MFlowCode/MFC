@@ -37,6 +37,8 @@ module m_time_steppers
 
     use m_nvtx
 
+    use m_thermochem
+
     use m_body_forces
 
     use ieee_arithmetic
@@ -217,6 +219,20 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(c_idx))
         end if
 
+        if (chemistry) then
+            do i = chemxb, chemxe
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+
+            @:ALLOCATE(q_prim_vf(tempxb)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(tempxb))
+        end if
+
         @:ALLOCATE_GLOBAL(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
@@ -310,6 +326,10 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: nR3bar
+        real(kind(0d0)) :: e_mix
+
+        real(kind(0d0)) :: T
+        real(kind(0d0)), dimension(num_species) :: Ys
 
         ! Stage 1 of 1 =====================================================
 

@@ -49,6 +49,8 @@ COMMON = {
     'adv_n': ParamType.LOG,
     'cfl_adap_dt': ParamType.LOG,
     'cfl_const_dt': ParamType.LOG,
+    'chemistry': ParamType.LOG,
+    'cantera_file': ParamType.STR,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -125,9 +127,8 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
-    # (cameron): This parameter has since been removed.
-    # for i in range(100):
-    #     PRE_PROCESS.append(f"patch_icpp({p_id})%Y({i})")
+    for i in range(100):
+        PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()
 
     PRE_PROCESS[f"patch_icpp({p_id})%model%filepath"] = ParamType.STR
 
@@ -222,9 +223,8 @@ SIMULATION.update({
     'comp_debug': ParamType.LOG,
 })
 
-# NOTE: Not currently present
-# for var in [ 'advection', 'diffusion', 'reactions' ]:
-#     SIMULATION.append(f'chem_params%{var}')
+for var in [ 'advection', 'diffusion', 'reactions' ]:
+    SIMULATION[f'chem_params%{var}'] = ParamType.LOG
 
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
@@ -255,12 +255,6 @@ for cmp in ["x", "y", "z"]:
 
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
-
-# NOTE: This is now just "probe_wrt"
-# for wrt_id in range(1,10+1):
-#    for cmp in ["x", "y", "z"]:
-#        SIMULATION.append(f'probe_wrt({wrt_id})%{cmp}')
-#        set_type(f'probe_wrt({wrt_id})%{cmp}', ParamType.LOG)
 
 for probe_id in range(1,3+1):
     for cmp in ["x", "y", "z"]:
@@ -296,7 +290,7 @@ for f_id in range(1,10+1):
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
 
 
-# Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt'
+# Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt_Y'
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
 POST_PROCESS.update({
@@ -347,9 +341,9 @@ for cmp_id in range(1,3+1):
     for real_attr in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS[f'{real_attr}({cmp_id})'] = ParamType.LOG
 
-# NOTE: `chem_wrt` is missing
+# NOTE: `chem_wrt_Y` is missing
 # for cmp_id in range(100):
-#     POST_PROCESS.append(f'chem_wrt({cmp_id})')
+#     POST_PROCESS.append(f'chem_wrt_Y({cmp_id})')
 
 for fl_id in range(1,10+1):
     for append, ty in [("schlieren_alpha", ParamType.REAL),
@@ -361,6 +355,7 @@ for fl_id in range(1,10+1):
                       "cv", "qv", "qvp" ]:
         POST_PROCESS[f"fluid_pp({fl_id})%{real_attr}"] = ParamType.REAL
 
+IGNORE = ["cantera_file", "chemistry"]
 
 ALL = COMMON.copy()
 ALL.update(PRE_PROCESS)

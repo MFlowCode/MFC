@@ -46,7 +46,7 @@ class Case:
         # Create Fortran-style input file content string
         dict_str = ""
         for key, val in self.params.items():
-            if key in MASTER_KEYS:
+            if key in MASTER_KEYS and key not in case_dicts.IGNORE:
                 if self.__is_ic_analytical(key, val):
                     dict_str += f"{key} = 0d0\n"
                     ignored.append(key)
@@ -211,6 +211,11 @@ class Case:
 """
 
     def get_fpp(self, target, print = True) -> str:
+        def _prepend() -> str:
+            return f"""\
+#:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}
+"""
+
         def _default(_) -> str:
             return "! This file is purposefully empty."
 
@@ -219,7 +224,7 @@ class Case:
             "simulation"  : self.__get_sim_fpp,
         }.get(build.get_target(target).name, _default)(print)
 
-        return result
+        return _prepend() + result
 
     def __getitem__(self, key: str) -> str:
         return self.params[key]
