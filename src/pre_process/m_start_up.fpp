@@ -419,7 +419,7 @@ contains
         ! Generic string used to store the address of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !<
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -543,7 +543,7 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -828,9 +828,9 @@ contains
 
     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
 
-        real(kind(0d0)), intent(inout) :: start, finish
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: start, finish
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), intent(inout) :: time_avg, time_final
         logical, intent(inout) :: file_exists
 
         ! Setting up the grid and the initial condition. If the grid is read in from
@@ -865,8 +865,8 @@ contains
 
     subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), intent(inout) :: time_avg, time_final
         logical, intent(inout) :: file_exists
 
         call s_mpi_barrier()

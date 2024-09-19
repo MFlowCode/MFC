@@ -54,9 +54,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: alpha_unadv
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: alpha_unadv
+        real(wp) :: rand_real
         call random_seed()
 
         do k = 0, p
@@ -86,8 +86,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !<  generic loop iterators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: rand_real
         call random_seed()
 
         ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
@@ -116,8 +116,8 @@ contains
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
-        real(kind(0d0)) :: uratio, Ldomain
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
+        real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
 
         uratio = 1d0/patch_icpp(1)%vel(1)
@@ -178,10 +178,10 @@ contains
 
     !>  This subroutine computes equilibrium bubble radius of the perturbed pressure field
     subroutine s_compute_equilibrium_state(fP, fR0, fR)
-        real(kind(0d0)), intent(in) :: fP, fR0
-        real(kind(0d0)), intent(inout) :: fR
-        real(kind(0d0)) :: f0, f1
-        real(kind(0d0)) :: gam_b
+        real(wp), intent(in) :: fP, fR0
+        real(wp), intent(inout) :: fR
+        real(wp) :: f0, f1
+        real(wp) :: gam_b
         integer :: ii, jj
 
         gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
@@ -224,14 +224,14 @@ contains
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha, beta, wave, shift)
-        real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
-        real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)), dimension(0:nbp - 1) :: u_mean !<  mean density and velocity profiles
-        real(kind(0d0)) :: rho_mean, p_mean !< mean density and pressure
-        real(kind(0d0)), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir
-        real(kind(0d0)) :: gam, pi_inf, mach, c1, adv
-        real(kind(0d0)) :: xratio, uratio
+        real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
+        real(wp) :: shift !< phase shift
+        real(wp), dimension(0:nbp - 1) :: u_mean !<  mean density and velocity profiles
+        real(wp) :: rho_mean, p_mean !< mean density and pressure
+        real(wp), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir
+        real(wp) :: gam, pi_inf, mach, c1, adv
+        real(wp) :: xratio, uratio
         integer :: i, j !<  generic loop iterators
 
         xratio = mixlayer_vel_coef
@@ -276,21 +276,21 @@ contains
         !!              generate instability waves for the given set of spatial
         !!              wave numbers and phase shift.
     subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
-        real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(0:nbp - 1), intent(in) :: u_mean !<  mean velocity profiles
-        real(kind(0d0)), intent(in) :: rho_mean, p_mean !< mean density and pressure
-        real(kind(0d0)), dimension(0:nbp - 1, 0:nbp - 1), intent(in) :: d !< differential operator in y dir
-        real(kind(0d0)), intent(in) :: gam, pi_inf, mach, shift
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp), dimension(0:nbp - 1), intent(in) :: u_mean !<  mean velocity profiles
+        real(wp), intent(in) :: rho_mean, p_mean !< mean density and pressure
+        real(wp), dimension(0:nbp - 1, 0:nbp - 1), intent(in) :: d !< differential operator in y dir
+        real(wp), intent(in) :: gam, pi_inf, mach, shift
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
 
-        real(kind(0d0)), dimension(0:nbp - 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: br, bi, ci !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: hr, hi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:nbp - 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: ar, ai    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: br, bi, ci !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: hr, hi    !< matrices for eigenvalue problem
 
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: zr, zi !< eigenvectors
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: fv1, fv2, fv3 !< temporary memory
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: zr, zi !< eigenvectors
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: wr, wi !< eigenvalues
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: fv1, fv2, fv3 !< temporary memory
 
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -353,12 +353,12 @@ contains
     !> This subroutine applies non-reflecting subsonic buffer boundary condition
         !!              to the linear system of equations (i.e. matrix A).
     subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(out) :: hr, hi    !< matrices for eigenvalue problem
-        real(kind(0d0)), intent(in) :: rho_mean !<  mean density profiles
-        real(kind(0d0)), intent(in) :: mach
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 1, 0:mixlayer_nvar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(out) :: hr, hi    !< matrices for eigenvalue problem
+        real(wp), intent(in) :: rho_mean !<  mean density profiles
+        real(wp), intent(in) :: mach
+        real(wp), dimension(0:mixlayer_nvar*n - 1, 0:mixlayer_nvar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
         integer :: i, j, k, l, ii, jj
 
         ! Condition 1: v = 0 at BC - no action required here
@@ -489,17 +489,17 @@ contains
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
-        real(kind(0d0)), intent(in) :: rho_mean
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
-        real(kind(0d0)), intent(in) :: alpha, beta, mach, shift
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1) :: xbr, xbi !< eigenvectors
-        real(kind(0d0)), dimension(0:mixlayer_nvar*(nbp - 1) - 1) :: xcr, xci !< eigenvectors
-        real(kind(0d0)) :: ang, norm
-        real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
-        real(kind(0d0)) :: xratio
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
+        real(wp), intent(in) :: rho_mean
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(wp), intent(in) :: alpha, beta, mach, shift
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1) :: xbr, xbi !< eigenvectors
+        real(wp), dimension(0:mixlayer_nvar*(nbp - 1) - 1) :: xcr, xci !< eigenvectors
+        real(wp) :: ang, norm
+        real(wp) :: tr, ti, cr, ci !< temporary memory
+        real(wp) :: xratio
         integer idx
         integer i, j, k
 

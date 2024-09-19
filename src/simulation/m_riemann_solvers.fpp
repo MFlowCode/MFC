@@ -94,9 +94,9 @@ module m_riemann_solvers
                                              flux_gsrc_vf, &
                                              norm_dir, ix, iy, iz)
 
-            import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
+            import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz, wp
 
-            real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+            real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
             type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
             type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
@@ -161,15 +161,15 @@ module m_riemann_solvers
     !! dqK_prim_ds_vf where ds = dx, dy or dz.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
     !$acc declare link( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
     !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
     !$acc declare create( flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf,  &
     !$acc   flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf )
 #endif
@@ -180,14 +180,14 @@ module m_riemann_solvers
     !! states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_gsrc_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_gsrc_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_gsrc_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), flux_gsrc_rsz_vf)
     !$acc declare link( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsx_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsy_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
     !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 #endif
     !> @}
@@ -195,38 +195,38 @@ module m_riemann_solvers
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
     ! part of Riemann problem solution and is used to evaluate the source flux.
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), vel_src_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), vel_src_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), vel_src_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), vel_src_rsz_vf)
     !$acc declare link(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: vel_src_rsz_vf
     !$acc declare create(vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_sp_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), mom_sp_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), mom_sp_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), mom_sp_rsz_vf)
     !$acc declare link(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: mom_sp_rsz_vf
     !$acc declare create(mom_sp_rsx_vf, mom_sp_rsy_vf, mom_sp_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), Re_avg_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), Re_avg_rsx_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), Re_avg_rsy_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), Re_avg_rsz_vf)
     !$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: Re_avg_rsz_vf
     !$acc declare link(Re_avg_rsx_vf, Re_avg_rsy_vf, Re_avg_rsz_vf)
 #endif
 
@@ -249,18 +249,18 @@ module m_riemann_solvers
 !$acc declare create(is1, is2, is3, isx, isy, isz)
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  Gs)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:),  Gs)
     !$acc declare link(Gs)
 #else
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), Res)
     !$acc declare link(Res)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+    real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 #endif
 
@@ -279,7 +279,7 @@ contains
                                     flux_gsrc_vf, &
                                     norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
@@ -298,39 +298,39 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-        real(kind(0d0)) :: rho_L, rho_R
-        real(kind(0d0)), dimension(num_dims) :: vel_L, vel_R
-        real(kind(0d0)) :: pres_L, pres_R
-        real(kind(0d0)) :: E_L, E_R
-        real(kind(0d0)) :: H_L, H_R
-        real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
-        real(kind(0d0)) :: Y_L, Y_R
-        real(kind(0d0)) :: gamma_L, gamma_R
-        real(kind(0d0)) :: pi_inf_L, pi_inf_R
-        real(kind(0d0)) :: qv_L, qv_R
-        real(kind(0d0)) :: c_L, c_R
-        real(kind(0d0)), dimension(6) :: tau_e_L, tau_e_R
-        real(kind(0d0)) :: G_L, G_R
-        real(kind(0d0)), dimension(2) :: Re_L, Re_R
+        real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+        real(wp) :: rho_L, rho_R
+        real(wp), dimension(num_dims) :: vel_L, vel_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_R
+        real(wp) :: Y_L, Y_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+        real(wp) :: c_L, c_R
+        real(wp), dimension(6) :: tau_e_L, tau_e_R
+        real(wp) :: G_L, G_R
+        real(wp), dimension(2) :: Re_L, Re_R
 
-        real(kind(0d0)) :: rho_avg
-        real(kind(0d0)), dimension(num_dims) :: vel_avg
-        real(kind(0d0)) :: H_avg
-        real(kind(0d0)) :: gamma_avg
-        real(kind(0d0)) :: c_avg
+        real(wp) :: rho_avg
+        real(wp), dimension(num_dims) :: vel_avg
+        real(wp) :: H_avg
+        real(wp) :: gamma_avg
+        real(wp) :: c_avg
 
-        real(kind(0d0)) :: s_L, s_R, s_M, s_P, s_S
-        real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
-        real(kind(0d0)) :: xi_M, xi_P
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_L, xi_R !< Left and right wave speeds functions
+        real(wp) :: xi_M, xi_P
 
-        real(kind(0d0)) :: nbub_L, nbub_R
-        real(kind(0d0)) :: ptilde_L, ptilde_R
-        real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(kind(0d0)) :: blkmod1, blkmod2
-        real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
-        real(kind(0d0)) :: Ms_L, Ms_R, pres_SL, pres_SR
-        real(kind(0d0)) :: alpha_L_sum, alpha_R_sum
+        real(wp) :: nbub_L, nbub_R
+        real(wp) :: ptilde_L, ptilde_R
+        real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(wp) :: blkmod1, blkmod2
+        real(wp) :: rho_Star, E_Star, p_Star, p_K_Star
+        real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
+        real(wp) :: alpha_L_sum, alpha_R_sum
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -834,7 +834,7 @@ contains
                                      flux_gsrc_vf, &
                                      norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
@@ -853,51 +853,51 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-        real(kind(0d0)) :: rho_L, rho_R
-        real(kind(0d0)), dimension(num_dims) :: vel_L, vel_R
-        real(kind(0d0)) :: pres_L, pres_R
-        real(kind(0d0)) :: E_L, E_R
-        real(kind(0d0)) :: H_L, H_R
-        real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
-        real(kind(0d0)) :: Y_L, Y_R
-        real(kind(0d0)) :: gamma_L, gamma_R
-        real(kind(0d0)) :: pi_inf_L, pi_inf_R
-        real(kind(0d0)) :: qv_L, qv_R
-        real(kind(0d0)) :: c_L, c_R
-        real(kind(0d0)), dimension(2) :: Re_L, Re_R
+        real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+        real(wp) :: rho_L, rho_R
+        real(wp), dimension(num_dims) :: vel_L, vel_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_R
+        real(wp) :: Y_L, Y_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+        real(wp) :: c_L, c_R
+        real(wp), dimension(2) :: Re_L, Re_R
 
-        real(kind(0d0)) :: rho_avg
-        real(kind(0d0)), dimension(num_dims) :: vel_avg
-        real(kind(0d0)) :: H_avg
-        real(kind(0d0)) :: gamma_avg
-        real(kind(0d0)) :: c_avg
+        real(wp) :: rho_avg
+        real(wp), dimension(num_dims) :: vel_avg
+        real(wp) :: H_avg
+        real(wp) :: gamma_avg
+        real(wp) :: c_avg
 
-        real(kind(0d0)) :: s_L, s_R, s_M, s_P, s_S
-        real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
-        real(kind(0d0)) :: xi_M, xi_P
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_L, xi_R !< Left and right wave speeds functions
+        real(wp) :: xi_M, xi_P
 
-        real(kind(0d0)) :: nbub_L, nbub_R
-        real(kind(0d0)), dimension(nb) :: R0_L, R0_R
-        real(kind(0d0)), dimension(nb) :: V0_L, V0_R
-        real(kind(0d0)), dimension(nb) :: P0_L, P0_R
-        real(kind(0d0)), dimension(nb) :: pbw_L, pbw_R
-        real(kind(0d0)), dimension(nb, nmom) :: moms_L, moms_R
-        real(kind(0d0)) :: ptilde_L, ptilde_R
+        real(wp) :: nbub_L, nbub_R
+        real(wp), dimension(nb) :: R0_L, R0_R
+        real(wp), dimension(nb) :: V0_L, V0_R
+        real(wp), dimension(nb) :: P0_L, P0_R
+        real(wp), dimension(nb) :: pbw_L, pbw_R
+        real(wp), dimension(nb, nmom) :: moms_L, moms_R
+        real(wp) :: ptilde_L, ptilde_R
 
-        real(kind(0d0)) :: alpha_L_sum, alpha_R_sum, nbub_L_denom, nbub_R_denom
+        real(wp) :: alpha_L_sum, alpha_R_sum, nbub_L_denom, nbub_R_denom
 
-        real(kind(0d0)) :: PbwR3Lbar, Pbwr3Rbar
-        real(kind(0d0)) :: R3Lbar, R3Rbar
-        real(kind(0d0)) :: R3V2Lbar, R3V2Rbar
+        real(wp) :: PbwR3Lbar, Pbwr3Rbar
+        real(wp) :: R3Lbar, R3Rbar
+        real(wp) :: R3V2Lbar, R3V2Rbar
 
-        real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
-        real(kind(0d0)) :: blkmod1, blkmod2
-        real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
-        real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: zcoef, pcorr !< low Mach number correction
+        real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(wp) :: vel_L_tmp, vel_R_tmp
+        real(wp) :: blkmod1, blkmod2
+        real(wp) :: rho_Star, E_Star, p_Star, p_K_Star
+        real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
+        real(wp) :: start, finish
+        real(wp) :: zcoef, pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -2531,7 +2531,7 @@ contains
         qR_prim_vf, &
         norm_dir, ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), &
             allocatable, dimension(:), &
@@ -3064,13 +3064,13 @@ contains
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
         ! of velocity
-        real(kind(0d0)), dimension(num_dims) :: avg_vel
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dx
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dy
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dz
+        real(wp), dimension(num_dims) :: avg_vel
+        real(wp), dimension(num_dims) :: dvel_avg_dx
+        real(wp), dimension(num_dims) :: dvel_avg_dy
+        real(wp), dimension(num_dims) :: dvel_avg_dz
 
         ! Viscous stress tensor
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
+        real(wp), dimension(num_dims, num_dims) :: tau_Re
 
         ! Generic loop iterators
         integer :: i, j, k, l
@@ -3590,11 +3590,11 @@ contains
         ! Arithmetic mean of the left and right, WENO-reconstructed, cell-
         ! boundary values of cell-average first-order spatial derivatives
         ! of velocity
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dx
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dy
-        real(kind(0d0)), dimension(num_dims) :: dvel_avg_dz
+        real(wp), dimension(num_dims) :: dvel_avg_dx
+        real(wp), dimension(num_dims) :: dvel_avg_dy
+        real(wp), dimension(num_dims) :: dvel_avg_dz
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re !< Viscous stress tensor
+        real(wp), dimension(num_dims, num_dims) :: tau_Re !< Viscous stress tensor
 
         integer :: i, j, k, l !< Generic loop iterators
 

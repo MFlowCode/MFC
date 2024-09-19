@@ -4,13 +4,15 @@
 
 module m_constants
 
+    use m_precision_select
+
     character, parameter :: dflt_char = ' ' !< Default string value
 
-    real(kind(0d0)), parameter :: dflt_real = -1d6                !< Default real value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16               !< Segmentation tolerance
-    real(kind(0d0)), parameter :: small_alf = 1d-11                !< Small alf tolerance
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0 !< Pi
-    real(kind(0d0)), parameter :: verysmall = 1.d-12              !< Very small number
+    real(wp), parameter :: dflt_real = -1d6                !< Default real value
+    real(wp), parameter :: sgm_eps = 1d-16               !< Segmentation tolerance
+    real(wp), parameter :: small_alf = 1d-11                !< Small alf tolerance
+    real(wp), parameter :: pi = 3.141592653589793d0 !< Pi
+    real(wp), parameter :: verysmall = 1.d-12              !< Very small number
 
     integer, parameter :: num_stcls_min = 5    !< Minimum # of stencils
     integer, parameter :: path_len = 400  !< Maximum path length
@@ -22,8 +24,8 @@ module m_constants
     integer, parameter :: num_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
-    real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
-    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
-    real(kind(0d0)), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
+    real(wp), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
+    real(wp), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
+    real(wp), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
 
 end module m_constants

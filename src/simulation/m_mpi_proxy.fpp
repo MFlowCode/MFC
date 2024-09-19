@@ -33,32 +33,32 @@ module m_mpi_proxy
     implicit none
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), q_cons_buff_send)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), q_cons_buff_recv)
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_recv)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), c_divs_buff_send)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), c_divs_buff_recv)
     !$acc declare link(q_cons_buff_recv, q_cons_buff_send)
     !$acc declare link(ib_buff_send, ib_buff_recv)
     !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
 #else
-    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
+    real(wp), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_recv !<
+    real(wp), private, allocatable, dimension(:), target :: q_cons_buff_recv !<
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average conservative variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    real(kind(0d0)), private, allocatable, dimension(:), target :: c_divs_buff_send !<
+    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_send !<
     !! c_divs_buff_send is utilized to send and unpack the buffer of the cell-
     !! centered color function derivatives, for a single computational domain
     !! boundary at the time, to the the relevant neighboring processor
 
-    real(kind(0d0)), private, allocatable, dimension(:), target :: c_divs_buff_recv
+    real(wp), private, allocatable, dimension(:), target :: c_divs_buff_recv
     !! c_divs_buff_recv is utilized to receiver and unpack the buffer of the cell-
     !! centered color function derivatives, for a single computational domain
     !! boundary at the time, from the relevant neighboring processor
@@ -292,10 +292,10 @@ contains
         integer :: num_procs_x, num_procs_y, num_procs_z !<
             !! Optimal number of processors in the x-, y- and z-directions
 
-        real(kind(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
+        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
             !! Non-optimal number of processors in the x-, y- and z-directions
 
-        real(kind(0d0)) :: fct_min !<
+        real(wp) :: fct_min !<
             !! Processor factorization (fct) minimization parameter
 
         integer :: MPI_COMM_CART !<
@@ -852,7 +852,7 @@ contains
                                                 pbc_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -867,7 +867,7 @@ contains
 
         integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
-        real(kind(0d0)), pointer :: p_send, p_recv
+        real(wp), pointer :: p_send, p_recv
         integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
@@ -2132,7 +2132,7 @@ contains
 
         integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
-        real(kind(0d0)), pointer :: p_send, p_recv
+        real(wp), pointer :: p_send, p_recv
 
 #ifdef MFC_MPI
 

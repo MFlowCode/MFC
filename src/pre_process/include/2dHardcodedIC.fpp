@@ -1,9 +1,9 @@
 #:def Hardcoded2DVariables()
 
-    real(kind(0d0)) :: eps
-    real(kind(0d0)) :: r, rmax, gam, umax, p0
+    real(wp) :: eps
+    real(wp) :: r, rmax, gam, umax, p0
 
-    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     eps = 1e-9
 

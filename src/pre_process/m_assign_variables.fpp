@@ -49,11 +49,11 @@ module m_assign_variables
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                             eta, q_prim_vf, patch_id_fp)
 
-            import :: scalar_field, sys_size, n, m, p
+            import :: scalar_field, sys_size, n, m, p, wp
 
             integer, intent(in) :: patch_id
             integer, intent(in) :: j, k, l
-            real(kind(0d0)), intent(in) :: eta
+            real(wp), intent(in) :: eta
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
             integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
@@ -111,18 +111,18 @@ contains
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
-        real(kind(0d0)), intent(in) :: eta
+        real(wp), intent(in) :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
-        real(kind(0d0)) :: rho    !< density
-        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(kind(0d0)) :: pres   !< pressure
-        real(kind(0d0)) :: gamma  !< specific heat ratio function
-        real(kind(0d0)) :: x_centroid, y_centroid
-        real(kind(0d0)) :: epsilon, beta
-        real(kind(0d0)) :: Ys(1:num_species)
-        real(kind(0d0)) :: mean_molecular_weight
+        real(wp) :: rho    !< density
+        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(wp) :: pres   !< pressure
+        real(wp) :: gamma  !< specific heat ratio function
+        real(wp) :: x_centroid, y_centroid
+        real(wp) :: epsilon, beta
+        real(wp) :: Ys(1:num_species)
+        real(wp) :: mean_molecular_weight
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
@@ -168,7 +168,7 @@ contains
         ! Species Concentrations
         #:if chemistry
             block
-                real(kind(0d0)) :: sum, term
+                real(wp) :: sum, term
 
                 ! Accumulating the species concentrations
                 sum = 0d0
@@ -212,8 +212,8 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i
-        real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
-        real(kind(0d0)) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
+        real(wp) :: pres_mag, loc, n_tait, B_tait, p0
+        real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
         p0 = 101325
         pres_mag = 1d-1
@@ -296,34 +296,34 @@ contains
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
-        real(kind(0d0)), intent(in) :: eta
+        real(wp), intent(in) :: eta
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
-        real(kind(0d0)) :: rho         !< density
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: lit_gamma   !< specific heat ratio
-        real(kind(0d0)) :: pi_inf      !< stiffness from SEOS
-        real(kind(0d0)) :: qv          !< reference energy from SEOS
-        real(kind(0d0)) :: orig_rho
-        real(kind(0d0)) :: orig_gamma
-        real(kind(0d0)) :: orig_pi_inf
-        real(kind(0d0)) :: orig_qv
-        real(kind(0d0)) :: muR, muV
-        real(kind(0d0)) :: R3bar
+        real(wp) :: rho         !< density
+        real(wp) :: gamma
+        real(wp) :: lit_gamma   !< specific heat ratio
+        real(wp) :: pi_inf      !< stiffness from SEOS
+        real(wp) :: qv          !< reference energy from SEOS
+        real(wp) :: orig_rho
+        real(wp) :: orig_gamma
+        real(wp) :: orig_pi_inf
+        real(wp) :: orig_qv
+        real(wp) :: muR, muV
+        real(wp) :: R3bar
 
-        real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
-        real(kind(0d0)) :: pres   !< pressure
-        real(kind(0d0)) :: x_centroid, y_centroid
-        real(kind(0d0)) :: epsilon, beta
+        real(wp), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+        real(wp) :: pres   !< pressure
+        real(wp) :: x_centroid, y_centroid
+        real(wp) :: epsilon, beta
 
-        real(kind(0d0)) :: Ys(1:num_species)
-        real(kind(0d0)) :: mean_molecular_weight
+        real(wp) :: Ys(1:num_species)
+        real(wp) :: mean_molecular_weight
 
-        real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
+        real(wp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -545,7 +545,7 @@ contains
         ! Species Concentrations
         #:if chemistry
             block
-                real(kind(0d0)) :: sum, term
+                real(wp) :: sum, term
 
                 ! Accumulating the species concentrations
                 sum = 0d0

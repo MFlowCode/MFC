@@ -33,11 +33,11 @@ contains
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
         !$acc routine seq
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
-        real(kind(0d0)), dimension(2) :: Re
+        real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
+        real(wp), dimension(2) :: Re
         integer :: i, j, k, l
 
         do i = 1, num_fluids
@@ -80,22 +80,22 @@ contains
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: icfl_sf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
-        real(kind(0d0)) :: fltr_dtheta   !<
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: c, icfl_dt, vcfl_dt, rho
+        real(wp), dimension(0:m, 0:n, 0:p) :: icfl_sf
+        real(wp), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
+        real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
         integer :: j, k, l
         integer :: Nfq
-        real(kind(0d0)), dimension(2) :: Re_l
+        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
                 fltr_dtheta = 2d0*pi*y_cb(0)/3d0
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
+                Nfq = min(floor(2d0*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if
@@ -176,21 +176,21 @@ contains
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         !$acc routine seq
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: max_dt
-        real(kind(0d0)) :: fltr_dtheta   !<
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: c, icfl_dt, vcfl_dt, rho
+        real(wp), dimension(0:m, 0:n, 0:p) :: max_dt
+        real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
         integer :: j, k, l
         integer :: Nfq
-        real(kind(0d0)), dimension(2) :: Re_l
+        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
                 fltr_dtheta = 2d0*pi*y_cb(0)/3d0
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
+                Nfq = min(floor(2d0*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if

@@ -192,8 +192,8 @@ contains
 
     subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
-        real(kind(0d0)), dimension(0:num_procs - 1), intent(inout) :: proc_time
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
+        real(wp), intent(inout) :: time_avg
 
 #ifdef MFC_MPI
 
@@ -226,15 +226,15 @@ contains
                                                        ccfl_max_glb, &
                                                        Rc_min_glb)
 
-        real(kind(0d0)), intent(in) :: icfl_max_loc
-        real(kind(0d0)), intent(in) :: vcfl_max_loc
-        real(kind(0d0)), intent(in) :: ccfl_max_loc
-        real(kind(0d0)), intent(in) :: Rc_min_loc
+        real(wp), intent(in) :: icfl_max_loc
+        real(wp), intent(in) :: vcfl_max_loc
+        real(wp), intent(in) :: ccfl_max_loc
+        real(wp), intent(in) :: Rc_min_loc
 
-        real(kind(0d0)), intent(out) :: icfl_max_glb
-        real(kind(0d0)), intent(out) :: vcfl_max_glb
-        real(kind(0d0)), intent(out) :: ccfl_max_glb
-        real(kind(0d0)), intent(out) :: Rc_min_glb
+        real(wp), intent(out) :: icfl_max_glb
+        real(wp), intent(out) :: vcfl_max_glb
+        real(wp), intent(out) :: ccfl_max_glb
+        real(wp), intent(out) :: Rc_min_glb
 
 #ifdef MFC_MPI
 #ifdef MFC_SIMULATION
@@ -268,8 +268,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_sum(var_loc, var_glb)
 
-        real(kind(0d0)), intent(in) :: var_loc
-        real(kind(0d0)), intent(out) :: var_glb
+        real(wp), intent(in) :: var_loc
+        real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -290,8 +290,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
-        real(kind(0d0)), intent(in) :: var_loc
-        real(kind(0d0)), intent(out) :: var_glb
+        real(wp), intent(in) :: var_loc
+        real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -312,8 +312,8 @@ contains
         !!  @param var_glb The globally reduced value
     subroutine s_mpi_allreduce_max(var_loc, var_glb)
 
-        real(kind(0d0)), intent(in) :: var_loc
-        real(kind(0d0)), intent(out) :: var_glb
+        real(wp), intent(in) :: var_loc
+        real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
 
@@ -333,12 +333,12 @@ contains
         !!      the minimum value, reduced amongst all of the local values.
     subroutine s_mpi_reduce_min(var_loc)
 
-        real(kind(0d0)), intent(inout) :: var_loc
+        real(wp), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
 
         ! Temporary storage variable that holds the reduced minimum value
-        real(kind(0d0)) :: var_glb
+        real(wp) :: var_glb
 
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
@@ -368,11 +368,11 @@ contains
         !!  belongs.
     subroutine s_mpi_reduce_maxloc(var_loc)
 
-        real(kind(0d0)), dimension(2), intent(inout) :: var_loc
+        real(wp), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), dimension(2) :: var_glb  !<
+        real(wp), dimension(2) :: var_glb  !<
             !! Temporary storage variable that holds the reduced maximum value
             !! and the rank of the processor with which the value is associated
 

@@ -1,9 +1,9 @@
 #:def Hardcoded3DVariables()
     ! Place any declaration of intermediate variables here
 
-    real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
-    real(kind(0d0)) :: eps
+    real(wp) :: eps
 
     eps = 1e-9
 #:enddef

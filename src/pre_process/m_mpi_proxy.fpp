@@ -130,10 +130,10 @@ contains
 
         ! Temporary # of processors in x-, y- and z-coordinate directions
         ! used during the processor factorization optimization procedure
-        real(kind(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
 
         ! Processor factorization (fct) minimization parameter
-        real(kind(0d0)) :: fct_min
+        real(wp) :: fct_min
 
         ! Cartesian processor topology communicator
         integer :: MPI_COMM_CART
@@ -305,7 +305,7 @@ contains
 
                 ! Preliminary uniform cell-width spacing
                 if (old_grid .neqv. .true.) then
-                    dz = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
+                    dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
                 end if
 
                 ! Optimal number of cells per processor
@@ -420,7 +420,7 @@ contains
 
             ! Preliminary uniform cell-width spacing
             if (old_grid .neqv. .true.) then
-                dy = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
+                dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
             end if
 
             ! Optimal number of cells per processor
@@ -489,7 +489,7 @@ contains
 
         ! Preliminary uniform cell-width spacing
         if (old_grid .neqv. .true.) then
-            dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+            dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
         end if
 
         ! Optimal number of cells per processor

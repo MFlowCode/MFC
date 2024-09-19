@@ -90,7 +90,7 @@ contains
         character(LEN=3) :: status
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !< Used to store
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
             !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
@@ -100,16 +100,16 @@ contains
         integer :: i, j, k, l, r, c !< Generic loop iterator
         integer :: t_step
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub                         !< Temporary bubble number density
-        real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
+        real(wp) :: nbub                         !< Temporary bubble number density
+        real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
+        real(wp) :: rho                          !< Temporary density
+        real(wp) :: pres                         !< Temporary pressure
 
-        real(kind(0d0)) :: nR3
-        real(kind(0d0)) :: ntmp
+        real(wp) :: nR3
+        real(wp) :: ntmp
 
-        real(kind(0d0)) :: rhoYks(1:num_species) !< Temporary species mass fractions
+        real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
         t_step = 0
 

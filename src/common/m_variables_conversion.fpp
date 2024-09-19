@@ -68,14 +68,14 @@ module m_variables_conversion
             ! Importing the derived type scalar_field from m_derived_types.f90
             ! and global variable sys_size, from m_global_variables.f90, as
             ! the abstract interface does not inherently have access to them
-            import :: scalar_field, sys_size, num_fluids
+            import :: scalar_field, sys_size, num_fluids, wp
 
             type(scalar_field), dimension(sys_size), intent(in) :: q_vf
             integer, intent(in) :: i, j, k
-            real(kind(0d0)), intent(out), target :: rho, gamma, pi_inf, qv
-            real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
-            real(kind(0d0)), optional, intent(out) :: G_K
-            real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+            real(wp), intent(out), target :: rho, gamma, pi_inf, qv
+            real(wp), optional, dimension(2), intent(out) :: Re_K
+            real(wp), optional, intent(out) :: G_K
+            real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         end subroutine s_convert_xxxxx_to_mixture_variables
 
@@ -86,28 +86,28 @@ module m_variables_conversion
 
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
-    real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), Gs)
     @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), Res)
     !$acc declare link(bubrs, Gs, Res)
 #else
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    real(wp), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+    real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
 #endif
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
+    real(wp), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
+    real(wp), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
+    real(wp), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
+    real(wp), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
     procedure(s_convert_xxxxx_to_mixture_variables), &
         pointer :: s_convert_to_mixture_variables => null() !<
@@ -130,18 +130,18 @@ contains
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, stress, mom, G)
         !$acc routine seq
 
-        real(kind(0d0)), intent(in) :: energy, alf
-        real(kind(0d0)), intent(in) :: dyn_p
-        real(kind(0d0)), intent(in) :: pi_inf, gamma, rho, qv
-        real(kind(0d0)), intent(out) :: pres
-        real(kind(0d0)), intent(in), optional :: stress, mom, G
+        real(wp), intent(in) :: energy, alf
+        real(wp), intent(in) :: dyn_p
+        real(wp), intent(in) :: pi_inf, gamma, rho, qv
+        real(wp), intent(out) :: pres
+        real(wp), intent(in), optional :: stress, mom, G
 
         ! Chemistry
         integer :: i
-        real(kind(0d0)), dimension(1:num_species), intent(in) :: rhoYks
-        real(kind(0d0)) :: E_e
-        real(kind(0d0)) :: T
-        real(kind(0d0)), dimension(1:num_species) :: Y_rs
+        real(wp), dimension(1:num_species), intent(in) :: rhoYks
+        real(wp) :: E_e
+        real(wp) :: T
+        real(wp), dimension(1:num_species) :: Y_rs
 
         integer :: s !< Generic loop iterator
 
@@ -219,15 +219,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
 
-        real(kind(0d0)), intent(out), target :: rho
-        real(kind(0d0)), intent(out), target :: gamma
-        real(kind(0d0)), intent(out), target :: pi_inf
-        real(kind(0d0)), intent(out), target :: qv
+        real(wp), intent(out), target :: rho
+        real(wp), intent(out), target :: gamma
+        real(wp), intent(out), target :: pi_inf
+        real(wp), intent(out), target :: qv
 
-        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+        real(wp), optional, dimension(2), intent(out) :: Re_K
 
-        real(kind(0d0)), optional, intent(out) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+        real(wp), optional, intent(out) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         ! Transferring the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -267,17 +267,17 @@ contains
 
         integer, intent(in) :: j, k, l
 
-        real(kind(0d0)), intent(out), target :: rho
-        real(kind(0d0)), intent(out), target :: gamma
-        real(kind(0d0)), intent(out), target :: pi_inf
-        real(kind(0d0)), intent(out), target :: qv
+        real(wp), intent(out), target :: rho
+        real(wp), intent(out), target :: gamma
+        real(wp), intent(out), target :: pi_inf
+        real(wp), intent(out), target :: qv
 
-        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
-        real(kind(0d0)), optional, intent(out) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+        real(wp), optional, dimension(2), intent(out) :: Re_K
+        real(wp), optional, intent(out) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, q
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K
+        real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K
 
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
@@ -391,17 +391,17 @@ contains
 
         integer, intent(in) :: k, l, r
 
-        real(kind(0d0)), intent(out), target :: rho
-        real(kind(0d0)), intent(out), target :: gamma
-        real(kind(0d0)), intent(out), target :: pi_inf
-        real(kind(0d0)), intent(out), target :: qv
+        real(wp), intent(out), target :: rho
+        real(wp), intent(out), target :: gamma
+        real(wp), intent(out), target :: pi_inf
+        real(wp), intent(out), target :: qv
 
-        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+        real(wp), optional, dimension(2), intent(out) :: Re_K
             !! Partial densities and volume fractions
-        real(kind(0d0)), optional, intent(out) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+        real(wp), optional, intent(out) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
+        real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
 
         integer :: i, j !< Generic loop iterator
 
@@ -480,19 +480,19 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0d0)), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
 
-        real(kind(0d0)), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
-        real(kind(0d0)), dimension(2), intent(out) :: Re_K
+        real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+        real(wp), dimension(2), intent(out) :: Re_K
         !! Partial densities and volume fractions
 
-        real(kind(0d0)), optional, intent(out) :: G_K
-        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+        real(wp), optional, intent(out) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer, intent(in) :: k, l, r
 
         integer :: i, j !< Generic loop iterators
-        real(kind(0d0)) :: alpha_K_sum
+        real(wp) :: alpha_K_sum
 
 #ifdef MFC_SIMULATION
         ! Constraining the partial densities and the volume fractions within
@@ -562,12 +562,12 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0d0)), intent(inout) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp), intent(inout) :: rho_K, gamma_K, pi_inf_K, qv_K
 
-        real(kind(0d0)), dimension(num_fluids), intent(in) :: alpha_K, alpha_rho_K !<
+        real(wp), dimension(num_fluids), intent(in) :: alpha_K, alpha_rho_K !<
             !! Partial densities and volume fractions
 
-        real(kind(0d0)), dimension(2), intent(out) :: Re_K
+        real(wp), dimension(2), intent(out) :: Re_K
         integer, intent(in) :: k, l, r
 
         integer :: i, j !< Generic loop iterators
@@ -785,10 +785,10 @@ contains
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     subroutine s_initialize_mv(qK_cons_vf, mv)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: mv
+        real(wp), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
-        real(kind(0d0)) :: mu, sig, nbub_sc
+        real(wp) :: mu, sig, nbub_sc
 
         do l = izb, ize
             do k = iyb, iye
@@ -816,11 +816,11 @@ contains
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(in) :: mv
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(in) :: mv
+        real(wp), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
-        real(kind(0d0)) :: mu, sig, nbub_sc
+        real(wp) :: mu, sig, nbub_sc
 
         do l = izb, ize
             do k = iyb, iye
@@ -866,27 +866,27 @@ contains
 
         type(int_bounds_info), optional, intent(in) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
-        real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
+        real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+        real(wp), dimension(2) :: Re_K
+        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
-            real(kind(0d0)), dimension(:), allocatable :: nRtmp
+            real(wp), dimension(:), allocatable :: nRtmp
 #else
-            real(kind(0d0)), dimension(nb) :: nRtmp
+            real(wp), dimension(nb) :: nRtmp
 #endif
         #:else
-            real(kind(0d0)), dimension(:), allocatable :: nRtmp
+            real(wp), dimension(:), allocatable :: nRtmp
         #:endif
 
-        real(kind(0d0)) :: rhoYks(1:num_species)
+        real(wp) :: rhoYks(1:num_species)
 
-        real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
+        real(wp) :: vftmp, nR3, nbub_sc, R3tmp
 
-        real(kind(0d0)) :: G_K
+        real(wp) :: G_K
 
-        real(kind(0d0)) :: pres, Yksum
+        real(wp) :: pres, Yksum
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -1103,21 +1103,21 @@ contains
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
         ! respectively
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: qv
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
-        real(kind(0d0)), dimension(nb) :: Rtmp
-        real(kind(0d0)) :: G = 0d0
-        real(kind(0d0)), dimension(2) :: Re_K
+        real(wp) :: rho
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: qv
+        real(wp) :: dyn_pres
+        real(wp) :: nbub, R3, vftmp, R3tmp
+        real(wp), dimension(nb) :: Rtmp
+        real(wp) :: G = 0d0
+        real(wp), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: spec
 
-        real(kind(0d0)), dimension(num_species) :: Ys
-        real(kind(0d0)) :: temperature, e_mix, mix_mol_weight, T
+        real(wp), dimension(num_species) :: Ys
+        real(wp) :: temperature, e_mix, mix_mol_weight, T
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
@@ -1276,27 +1276,27 @@ contains
                                                      is1, is2, is3, s2b, s3b)
 
         integer, intent(in) :: s2b, s3b
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(in) :: qK_prim_vf
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, 1:), intent(inout) :: FK_vf
-        real(kind(0d0)), dimension(0:, s2b:, s3b:, advxb:), intent(inout) :: FK_src_vf
+        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(in) :: qK_prim_vf
+        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(inout) :: FK_vf
+        real(wp), dimension(0:, s2b:, s3b:, advxb:), intent(inout) :: FK_src_vf
 
         type(int_bounds_info), intent(in) :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K
-        real(kind(0d0)), dimension(num_fluids) :: alpha_K
-        real(kind(0d0)) :: rho_K
-        real(kind(0d0)), dimension(num_dims) :: vel_K
-        real(kind(0d0)) :: vel_K_sum
-        real(kind(0d0)) :: pres_K
-        real(kind(0d0)) :: E_K
-        real(kind(0d0)) :: gamma_K
-        real(kind(0d0)) :: pi_inf_K
-        real(kind(0d0)) :: qv_K
-        real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: G_K
+        real(wp), dimension(num_fluids) :: alpha_rho_K
+        real(wp), dimension(num_fluids) :: alpha_K
+        real(wp) :: rho_K
+        real(wp), dimension(num_dims) :: vel_K
+        real(wp) :: vel_K_sum
+        real(wp) :: pres_K
+        real(wp) :: E_K
+        real(wp) :: gamma_K
+        real(wp) :: pi_inf_K
+        real(wp) :: qv_K
+        real(wp), dimension(2) :: Re_K
+        real(wp) :: G_K
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1429,14 +1429,14 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0d0)), intent(in) :: pres
-        real(kind(0d0)), intent(in) :: rho, gamma, pi_inf
-        real(kind(0d0)), intent(in) :: H
-        real(kind(0d0)), dimension(num_fluids), intent(in) :: adv
-        real(kind(0d0)), intent(in) :: vel_sum
-        real(kind(0d0)), intent(out) :: c
+        real(wp), intent(in) :: pres
+        real(wp), intent(in) :: rho, gamma, pi_inf
+        real(wp), intent(in) :: H
+        real(wp), dimension(num_fluids), intent(in) :: adv
+        real(wp), intent(in) :: vel_sum
+        real(wp), intent(out) :: c
 
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(wp) :: blkmod1, blkmod2
 
         integer :: q
 

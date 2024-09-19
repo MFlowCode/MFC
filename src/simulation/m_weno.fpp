@@ -45,10 +45,10 @@ module m_weno
     !> @{
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
     !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
+    real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
 #endif
     !> @}
 
@@ -61,27 +61,27 @@ module m_weno
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_z)
     !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
     !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
 
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
 #endif
 
-    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
+    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
+    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
@@ -90,25 +90,25 @@ module m_weno
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_z)
     !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_z
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
 
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
 #endif
-!    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
-!    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
+!    real(wp), pointer, dimension(:, :) :: d_L => null()
+!    real(wp), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -117,16 +117,16 @@ module m_weno
     !! the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_z)
     !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
 #endif
-!    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
+!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients ===================================================
@@ -142,7 +142,7 @@ module m_weno
     !
     !> @}
 
-    real(kind(0d0)) :: test
+    real(wp) :: test
 !$acc declare create(test)
 
 #ifndef CRAY_ACC_WAR
@@ -271,7 +271,7 @@ contains
         type(int_bounds_info), intent(in) :: is
         integer :: s
 
-        real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
+        real(wp), pointer, dimension(:) :: s_cb => null() !<
             !! Cell-boundary locations in the s-direction
 
         type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
@@ -507,22 +507,22 @@ contains
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
-        real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
-        real(kind(0d0)), dimension(0:weno_polyn) :: poly
-        real(kind(0d0)), dimension(0:weno_polyn) :: alpha
-        real(kind(0d0)), dimension(0:weno_polyn) :: omega
-        real(kind(0d0)), dimension(0:weno_polyn) :: beta
-        real(kind(0d0)), dimension(0:weno_polyn) :: delta
-        real(kind(0d0)) :: tau5
-        real(kind(0d0)), pointer :: beta_p(:)
+        real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
+        real(wp), dimension(0:weno_polyn) :: poly
+        real(wp), dimension(0:weno_polyn) :: alpha
+        real(wp), dimension(0:weno_polyn) :: omega
+        real(wp), dimension(0:weno_polyn) :: beta
+        real(wp), dimension(0:weno_polyn) :: delta
+        real(wp) :: tau5
+        real(wp), pointer :: beta_p(:)
 
-        real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
+        real(wp) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
 
         integer :: i, j, k, l, r, s, w
 
@@ -913,37 +913,37 @@ contains
         !!  @param l Third-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
         integer :: i, j, k, l
 
-        real(kind(0d0)), dimension(-1:1) :: d !< Curvature measures at the zone centers
+        real(wp), dimension(-1:1) :: d !< Curvature measures at the zone centers
 
-        real(kind(0d0)) :: d_MD, d_LC !<
+        real(wp) :: d_MD, d_LC !<
             !! Median (md) curvature and large curvature (LC) measures
 
         ! The left and right upper bounds (UL), medians, large curvatures,
         ! minima, and maxima of the WENO-reconstructed values of the cell-
         ! average variables.
-        real(kind(0d0)) :: vL_UL, vR_UL
-        real(kind(0d0)) :: vL_MD, vR_MD
-        real(kind(0d0)) :: vL_LC, vR_LC
-        real(kind(0d0)) :: vL_min, vR_min
-        real(kind(0d0)) :: vL_max, vR_max
+        real(wp) :: vL_UL, vR_UL
+        real(wp) :: vL_MD, vR_MD
+        real(wp) :: vL_LC, vR_LC
+        real(wp) :: vL_min, vR_min
+        real(wp) :: vL_max, vR_max
 
-        real(kind(0d0)), parameter :: alpha = 2d0 !>
+        real(wp), parameter :: alpha = 2d0 !>
             !! Determines the maximum Courant–Friedrichs–Lewy (CFL) number that
             !! may be utilized with the scheme. In theory, for stability, a CFL
             !! number less than 1/(1+alpha) is necessary. The default value for
             !! alpha is 2.
 
-        real(kind(0d0)), parameter :: beta = 4d0/3d0 !<
+        real(wp), parameter :: beta = 4d0/3d0 !<
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
 
-        real(kind(0d0)), parameter :: alpha_mp = 2d0
-        real(kind(0d0)), parameter :: beta_mp = 4d0/3d0
+        real(wp), parameter :: alpha_mp = 2d0
+        real(wp), parameter :: beta_mp = 4d0/3d0
 
         !$acc parallel loop gang vector collapse (4)  default(present) private(d)
         do l = is3_weno%beg, is3_weno%end

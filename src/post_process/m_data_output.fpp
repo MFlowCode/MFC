@@ -41,9 +41,9 @@ module m_data_output
     ! database file(s). Note that for 1D simulations, q_root_sf is employed to
     ! gather the flow variable(s) from all sub-domains on to the root process.
     ! If the run is not parallel, but serial, then q_root_sf is equal to q_sf.
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: q_sf
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: q_root_sf
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: cyl_q_sf
+    real(wp), allocatable, dimension(:, :, :), public :: q_sf
+    real(wp), allocatable, dimension(:, :, :) :: q_root_sf
+    real(wp), allocatable, dimension(:, :, :) :: cyl_q_sf
     ! Single precision storage for flow variables
     real(kind(0.0)), allocatable, dimension(:, :, :), public :: q_sf_s
     real(kind(0.0)), allocatable, dimension(:, :, :) :: q_root_sf_s
@@ -53,8 +53,8 @@ module m_data_output
     ! minimum and maximum values of the grid and flow variable(s), respectively.
     ! The purpose of bookkeeping this information is to boost the visualization
     ! of the Silo-HDF5 database file(s) in VisIt.
-    real(kind(0d0)), allocatable, dimension(:, :) :: spatial_extents
-    real(kind(0d0)), allocatable, dimension(:, :) :: data_extents
+    real(wp), allocatable, dimension(:, :) :: spatial_extents
+    real(wp), allocatable, dimension(:, :) :: data_extents
 
     ! The size of the ghost zone layer at beginning of each coordinate direction
     ! (lo) and at end of each coordinate direction (hi). Adding this information
@@ -763,7 +763,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Silo-HDF5 Database Format ========================================
 

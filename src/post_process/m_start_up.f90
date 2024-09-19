@@ -188,7 +188,7 @@ contains
 
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
-        real(kind(0d0)), intent(inout) :: pres, c, H
+        real(wp), intent(inout) :: pres, c, H
 
         integer :: i, j, k, l
 

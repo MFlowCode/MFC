@@ -460,7 +460,7 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -1042,17 +1042,17 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
 
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)) :: qv
-        real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: pres
+        real(wp) :: rho
+        real(wp) :: dyn_pres
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp) :: qv
+        real(wp), dimension(2) :: Re
+        real(wp) :: pres
 
         integer :: i, j, k, l, c
 
-        real(kind(0d0)), dimension(num_species) :: rhoYks
+        real(wp), dimension(num_species) :: rhoYks
 
         do j = 0, m
             do k = 0, n
@@ -1089,15 +1089,15 @@ contains
 
     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
-        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        real(wp), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: io_time_avg, io_time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), dimension(:), intent(inout) :: io_proc_time
         logical, intent(inout) :: file_exists
-        real(kind(0d0)), intent(inout) :: start, finish
+        real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(kind(0d0)) :: dt_init
+        real(wp) :: dt_init
 
         integer :: i, j, k, l
 
@@ -1175,15 +1175,15 @@ contains
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg, time_final
-        real(kind(0d0)), intent(inout) :: io_time_avg, io_time_final
-        real(kind(0d0)), dimension(:), intent(inout) :: proc_time
-        real(kind(0d0)), dimension(:), intent(inout) :: io_proc_time
+        real(wp), intent(inout) :: time_avg, time_final
+        real(wp), intent(inout) :: io_time_avg, io_time_final
+        real(wp), dimension(:), intent(inout) :: proc_time
+        real(wp), dimension(:), intent(inout) :: io_proc_time
         logical, intent(inout) :: file_exists
-        real(kind(0d0)), intent(inout) :: start, finish
+        real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(kind(0d0)) :: grind_time
+        real(wp) :: grind_time
 
         call s_mpi_barrier()
 
@@ -1236,7 +1236,7 @@ contains
 
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout) :: t_step
-        real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
+        real(wp), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
 
         integer :: i, j, k, l
@@ -1389,7 +1389,7 @@ contains
     subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_OpenACC
-        real(kind(0d0)) :: starttime, endtime
+        real(wp) :: starttime, endtime
         integer :: num_devices, local_size, num_nodes, ppn, my_device_num
         integer :: dev, devNum, local_rank
 #ifdef MFC_MPI

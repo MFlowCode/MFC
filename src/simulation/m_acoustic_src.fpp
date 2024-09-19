@@ -30,25 +30,25 @@ module m_acoustic_src
     @:CRAY_DECLARE_GLOBAL(logical, dimension(:), dipole)
     !$acc declare link(dipole)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_acoustic)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), loc_acoustic)
     !$acc declare link(loc_acoustic)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
     !$acc declare link(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), foc_length, aperture)
     !$acc declare link(foc_length, aperture)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), element_spacing_angle, element_polygon_ratio, rotate_angle)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), element_spacing_angle, element_polygon_ratio, rotate_angle)
     !$acc declare link(element_spacing_angle, element_polygon_ratio, rotate_angle)
 
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), num_elements, element_on)
     !$acc declare link(num_elements, element_on)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mass_src, e_src)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), mass_src, e_src)
     !$acc declare link(mass_src, e_src)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_src)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), mom_src)
     !$acc declare link(mom_src)
 
     @:CRAY_DECLARE_GLOBAL(integer, dimension(:), source_spatials_num_points)
@@ -64,16 +64,16 @@ module m_acoustic_src
     logical, allocatable, dimension(:) :: dipole
     !$acc declare create(dipole)
 
-    real(kind(0d0)), allocatable, target, dimension(:, :) :: loc_acoustic
+    real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
     !$acc declare create(loc_acoustic)
 
-    real(kind(0d0)), allocatable, dimension(:) :: mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
+    real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
     !$acc declare create(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
 
-    real(kind(0d0)), allocatable, dimension(:) :: foc_length, aperture
+    real(wp), allocatable, dimension(:) :: foc_length, aperture
     !$acc declare create(foc_length, aperture)
 
-    real(kind(0d0)), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
+    real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
     !$acc declare create(element_spacing_angle, element_polygon_ratio, rotate_angle)
 
     integer, allocatable, dimension(:) :: num_elements, element_on
@@ -81,8 +81,8 @@ module m_acoustic_src
 
     !> @name Acoustic source terms
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: mass_src, e_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: mom_src
+    real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
+    real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
     !$acc declare create(mass_src, e_src, mom_src)
 
@@ -167,12 +167,12 @@ contains
 
         integer, intent(in) :: t_step
 
-        real(kind(0d0)) :: myalpha(num_fluids), myalpha_rho(num_fluids)
-        real(kind(0d0)) :: myRho, B_tait
-        real(kind(0d0)) :: sim_time, c, small_gamma
-        real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
-        real(kind(0d0)) :: mass_src_diff, mom_src_diff
-        real(kind(0d0)) :: source_temporal
+        real(wp) :: myalpha(num_fluids), myalpha_rho(num_fluids)
+        real(wp) :: myRho, B_tait
+        real(wp) :: sim_time, c, small_gamma
+        real(wp) :: frequency_local, gauss_sigma_time_local
+        real(wp) :: mass_src_diff, mom_src_diff
+        real(wp) :: source_temporal
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
@@ -337,13 +337,13 @@ contains
     subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source)
         !$acc routine seq
         integer, intent(in) :: ai, term_index
-        real(kind(0d0)), intent(in) :: sim_time, c
-        real(kind(0d0)), intent(in) :: frequency_local, gauss_sigma_time_local
-        real(kind(0d0)), intent(out) :: source
+        real(wp), intent(in) :: sim_time, c
+        real(wp), intent(in) :: frequency_local, gauss_sigma_time_local
+        real(wp), intent(out) :: source
 
-        real(kind(0d0)) :: omega ! angular frequency
-        real(kind(0d0)) :: sine_wave ! sine function for square wave
-        real(kind(0d0)) :: foc_length_factor ! Scale amplitude with radius for spherical support
+        real(wp) :: omega ! angular frequency
+        real(wp) :: sine_wave ! sine function for square wave
+        real(wp) :: foc_length_factor ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
@@ -396,8 +396,8 @@ contains
         integer :: j, k, l, ai
         integer :: count
         integer :: dim
-        real(kind(0d0)) :: source_spatial, angle, xyz_to_r_ratios(3)
-        real(kind(0d0)), parameter :: threshold = 1d-10
+        real(wp) :: source_spatial, angle, xyz_to_r_ratios(3)
+        real(wp), parameter :: threshold = 1d-10
 
         if (n == 0) then
             dim = 1
@@ -493,10 +493,10 @@ contains
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: j, k, l, ai
-        real(kind(0d0)), dimension(3), intent(in) :: loc
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(wp), dimension(3), intent(in) :: loc
+        real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
-        real(kind(0d0)) :: sig, r(3)
+        real(wp) :: sig, r(3)
 
         ! Calculate sig spatial support width
         if (n == 0) then
@@ -529,10 +529,10 @@ contains
     !! @param source Source term amplitude
     subroutine s_source_spatial_planar(ai, sig, r, source)
         integer, intent(in) :: ai
-        real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: source
+        real(wp), intent(in) :: sig, r(3)
+        real(wp), intent(out) :: source
 
-        real(kind(0d0)) :: dist
+        real(wp) :: dist
 
         source = 0d0
 
@@ -559,10 +559,10 @@ contains
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
-        real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(wp), intent(in) :: sig, r(3)
+        real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
-        real(kind(0d0)) :: current_angle, angle_half_aperture, dist, norm
+        real(wp) :: current_angle, angle_half_aperture, dist, norm
 
         source = 0d0 ! If not affected by transducer
         angle = 0d0
@@ -604,14 +604,14 @@ contains
     !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         integer, intent(in) :: ai
-        real(kind(0d0)), intent(in) :: sig, r(3)
-        real(kind(0d0)), intent(out) :: source, angle, xyz_to_r_ratios(3)
+        real(wp), intent(in) :: sig, r(3)
+        real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
 
         integer :: elem, elem_min, elem_max
-        real(kind(0d0)) :: current_angle, angle_half_aperture, angle_per_elem, dist
-        real(kind(0d0)) :: angle_min, angle_max, norm
-        real(kind(0d0)) :: poly_side_length, aperture_element_3D, angle_elem
-        real(kind(0d0)) :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
+        real(wp) :: current_angle, angle_half_aperture, angle_per_elem, dist
+        real(wp) :: angle_min, angle_max, norm
+        real(wp) :: poly_side_length, aperture_element_3D, angle_elem
+        real(wp) :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
 
         if (element_on(ai) == 0) then ! Full transducer
             elem_min = 1
@@ -649,7 +649,7 @@ contains
             half_apert = aperture(ai)/2d0
 
             do elem = elem_min, elem_max
-                angle_elem = 2d0*pi*real(elem, kind(0d0))/real(num_elements(ai), kind(0d0)) + rotate_angle(ai)
+                angle_elem = 2d0*pi*real(elem, wp)/real(num_elements(ai), wp) + rotate_angle(ai)
 
                 ! Point 2 is the elem center
                 x2 = f - dsqrt(f**2 - half_apert**2)
@@ -688,8 +688,8 @@ contains
         !$acc routine seq
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
-        real(kind(0d0)), intent(in) :: c
-        real(kind(0d0)) :: f_frequency_local
+        real(wp), intent(in) :: c
+        real(wp) :: f_frequency_local
 
         if (freq_conv_flag) then
             f_frequency_local = c/wavelength(ai)
@@ -707,8 +707,8 @@ contains
         !$acc routine seq
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai
-        real(kind(0d0)), intent(in) :: c
-        real(kind(0d0)) :: f_gauss_sigma_time_local
+        real(wp), intent(in) :: c
+        real(wp) :: f_gauss_sigma_time_local
 
         if (gauss_conv_flag) then
             f_gauss_sigma_time_local = gauss_sigma_dist(ai)/c

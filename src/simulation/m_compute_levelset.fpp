@@ -26,9 +26,9 @@ module m_compute_levelset
  s_compute_rectangle_levelset, &
  s_compute_sphere_levelset
 
-    real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-    real(kind(0d0)) :: length_x, length_y, length_z
-    real(kind(0d0)) :: radius
+    real(wp) :: x_centroid, y_centroid, z_centroid
+    real(wp) :: length_x, length_y, length_z
+    real(wp) :: radius
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
         !! These variables combine the centroid and length parameters associated with
@@ -41,13 +41,13 @@ contains
     !>  Initialize IBM module
     subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: radius, dist
-        real(kind(0d0)) :: x_centroid, y_centroid
-        real(kind(0d0)), dimension(3) :: dist_vec
+        real(wp) :: radius, dist
+        real(wp) :: x_centroid, y_centroid
+        real(wp), dimension(3) :: dist_vec
 
         integer :: i, j !< Loop index variables
 
@@ -77,14 +77,14 @@ contains
 
     subroutine s_compute_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: radius, dist, global_dist
+        real(wp) :: radius, dist, global_dist
         integer :: global_id
-        real(kind(0d0)) :: x_centroid, y_centroid, x_act, y_act, theta
-        real(kind(0d0)), dimension(3) :: dist_vec
+        real(wp) :: x_centroid, y_centroid, x_act, y_act, theta
+        real(wp), dimension(3) :: dist_vec
 
         integer :: i, j, k !< Loop index variables
 
@@ -160,14 +160,14 @@ contains
 
     subroutine s_compute_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: radius, dist, dist_surf, dist_side, global_dist
+        real(wp) :: radius, dist, dist_surf, dist_side, global_dist
         integer :: global_id
-        real(kind(0d0)) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
-        real(kind(0d0)), dimension(3) :: dist_vec
+        real(wp) :: x_centroid, y_centroid, z_centroid, lz, z_max, z_min, x_act, y_act, theta
+        real(wp), dimension(3) :: dist_vec
 
         integer :: i, j, k, l !< Loop index variables
 
@@ -262,13 +262,13 @@ contains
     !>  Initialize IBM module
     subroutine s_compute_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: top_right(2), bottom_left(2)
-        real(kind(0d0)) :: x, y, min_dist
-        real(kind(0d0)) :: side_dists(4)
+        real(wp) :: top_right(2), bottom_left(2)
+        real(wp) :: x, y, min_dist
+        real(wp) :: side_dists(4)
 
         integer :: i, j, k !< Loop index variables
 
@@ -347,13 +347,13 @@ contains
 
     subroutine s_compute_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: radius, dist
-        real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-        real(kind(0d0)), dimension(3) :: dist_vec
+        real(wp) :: radius, dist
+        real(wp) :: x_centroid, y_centroid, z_centroid
+        real(wp), dimension(3) :: dist_vec
 
         integer :: i, j, k !< Loop index variables
 
@@ -384,15 +384,15 @@ contains
 
     subroutine s_compute_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
+        real(wp), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
         integer, intent(in) :: ib_patch_id
 
-        real(kind(0d0)) :: radius, dist
-        real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
-        real(kind(0d0)) :: length_x, length_y, length_z
-        real(kind(0d0)), dimension(3) :: pos_vec, centroid_vec, dist_vec, dist_sides_vec, dist_surface_vec
-        real(kind(0d0)) :: dist_side, dist_surface, side_pos
+        real(wp) :: radius, dist
+        real(wp) :: x_centroid, y_centroid, z_centroid
+        real(wp) :: length_x, length_y, length_z
+        real(wp), dimension(3) :: pos_vec, centroid_vec, dist_vec, dist_sides_vec, dist_surface_vec
+        real(wp) :: dist_side, dist_surface, side_pos
         type(bounds_info) :: boundary
         integer :: i, j, k !< Loop index variables
 

@@ -29,8 +29,8 @@ module m_mpi_proxy
     !! processors. Note that these variables are structured as vectors rather
     !! than arrays.
     !> @{
-    real(kind(0d0)), allocatable, dimension(:) :: q_cons_buffer_in
-    real(kind(0d0)), allocatable, dimension(:) :: q_cons_buffer_out
+    real(wp), allocatable, dimension(:) :: q_cons_buffer_in
+    real(wp), allocatable, dimension(:) :: q_cons_buffer_out
     !> @}
 
     !> @name Receive counts and displacement vector variables, respectively, used in
@@ -212,10 +212,10 @@ contains
 
         ! Temporary # of processors in x-, y- and z-coordinate directions
         ! used during the processor factorization optimization procedure
-        real(kind(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
 
         ! Processor factorization (fct) minimization parameter
-        real(kind(0d0)) :: fct_min
+        real(wp) :: fct_min
 
         ! Cartesian processor topology communicator
         integer :: MPI_COMM_CART
@@ -1414,7 +1414,7 @@ contains
         !!  the second dimension corresponds to the processor rank.
     subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(kind(0d0)), dimension(1:, 0:), intent(inout) :: spatial_extents
+        real(wp), dimension(1:, 0:), intent(inout) :: spatial_extents
 
 #ifdef MFC_MPI
 
@@ -1569,9 +1569,9 @@ contains
         !!  to each processor's rank.
     subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
-        real(kind(0d0)), dimension(:, :, :), intent(in) :: q_sf
+        real(wp), dimension(:, :, :), intent(in) :: q_sf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(1:2, 0:num_procs - 1), &
             intent(inout) :: data_extents
 
@@ -1599,11 +1599,11 @@ contains
         !!  @param q_root_sf Flow variable defined on the entire computational domain
     subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(0:m, 0:0, 0:0), &
             intent(in) :: q_sf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(0:m_root, 0:0, 0:0), &
             intent(inout) :: q_root_sf
 

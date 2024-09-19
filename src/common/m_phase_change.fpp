@@ -52,16 +52,16 @@ module m_phase_change
     !> @name Parameters for the first order transition phase change
     !> @{
     integer, parameter :: max_iter = 1e8        !< max # of iterations
-    real(kind(0d0)), parameter :: pCr = 4.94d7   !< Critical water pressure
-    real(kind(0d0)), parameter :: TCr = 385.05 + 273.15  !< Critical water temperature
-    real(kind(0d0)), parameter :: mixM = 1.0d-8 !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
+    real(wp), parameter :: pCr = 4.94d7   !< Critical water pressure
+    real(wp), parameter :: TCr = 385.05 + 273.15  !< Critical water temperature
+    real(wp), parameter :: mixM = 1.0d-8 !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
     integer, parameter :: lp = 1    !< index for the liquid phase of the reacting fluid
     integer, parameter :: vp = 2    !< index for the vapor phase of the reacting fluid
     !> @}
 
     !> @name Gibbs free energy phase change parameters
     !> @{
-    real(kind(0d0)) :: A, B, C, D
+    real(wp) :: A, B, C, D
     !> @}
 
     !$acc declare create(max_iter,pCr,TCr,mixM,lp,vp,A,B,C,D)
@@ -105,7 +105,7 @@ contains
 
         !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
 
-        real(kind(0d0)), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
 
         !< Generic loop iterators
         integer :: i, j, k, l

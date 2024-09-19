@@ -186,43 +186,43 @@ module m_rhs
 
 #ifdef CRAY_ACC_WAR
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), blkmod1, blkmod2, alpha1, alpha2, Kterm)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
     !$acc declare link(blkmod1, blkmod2, alpha1, alpha2, Kterm)
     !$acc declare link(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     !$acc declare link(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
+    real(wp), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
+    real(wp), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
     !$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
     !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gamma_min, pres_inf)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), gamma_min, pres_inf)
     !$acc declare link(gamma_min, pres_inf)
 #else
-    real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
+    real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
     !$acc declare create(gamma_min, pres_inf)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), Res)
     !$acc declare link(Res)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res
+    real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), nbub)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), nbub)
     !$acc declare link(nbub)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
+    real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
 #endif
 
@@ -714,32 +714,32 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
-        real(kind(0d0)) :: t_start, t_finish
-        real(kind(0d0)) :: gp_sum
+        real(wp) :: t_start, t_finish
+        real(wp) :: gp_sum
 
-        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
+        real(wp) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
+        real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
 
-        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
+        real(wp) :: tmp1, tmp2, tmp3, tmp4, &
                            c_gas, c_liquid, &
                            Cpbw, Cpinf, Cpinf_dot, &
                            myH, myHdot, rddot, alf_gas
 
-        real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
+        real(wp) :: n_tait, B_tait, angle, angle_z
 
-        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
+        real(wp), dimension(nb) :: Rtmp, Vtmp
+        real(wp) :: myR, myV, alf, myP, myRho, R2Vav
+        real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         integer :: ndirs
 
-        real(kind(0d0)) :: sound
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: s2, const_sos, s1
+        real(wp) :: sound
+        real(wp) :: start, finish
+        real(wp) :: s2, const_sos, s1
 
         integer :: i, c, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
@@ -1897,19 +1897,19 @@ contains
             !! function, liquid stiffness function (two variations of the last two
             !! ones), shear and volume Reynolds numbers and the Weber numbers
         !> @{
-        real(kind(0d0)) :: pres_relax
-        real(kind(0d0)), dimension(num_fluids) :: pres_K_init
-        real(kind(0d0)) :: f_pres
-        real(kind(0d0)) :: df_pres
-        real(kind(0d0)), dimension(num_fluids) :: rho_K_s
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)) :: sum_alpha
-        real(kind(0d0)) :: rho
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: gamma
-        real(kind(0d0)) :: pi_inf
-        real(kind(0d0)), dimension(2) :: Re
+        real(wp) :: pres_relax
+        real(wp), dimension(num_fluids) :: pres_K_init
+        real(wp) :: f_pres
+        real(wp) :: df_pres
+        real(wp), dimension(num_fluids) :: rho_K_s
+        real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp) :: sum_alpha
+        real(wp) :: rho
+        real(wp) :: dyn_pres
+        real(wp) :: gamma
+        real(wp) :: pi_inf
+        real(wp), dimension(2) :: Re
 
         integer :: i, j, k, l, q, iter !< Generic loop iterators
         integer :: relax !< Relaxation procedure determination variable
@@ -2147,8 +2147,8 @@ contains
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -2201,8 +2201,8 @@ contains
                                                               norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

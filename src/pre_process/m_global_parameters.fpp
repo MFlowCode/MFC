@@ -53,13 +53,13 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry !< Cylindrical coordinates (either axisymmetric or full 3D)
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
+    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
     !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
+    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
     !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)) :: dx, dy, dz !<
+    real(wp) :: dx, dy, dz !<
     !! Minimum cell-widths in the x-, y- and z-coordinate directions
 
     type(bounds_info) :: x_domain, y_domain, z_domain !<
@@ -72,10 +72,10 @@ module m_global_parameters
     ! directions. The "a" parameters are a measure of the rate at which the grid
     ! is stretched while the remaining parameters are indicative of the location
     ! on the grid at which the stretching begins.
-    real(kind(0d0)) :: a_x, a_y, a_z
+    real(wp) :: a_x, a_y, a_z
     integer :: loops_x, loops_y, loops_z
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     ! ==========================================================================
 
@@ -83,8 +83,8 @@ module m_global_parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
-    real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
@@ -116,19 +116,19 @@ module m_global_parameters
     integer :: precision !< Precision of output files
 
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
+    real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    real(wp) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
 
-    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    real(wp) :: pi_fac !< Factor for artificial pi_inf
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
-    real(kind(0d0)) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
+    real(wp) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
-    real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
+    real(wp), dimension(num_fluids_max) :: fluid_rho
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -169,18 +169,18 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    real(kind(0d0)) :: rhoref, pref !< Reference parameters for Tait EOS
+    real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
     !> @name Bubble modeling
     !> @{
     integer :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
-    real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
+    real(wp) :: R0ref
+    real(wp) :: Ca, Web, Re_inv
+    real(wp), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
-    real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    real(wp) :: sigR, sigV, rhoRV !< standard deviations in R/V
     logical :: adv_n !< Solve the number density equation and compute alpha from number density
     !> @}
 
@@ -206,19 +206,19 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: poly_sigma
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
     !> @}
 
     !> @name Surface Tension Modeling
     !> @{
-    real(kind(0d0)) :: sigma
+    real(wp) :: sigma
     !> @}
 
     !> @name Index variables used for m_variables_conversion

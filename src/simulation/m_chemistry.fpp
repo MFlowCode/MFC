@@ -99,16 +99,16 @@ contains
         integer :: x, y, z
         integer :: eqn
 
-        real(kind(0d0)) :: T
+        real(wp) :: T
         integer :: o
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: E
+        real(wp) :: dyn_pres
+        real(wp) :: E
 
-        real(kind(0d0)) :: rho
+        real(wp) :: rho
         real(kind(1.d0)), dimension(num_species) :: Ys
         real(kind(1.d0)), dimension(num_species) :: omega
-        real(kind(0d0)), dimension(num_species) :: enthalpies
-        real(kind(0d0)) :: cp_mix
+        real(wp), dimension(num_species) :: enthalpies
+        real(wp) :: cp_mix
 
         #:if chemistry
 

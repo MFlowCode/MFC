@@ -14,7 +14,7 @@ contains
 
         integer :: x, y, z !< Generic loop iterators
 
-        real(kind(0d0)) :: divergence
+        real(wp) :: divergence
 
         !$acc parallel loop collapse(3) private(divergence)
         do x = ix_s%beg, ix_s%end
@@ -74,9 +74,9 @@ contains
         integer, intent(IN) :: q
         integer, intent(IN) :: buff_size, fd_number_in, fd_order_in
         type(int_bounds_info), optional, intent(IN) :: offset_s
-        real(kind(0d0)), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
+        real(wp), allocatable, dimension(:, :), intent(INOUT) :: fd_coeff_s
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-buff_size:q + buff_size), &
             intent(IN) :: s_cc
 

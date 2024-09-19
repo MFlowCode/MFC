@@ -8,6 +8,8 @@
 !!              modifications for compatibility.
 module m_eigen_solver
 
+    use m_precision_select
+
     implicit none
 
     private; 
@@ -33,10 +35,10 @@ contains
         !! @param ierr an error completion code
     subroutine cg(nm, nl, ar, ai, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
         integer, intent(in) :: nm, nl
-        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
-        real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
-        real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
-        real(kind(0d0)), dimension(nl), intent(out) :: fv1, fv2, fv3
+        real(wp), dimension(nm, nl), intent(inout) :: ar, ai
+        real(wp), dimension(nl), intent(out) :: wr, wi
+        real(wp), dimension(nm, nl), intent(out) :: zr, zi
+        real(wp), dimension(nl), intent(out) :: fv1, fv2, fv3
         integer, intent(out) :: ierr
 
         integer :: is1, is2
@@ -76,12 +78,12 @@ contains
         !!              factors used.
     subroutine cbal(nm, nl, ar, ai, low, igh, scale)
         integer, intent(in) :: nm, nl
-        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
+        real(wp), dimension(nm, nl), intent(inout) :: ar, ai
         integer, intent(out) :: low, igh
-        real(kind(0d0)), dimension(nl), intent(out) :: scale
+        real(wp), dimension(nl), intent(out) :: scale
 
         integer :: i, j, k, l, ml, jj, iexc
-        real(kind(0d0)) :: c, f, g, r, s, b2, radix
+        real(wp) :: c, f, g, r, s, b2, radix
         logical :: noconv
 
         radix = 16.0d0
@@ -222,11 +224,11 @@ contains
         !! @param orti further information about the transformations
     subroutine corth(nm, nl, low, igh, ar, ai, ortr, orti)
         integer, intent(in) :: nm, nl, low, igh
-        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
-        real(kind(0d0)), dimension(igh), intent(out) :: ortr, orti
+        real(wp), dimension(nm, nl), intent(inout) :: ar, ai
+        real(wp), dimension(igh), intent(out) :: ortr, orti
 
         integer :: i, j, ml, ii, jj, la, mp, kp1, mll
-        real(kind(0d0)) :: f, g, h, fi, fr, scale, c
+        real(wp) :: f, g, h, fi, fr, scale, c
 
         mll = 6
 
@@ -344,14 +346,14 @@ contains
         !! @param ierr an error completion code
     subroutine comqr2(nm, nl, low, igh, ortr, orti, hr, hi, wr, wi, zr, zi, ierr)
         integer, intent(in) :: nm, nl, low, igh
-        real(kind(0d0)), dimension(nm, nl), intent(inout) :: hr, hi
-        real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
-        real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
-        real(kind(0d0)), dimension(igh), intent(inout) :: ortr, orti
+        real(wp), dimension(nm, nl), intent(inout) :: hr, hi
+        real(wp), dimension(nl), intent(out) :: wr, wi
+        real(wp), dimension(nm, nl), intent(out) :: zr, zi
+        real(wp), dimension(igh), intent(inout) :: ortr, orti
         integer, intent(out) :: ierr
 
         integer :: i, j, k, l, ml, en, ii, jj, ll, nn, ip1, itn, its, lp1, enm1, iend
-        real(kind(0d0)) :: si, sr, ti, tr, xi, xr, xxi, xxr, yi, yr, zzi, zzr, &
+        real(wp) :: si, sr, ti, tr, xi, xr, xxi, xxr, yi, yr, zzi, zzr, &
                            norm, tst1, tst2, c, d
 !
         ierr = 0
@@ -752,13 +754,13 @@ contains
     end subroutine cbabk2
 
     subroutine csroot(xr, xi, yr, yi)
-        real(kind(0d0)), intent(in) :: xr, xi
-        real(kind(0d0)), intent(out) :: yr, yi
+        real(wp), intent(in) :: xr, xi
+        real(wp), intent(out) :: yr, yi
 !
 !     (yr,yi) = complex dsqrt(xr,xi)
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
 !
-        real(kind(0d0)) :: s, tr, ti, c
+        real(wp) :: s, tr, ti, c
         tr = xr
         ti = xi
         call pythag(tr, ti, c)
@@ -772,9 +774,9 @@ contains
     end subroutine csroot
 
     subroutine cdiv(ar, ai, br, bi, cr, ci)
-        real(kind(0d0)), intent(in) :: ar, ai, br, bi
-        real(kind(0d0)), intent(out) :: cr, ci
-        real(kind(0d0)) :: s, ars, ais, brs, bis
+        real(wp), intent(in) :: ar, ai, br, bi
+        real(wp), intent(out) :: cr, ci
+        real(wp) :: s, ars, ais, brs, bis
 !
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
@@ -796,12 +798,12 @@ contains
     end subroutine cdiv
 
     subroutine pythag(a, b, c)
-        real(kind(0d0)), intent(in) :: a, b
-        real(kind(0d0)), intent(out) :: c
+        real(wp), intent(in) :: a, b
+        real(wp), intent(out) :: c
 !
 !     finds dsqrt(a**2+b**2) without overflow or destructive underflow
 !
-        real(kind(0d0)) :: p, r, s, t, u
+        real(wp) :: p, r, s, t, u
         p = dmax1(dabs(a), dabs(b))
         if (p == 0.0d0) go to 20
         r = (dmin1(dabs(a), dabs(b))/p)**2
