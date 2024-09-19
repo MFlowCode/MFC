@@ -50,13 +50,13 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
 | IBM Power10               |                           | CPU           | 24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
 | AMD EPYC 7401             | Naples                    | CPU           | 24 cores     | 10               | GNU 10.3.1           | LLNL Corona  |
-| Apple M1 Pro              |                           | CPU           |  8 cores     | 14               | GNU 13.2.0           | N/A     |
 | Intel Xeon 6226           | Cascade Lake              | CPU           | 12 cores     | 17               | GNU 12.3.0           | GT ICE  |
-| Apple M1 Max              |                           | CPU           |  8 cores     | 18               | GNU 14.1.0           | N/A     |
+| Apple M1 Max              |                           | CPU           | 10 cores     | 20               | GNU 14.1.0           | N/A     |
 | IBM Power9                |                           | CPU           | 20 cores     | 21               | GNU 9.1.0            | OLCF Summit |
 | Cavium ThunderX2          | Arm                       | CPU           | 32 cores     | 21               | GNU 13.2.0           | SBU Ookami |
 | Arm Cortex-A78AE          | Arm, BlueField3           | CPU           | 16 cores     | 25               | NVHPC 24.5           | GT Rogues Gallery |
 | Intel Xeon E5-2650V4      | Broadwell                 | CPU           | 12 cores     | 27               | NVHPC 23.5           | GT CSE Internal  |
+| Apple M1                  |                           | CPU           |  8 cores     | 33               | GNU 14.1.0           | N/A     |
 | Intel Xeon E7-4850V3      | Haswell                   | CPU           | 14 cores     | 34               | GNU 9.4.0            | GT CSE Internal  |
 | Fujitsu A64FX             | Arm                       | CPU           | 48 cores     | 63               | GNU 13.2.0           | SBU Ookami |
 
