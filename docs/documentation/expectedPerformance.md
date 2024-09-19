@@ -9,7 +9,8 @@ The following table outlines observed performance as nanoseconds per grid point 
 We solve an example 3D, inviscid, 5-equation model problem with two advected species (8 PDEs) and 8M grid points (158-cubed uniform grid).
 The numerics are WENO5 finite volume reconstruction and HLLC approximate Riemann solver.
 This case is located in `examples/3D_performance_test`.
-You can run it via `./mfc.sh run -n <num_processors> -j $(nproc) ./examples/3D_performance_test/case.py -t pre_process simulation --case-optimization`, which will build an optimized version of the code for this case then execute it.
+You can run it via `./mfc.sh run -n <num_processors> -j $(nproc) ./examples/3D_performance_test/case.py -t pre_process simulation --case-optimization` for CPU cases right after building MFC, which will build an optimized version of the code for this case then execute it.
+For benchmarking GPU devices, you will likely want to use `-n <num_gpus>` where `<num_gpus>` should likely be `1`.
 If the above does not work on your machine, see the rest of this documentation for other ways to use the `./mfc.sh run` command.
 
 Results are for MFC v4.9.3 (July 2024 release), though numbers have not changed meaningfully since then.
@@ -18,13 +19,13 @@ All results are for the compiler that gave the best performance.
 Note:
 * CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device. CPU results are the best performance we achieved using a single socket (or die).
 These are reported as (X/Y cores), where X is the used cores, and Y is the total on the die.
-* GPU results are for a single GPU device. For single-precision (SP) GPUs, we performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation. AMD MI250X and MI300A GPUs have multiple graphics compute dies (GCDs) per device; we report results for one _GCD_*, though one can quickly estimate full device runtime by dividing the grind time number by the number of GCDs on the device (the MI250X has 2 GCDs). We gratefully acknowledge the permission of LLNL, HPE/Cray, and AMD for permission to release MI300A performance numbers.
+* GPU results are for a single GPU device. For single-precision (SP) GPUs, we performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation. AMD MI250X and MI300A GPUs have multiple compute dies per socket; we report results for one _GCD_* for the MI250X and the entire APU (6 XCDs) for MI300A, though one can quickly estimate full device runtime by dividing the grind time number by the number of GCDs on the device (the MI250X has 2 GCDs). We gratefully acknowledge the permission of LLNL, HPE/Cray, and AMD for permission to release MI300A performance numbers.
 
 | Hardware                  | Details                   | Type          | Usage        | Grind Time [ns]  | Compiler             | Computer     |
 | ---:                      | ----:                     | ----:         | ----:        | ----:            | :---                 | :---         | 
 | NVIDIA GH200              | GPU only                  | APU           | 1 GPU        | 0.32             | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA H100               |                           | GPU           | 1 GPU        | 0.45             | NVHPC 24.5           | GT Rogues Gallery  |
-| AMD MI300A                |                           | APU           | 1 _GCD_*     | 0.60             | CCE 18.0.0           | LLNL Tioga |
+| AMD MI300A                |                           | APU           | 1 APU        | 0.60             | CCE 18.0.0           | LLNL Tioga |
 | NVIDIA A100               |                           | GPU           | 1 GPU        | 0.62             | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA V100               |                           | GPU           | 1 GPU        | 0.99             | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA A30                |                           | GPU           | 1 GPU        | 1.1              | NVHPC 24.1           | GT Rogues Gallery  |
@@ -56,7 +57,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Cavium ThunderX2          | Arm                       | CPU           | 32 cores     | 21               | GNU 13.2.0           | SBU Ookami |
 | Arm Cortex-A78AE          | Arm, BlueField3           | CPU           | 16 cores     | 25               | NVHPC 24.5           | GT Rogues Gallery |
 | Intel Xeon E5-2650V4      | Broadwell                 | CPU           | 12 cores     | 27               | NVHPC 23.5           | GT CSE Internal  |
-| Apple M1                  |                           | CPU           |  8 cores     | 33               | GNU 14.1.0           | N/A     |
+| Apple M1                  |                           | CPU           |  8 cores     | 32               | GNU 14.1.0           | N/A     |
 | Intel Xeon E7-4850V3      | Haswell                   | CPU           | 14 cores     | 34               | GNU 9.4.0            | GT CSE Internal  |
 | Fujitsu A64FX             | Arm                       | CPU           | 48 cores     | 63               | GNU 13.2.0           | SBU Ookami |
 
