@@ -136,7 +136,12 @@ contains
         real(wp), intent(out) :: pres
         real(wp), intent(in), optional :: stress, mom, G
 
-        real(kind(0d0)) :: E_e
+        ! Chemistry
+        integer :: i
+        real(wp), dimension(1:num_species), intent(in) :: rhoYks
+        real(wp) :: E_e
+        real(wp) :: T
+        real(wp), dimension(1:num_species) :: Y_rs
 
         integer :: s !< Generic loop iterator
 
@@ -160,7 +165,7 @@ contains
                 E_e = 0._wp
                 do s = stress_idx%beg, stress_idx%end
                     if (G > 0) then
-                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                        E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
                         ! Additional terms in 2D and 3D
                         if ((s == stress_idx%beg + 1) .or. &
                             (s == stress_idx%beg + 3) .or. &
@@ -185,7 +190,7 @@ contains
             end do
 
             if (sum(Y_rs) > 1d-16) then
-                call get_temperature(.true., energy - dyn_p, 1200d0, Y_rs, T)
+                call get_temperature(.true., energy - dyn_p, 1200._wp, Y_rs, T)
                 call get_pressure(rho, T, Y_rs, pres)
             else
                 pres = 0._wp
@@ -877,8 +882,6 @@ contains
 
         real(wp) :: rhoYks(1:num_species)
 
-        real(wp) :: rhoYks(1:num_species)
-
         real(wp) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(wp) :: G_K
@@ -943,11 +946,11 @@ contains
                     end if
 
                     if (chemistry) then
-                        rho_K = 0d0
+                        rho_K = 0._wp
                         !$acc loop seq
                         do i = chemxb, chemxe
                             !print*, j,k,l, qK_cons_vf(i)%sf(j, k, l)
-                            rho_K = rho_K + max(0d0, qK_cons_vf(i)%sf(j, k, l))
+                            rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
                         end do
 
                         !$acc loop seq
@@ -955,10 +958,10 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = rho_K
                         end do
 
-                        Yksum = 0d0
+                        Yksum = 0._wp
                         !$acc loop seq
                         do i = chemxb, chemxe
-                            qK_prim_vf(i)%sf(j, k, l) = max(0d0, qK_cons_vf(i)%sf(j, k, l)/rho_K)
+                            qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
                             Yksum = Yksum + qK_prim_vf(i)%sf(j, k, l)
                         end do
 
@@ -1113,8 +1116,8 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: spec
 
-        real(kind(0d0)), dimension(num_species) :: Ys
-        real(kind(0d0)) :: temperature, e_mix, mix_mol_weight, T
+        real(wp), dimension(num_species) :: Ys
+        real(wp) :: temperature, e_mix, mix_mol_weight, T
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
@@ -1172,7 +1175,7 @@ contains
                         else if ((model_eqns /= 4) .and. (bubbles)) then
                             ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
-                                                           (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
+                                                           (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))* &
                                                            (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                         else
                             !Tait EOS, no conserved energy variable
