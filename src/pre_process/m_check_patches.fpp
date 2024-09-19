@@ -1,3 +1,5 @@
+#:include 'macros.fpp'
+
 !> @brief This module contains subroutines that read, and check consistency
 !!              of, the user provided inputs and data.
 
@@ -505,6 +507,7 @@ contains
     subroutine s_check_active_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id
+
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%vel(1)), &
@@ -537,7 +540,12 @@ contains
                 "Patch "//trim(iStr)//": alpha(num_fluids) must be set")
         end if
 
-    end subroutine s_check_active_patch_primitive_variables
+        if (chemistry) then
+            !@:ASSERT(all(patch_icpp(patch_id)%Y(1:num_species) >=       0d0), "Patch " // trim(iStr) // ".")
+            !@:ASSERT(any(patch_icpp(patch_id)%Y(1:num_species) >  verysmall), "Patch " // trim(iStr) // ".")
+        end if
+
+    end subroutine s_check_active_patch_primitive_variables ! --------------
 
     !>  This subroutine verifies that the primitive variables
         !!      associated with the given inactive patch remain unaltered

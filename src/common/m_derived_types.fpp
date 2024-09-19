@@ -8,8 +8,9 @@
 !!              types used in the pre-process code.
 module m_derived_types
 
-    use m_constants !< Constants
+    use m_constants  !< Constants
     use m_precision_select
+    use m_thermochem !< Thermodynamic properties
 
     implicit none
 
@@ -193,6 +194,7 @@ module m_derived_types
         !! id for hard coded initial condition
 
         real(wp) :: cf_val !! color function value
+        real(wp) :: Y(1:num_species)
 
     end type ic_patch_parameters
 
@@ -300,5 +302,19 @@ module m_derived_types
         integer, dimension(3) :: DB
 
     end type ghost_point
+
+    !> Species parameters
+    type species_parameters
+        character(LEN=name_len) :: name !< Name of species
+    end type species_parameters
+
+    !> Chemistry parameters
+    type chemistry_parameters
+        character(LEN=name_len) :: cantera_file !< Path to Cantera file
+
+        logical :: advection
+        logical :: diffusion
+        logical :: reactions
+    end type chemistry_parameters
 
 end module m_derived_types

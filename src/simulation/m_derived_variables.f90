@@ -21,6 +21,9 @@ module m_derived_variables
     use m_time_steppers         !< Time-stepping algorithms
 
     use m_helper
+
+    use m_finite_differences
+
     ! ==========================================================================
 
     implicit none

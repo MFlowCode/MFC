@@ -101,7 +101,7 @@ contains
         !!      any reflections caused by outgoing waves.
     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
 #ifdef CRAY_ACC_WAR
-        !DIR$ INLINEALWAYS ss_compute_nonreflecting_subsonic_inflow_L
+        !DIR$ INLINEALWAYS s_compute_nonreflecting_subsonic_inflow_L
 #else
         !$acc routine seq
 #endif

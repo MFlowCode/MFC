@@ -988,7 +988,20 @@ contains
                     y_boundary%end >= y_cc(j)) &
                     then
 
-                    patch_id_fp(i, j, 0) = patch_id
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                            eta, q_prim_vf, patch_id_fp)
+
+                    @:analytical()
+
+                    if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
+                        !zero density, reassign according to Tait EOS
+                        q_prim_vf(1)%sf(i, j, 0) = &
+                            (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1d0/lit_gamma))* &
+                            rhoref*(1d0 - q_prim_vf(alf_idx)%sf(i, j, 0))
+                    end if
+
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
 
                 end if
 

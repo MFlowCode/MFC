@@ -19,7 +19,7 @@ module m_boundary_conditions
     implicit none
 
     private; 
-    public :: s_populate_primitive_variables_buffers, &
+    public :: s_populate_variables_buffers, &
               s_populate_capillary_buffers
 
 contains
@@ -27,8 +27,7 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
     !!      boundary conditions.
-    !! @param q_prim_vf Primitive variable
-    subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
+    subroutine s_populate_variables_buffers(q_prim_vf, pb, mv)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
@@ -213,7 +212,7 @@ contains
 
         ! END: Population of Buffers in z-direction ========================
 
-    end subroutine s_populate_primitive_variables_buffers
+    end subroutine s_populate_variables_buffers
 
     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
 

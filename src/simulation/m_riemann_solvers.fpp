@@ -18,6 +18,7 @@
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
 
@@ -35,6 +36,8 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension      !< To get the capilary fluxes
+
+    use m_chemistry
     ! ==========================================================================
 
     implicit none
@@ -354,7 +357,7 @@ contains
 
             if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Y_L, Y_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -732,6 +735,20 @@ contains
                                 if (num_fluids > 1) then
                                     flux_rs${XYZ}$_vf(j, k, l, contxe) = 0._wp
                                 end if
+                            end if
+
+                            if (chemistry .and. chem_params%advection) then
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
+                                                                     + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
+                                                                    /(s_M - s_P)
+                                    flux_src_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                end do
                             end if
                         end do
                     end do

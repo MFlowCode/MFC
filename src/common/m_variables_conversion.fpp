@@ -21,6 +21,9 @@ module m_variables_conversion
     use m_helper_basic         !< Functions to compare floating point numbers
 
     use m_helper
+
+    use m_thermochem
+
     ! ==========================================================================
 
     implicit none
@@ -124,7 +127,7 @@ contains
         !! @param pres Pressure to calculate
         !! @param stress Shear Stress
         !! @param mom Momentum
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, pres, stress, mom, G)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, stress, mom, G)
         !$acc routine seq
 
         real(wp), intent(in) :: energy, alf
@@ -133,46 +136,62 @@ contains
         real(wp), intent(out) :: pres
         real(wp), intent(in), optional :: stress, mom, G
 
-        real(wp) :: E_e
+        real(kind(0d0)) :: E_e
 
         integer :: s !< Generic loop iterator
 
-        ! Depending on model_eqns and bubbles, the appropriate procedure
-        ! for computing pressure is targeted by the procedure pointer
+        #:if not chemistry
+            ! Depending on model_eqns and bubbles, the appropriate procedure
+            ! for computing pressure is targeted by the procedure pointer
 
-        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
-            pres = (energy - dyn_p - pi_inf - qv)/gamma
-        else if ((model_eqns /= 4) .and. bubbles) then
-            pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
-        else
-            pres = (pref + pi_inf)* &
-                   (energy/ &
-                    (rhoref*(1 - alf)) &
-                    )**(1/gamma + 1) - pi_inf
-        end if
+            if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
+                pres = (energy - dyn_p - pi_inf - qv)/gamma
+            else if ((model_eqns /= 4) .and. bubbles) then
+                pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
+            else
+                pres = (pref + pi_inf)* &
+                       (energy/ &
+                        (rhoref*(1 - alf)) &
+                        )**(1/gamma + 1) - pi_inf
+            end if
 
-        if (hypoelasticity .and. present(G)) then
-            ! calculate elastic contribution to Energy
-            E_e = 0._wp
-            do s = stress_idx%beg, stress_idx%end
-                if (G > 0) then
-                    E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
-                    ! Additional terms in 2D and 3D
-                    if ((s == stress_idx%beg + 1) .or. &
-                        (s == stress_idx%beg + 3) .or. &
-                        (s == stress_idx%beg + 4)) then
-                        E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+            if (hypoelasticity .and. present(G)) then
+                ! calculate elastic contribution to Energy
+                E_e = 0._wp
+                do s = stress_idx%beg, stress_idx%end
+                    if (G > 0) then
+                        E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+                        ! Additional terms in 2D and 3D
+                        if ((s == stress_idx%beg + 1) .or. &
+                            (s == stress_idx%beg + 3) .or. &
+                            (s == stress_idx%beg + 4)) then
+                            E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                        end if
                     end if
-                end if
+                end do
+
+                pres = ( &
+                       energy - &
+                       0.5_wp*(mom**2._wp)/rho - &
+                       pi_inf - qv - E_e &
+                       )/gamma
+
+            end if
+
+        #:else
+            !$acc loop seq
+            do i = 1, num_species
+                Y_rs(i) = rhoYks(i)/rho
             end do
 
-            pres = ( &
-                   energy - &
-                   0.5_wp*(mom**2._wp)/rho - &
-                   pi_inf - qv - E_e &
-                   )/gamma
+            if (sum(Y_rs) > 1d-16) then
+                call get_temperature(.true., energy - dyn_p, 1200d0, Y_rs, T)
+                call get_pressure(rho, T, Y_rs, pres)
+            else
+                pres = 0._wp
+            end if
 
-        end if
+        #:endif
 
     end subroutine s_compute_pressure
 
@@ -856,11 +875,15 @@ contains
             real(wp), dimension(:), allocatable :: nRtmp
         #:endif
 
+        real(wp) :: rhoYks(1:num_species)
+
+        real(wp) :: rhoYks(1:num_species)
+
         real(wp) :: vftmp, nR3, nbub_sc, R3tmp
 
         real(wp) :: G_K
 
-        real(wp) :: pres
+        real(wp) :: pres, Yksum
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -882,7 +905,7 @@ contains
             end if
         #:endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
         do l = izb, ize
             do k = iyb, iye
                 do j = ixb, ixe
@@ -892,11 +915,6 @@ contains
                     do i = 1, num_fluids
                         alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                         alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                    end do
-
-                    !$acc loop seq
-                    do i = 1, contxe
-                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
                     if (model_eqns /= 4) then
@@ -924,6 +942,39 @@ contains
 #endif
                     end if
 
+                    if (chemistry) then
+                        rho_K = 0d0
+                        !$acc loop seq
+                        do i = chemxb, chemxe
+                            !print*, j,k,l, qK_cons_vf(i)%sf(j, k, l)
+                            rho_K = rho_K + max(0d0, qK_cons_vf(i)%sf(j, k, l))
+                        end do
+
+                        !$acc loop seq
+                        do i = 1, contxe
+                            qK_prim_vf(i)%sf(j, k, l) = rho_K
+                        end do
+
+                        Yksum = 0d0
+                        !$acc loop seq
+                        do i = chemxb, chemxe
+                            qK_prim_vf(i)%sf(j, k, l) = max(0d0, qK_cons_vf(i)%sf(j, k, l)/rho_K)
+                            Yksum = Yksum + qK_prim_vf(i)%sf(j, k, l)
+                        end do
+
+                        !$acc loop seq
+                        do i = chemxb, chemxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_prim_vf(i)%sf(j, k, l)/Yksum
+                        end do
+
+                        qK_prim_vf(tempxb)%sf(j, k, l) = qK_cons_vf(tempxb)%sf(j, k, l)
+                    else
+                        !$acc loop seq
+                        do i = 1, contxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
 #ifdef MFC_SIMULATION
                     rho_K = max(rho_K, sgm_eps)
 #endif
@@ -941,9 +992,16 @@ contains
                         end if
                     end do
 
+                    if (chemistry) then
+                        !$acc loop seq
+                        do i = 1, num_species
+                            rhoYks(i) = qK_cons_vf(chemxb + i - 1)%sf(j, k, l)
+                        end do
+                    end if
+
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
-                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, pres)
+                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -1053,6 +1111,10 @@ contains
         real(wp), dimension(2) :: Re_K
 
         integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: spec
+
+        real(kind(0d0)), dimension(num_species) :: Ys
+        real(kind(0d0)) :: temperature, e_mix, mix_mol_weight, T
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
@@ -1086,21 +1148,37 @@ contains
                                    q_prim_vf(i)%sf(j, k, l)/2._wp
                     end do
 
-                    ! Computing the energy from the pressure
-                    if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
-                        ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
+                    #:if chemistry
+                        do i = chemxb, chemxe
+                            Ys(i - chemxb + 1) = q_prim_vf(i)%sf(j, k, l)
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+
+                        call get_mixture_molecular_weight(Ys, mix_mol_weight)
+                        T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
+                        call get_mixture_energy_mass(T, Ys, e_mix)
+
                         q_cons_vf(E_idx)%sf(j, k, l) = &
-                            gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
-                            + qv
-                    else if ((model_eqns /= 4) .and. (bubbles)) then
-                        ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
-                        q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
-                                                       (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))* &
-                                                       (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
-                    else
-                        !Tait EOS, no conserved energy variable
-                        q_cons_vf(E_idx)%sf(j, k, l) = 0.
-                    end if
+                            dyn_pres + e_mix
+
+                        q_cons_vf(tempxb)%sf(j, k, l) = T
+                    #:else
+                        ! Computing the energy from the pressure
+                        if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
+                            ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
+                            q_cons_vf(E_idx)%sf(j, k, l) = &
+                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
+                                + qv
+                        else if ((model_eqns /= 4) .and. (bubbles)) then
+                            ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
+                            q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
+                                                           (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
+                                                           (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
+                        else
+                            !Tait EOS, no conserved energy variable
+                            q_cons_vf(E_idx)%sf(j, k, l) = 0.
+                        end if
+                    #:endif
 
                     ! Computing the internal energies from the pressure and continuities
                     if (model_eqns == 3) then
