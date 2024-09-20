@@ -354,7 +354,7 @@ contains
 
         integer :: i, j, k, l, ml, en, ii, jj, ll, nn, ip1, itn, its, lp1, enm1, iend
         real(wp) :: si, sr, ti, tr, xi, xr, xxi, xxr, yi, yr, zzi, zzr, &
-                           norm, tst1, tst2, c, d
+                    norm, tst1, tst2, c, d
 !
         ierr = 0
 !     .......... initialize eigenvector matrix ..........

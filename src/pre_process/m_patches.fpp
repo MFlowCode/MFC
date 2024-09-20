@@ -1507,7 +1507,7 @@ contains
                         elseif (epsilon == 4._wp) then
                             if (beta == 0._wp) then
                                 H = 3._wp/16._wp*sqrt(1._wp/pi)*(35._wp*cos(sph_phi)**4._wp - &
-                                                           3d1*cos(sph_phi)**2 + 3._wp)
+                                                                 3d1*cos(sph_phi)**2 + 3._wp)
                             elseif (beta == 1._wp) then
                                 H = -3._wp/8._wp*sqrt(5._wp/pi)*exp(cmplx_i*z_cc(k))* &
                                     sin(sph_phi)*(7._wp*cos(sph_phi)**3._wp - 3._wp*cos(sph_phi))
@@ -1524,7 +1524,7 @@ contains
                         elseif (epsilon == 5._wp) then
                             if (beta == 0._wp) then
                                 H = 1._wp/16._wp*sqrt(11._wp/pi)*(63._wp*cos(sph_phi)**5._wp - &
-                                                            7d1*cos(sph_phi)**3._wp + 15._wp*cos(sph_phi))
+                                                                  7d1*cos(sph_phi)**3._wp + 15._wp*cos(sph_phi))
                             elseif (beta == 1._wp) then
                                 H = -1._wp/16._wp*sqrt(165._wp/(2._wp*pi))*exp(cmplx_i*z_cc(k))* &
                                     sin(sph_phi)*(21._wp*cos(sph_phi)**4._wp - 14._wp*cos(sph_phi)**2 + 1._wp)

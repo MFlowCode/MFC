@@ -118,7 +118,7 @@ contains
         ! Define the view for each variable
         do i = 1, sys_size
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
@@ -126,7 +126,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                              MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), ierr)
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
 
             end do
@@ -167,7 +167,7 @@ contains
 #endif
 
                     call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), ierr)
+                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), ierr)
                     call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(1), ierr)
 
 #ifdef MFC_PRE_PROCESS
@@ -177,7 +177,7 @@ contains
                     end do
 #endif
                     call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), ierr)
+                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), ierr)
                     call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(2), ierr)
 
                 end if
@@ -197,7 +197,7 @@ contains
 
 #ifdef MFC_MPI
 
-        call MPI_GATHER(time_avg, 1, MPI_DOUBLE_PRECISION, proc_time(0), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
 #endif
 
@@ -242,15 +242,15 @@ contains
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, &
-                        MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
+                        mpi_p, MPI_MAX, 0, &
                         MPI_COMM_WORLD, ierr)
 
         if (any(Re_size > 0)) then
             call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, &
-                            MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
+                            mpi_p, MPI_MAX, 0, &
                             MPI_COMM_WORLD, ierr)
             call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, &
-                            MPI_DOUBLE_PRECISION, MPI_MIN, 0, &
+                            mpi_p, MPI_MIN, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
 
@@ -274,7 +274,7 @@ contains
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -296,7 +296,7 @@ contains
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MIN, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -318,7 +318,7 @@ contains
 #ifdef MFC_MPI
 
         ! Performing the reduction procedure
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MAX, MPI_COMM_WORLD, ierr)
 
 #endif
@@ -342,10 +342,10 @@ contains
 
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, &
                         MPI_MIN, 0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(var_glb, 1, MPI_DOUBLE_PRECISION, &
+        call MPI_BCAST(var_glb, 1, mpi_p, &
                        0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb

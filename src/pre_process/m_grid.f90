@@ -316,7 +316,7 @@ contains
         data_size = m_glb + 2
         call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                            mpi_info_int, ifile, ierr)
-        call MPI_FILE_WRITE(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+        call MPI_FILE_WRITE(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 
         if (n > 0) then
@@ -324,7 +324,7 @@ contains
             data_size = n_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
-            call MPI_FILE_WRITE(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_WRITE(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
 
             if (p > 0) then
@@ -332,7 +332,7 @@ contains
                 data_size = p_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                    mpi_info_int, ifile, ierr)
-                call MPI_FILE_WRITE(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_WRITE(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             end if
         end if

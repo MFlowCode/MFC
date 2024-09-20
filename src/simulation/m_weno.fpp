@@ -400,67 +400,67 @@ contains
 
                         beta_coef_${XYZ}$ (i + 1, 0, 0) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/((s_cb(i) - &
-                                                                                                                                                                s_cb(i + 3))**2._wp*(s_cb(i + 1) - s_cb(i + 3))**2._wp)
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/((s_cb(i) - &
+                                                                                                                                                                          s_cb(i + 3))**2._wp*(s_cb(i + 1) - s_cb(i + 3))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 0, 1) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(19._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                                                                                                             s_cb(i + 1)) + 2._wp*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                                                                                                                                                                                                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2._wp*(s_cb(i + 3) - &
-                                                                                                                                                                                                                                                s_cb(i + 1)))
+                                                                          s_cb(i))**2._wp - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
+                                                                                                                     s_cb(i + 1)) + 2._wp*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
+                                                                                                                                                                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
+                                                                                                                                                                                                               s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2._wp*(s_cb(i + 3) - &
+                                                                                                                                                                                                                                                            s_cb(i + 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 0, 2) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                              s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2._wp)/((s_cb(i) - &
-                                                                                                                                                                                                          s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 3))**2._wp)
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
+                                                                                                                      s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
+                                                                                                                                                                  s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2._wp)/((s_cb(i) - &
+                                                                                                                                                                                                                    s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 3))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 0) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
-                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                                                                                                                                                            s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 2))**2._wp)
+                                                                          s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
+                                                                                                                              s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
+                                                                                                                                                                      s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 2))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 1) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*((s_cb(i) - &
-                                                               s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20._wp*(s_cb(i + 1) - &
-                                                                                                             s_cb(i))) + (2._wp*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                                                                                                                                                         s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                                                                                                                                                                                              s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2._wp*(s_cb(i + 2) - &
-                                                                                                                                                                                                                                             s_cb(i)))
+                                                                   s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20._wp*(s_cb(i + 1) - &
+                                                                                                                   s_cb(i))) + (2._wp*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
+                                                                                                                                                                 s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
+                                                                                                                                                                                                      s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2._wp*(s_cb(i + 2) - &
+                                                                                                                                                                                                                                                       s_cb(i)))
 
                         beta_coef_${XYZ}$ (i + 1, 1, 2) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/ &
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/ &
                             ((s_cb(i - 1) - s_cb(i + 1))**2._wp*(s_cb(i - 1) - &
-                                                               s_cb(i + 2))**2._wp)
+                                                                 s_cb(i + 2))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 0) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(12._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                                                                                                                s_cb(i - 1)))**2._wp + 3._wp*((s_cb(i) - s_cb(i - 2)) + &
-                                                                                                                                          (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
+                                                                          s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
+                                                                                                                        s_cb(i - 1)))**2._wp + 3._wp*((s_cb(i) - s_cb(i - 2)) + &
+                                                                                                                                                      (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
                             ((s_cb(i - 2) - s_cb(i + 1))**2._wp*(s_cb(i - 1) - &
-                                                               s_cb(i + 1))**2._wp)
+                                                                 s_cb(i + 1))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 1) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(19._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                                                                                                              s_cb(i + 1))) + 2._wp*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                                                                                                                                                                s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                                                                                                                                                                                                               s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2._wp*(s_cb(i + 1) - &
-                                                                                                                                                                                                                                                          s_cb(i - 1)))
+                                                                          s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
+                                                                                                                      s_cb(i + 1))) + 2._wp*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
+                                                                                                                                                                          s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
+                                                                                                                                                                                                                         s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2._wp*(s_cb(i + 1) - &
+                                                                                                                                                                                                                                                                      s_cb(i - 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 2, 2) = &
                             4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
-                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                                                                                                                                                            s_cb(i))**2._wp*(s_cb(i - 2) - s_cb(i + 1))**2._wp)
+                                                                          s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
+                                                                                                                              s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
+                                                                                                                                                                      s_cb(i))**2._wp*(s_cb(i - 2) - s_cb(i + 1))**2._wp)
 
                     end do
 

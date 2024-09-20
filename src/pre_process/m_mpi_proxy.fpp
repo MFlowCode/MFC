@@ -69,7 +69,7 @@ contains
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
             & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef',          &
             & 'mixlayer_domain' ]
-            call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         do i = 1, num_patches_max
@@ -85,14 +85,14 @@ contains
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
                 & 'model%threshold', 'cf_val']
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             call MPI_BCAST(patch_icpp(i)%model%filepath, len(patch_icpp(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate', &
                 'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha' ]
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             call MPI_BCAST(patch_icpp(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -101,7 +101,7 @@ contains
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
-                call MPI_BCAST(patch_ib(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 
@@ -109,7 +109,7 @@ contains
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
                 & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp' ]
-                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 #endif
@@ -180,7 +180,7 @@ contains
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
                     fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y)
+                                         - (n + 1)/tmp_num_procs_y)
 
                     ! Searching for optimal computational domain distribution
                     do i = 1, num_procs
@@ -224,9 +224,9 @@ contains
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
                     fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y) &
+                                         - (n + 1)/tmp_num_procs_y) &
                               + 10._wp*abs((n + 1)/tmp_num_procs_y &
-                                         - (p + 1)/tmp_num_procs_z)
+                                           - (p + 1)/tmp_num_procs_z)
 
                     ! Searching for optimal computational domain distribution
                     do i = 1, num_procs
@@ -358,7 +358,7 @@ contains
                 tmp_num_procs_x = num_procs_x
                 tmp_num_procs_y = num_procs_y
                 fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
-                                   - (n + 1)/tmp_num_procs_y)
+                                     - (n + 1)/tmp_num_procs_y)
 
                 ! Searching for optimal computational domain distribution
                 do i = 1, num_procs

@@ -929,7 +929,7 @@ contains
                     *(mass_n0(iR0) + mass_v0(iR0))/(mass_n0(iR0) + fmass_v)
             grad_T = -Re_trans_T(iR0)*(T_bar - Tw)
             f_bpres_dot = 3._wp*gamma_m*(-fV*fpb + fvflux*R_v*Tw &
-                                        + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
+                                         + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
         else
             f_bpres_dot = -3._wp*gamma_m*fV/fR*(fpb - pv)
         end if

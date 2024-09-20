@@ -208,7 +208,7 @@ contains
                         blkmod2 = ((fluid_pp(2)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
                                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
                         q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
-                                                               (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
+                                                                 (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
                     if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
@@ -237,8 +237,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, &
-                                   -offset_y%beg:n + offset_y%end, &
-                                   -offset_z%beg:p + offset_z%end), &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end), &
             intent(inout) :: q_sf
 
         real(wp) :: top, bottom, slope !< Flux limiter calcs

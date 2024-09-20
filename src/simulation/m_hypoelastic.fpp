@@ -229,7 +229,7 @@ contains
                                                          q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) - &
                                                          q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy(k, l, q) + &
                                                          2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dy(k, l, q) + &
-                                                                                           dv_dx(k, l, q)))
+                                                                                                 dv_dx(k, l, q)))
 
                         rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
                                                         (q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx(k, l, q) + &
@@ -239,8 +239,8 @@ contains
                                                          q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) - &
                                                          q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy(k, l, q) + &
                                                          2._wp*G_K_field(k, l, q)*(dv_dy(k, l, q) - (1._wp/3._wp)* &
-                                                                                 (du_dx(k, l, q) + &
-                                                                                  dv_dy(k, l, q))))
+                                                                                   (du_dx(k, l, q) + &
+                                                                                    dv_dy(k, l, q))))
                     end do
                 end do
             end do
@@ -278,7 +278,7 @@ contains
                                                          q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) - &
                                                          q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz(k, l, q) + &
                                                          2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dz(k, l, q) + &
-                                                                                           dw_dx(k, l, q)))
+                                                                                                 dw_dx(k, l, q)))
 
                         rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
                                                         (q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dx(k, l, q) + &
@@ -291,7 +291,7 @@ contains
                                                          q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) - &
                                                          q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz(k, l, q) + &
                                                          2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(dv_dz(k, l, q) + &
-                                                                                           dw_dy(k, l, q)))
+                                                                                                 dw_dy(k, l, q)))
 
                         rhs_vf(strxe)%sf(k, l, q) = rhs_vf(strxe)%sf(k, l, q) + rho_K_field(k, l, q)* &
                                                     (q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx(k, l, q) + &
@@ -304,9 +304,9 @@ contains
                                                      q_prim_vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) - &
                                                      q_prim_vf(strxe)%sf(k, l, q)*dw_dz(k, l, q) + &
                                                      2._wp*G_K_field(k, l, q)*(dw_dz(k, l, q) - (1._wp/3._wp)* &
-                                                                             (du_dx(k, l, q) + &
-                                                                              dv_dy(k, l, q) + &
-                                                                              dw_dz(k, l, q))))
+                                                                               (du_dx(k, l, q) + &
+                                                                                dv_dy(k, l, q) + &
+                                                                                dw_dz(k, l, q))))
                     end do
                 end do
             end do

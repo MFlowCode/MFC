@@ -488,7 +488,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -519,7 +519,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -540,7 +540,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
                     call s_mpi_abort('File '//trim(file_loc)//'is missing. Exiting...')
@@ -598,7 +598,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -606,7 +606,7 @@ contains
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                         end do
                     end if
                 else
@@ -614,7 +614,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                 end if
 
@@ -692,10 +692,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -704,10 +704,10 @@ contains
                             ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                    'native', mpi_info_int, ierr)
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                         end do
                     end if
                 else
@@ -717,10 +717,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
 
                     end do
                 end if
@@ -778,10 +778,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
 
                     end if
 
@@ -795,10 +795,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = 0
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
-                                           MPI_DOUBLE_PRECISION, status, ierr)
+                                           mpi_p, status, ierr)
                     end if
 
                     do i = 1, Np

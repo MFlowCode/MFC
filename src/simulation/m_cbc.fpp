@@ -483,8 +483,8 @@ contains
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) &
-                                                             - 1d1*ds(2) + 1d1*ds(3) &
-                                                             - 3._wp*ds(4))
+                                                               - 1d1*ds(2) + 1d1*ds(3) &
+                                                               - 3._wp*ds(4))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (3, cbc_loc_in) = -16._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp

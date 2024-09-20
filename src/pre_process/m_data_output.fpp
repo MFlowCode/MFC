@@ -570,7 +570,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -578,7 +578,7 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -587,7 +587,7 @@ contains
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -635,10 +635,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -648,10 +648,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                MPI_DOUBLE_PRECISION, status, ierr)
+                                                mpi_p, status, ierr)
                     end do
                 end if
             else
@@ -662,10 +662,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
                 end do
             end if
 
@@ -712,10 +712,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = 0
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
 
                     call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -731,10 +731,10 @@ contains
                     ! Initial displacement to skip at beginning of file
                     disp = 0
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), &
                                            'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
-                                            MPI_DOUBLE_PRECISION, status, ierr)
+                                            mpi_p, status, ierr)
 
                     call MPI_FILE_CLOSE(ifile, ierr)
                 end if
