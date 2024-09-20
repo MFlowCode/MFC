@@ -122,6 +122,7 @@ MFC can be built with support for various (compile-time) features:
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Builds MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Builds MFC with unified CPU/GPU memory (GH-200 superchip only)  |
+| **Strict**         | `--strict`  | `--no-strict`  | off     | Builds MFC with strict floating point operations                |
 
 _⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
 
