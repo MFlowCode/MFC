@@ -30,6 +30,7 @@ contains
         call s_check_inputs_grid_stretching
         call s_check_inputs_qbmm_and_polydisperse
         call s_check_inputs_perturb_density
+        call s_check_inputs_chemistry
         call s_check_inputs_misc
 
     end subroutine s_check_inputs
@@ -169,6 +170,14 @@ contains
                 "fluid_rho("//trim(iStr)//") must be set if perturb_sph = T")
         end do
     end subroutine s_check_inputs_perturb_density
+
+    subroutine s_check_inputs_chemistry
+
+        if (chemistry) then
+            @:ASSERT(num_species > 0)
+        end if
+
+    end subroutine s_check_inputs_chemistry
 
     !> Checks miscellaneous constraints
         !! (mixlayer_vel_profile and mixlayer_perturb)

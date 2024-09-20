@@ -38,6 +38,8 @@ module m_start_up
 
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
+    use m_chemistry            !< Chemistry module
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_time_steppers        !< Time-stepping algorithms
@@ -145,7 +147,7 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
-            R0ref, &
+            R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
 #:endif
@@ -1048,7 +1050,9 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: pres
 
-        integer :: i, j, k, l
+        integer :: i, j, k, l, c
+
+        real(kind(0d0)), dimension(num_species) :: rhoYks
 
         do j = 0, m
             do k = 0, n
@@ -1062,8 +1066,14 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
+                    if (chemistry) then
+                        do c = 1, num_species
+                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                        end do
+                    end if
+
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1092,13 +1102,13 @@ contains
         integer :: i, j, k, l
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 1) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
             if (cfl_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1d-3*dt_init) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt) call s_mpi_abort("Delta t has become too small")
         end if
 
         if (cfl_dt) then
@@ -1151,6 +1161,11 @@ contains
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+
+        if (chemistry) then
+            call s_chemistry_normalize_cons(q_cons_ts(1)%vf)
+        end if
+
         ! Time-stepping loop controls
 
         t_step = t_step + 1
@@ -1325,6 +1340,8 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
+        if (chemistry) call s_initialize_chemistry_module()
+
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
