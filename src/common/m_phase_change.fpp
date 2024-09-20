@@ -77,15 +77,15 @@ contains
     subroutine s_initialize_phasechange_module
         ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) &
-             + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0d0)*cvs(vp))
+             + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
-        B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0d0)*cvs(vp))
+        B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
         C = (gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
-            /((gs_min(vp) - 1.0d0)*cvs(vp))
+            /((gs_min(vp) - 1.0_wp)*cvs(vp))
 
-        D = ((gs_min(lp) - 1.0d0)*cvs(lp)) &
-            /((gs_min(vp) - 1.0d0)*cvs(vp))
+        D = ((gs_min(lp) - 1.0_wp)*cvs(lp)) &
+            /((gs_min(vp) - 1.0_wp)*cvs(vp))
 
     end subroutine s_initialize_phasechange_module
 
@@ -97,11 +97,11 @@ contains
     subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0d0)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
-        real(kind(0.0d0)) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
-        real(kind(0.0d0)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
-        real(kind(0.0d0)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
-        real(kind(0.0d0)) :: TvF !< total volume fraction
+        real(kind(0.0_wp)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
+        real(kind(0.0_wp)) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
+        real(kind(0.0_wp)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
+        real(kind(0.0_wp)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
+        real(kind(0.0_wp)) :: TvF !< total volume fraction
 
         !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
 
@@ -118,7 +118,7 @@ contains
             do k = 0, n
                 do l = 0, p
 
-                    rho = 0.0d0; TvF = 0.0d0
+                    rho = 0.0_wp; TvF = 0.0_wp
                     !$acc loop seq
                     do i = 1, num_fluids
 
@@ -144,7 +144,7 @@ contains
                     m2 = q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
                     ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
-                    dynE = 0.0d0
+                    dynE = 0.0_wp
                     !$acc loop seq
                     do i = momxb, momxe
 
@@ -177,7 +177,7 @@ contains
                         q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
                         ! tranferring the total mass to vapor
-                        q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
+                        q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         ! calling pT-equilibrium for overheated vapor, which is MFL = 0
                         call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, rM, q_cons_vf, rhoe, TSOV)
@@ -187,7 +187,7 @@ contains
 
                         ! subcooled liquid case
                         ! tranferring the total mass to liquid
-                        q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
+                        q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         ! depleting the mass of vapor
                         q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
@@ -211,7 +211,7 @@ contains
                             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
                             ! correcting the vapor partial density
-                            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
+                            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                         elseif (TSSL < TSatSL) then
 
@@ -222,7 +222,7 @@ contains
                             TS = TSSL
 
                             ! correcting the liquid partial density
-                            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0d0 - mixM)*rM
+                            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
                             ! correcting the vapor partial density
                             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
@@ -247,7 +247,7 @@ contains
 
                     ! entropy
                     sk(1:num_fluids) = cvs(1:num_fluids)*DLOG((TS**gs_min(1:num_fluids)) &
-                                                              /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0d0))) + qvps(1:num_fluids)
+                                                              /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
 
                     ! enthalpy
                     hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &
@@ -266,7 +266,7 @@ contains
                                        *cvs(1:num_fluids)*TS + qvs(1:num_fluids)
 
                     ! calculating volume fractions, internal energies, and total entropy
-                    rhos = 0.0d0
+                    rhos = 0.0_wp
                     !$acc loop seq
                     do i = 1, num_fluids
 
@@ -302,21 +302,21 @@ contains
 
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
-        real(kind(0.0d0)), intent(out) :: pS
-        real(kind(0.0d0)), dimension(num_fluids), intent(out) :: p_infpT
-        real(kind(0.0d0)), intent(in) :: rM
+        real(kind(0.0_wp)), intent(out) :: pS
+        real(kind(0.0_wp)), dimension(num_fluids), intent(out) :: p_infpT
+        real(kind(0.0_wp)), intent(in) :: rM
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0d0)), intent(in) :: rhoe
-        real(kind(0.0d0)), intent(out) :: TS
+        real(kind(0.0_wp)), intent(in) :: rhoe
+        real(kind(0.0_wp)), intent(out) :: TS
 
         integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
-        real(kind(0.0d0)), dimension(num_fluids) :: pk !< individual initial pressures
-        real(kind(0.0d0)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
+        real(kind(0.0_wp)), dimension(num_fluids) :: pk !< individual initial pressures
+        real(kind(0.0_wp)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
 
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0d0; mQ = 0.0d0; p_infpT = ps_inf; 
+        mCP = 0.0_wp; mQ = 0.0_wp; p_infpT = ps_inf; 
         ! Performing tests before initializing the pT-equilibrium
         !$acc loop seq
         do i = 1, num_fluids
@@ -330,16 +330,16 @@ contains
         end do
 
         ! Checking energy constraint
-        if ((rhoe - mQ - minval(p_infpT)) < 0.0d0) then
+        if ((rhoe - mQ - minval(p_infpT)) < 0.0_wp) then
 
             if ((MFL == 0) .or. (MFL == 1)) then
 
                 ! Assigning zero values for mass depletion cases
                 ! pressure
-                pS = 0.0d0
+                pS = 0.0_wp
 
                 ! temperature
-                TS = 0.0d0
+                TS = 0.0_wp
 
                 return
             end if
@@ -348,7 +348,7 @@ contains
 
         ! calculating initial estimate for pressure in the pT-relaxation procedure. I will also use this variable to
         ! iterate over the Newton's solver
-        pO = 0.0d0
+        pO = 0.0_wp
 
         ! Maybe improve this condition afterwards. As long as the initial guess is in between -min(ps_inf)
         ! and infinity, a solution should be able to be found.
@@ -366,23 +366,23 @@ contains
             pO = pS
 
             ! updating functions used in the Newton's solver
-            gpp = 0.0d0; gp = 0.0d0; hp = 0.0d0
+            gpp = 0.0_wp; gp = 0.0_wp; hp = 0.0_wp
             !$acc loop seq
             do i = 1, num_fluids
 
-                gp = gp + (gs_min(i) - 1.0d0)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
+                gp = gp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
                      *(rhoe + pS - mQ)/(mCP*(pS + p_infpT(i)))
 
-                gpp = gpp + (gs_min(i) - 1.0d0)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
+                gpp = gpp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i) &
                       *(p_infpT(i) - rhoe + mQ)/(mCP*(pS + p_infpT(i))**2)
 
             end do
 
-            hp = 1.0d0/(rhoe + pS - mQ) + 1.0d0/(pS + minval(p_infpT))
+            hp = 1.0_wp/(rhoe + pS - mQ) + 1.0_wp/(pS + minval(p_infpT))
 
             ! updating common pressure for the newton solver
-            pS = pO + ((1.0d0 - gp)/gpp)/(1.0d0 - (1.0d0 - gp + DABS(1.0d0 - gp)) &
-                                          /(2.0d0*gpp)*hp)
+            pS = pO + ((1.0_wp - gp)/gpp)/(1.0_wp - (1.0_wp - gp + DABS(1.0_wp - gp)) &
+                                          /(2.0_wp*gpp)*hp)
         end do
 
         ! common temperature
@@ -405,17 +405,17 @@ contains
         !$acc routine seq
 
         integer, intent(in) :: j, k, l
-        real(kind(0.0d0)), intent(inout) :: pS
-        real(kind(0.0d0)), dimension(num_fluids), intent(in) :: p_infpT
-        real(kind(0.0d0)), intent(in) :: rhoe
+        real(kind(0.0_wp)), intent(inout) :: pS
+        real(kind(0.0_wp)), dimension(num_fluids), intent(in) :: p_infpT
+        real(kind(0.0_wp)), intent(in) :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0d0)), intent(inout) :: TS
+        real(kind(0.0_wp)), intent(inout) :: TS
 
-        real(kind(0.0d0)), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
-        real(kind(0.0d0)), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
-        real(kind(0.0d0)), dimension(2) :: R2D, DeltamP !< residual and correction array
-        real(kind(0.0d0)) :: Om ! underrelaxation factor
-        real(kind(0.0d0)) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
+        real(kind(0.0_wp)), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        real(kind(0.0_wp)), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
+        real(kind(0.0_wp)), dimension(2) :: R2D, DeltamP !< residual and correction array
+        real(kind(0.0_wp)) :: Om ! underrelaxation factor
+        real(kind(0.0_wp)) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
 
         !< Generic loop iterators
         integer :: i, ns
@@ -429,10 +429,10 @@ contains
 
         p_infpTg = p_infpT
 
-        if (((pS < 0.0d0) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
+        if (((pS < 0.0_wp) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
                                   + q_cons_vf(vp + contxb - 1)%sf(j, k, l)) > ((rhoe &
                                                                                 - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. &
-            ((pS >= 0.0d0) .and. (pS < 1.0d-1))) then
+            ((pS >= 0.0_wp) .and. (pS < 1.0d-1))) then
 
             ! improve this initial condition
             pS = 1.0d4
@@ -444,8 +444,8 @@ contains
         ! for the residual, and how to do it adequately.
         ! Dummy guess to start the pTg-equilibrium problem.
         ! improve this initial condition
-        R2D(1) = 0.0d0; R2D(2) = 0.0d0
-        DeltamP(1) = 0.0d0; DeltamP(2) = 0.0d0
+        R2D(1) = 0.0_wp; R2D(2) = 0.0_wp
+        DeltamP(1) = 0.0_wp; DeltamP(2) = 0.0_wp
         do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
                    .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) &
                   .or. (ns == 0))
@@ -454,7 +454,7 @@ contains
             ns = ns + 1
 
             ! Auxiliary variables to help in the calculation of the residue
-            mCP = 0.0d0; mCPD = 0.0d0; mCVGP = 0.0d0; mCVGP2 = 0.0d0; mQ = 0.0d0; mQD = 0.0d0
+            mCP = 0.0_wp; mCPD = 0.0_wp; mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mQ = 0.0_wp; mQD = 0.0_wp
             ! Those must be updated through the iterations, as they either depend on
             ! the partial masses for all fluids, or on the equilibrium pressure
             !$acc loop seq
@@ -491,7 +491,7 @@ contains
             call s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 
             ! calculating correction array for Newton's method
-            DeltamP = -1.0d0*matmul(InvJac, R2D)
+            DeltamP = -1.0_wp*matmul(InvJac, R2D)
 
             ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change
             ! liquid
@@ -526,19 +526,19 @@ contains
 
         !> @name variables for the correction of the reacting partial densities
         !> @{
-        real(kind(0.0d0)), intent(out) :: MCT
+        real(kind(0.0_wp)), intent(out) :: MCT
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0d0)), intent(inout) :: rM
+        real(kind(0.0_wp)), intent(inout) :: rM
         integer, intent(in) :: j, k, l
         !> @}
-        if (rM < 0.0d0) then
+        if (rM < 0.0_wp) then
 
-            if ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) >= -1.0d0*mixM) .and. &
-                (q_cons_vf(vp + contxb - 1)%sf(j, k, l) >= -1.0d0*mixM)) then
+            if ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) >= -1.0_wp*mixM) .and. &
+                (q_cons_vf(vp + contxb - 1)%sf(j, k, l) >= -1.0_wp*mixM)) then
 
-                q_cons_vf(lp + contxb - 1)%sf(j, k, l) = 0.0d0
+                q_cons_vf(lp + contxb - 1)%sf(j, k, l) = 0.0_wp
 
-                q_cons_vf(vp + contxb - 1)%sf(j, k, l) = 0.0d0
+                q_cons_vf(vp + contxb - 1)%sf(j, k, l) = 0.0_wp
 
                 rM = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
@@ -551,15 +551,15 @@ contains
         MCT = 2*mixM
 
         ! correcting the partial densities of the reacting fluids. What to do for the nonreacting ones?
-        if (q_cons_vf(lp + contxb - 1)%sf(j, k, l) < 0.0d0) then
+        if (q_cons_vf(lp + contxb - 1)%sf(j, k, l) < 0.0_wp) then
 
             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = MCT*rM
 
-            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0d0 - MCT)*rM
+            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - MCT)*rM
 
-        elseif (q_cons_vf(vp + contxb - 1)%sf(j, k, l) < 0.0d0) then
+        elseif (q_cons_vf(vp + contxb - 1)%sf(j, k, l) < 0.0_wp) then
 
-            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0d0 - MCT)*rM
+            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - MCT)*rM
 
             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = MCT*rM
 
@@ -582,15 +582,15 @@ contains
     subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
         !$acc routine seq
 
-        real(kind(0.0d0)), dimension(2, 2), intent(out) :: InvJac
+        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: InvJac
         integer, intent(in) :: j
-        real(kind(0.0d0)), dimension(2, 2), intent(out) :: Jac
+        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: Jac
         integer, intent(in) :: k, l
-        real(kind(0.0d0)), intent(in) :: mCPD, mCVGP, mCVGP2, pS
+        real(kind(0.0_wp)), intent(in) :: mCPD, mCVGP, mCVGP2, pS
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0d0)), dimension(2, 2), intent(out) :: TJac
+        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: TJac
 
-        real(kind(0.0d0)) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
+        real(kind(0.0_wp)) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
 
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -655,8 +655,8 @@ contains
 
         ! intermediate elements of J^{-1}
         InvJac(1, 1) = Jac(2, 2)
-        InvJac(1, 2) = -1.0d0*Jac(1, 2)
-        InvJac(2, 1) = -1.0d0*Jac(2, 1)
+        InvJac(1, 2) = -1.0_wp*Jac(1, 2)
+        InvJac(2, 1) = -1.0_wp*Jac(2, 1)
         InvJac(2, 2) = Jac(1, 1)
 
         ! elements of J^{T}
@@ -685,12 +685,12 @@ contains
         !$acc routine seq
 
         integer, intent(in) :: j, k, l
-        real(kind(0.0d0)), intent(in) :: mCPD, mCVGP, mQD
+        real(kind(0.0_wp)), intent(in) :: mCPD, mCVGP, mQD
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0d0)), intent(in) :: pS, rhoe
-        real(kind(0.0d0)), dimension(2), intent(out) :: R2D
+        real(kind(0.0_wp)), intent(in) :: pS, rhoe
+        real(kind(0.0_wp)), dimension(2), intent(out) :: R2D
 
-        real(kind(0.0d0)) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
+        real(kind(0.0_wp)) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
 
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -730,19 +730,19 @@ contains
     subroutine s_TSat(pSat, TSat, TSIn)
         !$acc routine seq
 
-        real(kind(0.0d0)), intent(in) :: pSat
-        real(kind(0.0d0)), intent(out) :: TSat
-        real(kind(0.0d0)), intent(in) :: TSIn
+        real(kind(0.0_wp)), intent(in) :: pSat
+        real(kind(0.0_wp)), intent(out) :: TSat
+        real(kind(0.0_wp)), intent(in) :: TSIn
 
-        real(kind(0.0d0)) :: dFdT, FT, Om !< auxiliary variables
+        real(kind(0.0_wp)) :: dFdT, FT, Om !< auxiliary variables
 
         ! Generic loop iterators
         integer :: ns
 
-        if ((pSat == 0.0d0) .and. (TSIn == 0.0d0)) then
+        if ((pSat == 0.0_wp) .and. (TSIn == 0.0_wp)) then
 
             ! assigning Saturation temperature
-            TSat = 0.0d0
+            TSat = 0.0_wp
 
         else
 

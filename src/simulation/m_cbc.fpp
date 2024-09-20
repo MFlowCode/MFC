@@ -449,7 +449,7 @@ contains
         call s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         ! Determining the cell-boundary locations in the s-direction
-        s_cb(0) = 0d0
+        s_cb(0) = 0._wp
 
         do i = 0, buff_size
             s_cb(i + 1) = s_cb(i) + ds(i)
@@ -460,8 +460,8 @@ contains
             if (cbc_dir_in == ${CBC_DIR}$) then
                 if (weno_order == 1) then
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -2d0/(ds(0) + ds(1))
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
                     ! ==================================================================
@@ -469,10 +469,10 @@ contains
                     ! Computing CBC2 Coefficients ======================================
                 elseif (weno_order == 3) then
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -4d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/3d0
-                    fd_coef_${XYZ}$ (2, cbc_loc_in) = fd_coef_${XYZ}$ (0, cbc_loc_in)/3d0
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -6._wp/(3._wp*ds(0) + 2._wp*ds(1) - ds(2))
+                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -4._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
+                    fd_coef_${XYZ}$ (2, cbc_loc_in) = fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
@@ -481,14 +481,14 @@ contains
                     ! Computing CBC4 Coefficients ======================================
                 else
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) &
                                                              - 1d1*ds(2) + 1d1*ds(3) &
-                                                             - 3d0*ds(4))
-                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -48d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (2, cbc_loc_in) = 36d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (3, cbc_loc_in) = -16d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (4, cbc_loc_in) = 3d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
+                                                             - 3._wp*ds(4))
+                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (3, cbc_loc_in) = -16._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (4, cbc_loc_in) = 3._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = &
                         ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
@@ -778,10 +778,10 @@ contains
                             vel(i) = q_prim_rs${XYZ}$_vf(0, k, r, contxe + i)
                         end do
 
-                        vel_K_sum = 0d0
+                        vel_K_sum = 0._wp
                         !$acc loop seq
                         do i = 1, num_dims
-                            vel_K_sum = vel_K_sum + vel(i)**2d0
+                            vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
                         pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
@@ -814,18 +814,18 @@ contains
 
                         !$acc loop seq
                         do i = 1, contxe
-                            dalpha_rho_ds(i) = 0d0
+                            dalpha_rho_ds(i) = 0._wp
                         end do
 
                         !$acc loop seq
                         do i = 1, num_dims
-                            dvel_ds(i) = 0d0
+                            dvel_ds(i) = 0._wp
                         end do
 
-                        dpres_ds = 0d0
+                        dpres_ds = 0._wp
                         !$acc loop seq
                         do i = 1, advxe - E_idx
-                            dadv_ds(i) = 0d0
+                            dadv_ds(i) = 0._wp
                         end do
 
                         !$acc loop seq
@@ -896,12 +896,12 @@ contains
                         !$acc loop seq
                         do i = 1, num_dims
                             dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
-                                                  (L(1) - L(advxe))/(2d0*rho*c) + &
-                                                  (dir_flg(dir_idx(i)) - 1d0)* &
+                                                  (L(1) - L(advxe))/(2._wp*rho*c) + &
+                                                  (dir_flg(dir_idx(i)) - 1._wp)* &
                                                   L(momxb + i - 1)
                         end do
 
-                        vel_dv_dt_sum = 0d0
+                        vel_dv_dt_sum = 0._wp
                         !$acc loop seq
                         do i = 1, num_dims
                             vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
@@ -920,7 +920,7 @@ contains
                             end do
                         end if
 
-                        drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0; dqv_dt = 0d0
+                        drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
                         if (model_eqns == 1) then
                             drho_dt = dalpha_rho_dt(1)
@@ -962,14 +962,14 @@ contains
                         if (riemann_solver == 1) then
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf(-1, k, r, i) = 0d0
+                                flux_rs${XYZ}$_vf(-1, k, r, i) = 0._wp
                             end do
 
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_src_rs${XYZ}$_vf(-1, k, r, i) = &
-                                    1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                    *sign(1d0, vel(dir_idx(1))) &
+                                    1._wp/max(abs(vel(dir_idx(1))), sgm_eps) &
+                                    *sign(1._wp, vel(dir_idx(1))) &
                                     *(flux_rs${XYZ}$_vf(0, k, r, i) &
                                       + vel(dir_idx(1)) &
                                       *flux_src_rs${XYZ}$_vf(0, k, r, i) &
@@ -1039,13 +1039,13 @@ contains
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
+            dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
         elseif (cbc_dir == 2) then
             is1%beg = 0; is1%end = buff_size; is2 = ix; is3 = iz
-            dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
+            dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
         else
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
+            dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
         dj = max(0, cbc_loc)
@@ -1073,7 +1073,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsx_vf(j, k, r, momxb) = &
                             q_prim_vf(momxb)%sf(dj*(m - 2*j) + j, k, r)* &
-                            sign(1d0, -real(cbc_loc, wp))
+                            sign(1._wp, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1085,7 +1085,7 @@ contains
                         do j = -1, buff_size
                             flux_rsx_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1120,7 +1120,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsx_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1149,7 +1149,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsy_vf(j, k, r, momxb + 1) = &
                             q_prim_vf(momxb + 1)%sf(k, dj*(n - 2*j) + j, r)* &
-                            sign(1d0, -real(cbc_loc, wp))
+                            sign(1._wp, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1161,7 +1161,7 @@ contains
                         do j = -1, buff_size
                             flux_rsy_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1196,7 +1196,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsy_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1225,7 +1225,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsz_vf(j, k, r, momxe) = &
                             q_prim_vf(momxe)%sf(r, k, dj*(p - 2*j) + j)* &
-                            sign(1d0, -real(cbc_loc, wp))
+                            sign(1._wp, -real(cbc_loc, wp))
                     end do
                 end do
             end do
@@ -1237,7 +1237,7 @@ contains
                         do j = -1, buff_size
                             flux_rsz_vf(j, k, r, i) = &
                                 flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1272,7 +1272,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsz_vf(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1322,7 +1322,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_rsx_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1356,7 +1356,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_src_rsx_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1373,7 +1373,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_rsy_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1408,7 +1408,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_src_rsy_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1426,7 +1426,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_rsz_vf(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do
@@ -1461,7 +1461,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_src_rsz_vf(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, wp))
+                                sign(1._wp, -real(cbc_loc, wp))
                         end do
                     end do
                 end do

@@ -54,7 +54,7 @@ program p_main
     else
         t_step = t_step_start
         if (t_step == 0) then
-            mytime = 0d0
+            mytime = 0._wp
         else
             mytime = t_step*dt
         end if

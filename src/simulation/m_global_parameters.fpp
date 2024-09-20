@@ -563,8 +563,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -576,9 +576,9 @@ contains
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%mul0 = dflt_real
             fluid_pp(i)%ss = dflt_real
@@ -587,7 +587,7 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%G = 0._wp
         end do
 
         ! Tait EOS
@@ -617,7 +617,7 @@ contains
         adv_n = .false.
         adap_dt = .false.
 
-        pi_fac = 1d0
+        pi_fac = 1._wp
 
         ! User inputs for qbmm for simulation code
         qbmm = .false.
@@ -792,9 +792,9 @@ contains
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
                     if (num_fluids == 1) then
-                        gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids + 1)%gamma + 1._wp
                     else
-                        gam = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                        gam = 1._wp/fluid_pp(num_fluids)%gamma + 1._wp
                     end if
 
                     if (qbmm) then
@@ -826,11 +826,11 @@ contains
                     end if
 
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 1d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 1._wp
                     else if (nb > 1) then
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                         !R0 and weight initialized in s_simpson
                     else
                         stop 'Invalid value of nb'
@@ -839,8 +839,8 @@ contains
                     !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                     if (.not. qbmm) then
                         if (polytropic) then
-                            rhoref = 1.d0
-                            pref = 1.d0
+                            rhoref = 1._wp
+                            pref = 1._wp
                         end if
                     end if
 
@@ -853,9 +853,9 @@ contains
                             if ((f_is_default(Web))) then
                                 pb0 = pref
                                 pb0 = pb0/pref
-                                pref = 1d0
+                                pref = 1._wp
                             end if
-                            rhoref = 1d0
+                            rhoref = 1._wp
                         end if
                     end if
                 end if
@@ -929,18 +929,18 @@ contains
                         end if
                     end do
                     if (nb == 1) then
-                        weight(:) = 1d0
-                        R0(:) = 1d0
-                        V0(:) = 0d0
+                        weight(:) = 1._wp
+                        R0(:) = 1._wp
+                        V0(:) = 0._wp
                     else if (nb > 1) then
-                        V0(:) = 1d0
+                        V0(:) = 1._wp
                     else
                         stop 'Invalid value of nb'
                     end if
 
                     if (polytropic) then
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
             end if
@@ -1003,7 +1003,7 @@ contains
         ! using the arithmetic mean of left and right, WENO-reconstructed,
         ! cell-boundary values or otherwise, the unaltered left and right,
         ! WENO-reconstructed, cell-boundary values
-        wa_flg = 0d0; if (weno_avg) wa_flg = 1d0
+        wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         !$acc update device(wa_flg)
 
         ! Resort to default WENO-JS if no other WENO scheme is selected

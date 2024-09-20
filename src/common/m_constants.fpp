@@ -11,7 +11,7 @@ module m_constants
     real(wp), parameter :: dflt_real = -1d6                !< Default real value
     real(wp), parameter :: sgm_eps = 1d-16               !< Segmentation tolerance
     real(wp), parameter :: small_alf = 1d-11                !< Small alf tolerance
-    real(wp), parameter :: pi = 3.141592653589793d0 !< Pi
+    real(wp), parameter :: pi = 3.141592653589793_wp !< Pi
     real(wp), parameter :: verysmall = 1.d-12              !< Very small number
 
     integer, parameter :: num_stcls_min = 5    !< Minimum # of stencils
@@ -25,7 +25,7 @@ module m_constants
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     real(wp), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
-    real(wp), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
-    real(wp), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
+    real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial
+    real(wp), parameter :: dflt_vcfl_dt = 100._wp !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
 
 end module m_constants

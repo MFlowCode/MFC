@@ -153,7 +153,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
-                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0d0, 0d0)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._wp, 0._wp)
                 end do
             end do
         end do
@@ -217,7 +217,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
-                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0d0, 0d0)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._wp, 0._wp)
                     end do
                 end do
             end do
@@ -240,7 +240,7 @@ contains
 #endif
             !$acc end host_data
 
-            Nfq = min(floor(2d0*real(i, wp)*pi), cmplx_size)
+            Nfq = min(floor(2._wp*real(i, wp)*pi), cmplx_size)
             !$acc update device(Nfq)
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -277,7 +277,7 @@ contains
         Nfq = 3
         do j = 0, m
             do k = 1, sys_size
-                data_fltr_cmplx(:) = (0d0, 0d0)
+                data_fltr_cmplx(:) = (0._wp, 0._wp)
                 data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0, 0:p)
                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
@@ -289,10 +289,10 @@ contains
 
         ! Apply Fourier filter to additional rings
         do i = 1, fourier_rings
-            Nfq = min(floor(2d0*real(i, wp)*pi), cmplx_size)
+            Nfq = min(floor(2._wp*real(i, wp)*pi), cmplx_size)
             do j = 0, m
                 do k = 1, sys_size
-                    data_fltr_cmplx(:) = (0d0, 0d0)
+                    data_fltr_cmplx(:) = (0._wp, 0._wp)
                     data_real(1:p + 1) = q_cons_vf(k)%sf(j, i, 0:p)
                     call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                     data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)

@@ -91,7 +91,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    rhoM(j, k, l) = 0d0
+                    rhoM(j, k, l) = 0._wp
                     do i = 1, num_fluids
                         rhoM(j, k, l) = rhoM(j, k, l) + &
                                         q_cons_vf(contxb + i - 1)%sf(j, k, l)
@@ -122,7 +122,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        rhs_vf(i)%sf(j, k, l) = 0d0
+                        rhs_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do

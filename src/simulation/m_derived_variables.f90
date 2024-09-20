@@ -148,12 +148,12 @@ contains
                 do j = 0, n
                     do i = 0, m
                         if (p > 0) then
-                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2d0 + &
-                                                      y_accel(i, j, k)**2d0 + &
-                                                      z_accel(i, j, k)**2d0)
+                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
+                                                      y_accel(i, j, k)**2._wp + &
+                                                      z_accel(i, j, k)**2._wp)
                         elseif (n > 0) then
-                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2d0 + &
-                                                      y_accel(i, j, k)**2d0)
+                            accel_mag(i, j, k) = sqrt(x_accel(i, j, k)**2._wp + &
+                                                      y_accel(i, j, k)**2._wp)
                         else
                             accel_mag(i, j, k) = x_accel(i, j, k)
                         end if
@@ -198,10 +198,10 @@ contains
                 do k = 0, n
                     do j = 0, m
 
-                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%beg)%sf(j, k, l) &
-                                         - 18d0*q_prim_vf1(mom_idx%beg)%sf(j, k, l) &
-                                         + 9d0*q_prim_vf2(mom_idx%beg)%sf(j, k, l) &
-                                         - 2d0*q_prim_vf3(mom_idx%beg)%sf(j, k, l))/(6d0*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%beg)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(mom_idx%beg)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(mom_idx%beg)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(mom_idx%beg)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (n == 0) then ! 1D simulation
@@ -244,10 +244,10 @@ contains
                 do k = 0, n
                     do j = 0, m
 
-                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l) &
-                                         - 18d0*q_prim_vf1(mom_idx%beg + 1)%sf(j, k, l) &
-                                         + 9d0*q_prim_vf2(mom_idx%beg + 1)%sf(j, k, l) &
-                                         - 2d0*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l))/(6d0*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%beg + 1)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(mom_idx%beg + 1)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(mom_idx%beg + 1)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(mom_idx%beg + 1)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (p == 0) then ! 2D simulation
@@ -265,7 +265,7 @@ contains
                                                     q_prim_vf0(mom_idx%beg + 1)%sf(j, r + k, l) &
                                                     + q_prim_vf0(mom_idx%end)%sf(j, k, l)*fd_coeff_z(r, l)* &
                                                     q_prim_vf0(mom_idx%beg + 1)%sf(j, k, r + l)/y_cc(k) &
-                                                    - (q_prim_vf0(mom_idx%end)%sf(j, k, l)**2d0)/y_cc(k)
+                                                    - (q_prim_vf0(mom_idx%end)%sf(j, k, l)**2._wp)/y_cc(k)
                                 else
                                     q_sf(j, k, l) = q_sf(j, k, l) &
                                                     + q_prim_vf0(mom_idx%beg)%sf(j, k, l)*fd_coeff_x(r, j)* &
@@ -286,10 +286,10 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_sf(j, k, l) = (11d0*q_prim_vf0(mom_idx%end)%sf(j, k, l) &
-                                         - 18d0*q_prim_vf1(mom_idx%end)%sf(j, k, l) &
-                                         + 9d0*q_prim_vf2(mom_idx%end)%sf(j, k, l) &
-                                         - 2d0*q_prim_vf3(mom_idx%end)%sf(j, k, l))/(6d0*dt)
+                        q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%end)%sf(j, k, l) &
+                                         - 18._wp*q_prim_vf1(mom_idx%end)%sf(j, k, l) &
+                                         + 9._wp*q_prim_vf2(mom_idx%end)%sf(j, k, l) &
+                                         - 2._wp*q_prim_vf3(mom_idx%end)%sf(j, k, l))/(6._wp*dt)
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
