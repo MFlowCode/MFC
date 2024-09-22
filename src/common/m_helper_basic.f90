@@ -22,7 +22,7 @@ contains
     !> This procedure checks if two floating point numbers of wp are within tolerance.
     !! @param a First number.
     !! @param b Second number.
-    !! @param tol_input Relative error (default = 1d-6).
+    !! @param tol_input Relative error (default = 1e-6).
     !! @return Result of the comparison.
     logical function f_approx_equal(a, b, tol_input) result(res)
         !$acc routine seq
@@ -35,7 +35,7 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1d-6
+            tol = 1e-6
         end if
 
         if (a == b) then

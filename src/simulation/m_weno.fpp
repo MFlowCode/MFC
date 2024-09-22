@@ -909,8 +909,8 @@ contains
         !!      stencil.
         !!  @param i Equation number
         !!  @param j First-coordinate cell index
-        !!  @param k Second-coordinate cell index
-        !!  @param l Third-coordinate cell index
+        !!  @param k Secone-coordinate cell index
+        !!  @param l Thire-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
@@ -981,11 +981,11 @@ contains
 
                         vL_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j - 1, k, l, i) &
-                                 - d_MD)*5d-1
+                                 - d_MD)*5e-1
 
                         vL_LC = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*5d-1 + beta_mp*d_LC
+                                   - v_rs_ws(j, k, l, i))*5e-1 + beta_mp*d_LC
 
                         vL_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j - 1, k, l, i), &
@@ -1002,8 +1002,8 @@ contains
                                          vL_LC))
 
                         vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
-                                               + (sign(5d-1, vL_min - vL_rs_vf(j, k, l, i)) &
-                                                  + sign(5d-1, vL_max - vL_rs_vf(j, k, l, i))) &
+                                               + (sign(5e-1, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                  + sign(5e-1, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
                         ! END: Left Monotonicity Preserving Bound ==========================
@@ -1040,11 +1040,11 @@ contains
 
                         vR_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j + 1, k, l, i) &
-                                 - d_MD)*5d-1
+                                 - d_MD)*5e-1
 
                         vR_LC = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
+                                   - v_rs_ws(j - 1, k, l, i))*5e-1 + beta_mp*d_LC
 
                         vR_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j + 1, k, l, i), &
@@ -1061,8 +1061,8 @@ contains
                                          vR_LC))
 
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
-                                               + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
-                                                  + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
+                                               + (sign(5e-1, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                  + sign(5e-1, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
                         ! END: Right Monotonicity Preserving Bound =========================

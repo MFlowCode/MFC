@@ -163,8 +163,8 @@ contains
 
             do 200 j = k, l
                 if (j == i) go to 200
-                c = c + dabs(ar(j, i)) + dabs(ai(j, i))
-                r = r + dabs(ar(i, j)) + dabs(ai(i, j))
+                c = c + abs(ar(j, i)) + abs(ai(j, i))
+                r = r + abs(ar(i, j)) + abs(ai(i, j))
 200         end do
 !     .......... guard against zero c or r due to underflow ..........
             if (c == 0.0_wp .or. r == 0.0_wp) go to 270
@@ -243,7 +243,7 @@ contains
             scale = 0.0_wp
 !     .......... scale column (algol tol then not needed) ..........
             do 90 i = ml, igh
-                scale = scale + dabs(ar(i, ml - 1)) + dabs(ai(i, ml - 1))
+                scale = scale + abs(ar(i, ml - 1)) + abs(ai(i, ml - 1))
 90          end do
             if (scale == 0._wp) go to 180
             mp = ml + igh
@@ -255,7 +255,7 @@ contains
                 h = h + ortr(i)*ortr(i) + orti(i)*orti(i)
 100         end do
 !
-            g = dsqrt(h)
+            g = sqrt(h)
             call pythag(ortr(ml), orti(ml), f)
             if (f == 0._wp) go to 103
             h = h + f*g
@@ -375,8 +375,8 @@ contains
 !     .......... for i=igh-1 step -1 until low+1 do -- ..........
 105     do 140 ii = 1, iend
             i = igh - ii
-            if (dabs(ortr(i)) == 0._wp .and. dabs(orti(i)) == 0._wp) go to 140
-            if (dabs(hr(i, i - 1)) == 0._wp .and. dabs(hi(i, i - 1)) == 0._wp) go to 140
+            if (abs(ortr(i)) == 0._wp .and. abs(orti(i)) == 0._wp) go to 140
+            if (abs(hr(i, i - 1)) == 0._wp .and. abs(hi(i, i - 1)) == 0._wp) go to 140
 !     .......... norm below is negative of h formed in corth ..........
             norm = hr(i, i - 1)*ortr(i) + hi(i, i - 1)*orti(i)
             ip1 = i + 1
@@ -411,7 +411,7 @@ contains
 !
         do 170 i = l, igh
             ll = min0(i + 1, igh)
-            if (dabs(hi(i, i - 1)) == 0._wp) go to 170
+            if (abs(hi(i, i - 1)) == 0._wp) go to 170
             call pythag(hr(i, i - 1), hi(i, i - 1), norm)
             yr = hr(i, i - 1)/norm
             yi = hi(i, i - 1)/norm
@@ -456,9 +456,9 @@ contains
 240     do 260 ll = low, en
             l = en + low - ll
             if (l == low) go to 300
-            tst1 = dabs(hr(l - 1, l - 1)) + dabs(hi(l - 1, l - 1)) &
-                   + dabs(hr(l, l)) + dabs(hi(l, l))
-            tst2 = tst1 + dabs(hr(l, l - 1))
+            tst1 = abs(hr(l - 1, l - 1)) + abs(hi(l - 1, l - 1)) &
+                   + abs(hr(l, l)) + abs(hi(l, l))
+            tst2 = tst1 + abs(hr(l, l - 1))
             if (tst2 == tst1) go to 300
 260     end do
 !     .......... form shift ..........
@@ -481,7 +481,7 @@ contains
         si = si - xxi
         go to 340
 !     .......... form exceptional shift ..........
-320     sr = dabs(hr(en, enm1)) + dabs(hr(enm1, en - 2))
+320     sr = abs(hr(en, enm1)) + abs(hr(enm1, en - 2))
         si = 0.0_wp
 !
 340     do 360 i = low, en
@@ -523,7 +523,7 @@ contains
 500     end do
 !
         si = hi(en, en)
-        if (dabs(si) == 0._wp) go to 540
+        if (abs(si) == 0._wp) go to 540
         call pythag(hr(en, en), si, norm)
         sr = hr(en, en)/norm
         si = si/norm
@@ -568,7 +568,7 @@ contains
 590         end do
 600     end do
 !
-        if (dabs(si) == 0._wp) go to 240
+        if (abs(si) == 0._wp) go to 240
 !
         do 630 i = 1, en
             yr = hr(i, en)
@@ -598,7 +598,7 @@ contains
 !
         do i = 1, nl
             do j = i, nl
-                tr = dabs(hr(i, j)) + dabs(hi(i, j))
+                tr = abs(hr(i, j)) + abs(hi(i, j))
                 if (tr > norm) norm = tr
             end do
         end do
@@ -635,7 +635,7 @@ contains
 765             continue
                 call cdiv(zzr, zzi, yr, yi, hr(i, en), hi(i, en))
 !     .......... overflow control ..........
-                tr = dabs(hr(i, en)) + dabs(hi(i, en))
+                tr = abs(hr(i, en)) + abs(hi(i, en))
                 if (tr == 0.0_wp) go to 780
                 tst1 = tr
                 tst2 = tst1 + 1.0_wp/tst1
@@ -709,12 +709,12 @@ contains
         !!           transformed in their first ml columns
     subroutine cbabk2(nm, nl, low, igh, scale, ml, zr, zi)
         integer, intent(in) :: nm, nl, low, igh
-        double precision, intent(in) :: scale(nl)
+        real(wp), intent(in) :: scale(nl)
         integer, intent(in) :: ml
-        double precision, intent(inout) :: zr(nm, ml), zi(nm, ml)
+        real(wp), intent(inout) :: zr(nm, ml), zi(nm, ml)
 
         integer :: i, j, k, ii
-        double precision :: s
+        real(wp) :: s
 
         if (ml == 0) go to 200
         if (igh == low) go to 120
@@ -757,14 +757,14 @@ contains
         real(wp), intent(in) :: xr, xi
         real(wp), intent(out) :: yr, yi
 !
-!     (yr,yi) = complex dsqrt(xr,xi)
+!     (yr,yi) = complex sqrt(xr,xi)
 !     branch chosen so that yr .ge. 0.0 and sign(yi) .eq. sign(xi)
 !
         real(wp) :: s, tr, ti, c
         tr = xr
         ti = xi
         call pythag(tr, ti, c)
-        s = dsqrt(0.5_wp*(c + dabs(tr)))
+        s = sqrt(0.5_wp*(c + abs(tr)))
         if (tr >= 0.0_wp) yr = s
         if (ti < 0.0_wp) s = -s
         if (tr <= 0.0_wp) yi = s
@@ -786,7 +786,7 @@ contains
         ! cr = (ar*br + ai*bi) / (br**2._wp + bi**2._wp)
         ! ci = (ai*br - ar*bi) / (br**2._wp + bi**2._wp)
 
-        s = dabs(br) + dabs(bi)
+        s = abs(br) + abs(bi)
         ars = ar/s
         ais = ai/s
         brs = br/s
@@ -801,12 +801,12 @@ contains
         real(wp), intent(in) :: a, b
         real(wp), intent(out) :: c
 !
-!     finds dsqrt(a**2+b**2) without overflow or destructive underflow
+!     finds sqrt(a**2+b**2) without overflow or destructive underflow
 !
         real(wp) :: p, r, s, t, u
-        p = dmax1(dabs(a), dabs(b))
+        p = dmax1(abs(a), abs(b))
         if (p == 0.0_wp) go to 20
-        r = (dmin1(dabs(a), dabs(b))/p)**2
+        r = (dmin1(abs(a), abs(b))/p)**2
 10      continue
         t = 4.0_wp + r
         if (t == 4.0_wp) go to 20

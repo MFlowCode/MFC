@@ -68,7 +68,7 @@ contains
         real(wp) :: nR3
 
         nR3 = dot_product(weights, nRtmp**3._wp)
-        ntmp = DSQRT((4._wp*pi/3._wp)*nR3/vftmp)
+        ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)
         !ntmp = (3._wp/(4._wp*pi))*0.00001
 
         !print *, "nbub", ntmp
@@ -153,8 +153,8 @@ contains
         if (thermal == 2) gamma_m = 1._wp
 
         temp = 293.15_wp
-        D_m = 0.242d-4
-        uu = DSQRT(pl0/rhol0)
+        D_m = 0.242e-4
+        uu = sqrt(pl0/rhol0)
 
         omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
 
@@ -163,10 +163,10 @@ contains
         R_n = Ru/M_n
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1._wp + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
-                 /(DSQRT(8._wp)*DSQRT(1._wp + M_v/M_n))
-        phi_nv = (1._wp + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
-                 /(DSQRT(8._wp)*DSQRT(1._wp + M_n/M_v))
+        phi_vn = (1._wp + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_v/M_n))
+        phi_nv = (1._wp + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_n/M_v))
         ! internal bubble pressure
         pb0 = pl0 + 2._wp*ss/(R0ref*R0)
 
@@ -208,7 +208,7 @@ contains
         !end if
 
         ! natural frequencies
-        omegaN = DSQRT(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
+        omegaN = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
@@ -273,30 +273,30 @@ contains
         !R0mx = 150.D0
 
         sd = poly_sigma
-        R0mn = 0.8_wp*DEXP(-2.8_wp*sd)
-        R0mx = 0.2_wp*DEXP(9.5_wp*sd) + 1._wp
+        R0mn = 0.8_wp*exp(-2.8_wp*sd)
+        R0mx = 0.2_wp*exp(9.5_wp*sd) + 1._wp
 
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
-            R0(ir) = DEXP(phi(ir))
+            phi(ir) = log(R0mn) &
+                      + dble(ir - 1)*log(R0mx/R0mn)/dble(nb - 1)
+            R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
             ! Gaussian
-            tmp = DEXP(-0.5_wp*(phi(ir)/sd)**2)/DSQRT(2._wp*pi)/sd
+            tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
                 weight(ir) = tmp*4._wp*dphi/3._wp
             else
                 weight(ir) = tmp*2._wp*dphi/3._wp
             end if
         end do
-        tmp = DEXP(-0.5_wp*(phi(1)/sd)**2)/DSQRT(2._wp*pi)/sd
+        tmp = exp(-0.5_wp*(phi(1)/sd)**2)/sqrt(2._wp*pi)/sd
         weight(1) = tmp*dphi/3._wp
-        tmp = DEXP(-0.5_wp*(phi(nb)/sd)**2)/DSQRT(2._wp*pi)/sd
+        tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
         weight(nb) = tmp*dphi/3._wp
     end subroutine s_simpson
 

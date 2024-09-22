@@ -197,7 +197,7 @@ contains
         #:endif
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1e-16) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
@@ -216,7 +216,7 @@ contains
         real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
         p0 = 101325
-        pres_mag = 1d-1
+        pres_mag = 1e-1
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
         B_tait = fluid_pp(1)%pi_inf
@@ -264,7 +264,7 @@ contains
             velH = 0._wp
         else
             velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
-            velH = dsqrt(velH)
+            velH = sqrt(velH)
             velH = velH*deno
         end if
 
@@ -439,10 +439,10 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2._wp)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2._wp)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2._wp)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
@@ -604,10 +604,10 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = dexp((sigR**2)/2._wp)*muR
+                        q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = dexp((sigR**2)*2._wp)*(muR**2)
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = dexp((sigR**2)/2._wp)*muR*muV
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
                 else
@@ -669,7 +669,7 @@ contains
         end if
 
         ! Updating the patch identities bookkeeping variable
-        if (1._wp - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
+        if (1._wp - eta < 1e-16) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables
 

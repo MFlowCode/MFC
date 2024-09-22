@@ -17,7 +17,7 @@ module m_time_steppers
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
+    use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
     use m_data_output          !< Run-time info & solution data output procedures
 

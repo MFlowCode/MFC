@@ -462,9 +462,9 @@ contains
                                     end if
 
                                     if (q <= 2) then
-                                        AX = R - dsqrt(var)
+                                        AX = R - sqrt(var)
                                     else
-                                        AX = R + dsqrt(var)
+                                        AX = R + sqrt(var)
                                     end if
 
                                     nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -475,15 +475,15 @@ contains
                                                             (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
                                     if (q <= 2) then
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                     else
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     end if
 
@@ -546,9 +546,9 @@ contains
                                     end if
 
                                     if (q <= 2) then
-                                        AX = R - dsqrt(var)
+                                        AX = R - sqrt(var)
                                     else
-                                        AX = R + dsqrt(var)
+                                        AX = R + sqrt(var)
                                     end if
 
                                     nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -559,15 +559,15 @@ contains
                                                             (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
                                     if (q <= 2) then
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                     else
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                 (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     end if
 
@@ -603,9 +603,9 @@ contains
                                         end if
 
                                         if (q <= 2) then
-                                            AX = R - dsqrt(var)
+                                            AX = R - sqrt(var)
                                         else
-                                            AX = R + dsqrt(var)
+                                            AX = R + sqrt(var)
                                         end if
 
                                         nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
@@ -616,15 +616,15 @@ contains
                                                                 (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
                                         if (q <= 2) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                         else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
                                     end do
@@ -654,9 +654,9 @@ contains
                                         end if
 
                                         if (q <= 2) then
-                                            AX = R - dsqrt(var)
+                                            AX = R - sqrt(var)
                                         else
-                                            AX = R + dsqrt(var)
+                                            AX = R + sqrt(var)
                                         end if
 
                                         nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -667,15 +667,15 @@ contains
                                                                 (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
                                         if (q <= 2) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                         else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*dsqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
 
@@ -869,7 +869,7 @@ contains
                         c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
 
                         if (c > 0._wp) then
-                            c = DSQRT(c)
+                            c = sqrt(c)
                         else
                             c = sgm_eps
                         end if
@@ -977,16 +977,16 @@ contains
                                     drdt = msum(2)
                                     if (moms(4) - moms(2)**2._wp > 0._wp) then
                                         if (j == 1 .or. j == 2) then
-                                            drdt2 = -1._wp/(2._wp*dsqrt(moms(4) - moms(2)**2._wp))
+                                            drdt2 = -1._wp/(2._wp*sqrt(moms(4) - moms(2)**2._wp))
                                         else
-                                            drdt2 = 1._wp/(2._wp*dsqrt(moms(4) - moms(2)**2._wp))
+                                            drdt2 = 1._wp/(2._wp*sqrt(moms(4) - moms(2)**2._wp))
                                         end if
                                     else
                                         ! Edge case where variance < 0
                                         if (j == 1 .or. j == 2) then
-                                            drdt2 = -1._wp/(2._wp*dsqrt(verysmall))
+                                            drdt2 = -1._wp/(2._wp*sqrt(verysmall))
                                         else
-                                            drdt2 = 1._wp/(2._wp*dsqrt(verysmall))
+                                            drdt2 = 1._wp/(2._wp*sqrt(verysmall))
                                         end if
                                     end if
 
@@ -1006,7 +1006,7 @@ contains
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp)
                         momsp(2)%sf(id1, id2, id3) = 4._wp*pi*nbub*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp)
                         momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 2._wp, 0._wp)
-                        if (abs(gam - 1._wp) <= 1.d-4) then
+                        if (abs(gam - 1._wp) <= 1.e-4) then
                             ! Gam \approx 1, don't risk imaginary quadrature
                             momsp(4)%sf(id1, id2, id3) = 1._wp
                         else
@@ -1129,8 +1129,8 @@ contains
         frho(1) = fmom(1)/2._wp; 
         frho(2) = fmom(1)/2._wp; 
         c2 = maxval((/c2, verysmall/))
-        fup(1) = bu - DSQRT(c2)
-        fup(2) = bu + DSQRT(c2)
+        fup(1) = bu - sqrt(c2)
+        fup(2) = bu + sqrt(c2)
 
     end subroutine s_hyqmom
 

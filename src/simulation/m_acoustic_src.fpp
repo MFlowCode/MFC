@@ -250,7 +250,7 @@ contains
                 end if
 
                 small_gamma = 1._wp/small_gamma + 1._wp
-                c = dsqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
+                c = sqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
 
                 ! Wavelength to frequency conversion
                 if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
@@ -368,12 +368,12 @@ contains
             end if
 
         elseif (pulse(ai) == 2) then ! Gaussian pulse
-            source = mag(ai)*dexp(-0.5_wp*((sim_time - delay(ai))**2._wp)/(gauss_sigma_time_local**2._wp))
+            source = mag(ai)*exp(-0.5_wp*((sim_time - delay(ai))**2._wp)/(gauss_sigma_time_local**2._wp))
 
             if (term_index == mass_label) then
                 source = source/c - &
-                         foc_length_factor*mag(ai)*dsqrt(pi/2)*gauss_sigma_time_local* &
-                         (erf((sim_time - delay(ai))/(dsqrt(2._wp)*gauss_sigma_time_local)) + 1)
+                         foc_length_factor*mag(ai)*sqrt(pi/2)*gauss_sigma_time_local* &
+                         (erf((sim_time - delay(ai))/(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
             end if
 
         elseif (pulse(ai) == 3) then ! Square wave
@@ -384,7 +384,7 @@ contains
             source = mag(ai)*sign(1._wp, sine_wave)
 
             ! Prevent max-norm differences due to compilers to pass CI
-            if (abs(sine_wave) < 1d-2) then
+            if (abs(sine_wave) < 1e-2) then
                 source = mag(ai)*sine_wave*1d2
             end if
 
@@ -397,7 +397,7 @@ contains
         integer :: count
         integer :: dim
         real(wp) :: source_spatial, angle, xyz_to_r_ratios(3)
-        real(wp), parameter :: threshold = 1d-10
+        real(wp), parameter :: threshold = 1e-10
 
         if (n == 0) then
             dim = 1
@@ -537,14 +537,14 @@ contains
         source = 0._wp
 
         if (support(ai) == 1) then ! 1D
-            source = 1._wp/(dsqrt(2._wp*pi)*sig/2._wp)*dexp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
+            source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
 
         elseif (support(ai) == 2 .or. support(ai) == 3) then ! 2D or 3D
             ! If we let unit vector e = (cos(dir), sin(dir)),
             dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai)) ! dot(r,e)
             if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) then ! |r - dist*e| < length/2
                 if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then ! additional height constraint for 3D
-                    source = 1._wp/(dsqrt(2._wp*pi)*sig/2._wp)*dexp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
+                    source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 end if
             end if
         end if
@@ -573,20 +573,20 @@ contains
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
             if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(ai)) then
-                dist = foc_length(ai) - dsqrt(r(2)**2._wp + (foc_length(ai) - r(1))**2._wp)
-                source = 1._wp/(dsqrt(2._wp*pi)*sig/2._wp)*dexp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
+                dist = foc_length(ai) - sqrt(r(2)**2._wp + (foc_length(ai) - r(1))**2._wp)
+                source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 angle = -atan(r(2)/(foc_length(ai) - r(1)))
             end if
 
         elseif (support(ai) == 7) then ! 3D
-            current_angle = -atan(dsqrt(r(2)**2 + r(3)**2)/(foc_length(ai) - r(1)))
+            current_angle = -atan(sqrt(r(2)**2 + r(3)**2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
             if (abs(current_angle) < angle_half_aperture .and. r(1) < foc_length(ai)) then
-                dist = foc_length(ai) - dsqrt(r(2)**2._wp + r(3)**2._wp + (foc_length(ai) - r(1))**2._wp)
-                source = 1._wp/(dsqrt(2._wp*pi)*sig/2._wp)*dexp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
+                dist = foc_length(ai) - sqrt(r(2)**2._wp + r(3)**2._wp + (foc_length(ai) - r(1))**2._wp)
+                source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
 
-                norm = dsqrt(r(2)**2._wp + r(3)**2._wp + (foc_length(ai) - r(1))**2._wp)
+                norm = sqrt(r(2)**2._wp + r(3)**2._wp + (foc_length(ai) - r(1))**2._wp)
                 xyz_to_r_ratios(1) = -(r(1) - foc_length(ai))/norm
                 xyz_to_r_ratios(2) = -r(2)/norm
                 xyz_to_r_ratios(3) = -r(3)/norm
@@ -629,14 +629,14 @@ contains
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
             angle_per_elem = (2._wp*angle_half_aperture - (num_elements(ai) - 1._wp)*element_spacing_angle(ai))/num_elements(ai)
-            dist = foc_length(ai) - dsqrt(r(2)**2._wp + (foc_length(ai) - r(1))**2._wp)
+            dist = foc_length(ai) - sqrt(r(2)**2._wp + (foc_length(ai) - r(1))**2._wp)
 
             do elem = elem_min, elem_max
                 angle_max = angle_half_aperture - (element_spacing_angle(ai) + angle_per_elem)*(elem - 1._wp)
                 angle_min = angle_max - angle_per_elem
 
                 if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(ai)) then
-                    source = dexp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(dsqrt(2._wp*pi)*sig/2._wp)
+                    source = exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(sqrt(2._wp*pi)*sig/2._wp)
                     angle = current_angle
                     exit ! Assume elements don't overlap
                 end if
@@ -652,7 +652,7 @@ contains
                 angle_elem = 2._wp*pi*real(elem, wp)/real(num_elements(ai), wp) + rotate_angle(ai)
 
                 ! Point 2 is the elem center
-                x2 = f - dsqrt(f**2 - half_apert**2)
+                x2 = f - sqrt(f**2 - half_apert**2)
                 y2 = half_apert*cos(angle_elem)
                 z2 = half_apert*sin(angle_elem)
 
@@ -663,12 +663,12 @@ contains
                 y3 = C*r(2)
                 z3 = C*r(3)
 
-                dist_interp_to_elem_center = dsqrt((x2 - x3)**2._wp + (y2 - y3)**2._wp + (z2 - z3)**2._wp)
+                dist_interp_to_elem_center = sqrt((x2 - x3)**2._wp + (y2 - y3)**2._wp + (z2 - z3)**2._wp)
                 if ((dist_interp_to_elem_center < aperture_element_3D/2._wp) .and. (r(1) < f)) then
-                    dist = dsqrt((x3 - r(1))**2._wp + (y3 - r(2))**2._wp + (z3 - r(3))**2._wp)
-                    source = dexp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(dsqrt(2._wp*pi)*sig/2._wp)
+                    dist = sqrt((x3 - r(1))**2._wp + (y3 - r(2))**2._wp + (z3 - r(3))**2._wp)
+                    source = exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(sqrt(2._wp*pi)*sig/2._wp)
 
-                    norm = dsqrt(r(2)**2._wp + r(3)**2._wp + (f - r(1))**2._wp)
+                    norm = sqrt(r(2)**2._wp + r(3)**2._wp + (f - r(1))**2._wp)
                     xyz_to_r_ratios(1) = -(r(1) - f)/norm
                     xyz_to_r_ratios(2) = -r(2)/norm
                     xyz_to_r_ratios(3) = -r(3)/norm

@@ -64,7 +64,7 @@ contains
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
         do i = 0, m
-            x_cc(i) = x_domain%beg + 5d-1*dx*real(2*i + 1, wp)
+            x_cc(i) = x_domain%beg + 5e-1*dx*real(2*i + 1, wp)
             x_cb(i - 1) = x_domain%beg + dx*real(i, wp)
         end do
 
@@ -104,7 +104,7 @@ contains
 
             dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
 
-            y_cc(0) = y_domain%beg + 5d-1*dy
+            y_cc(0) = y_domain%beg + 5e-1*dy
             y_cb(-1) = y_domain%beg
 
             do i = 1, n
@@ -117,7 +117,7 @@ contains
             dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
 
             do i = 0, n
-                y_cc(i) = y_domain%beg + 5d-1*dy*real(2*i + 1, wp)
+                y_cc(i) = y_domain%beg + 5e-1*dy*real(2*i + 1, wp)
                 y_cb(i - 1) = y_domain%beg + dy*real(i, wp)
             end do
 
@@ -157,7 +157,7 @@ contains
         dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
 
         do i = 0, p
-            z_cc(i) = z_domain%beg + 5d-1*dz*real(2*i + 1, wp)
+            z_cc(i) = z_domain%beg + 5e-1*dz*real(2*i + 1, wp)
             z_cb(i - 1) = z_domain%beg + dz*real(i, wp)
         end do
 

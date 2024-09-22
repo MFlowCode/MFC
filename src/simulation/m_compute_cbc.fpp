@@ -73,25 +73,25 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        L(1) = (5d-1 - 5d-1*sign(1._wp, lambda(1)))*lambda(1) &
+        L(1) = (5e-1 - 5e-1*sign(1._wp, lambda(1)))*lambda(1) &
                *(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
 
         do i = 2, momxb
-            L(i) = (5d-1 - 5d-1*sign(1._wp, lambda(2)))*lambda(2) &
+            L(i) = (5e-1 - 5e-1*sign(1._wp, lambda(2)))*lambda(2) &
                    *(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
         do i = momxb + 1, momxe
-            L(i) = (5d-1 - 5d-1*sign(1._wp, lambda(2)))*lambda(2) &
+            L(i) = (5e-1 - 5e-1*sign(1._wp, lambda(2)))*lambda(2) &
                    *(dvel_ds(dir_idx(i - contxe)))
         end do
 
         do i = E_idx, advxe - 1
-            L(i) = (5d-1 - 5d-1*sign(1._wp, lambda(2)))*lambda(2) &
+            L(i) = (5e-1 - 5e-1*sign(1._wp, lambda(2)))*lambda(2) &
                    *(dadv_ds(i - momxe))
         end do
 
-        L(advxe) = (5d-1 - 5d-1*sign(1._wp, lambda(3)))*lambda(3) &
+        L(advxe) = (5e-1 - 5e-1*sign(1._wp, lambda(3)))*lambda(3) &
                    *(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_nonreflecting_subsonic_buffer_L

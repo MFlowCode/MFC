@@ -469,8 +469,8 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                            E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
+                            E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
 
                             H_L = (E_L + pres_L)/rho_L
                             H_R = (E_R + pres_R)/rho_R
@@ -553,35 +553,35 @@ contains
                                       /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                         rho_R*(s_R - vel_R(dir_idx(1))))
                             elseif (wave_speeds == 2) then
-                                pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                pres_SL = 5e-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                 (vel_L(dir_idx(1)) - &
                                                  vel_R(dir_idx(1))))
 
                                 pres_SR = pres_SL
 
-                                Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
+                                Ms_L = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_L)/(1._wp + gamma_L))* &
                                                        (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                        ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
+                                Ms_R = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_R)/(1._wp + gamma_R))* &
                                                        (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                        ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                 s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                 s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                s_S = 5e-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                             (pres_L - pres_R)/ &
                                             (rho_avg*c_avg))
                             end if
 
                             s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
-                            xi_M = (5d-1 + sign(5d-1, s_L)) &
-                                   + (5d-1 - sign(5d-1, s_L)) &
-                                   *(5d-1 + sign(5d-1, s_R))
-                            xi_P = (5d-1 - sign(5d-1, s_R)) &
-                                   + (5d-1 - sign(5d-1, s_L)) &
-                                   *(5d-1 + sign(5d-1, s_R))
+                            xi_M = (5e-1 + sign(5e-1, s_L)) &
+                                   + (5e-1 - sign(5e-1, s_L)) &
+                                   *(5e-1 + sign(5e-1, s_R))
+                            xi_P = (5e-1 - sign(5e-1, s_R)) &
+                                   + (5e-1 - sign(5e-1, s_L)) &
+                                   *(5e-1 + sign(5e-1, s_R))
 
                             ! Mass
                             !$acc loop seq
@@ -1037,9 +1037,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1076,23 +1076,23 @@ contains
                                           /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                    pres_SL = 5e-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(dir_idx(1)) - &
                                                      vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                    s_S = 5e-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
@@ -1336,9 +1336,9 @@ contains
                                     qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1368,23 +1368,23 @@ contains
                                           /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                    pres_SL = 5e-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(dir_idx(1)) - &
                                                      vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                    s_S = 5e-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
@@ -1400,8 +1400,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5d-1 + sign(5d-1, s_S))
-                                xi_P = (5d-1 - sign(5d-1, s_S))
+                                xi_M = (5e-1 + sign(5e-1, s_S))
+                                xi_P = (5e-1 - sign(5e-1, s_S))
 
                                 !$acc loop seq
                                 do i = 1, contxe
@@ -1645,9 +1645,9 @@ contains
                                     end if
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
+                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1749,14 +1749,14 @@ contains
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
                                     end if
 
-                                    rho_avg = 5d-1*(rho_L + rho_R)
-                                    H_avg = 5d-1*(H_L + H_R)
-                                    gamma_avg = 5d-1*(gamma_L + gamma_R)
+                                    rho_avg = 5e-1*(rho_L + rho_R)
+                                    H_avg = 5e-1*(H_L + H_R)
+                                    gamma_avg = 5e-1*(gamma_L + gamma_R)
                                     vel_avg_rms = 0._wp
 
                                     !$acc loop seq
                                     do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (5d-1*(vel_L(i) + vel_R(i)))**2._wp
+                                        vel_avg_rms = vel_avg_rms + (5e-1*(vel_L(i) + vel_R(i)))**2._wp
                                     end do
 
                                 end if
@@ -1795,23 +1795,23 @@ contains
                                           /(rho_L*(s_L - vel_L(dir_idx(1))) - &
                                             rho_R*(s_R - vel_R(dir_idx(1))))
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                    pres_SL = 5e-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(dir_idx(1)) - &
                                                      vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                    s_S = 5e-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
@@ -1827,8 +1827,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5d-1 + sign(5d-1, s_S))
-                                xi_P = (5d-1 - sign(5d-1, s_S))
+                                xi_M = (5e-1 + sign(5e-1, s_S))
+                                xi_P = (5e-1 - sign(5e-1, s_S))
 
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
@@ -2107,9 +2107,9 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_L = gamma_L*pres_L + pi_inf_L + 5e-1*rho_L*vel_L_rms + qv_L
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                E_R = gamma_R*pres_R + pi_inf_R + 5e-1*rho_R*vel_R_rms + qv_R
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -2151,23 +2151,23 @@ contains
                                             rho_R*(s_R - vel_R(idx1)))
 
                                 elseif (wave_speeds == 2) then
-                                    pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
+                                    pres_SL = 5e-1*(pres_L + pres_R + rho_avg*c_avg* &
                                                     (vel_L(idx1) - &
                                                      vel_R(idx1)))
 
                                     pres_SR = pres_SL
 
-                                    Ms_L = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_L)/(1._wp + gamma_L))* &
+                                    Ms_L = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_L)/(1._wp + gamma_L))* &
                                                            (pres_SL/pres_L - 1._wp)*pres_L/ &
                                                            ((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                    Ms_R = max(1._wp, sqrt(1._wp + ((5d-1 + gamma_R)/(1._wp + gamma_R))* &
+                                    Ms_R = max(1._wp, sqrt(1._wp + ((5e-1 + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
 
                                     s_L = vel_L(idx1) - c_L*Ms_L
                                     s_R = vel_R(idx1) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(idx1) + vel_R(idx1)) + &
+                                    s_S = 5e-1*((vel_L(idx1) + vel_R(idx1)) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
@@ -2183,8 +2183,8 @@ contains
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5d-1 + sign(5d-1, s_S))
-                                xi_P = (5d-1 - sign(5d-1, s_S))
+                                xi_M = (5e-1 + sign(5e-1, s_S))
+                                xi_P = (5e-1 - sign(5e-1, s_S))
 
                                 if (low_Mach == 1) then
                                     @:compute_low_Mach_correction()
@@ -3083,7 +3083,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = (4._wp/3._wp)*dvel_avg_dx(1)/ &
@@ -3109,7 +3109,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dx(1)/ &
@@ -3137,17 +3137,17 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
+                            avg_vel(2) = 5e-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j + 1, k, l))
 
                             !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j + 1, k, l))
                             end do
 
-                            dvel_avg_dx(2) = 5d-1*(dvelL_dx_vf(2)%sf(j, k, l) &
+                            dvel_avg_dx(2) = 5e-1*(dvelL_dx_vf(2)%sf(j, k, l) &
                                                    + dvelR_dx_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2._wp/3._wp)*(dvel_avg_dy(2) + &
@@ -3179,10 +3179,10 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
+                            avg_vel(2) = 5e-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j + 1, k, l))
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = (dvel_avg_dy(2) + &
@@ -3214,11 +3214,11 @@ contains
                             !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j + 1, k, l))
                             end do
 
-                            dvel_avg_dx(3) = 5d-1*(dvelL_dx_vf(3)%sf(j, k, l) &
+                            dvel_avg_dx(3) = 5e-1*(dvelL_dx_vf(3)%sf(j, k, l) &
                                                    + dvelR_dx_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2._wp/3._wp)*dvel_avg_dz(3)/y_cc(k)/ &
@@ -3252,7 +3252,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dz(3)/y_cc(k)/ &
@@ -3283,18 +3283,18 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
+                            avg_vel(2) = 5e-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j, k + 1, l))
 
                             !$acc loop seq
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
-                                    5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k + 1, l))
 
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k + 1, l))
 
                             end do
@@ -3332,13 +3332,13 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
+                            avg_vel(2) = 5e-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j, k + 1, l))
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j, k + 1, l))
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2) + &
@@ -3367,17 +3367,17 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(3) = 5d-1*(velL_vf(3)%sf(j, k, l) &
+                            avg_vel(3) = 5e-1*(velL_vf(3)%sf(j, k, l) &
                                                + velR_vf(3)%sf(j, k + 1, l))
 
                             !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j, k + 1, l))
                             end do
 
-                            dvel_avg_dy(3) = 5d-1*(dvelL_dy_vf(3)%sf(j, k, l) &
+                            dvel_avg_dy(3) = 5e-1*(dvelL_dy_vf(3)%sf(j, k, l) &
                                                    + dvelR_dy_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*dvel_avg_dz(3)/y_cb(k)/ &
@@ -3412,7 +3412,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = dvel_avg_dz(3)/y_cb(k)/ &
@@ -3444,27 +3444,27 @@ contains
 
                             !$acc loop seq
                             do i = 2, 3
-                                avg_vel(i) = 5d-1*(velL_vf(i)%sf(j, k, l) &
+                                avg_vel(i) = 5e-1*(velL_vf(i)%sf(j, k, l) &
                                                    + velR_vf(i)%sf(j, k, l + 1))
                             end do
 
                             !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
-                                    5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k, l + 1))
                             end do
 
                             do i = 2, 3
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
                             !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j, k, l + 1))
                             end do
 
@@ -3507,16 +3507,16 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            avg_vel(2) = 5d-1*(velL_vf(2)%sf(j, k, l) &
+                            avg_vel(2) = 5e-1*(velL_vf(2)%sf(j, k, l) &
                                                + velR_vf(2)%sf(j, k, l + 1))
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j, k, l + 1))
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j, k, l + 1))
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j, k, l + 1))
 
                             tau_Re(3, 3) = (dvel_avg_dx(1) &
@@ -3607,7 +3607,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = (4._wp/3._wp)*dvel_avg_dx(1)/ &
@@ -3633,7 +3633,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dx(1)/ &
@@ -3664,11 +3664,11 @@ contains
                             !$acc loop seq
                             do i = 1, 2
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j + 1, k, l))
                             end do
 
-                            dvel_avg_dx(2) = 5d-1*(dvelL_dx_vf(2)%sf(j, k, l) &
+                            dvel_avg_dx(2) = 5e-1*(dvelL_dx_vf(2)%sf(j, k, l) &
                                                    + dvelR_dx_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2._wp/3._wp)*dvel_avg_dy(2)/ &
@@ -3702,7 +3702,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dy(2)/ &
@@ -3733,11 +3733,11 @@ contains
                             !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j + 1, k, l))
                             end do
 
-                            dvel_avg_dx(3) = 5d-1*(dvelL_dx_vf(3)%sf(j, k, l) &
+                            dvel_avg_dx(3) = 5e-1*(dvelL_dx_vf(3)%sf(j, k, l) &
                                                    + dvelR_dx_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = -(2._wp/3._wp)*dvel_avg_dz(3)/ &
@@ -3770,7 +3770,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j + 1, k, l))
 
                             tau_Re(1, 1) = dvel_avg_dz(3)/ &
@@ -3804,11 +3804,11 @@ contains
                             do i = 1, 2
 
                                 dvel_avg_dx(i) = &
-                                    5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k + 1, l))
 
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k + 1, l))
 
                             end do
@@ -3845,10 +3845,10 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j, k + 1, l))
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = (dvel_avg_dx(1) + dvel_avg_dy(2))/ &
@@ -3879,11 +3879,11 @@ contains
                             !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j, k + 1, l))
                             end do
 
-                            dvel_avg_dy(3) = 5d-1*(dvelL_dy_vf(3)%sf(j, k, l) &
+                            dvel_avg_dy(3) = 5e-1*(dvelL_dy_vf(3)%sf(j, k, l) &
                                                    + dvelR_dy_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*dvel_avg_dz(3)/ &
@@ -3917,7 +3917,7 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j, k + 1, l))
 
                             tau_Re(2, 2) = dvel_avg_dz(3)/ &
@@ -3950,21 +3950,21 @@ contains
                             !$acc loop seq
                             do i = 1, 3, 2
                                 dvel_avg_dx(i) = &
-                                    5d-1*(dvelL_dx_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dx_vf(i)%sf(j, k, l) &
                                           + dvelR_dx_vf(i)%sf(j, k, l + 1))
                             end do
 
                             !$acc loop seq
                             do i = 2, 3
                                 dvel_avg_dy(i) = &
-                                    5d-1*(dvelL_dy_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dy_vf(i)%sf(j, k, l) &
                                           + dvelR_dy_vf(i)%sf(j, k, l + 1))
                             end do
 
                             !$acc loop seq
                             do i = 1, 3
                                 dvel_avg_dz(i) = &
-                                    5d-1*(dvelL_dz_vf(i)%sf(j, k, l) &
+                                    5e-1*(dvelL_dz_vf(i)%sf(j, k, l) &
                                           + dvelR_dz_vf(i)%sf(j, k, l + 1))
                             end do
 
@@ -4004,13 +4004,13 @@ contains
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
 
-                            dvel_avg_dx(1) = 5d-1*(dvelL_dx_vf(1)%sf(j, k, l) &
+                            dvel_avg_dx(1) = 5e-1*(dvelL_dx_vf(1)%sf(j, k, l) &
                                                    + dvelR_dx_vf(1)%sf(j, k, l + 1))
 
-                            dvel_avg_dy(2) = 5d-1*(dvelL_dy_vf(2)%sf(j, k, l) &
+                            dvel_avg_dy(2) = 5e-1*(dvelL_dy_vf(2)%sf(j, k, l) &
                                                    + dvelR_dy_vf(2)%sf(j, k, l + 1))
 
-                            dvel_avg_dz(3) = 5d-1*(dvelL_dz_vf(3)%sf(j, k, l) &
+                            dvel_avg_dz(3) = 5e-1*(dvelL_dz_vf(3)%sf(j, k, l) &
                                                    + dvelR_dz_vf(3)%sf(j, k, l + 1))
 
                             tau_Re(3, 3) = (dvel_avg_dx(1) &

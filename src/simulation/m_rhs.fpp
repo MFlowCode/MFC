@@ -6,7 +6,7 @@
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to calculate the right-
-!!              hand-side (RHS) in the quasi-conservative, shock- and interface-
+!!              hane-side (RHS) in the quasi-conservative, shock- and interface-
 !!              capturing finite-volume framework for the multicomponent Navier-
 !!              Stokes equations supplemented by appropriate advection equations
 !!              used to capture the material interfaces. The system of equations
@@ -1285,7 +1285,7 @@ contains
                             do j = 0, m
                                 do i = 1, num_fluids
                                     rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 5e-1/y_cc(k)* &
                                         q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
                                         q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                         (flux_src_n(2)%vf(advxb)%sf(j, k, l) + &
@@ -1304,7 +1304,7 @@ contains
                         do k = 0, n
                             do q = 0, m
                                 rhs_vf(j)%sf(q, k, l) = &
-                                    rhs_vf(j)%sf(q, k, l) - 5d-1/y_cc(k)* &
+                                    rhs_vf(j)%sf(q, k, l) - 5e-1/y_cc(k)* &
                                     (flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l) &
                                      + flux_gsrc_n(2)%vf(j)%sf(q, k, l))
                             end do
@@ -1443,7 +1443,7 @@ contains
                         do q = 0, n
                             do l = 0, m
                                 rhs_vf(j)%sf(l, q, k) = &
-                                    rhs_vf(j)%sf(l, q, k) - 5d-1/y_cc(q)* &
+                                    rhs_vf(j)%sf(l, q, k) - 5e-1/y_cc(q)* &
                                     (flux_gsrc_n(3)%vf(j)%sf(l, q, k - 1) &
                                      - flux_gsrc_n(3)%vf(j)%sf(l, q, k))
                             end do
@@ -1785,7 +1785,7 @@ contains
                                 !$acc loop seq
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        rhs_vf(i)%sf(j, k, l) - 5e-1/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
                                          + flux_src_n(i)%sf(j, k, l))
                                 end do
@@ -1815,7 +1815,7 @@ contains
                                 !$acc loop seq
                                 do i = momxb, E_idx
                                     rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        rhs_vf(i)%sf(j, k, l) - 5e-1/y_cc(k)* &
                                         (flux_src_n(i)%sf(j, k - 1, l) &
                                          + flux_src_n(i)%sf(j, k, l))
                                 end do
@@ -1864,12 +1864,12 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(momxb + 1)%sf(j, k, l) = &
-                                rhs_vf(momxb + 1)%sf(j, k, l) + 5d-1* &
+                                rhs_vf(momxb + 1)%sf(j, k, l) + 5e-1* &
                                 (flux_src_n(momxe)%sf(j, k, l - 1) &
                                  + flux_src_n(momxe)%sf(j, k, l))
 
                             rhs_vf(momxe)%sf(j, k, l) = &
-                                rhs_vf(momxe)%sf(j, k, l) - 5d-1* &
+                                rhs_vf(momxe)%sf(j, k, l) - 5e-1* &
                                 (flux_src_n(momxb + 1)%sf(j, k, l - 1) &
                                  + flux_src_n(momxb + 1)%sf(j, k, l))
                         end do
@@ -1965,8 +1965,8 @@ contains
                                      q_cons_vf(i + advxb - 1)%sf(j, k, l) &
                                      - pi_infs(i))/gammas(i)
 
-                                if (pres_K_init(i) <= -(1._wp - 1d-8)*pres_inf(i) + 1d-8) &
-                                    pres_K_init(i) = -(1._wp - 1d-8)*pres_inf(i) + 1d-8
+                                if (pres_K_init(i) <= -(1._wp - 1e-8)*pres_inf(i) + 1e-8) &
+                                    pres_K_init(i) = -(1._wp - 1e-8)*pres_inf(i) + 1e-8
                             else
                                 pres_K_init(i) = 0._wp
                             end if
@@ -1974,7 +1974,7 @@ contains
                         end do
 
                         ! Iterative process for relaxed pressure determination
-                        f_pres = 1d-9
+                        f_pres = 1e-9
                         df_pres = 1d9
 
                         !$acc loop seq
@@ -1985,13 +1985,13 @@ contains
                         !$acc loop seq
                         do iter = 0, 49
 
-                            if (DABS(f_pres) > 1d-10) then
+                            if (abs(f_pres) > 1e-10) then
                                 pres_relax = pres_relax - f_pres/df_pres
 
                                 ! Physical pressure
                                 do i = 1, num_fluids
-                                    if (pres_relax <= -(1._wp - 1d-8)*pres_inf(i) + 1d-8) &
-                                        pres_relax = -(1._wp - 1d-8)*pres_inf(i) + 1._wp
+                                    if (pres_relax <= -(1._wp - 1e-8)*pres_inf(i) + 1e-8) &
+                                        pres_relax = -(1._wp - 1e-8)*pres_inf(i) + 1._wp
                                 end do
 
                                 ! Newton-Raphson method
@@ -2114,7 +2114,7 @@ contains
 
                     !$acc loop seq
                     do i = momxb, momxe
-                        dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
+                        dyn_pres = dyn_pres + 5e-1*q_cons_vf(i)%sf(j, k, l)* &
                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 

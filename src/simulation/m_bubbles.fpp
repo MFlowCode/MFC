@@ -139,7 +139,7 @@ contains
                         do j = 0, m
                             divu%sf(j, k, l) = 0._wp
                             divu%sf(j, k, l) = &
-                                5d-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                5e-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
                                             q_prim_vf(contxe + idir)%sf(j - 1, k, l))
 
                         end do
@@ -154,7 +154,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5d-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                           5e-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
                                                        q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
                     end do
@@ -168,7 +168,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5d-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                           5e-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
                                                        q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do
@@ -359,8 +359,8 @@ contains
                                     !   Rule 2: myR_tmp1(4) > 0._wp
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
-                                    if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                        .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
+                                    if ((err1 <= 1e-4) .and. (err2 <= 1e-4) .and. (err3 <= 1e-4) &
+                                        .and. (err4 < 1e-4) .and. (err5 < 1e-4) &
                                         .and. myR_tmp1(4) > 0._wp) then
 
                                         ! Accepted. Finalize the sub-step
@@ -371,12 +371,12 @@ contains
                                         myV = myV_tmp1(4)
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2._wp, max(0.5_wp, (1d-4/err1)**(1._wp/3._wp)))
+                                        h = h*min(2._wp, max(0.5_wp, (1e-4/err1)**(1._wp/3._wp)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (err2 <= 1d-4) then
+                                        if (err2 <= 1e-4) then
                                             h = 0.5_wp*h
                                         else
                                             h = 0.25_wp*h
@@ -401,7 +401,7 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        if (alf < 1.d-11) then
+                        if (alf < 1.e-11) then
                             bub_adv_src(j, k, l) = 0._wp
                             bub_r_src(j, k, l, q) = 0._wp
                             bub_v_src(j, k, l, q) = 0._wp
@@ -474,12 +474,12 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-        d0 = DSQRT((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
-        d1 = DSQRT((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d0 < 1d-5 .or. d1 < 1d-5) then
-            h0 = 1d-6
+        d0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
+        d1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
+        if (d0 < 1e-5 .or. d1 < 1e-5) then
+            h0 = 1e-6
         else
-            h0 = 1d-2*(d0/d1)
+            h0 = 1e-2*(d0/d1)
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -490,14 +490,14 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-        d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
+        d2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
 
         ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
         !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-        if (max(d1, d2) < 1d-15) then
-            h1 = max(1d-6, h0*1d-3)
+        if (max(d1, d2) < 1e-15) then
+            h1 = max(1e-6, h0*1e-3)
         else
-            h1 = (1d-2/max(d1, d2))**(1._wp/3._wp)
+            h1 = (1e-2/max(d1, d2))**(1._wp/3._wp)
         end if
 
         ! Set h = min(100*h0,h1)
@@ -566,7 +566,7 @@ contains
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
         err_V = (-5._wp*h/24._wp)*(myA_tmp(2) + myA_tmp(3) - 2._wp*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-        err = DSQRT((err_R**2._wp + err_V**2._wp)/2._wp)
+        err = sqrt((err_R**2._wp + err_V**2._wp)/2._wp)
 
     end subroutine s_advance_substep
 
@@ -625,7 +625,7 @@ contains
         tmp = (fCpinf/(1._wp + fBtait) + 1._wp)**((fntait - 1._wp)/fntait)
         tmp = fntait*(1._wp + fBtait)*tmp
 
-        f_cgas = dsqrt(tmp + (fntait - 1._wp)*fH)
+        f_cgas = sqrt(tmp + (fntait - 1._wp)*fH)
 
     end function f_cgas
 
@@ -730,7 +730,7 @@ contains
             ! Keller-Miksis bubbles
             fCpinf = fP
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            c_liquid = dsqrt(fntait*(fP + fBtait)/(fRho*(1._wp - alf)))
+            c_liquid = sqrt(fntait*(fP + fBtait)/(fRho*(1._wp - alf)))
             f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles

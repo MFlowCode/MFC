@@ -54,7 +54,7 @@ module m_phase_change
     integer, parameter :: max_iter = 1e8        !< max # of iterations
     real(wp), parameter :: pCr = 4.94d7   !< Critical water pressure
     real(wp), parameter :: TCr = 385.05 + 273.15  !< Critical water temperature
-    real(wp), parameter :: mixM = 1.0d-8 !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
+    real(wp), parameter :: mixM = 1.0e-8 !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
     integer, parameter :: lp = 1    !< index for the liquid phase of the reacting fluid
     integer, parameter :: vp = 2    !< index for the vapor phase of the reacting fluid
     !> @}
@@ -148,7 +148,7 @@ contains
                     !$acc loop seq
                     do i = momxb, momxe
 
-                        dynE = dynE + 5.0d-1*q_cons_vf(i)%sf(j, k, l)**2/rho
+                        dynE = dynE + 5.0e-1*q_cons_vf(i)%sf(j, k, l)**2/rho
 
                     end do
 
@@ -246,7 +246,7 @@ contains
                     ! Calculations AFTER equilibrium
 
                     ! entropy
-                    sk(1:num_fluids) = cvs(1:num_fluids)*DLOG((TS**gs_min(1:num_fluids)) &
+                    sk(1:num_fluids) = cvs(1:num_fluids)*log((TS**gs_min(1:num_fluids)) &
                                                               /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
 
                     ! enthalpy
@@ -357,7 +357,7 @@ contains
         ! Newton Solver for the pT-equilibrium
         ns = 0
         ! change this relative error metric. 1E4 is just arbitrary
-        do while ((DABS(pS - pO) > palpha_eps) .and. (DABS((pS - pO)/pO) > palpha_eps/1e4) .or. (ns == 0))
+        do while ((abs(pS - pO) > palpha_eps) .and. (abs((pS - pO)/pO) > palpha_eps/1e4) .or. (ns == 0))
 
             ! increasing counter
             ns = ns + 1
@@ -381,7 +381,7 @@ contains
             hp = 1.0_wp/(rhoe + pS - mQ) + 1.0_wp/(pS + minval(p_infpT))
 
             ! updating common pressure for the newton solver
-            pS = pO + ((1.0_wp - gp)/gpp)/(1.0_wp - (1.0_wp - gp + DABS(1.0_wp - gp)) &
+            pS = pO + ((1.0_wp - gp)/gpp)/(1.0_wp - (1.0_wp - gp + abs(1.0_wp - gp)) &
                                            /(2.0_wp*gpp)*hp)
         end do
 
@@ -425,14 +425,14 @@ contains
         ns = 0
 
         ! Relaxation factor
-        Om = 1.0d-3
+        Om = 1.0e-3
 
         p_infpTg = p_infpT
 
         if (((pS < 0.0_wp) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
                                    + q_cons_vf(vp + contxb - 1)%sf(j, k, l)) > ((rhoe &
                                                                                  - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. &
-            ((pS >= 0.0_wp) .and. (pS < 1.0d-1))) then
+            ((pS >= 0.0_wp) .and. (pS < 1.0e-1))) then
 
             ! improve this initial condition
             pS = 1.0d4
@@ -446,8 +446,8 @@ contains
         ! improve this initial condition
         R2D(1) = 0.0_wp; R2D(2) = 0.0_wp
         DeltamP(1) = 0.0_wp; DeltamP(2) = 0.0_wp
-        do while (((DSQRT(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
-                   .and. ((DSQRT(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) &
+        do while (((sqrt(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) &
+                   .and. ((sqrt(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1d6))) &
                   .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
@@ -605,10 +605,10 @@ contains
                 + mCVGP)
 
         dFdT = &
-            -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*DLOG(TS) &
+            -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) &
             - (qvps(lp) - qvps(vp)) &
-            + cvs(lp)*(gs_min(lp) - 1)*DLOG(pS + ps_inf(lp)) &
-            - cvs(vp)*(gs_min(vp) - 1)*DLOG(pS + ps_inf(vp))
+            + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
+            - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
 
         dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
                  - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
@@ -706,9 +706,9 @@ contains
 
         ! Gibbs Free Energy Equality condition (DG)
         R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &
-                     *(1 - DLOG(TS)) - (qvps(lp) - qvps(vp)) &
-                     + cvs(lp)*(gs_min(lp) - 1)*DLOG(pS + ps_inf(lp)) &
-                     - cvs(vp)*(gs_min(vp) - 1)*DLOG(pS + ps_inf(vp))) &
+                     *(1 - log(TS)) - (qvps(lp) - qvps(vp)) &
+                     + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
+                     - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) &
                  + qvs(lp) - qvs(vp)
 
         ! Constant Energy Process condition (DE)
@@ -754,24 +754,24 @@ contains
             ns = 0
 
             ! underrelaxation factor
-            Om = 1.0d-3
-            do while ((DABS(FT) > ptgalpha_eps) .or. (ns == 0))
+            Om = 1.0e-3
+            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
                 ! increasing counter
                 ns = ns + 1
 
                 ! calculating residual
                 FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &
-                           *(1 - DLOG(TSat)) - (qvps(lp) - qvps(vp)) &
-                           + cvs(lp)*(gs_min(lp) - 1)*DLOG(pSat + ps_inf(lp)) &
-                           - cvs(vp)*(gs_min(vp) - 1)*DLOG(pSat + ps_inf(vp))) &
+                           *(1 - log(TSat)) - (qvps(lp) - qvps(vp)) &
+                           + cvs(lp)*(gs_min(lp) - 1)*log(pSat + ps_inf(lp)) &
+                           - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) &
                      + qvs(lp) - qvs(vp)
 
                 ! calculating the jacobian
                 dFdT = &
-                    -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*DLOG(TSat) &
+                    -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TSat) &
                     - (qvps(lp) - qvps(vp)) &
-                    + cvs(lp)*(gs_min(lp) - 1)*DLOG(pSat + ps_inf(lp)) &
-                    - cvs(vp)*(gs_min(vp) - 1)*DLOG(pSat + ps_inf(vp))
+                    + cvs(lp)*(gs_min(lp) - 1)*log(pSat + ps_inf(lp)) &
+                    - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))
 
                 ! updating saturation temperature
                 TSat = TSat - Om*FT/dFdT

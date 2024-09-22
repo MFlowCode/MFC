@@ -489,7 +489,7 @@ contains
 
     end function f_model_is_inside
 
-    ! From https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
+    ! From https://www.scratchapixel.com/lessons/3e-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
     !> This procedure checks if a ray intersects a triangle.
     !! @param ray      Ray.
     !! @param triangle Triangle.

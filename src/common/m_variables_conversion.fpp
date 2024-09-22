@@ -189,7 +189,7 @@ contains
                 Y_rs(i) = rhoYks(i)/rho
             end do
 
-            if (sum(Y_rs) > 1d-16) then
+            if (sum(Y_rs) > 1e-16) then
                 call get_temperature(.true., energy - dyn_p, 1200._wp, Y_rs, T)
                 call get_pressure(rho, T, Y_rs, pres)
             else
@@ -295,7 +295,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
 
-            alpha_K = alpha_K/max(sum(alpha_K), 1d-16)
+            alpha_K = alpha_K/max(sum(alpha_K), 1e-16)
 
         end if
 
@@ -420,7 +420,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
 
-            alpha_K = alpha_K/max(sum(alpha_K), 1d-16)
+            alpha_K = alpha_K/max(sum(alpha_K), 1e-16)
 
         end if
 
@@ -987,7 +987,7 @@ contains
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
                                                         /rho_K
-                            dyn_pres_K = dyn_pres_K + 5d-1*qK_cons_vf(i)%sf(j, k, l) &
+                            dyn_pres_K = dyn_pres_K + 5e-1*qK_cons_vf(i)%sf(j, k, l) &
                                          *qK_prim_vf(i)%sf(j, k, l)
                         else
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
@@ -1349,7 +1349,7 @@ contains
 
                     ! Computing the energy from the pressure
                     E_K = gamma_K*pres_K + pi_inf_K &
-                          + 5d-1*rho_K*vel_K_sum + qv_K
+                          + 5e-1*rho_K*vel_K_sum + qv_K
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
                     !$acc loop seq
@@ -1468,7 +1468,7 @@ contains
                     (rho*(1._wp - adv(num_fluids)))
             end if
         else
-            c = ((H - 5d-1*vel_sum)/gamma)
+            c = ((H - 5e-1*vel_sum)/gamma)
         end if
 
         if (mixture_err .and. c < 0._wp) then

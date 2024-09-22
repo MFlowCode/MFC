@@ -985,7 +985,7 @@ contains
             if (t_step_old /= dflt_int) then
                 nondim_time = real(t_step + t_step_old, wp)*dt
             else
-                nondim_time = real(t_step, wp)*dt !*1.d-5/10.0761131451_wp
+                nondim_time = real(t_step, wp)*dt !*1.e-5/10.0761131451_wp
             end if
         end if
 
@@ -1088,7 +1088,7 @@ contains
                                 nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                             end do
 
-                            nbub = dsqrt((4._wp*pi/3._wp)*nR3/alf)
+                            nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                         end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
@@ -1195,7 +1195,7 @@ contains
                                     nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                                 end do
 
-                                nbub = dsqrt((4._wp*pi/3._wp)*nR3/alf)
+                                nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                             end if
 
                             R(:) = nR(:)/nbub
@@ -1464,7 +1464,7 @@ contains
                             int_pres = int_pres + (pres - 1._wp)**2._wp
                         end if
                     end do
-                    int_pres = dsqrt(int_pres/(1._wp*npts))
+                    int_pres = sqrt(int_pres/(1._wp*npts))
 
                     if (num_procs > 1) then
                         tmp = int_pres
@@ -1496,16 +1496,16 @@ contains
                             trigger = .false.
                             if (i == 1) then
                                 !inner portion
-                                if (dsqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) &
                                     trigger = .true.
                             elseif (i == 2) then
                                 !net region
-                                if (dsqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. &
-                                    dsqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. &
+                                    sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) &
                                     trigger = .true.
                             elseif (i == 3) then
                                 !everything else
-                                if (dsqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) &
+                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) &
                                     trigger = .true.
                             end if
 

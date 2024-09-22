@@ -80,7 +80,7 @@
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
 
-        alph = 5d-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+        alph = 5e-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
 
         if (alph < eps) alph = eps
         if (alph > 1 - eps) alph = 1 - eps

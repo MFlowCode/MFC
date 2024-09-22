@@ -36,7 +36,7 @@ module m_start_up
 
     use m_acoustic_src      !< Acoustic source calculations
 
-    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
+    use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
     use m_chemistry            !< Chemistry module
 
@@ -1062,7 +1062,7 @@ contains
 
                     dyn_pres = 0._wp
                     do i = mom_idx%beg, mom_idx%end
-                        dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
+                        dyn_pres = dyn_pres + 5e-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
 
@@ -1108,7 +1108,7 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1d-3*dt_init) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1e-3*dt_init) call s_mpi_abort("Delta t has become too small")
         end if
 
         if (cfl_dt) then

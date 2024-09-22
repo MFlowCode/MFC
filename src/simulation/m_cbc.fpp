@@ -603,7 +603,7 @@ contains
     !>  The following is the implementation of the CBC based on
         !!      the work of Thompson (1987, 1990) on hyperbolic systems.
         !!      The CBC is indirectly applied in the computation of the
-        !!      right-hand-side (RHS) near the relevant domain boundary
+        !!      right-hane-side (RHS) near the relevant domain boundary
         !!      through the modification of the fluxes.
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param flux_vf Cell-boundary-average fluxes
@@ -802,7 +802,7 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
+                        E = gamma*pres + pi_inf + 5e-1*rho*vel_K_sum
 
                         H = (E + pres)/rho
 
@@ -881,10 +881,10 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5d-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5e-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
                                        /y_cc(n)
                         else
-                            dpres_dt = -5d-1*(L(advxe) + L(1))
+                            dpres_dt = -5e-1*(L(advxe) + L(1))
                         end if
 
                         !$acc loop seq
@@ -957,7 +957,7 @@ contains
                                                                       + dpi_inf_dt &
                                                                       + dqv_dt &
                                                                       + rho*vel_dv_dt_sum &
-                                                                      + 5d-1*drho_dt*vel_K_sum)
+                                                                      + 5e-1*drho_dt*vel_K_sum)
 
                         if (riemann_solver == 1) then
                             !$acc loop seq

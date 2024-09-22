@@ -61,7 +61,7 @@ contains
                 dist_vec(1) = x_cc(i) - x_centroid
                 dist_vec(2) = y_cc(j) - y_centroid
                 dist_vec(3) = 0
-                dist = dsqrt(sum(dist_vec**2))
+                dist = sqrt(sum(dist_vec**2))
                 levelset(i, j, 0, ib_patch_id) = dist - radius
                 if (dist == 0) then
                     levelset_norm(i, j, 0, ib_patch_id, :) = 0
@@ -108,7 +108,7 @@ contains
                         dist_vec(1) = x_cc(i) - airfoil_grid_u(k)%x
                         dist_vec(2) = y_cc(j) - airfoil_grid_u(k)%y
                         dist_vec(3) = 0
-                        dist = dsqrt(sum(dist_vec**2))
+                        dist = sqrt(sum(dist_vec**2))
                         if (k == 1) then
                             global_dist = dist
                             global_id = k
@@ -128,7 +128,7 @@ contains
                         dist_vec(1) = x_cc(i) - airfoil_grid_l(k)%x
                         dist_vec(2) = y_cc(j) - airfoil_grid_l(k)%y
                         dist_vec(3) = 0
-                        dist = dsqrt(sum(dist_vec**2))
+                        dist = sqrt(sum(dist_vec**2))
                         if (k == 1) then
                             global_dist = dist
                             global_id = k
@@ -197,7 +197,7 @@ contains
                             dist_vec(1) = x_cc(i) - airfoil_grid_u(k)%x
                             dist_vec(2) = y_cc(j) - airfoil_grid_u(k)%y
                             dist_vec(3) = 0
-                            dist_surf = dsqrt(sum(dist_vec**2))
+                            dist_surf = sqrt(sum(dist_vec**2))
                             if (k == 1) then
                                 global_dist = dist_surf
                                 global_id = k
@@ -217,7 +217,7 @@ contains
                             dist_vec(1) = x_cc(i) - airfoil_grid_l(k)%x
                             dist_vec(2) = y_cc(j) - airfoil_grid_l(k)%y
                             dist_vec(3) = 0
-                            dist_surf = dsqrt(sum(dist_vec**2))
+                            dist_surf = sqrt(sum(dist_vec**2))
                             if (k == 1) then
                                 global_dist = dist_surf
                                 global_id = k
@@ -368,7 +368,7 @@ contains
                     dist_vec(1) = x_cc(i) - x_centroid
                     dist_vec(2) = y_cc(j) - y_centroid
                     dist_vec(3) = z_cc(k) - z_centroid
-                    dist = dsqrt(sum(dist_vec**2))
+                    dist = sqrt(sum(dist_vec**2))
                     levelset(i, j, k, ib_patch_id) = dist - radius
                     if (dist == 0) then
                         levelset_norm(i, j, k, ib_patch_id, :) = (/1, 0, 0/)

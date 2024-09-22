@@ -67,7 +67,7 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
+                    !    IF ((perturb_alpha >= 25e-2) .AND. (perturb_alpha <= 75e-2)) THEN
                     if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
 
                         ! Derive new partial densities
@@ -518,9 +518,9 @@ contains
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0._wp
         do i = 0, mixlayer_nvar*n - n_bc_skip - 1
-            if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
+            if (sqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2 + vi(i)**2)
+                norm = sqrt(vr(i)**2 + vi(i)**2)
             end if
         end do
 
@@ -583,8 +583,8 @@ contains
         xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
-                xcr((i - 1)*(nbp - 1) + k) = 5d-1*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
-                xci((i - 1)*(nbp - 1) + k) = 5d-1*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
+                xcr((i - 1)*(nbp - 1) + k) = 5e-1*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
+                xci((i - 1)*(nbp - 1) + k) = 5e-1*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
             end do
         end do
 
