@@ -58,7 +58,7 @@ It's rather straightforward.
 We'll give a brief intro. here for MacOS.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
-brew install wget python cmake gcc@14 mpich
+brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
@@ -66,10 +66,11 @@ Put it to a convenient directory via
 git clone https://github.com/MFlowCode/MFC
 cd MFC
 ```
-and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
+and be sure MFC knows where to find Boost by appending to your dotfiles and sourcing them again
 ```shell
-echo -e "export CC=gcc-14 \nexport CXX=g++-14 \nexport FC=gfortran-14" >> ~/.profile
-source ~/.profile
+echo -e 'export BOOST_INCLUDE=/opt/homebrew/' | tee -a ~/.bash_profile ~/.zshrc
+. ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
+! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
 ```
 then you can build MFC and run the test suite!
 ```shell

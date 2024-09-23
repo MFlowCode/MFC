@@ -54,9 +54,11 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Intel Xeon 6226           | Cascade Lake              | CPU           | 12 cores     | 17               | GNU 12.3.0           | GT ICE  |
 | Apple M1 Max              |                           | CPU           |  8 cores     | 18               | GNU 14.1.0           | N/A     |
 | IBM Power9                |                           | CPU           | 20 cores     | 21               | GNU 9.1.0            | OLCF Summit |
+| Cavium ThunderX2          | Arm                       | CPU           | 32 cores     | 21               | GNU 13.2.0           | SBU Ookami |
 | Arm Cortex-A78AE          | Arm, BlueField3           | CPU           | 16 cores     | 25               | NVHPC 24.5           | GT Rogues Gallery |
 | Intel Xeon E5-2650V4      | Broadwell                 | CPU           | 12 cores     | 27               | NVHPC 23.5           | GT CSE Internal  |
 | Intel Xeon E7-4850V3      | Haswell                   | CPU           | 14 cores     | 34               | GNU 9.4.0            | GT CSE Internal  |
+| Fujitsu A64FX             | Arm                       | CPU           | 48 cores     | 63               | GNU 13.2.0           | SBU Ookami |
 
 __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) per right-hand side (rhs) evaluation, so X ns/gp/eq/rhs. Lower is better.__
 
