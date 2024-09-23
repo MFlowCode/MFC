@@ -1062,7 +1062,7 @@ contains
 
                     dyn_pres = 0._wp
                     do i = mom_idx%beg, mom_idx%end
-                        dyn_pres = dyn_pres + 5e-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
+                        dyn_pres = dyn_pres + 5e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
 
@@ -1108,7 +1108,7 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3*dt_init) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1e-3_wp*dt_init) call s_mpi_abort("Delta t has become too small")
         end if
 
         if (cfl_dt) then
@@ -1204,7 +1204,7 @@ contains
                 io_time_final = maxval(io_proc_time)
             end if
 
-            grind_time = time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
+            grind_time = time_final*1.0e9_wp/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/)))
 
             print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)

@@ -212,7 +212,7 @@ contains
                     end if
 
                     if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
-                        q_sf(i, j, k) = 1e-16
+                        q_sf(i, j, k) = 1e-16_wp
                     else
                         q_sf(i, j, k) = sqrt(q_sf(i, j, k))
                     end if
@@ -285,8 +285,8 @@ contains
                         end if
                     end if
 
-                    if (abs(top) < 1e-8) top = 0._wp
-                    if (abs(bottom) < 1e-8) bottom = 0._wp
+                    if (abs(top) < 1e-8_wp) top = 0._wp
+                    if (abs(bottom) < 1e-8_wp) bottom = 0._wp
 
                     if (top == bottom) then
                         slope = 1._wp
@@ -295,20 +295,20 @@ contains
                         !           (bottom == 0._wp .AND. top /= 0._wp)) THEN
                         !           slope = 0._wp
                     else
-                        slope = (top*bottom)/(bottom**2._wp + 1e-16)
+                        slope = (top*bottom)/(bottom**2._wp + 1e-16_wp)
                     end if
 
                     ! Flux limiter function
                     if (flux_lim == 1) then ! MINMOD (MM)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, slope))
                     elseif (flux_lim == 2) then ! MUSCL (MC)
-                        q_sf(j, k, l) = max(0._wp, min(2._wp*slope, 5e-1*(1._wp + slope), 2._wp))
+                        q_sf(j, k, l) = max(0._wp, min(2._wp*slope, 5e-1_wp*(1._wp + slope), 2._wp))
                     elseif (flux_lim == 3) then ! OSPRE (OP)
-                        q_sf(j, k, l) = (15e-1*(slope**2._wp + slope))/(slope**2._wp + slope + 1._wp)
+                        q_sf(j, k, l) = (15e-1_wp*(slope**2._wp + slope))/(slope**2._wp + slope + 1._wp)
                     elseif (flux_lim == 4) then ! SUPERBEE (SB)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, 2._wp*slope), min(slope, 2._wp))
                     elseif (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
-                        q_sf(j, k, l) = max(0._wp, min(15e-1*slope, 1._wp), min(slope, 15e-1))
+                        q_sf(j, k, l) = max(0._wp, min(15e-1_wp*slope, 1._wp), min(slope, 15e-1_wp))
                     elseif (flux_lim == 6) then ! VAN ALBADA (VA)
                         q_sf(j, k, l) = (slope**2._wp + slope)/(slope**2._wp + 1._wp)
                     elseif (flux_lim == 7) then ! VAN LEER (VL)

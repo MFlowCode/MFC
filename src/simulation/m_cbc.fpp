@@ -483,7 +483,7 @@ contains
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) &
-                                                               - 1d1*ds(2) + 1d1*ds(3) &
+                                                               - 1e1_wp*ds(2) + 1e1_wp*ds(3) &
                                                                - 3._wp*ds(4))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
@@ -802,7 +802,7 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5e-1*rho*vel_K_sum
+                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
 
                         H = (E + pres)/rho
 
@@ -881,10 +881,10 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5e-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
                                        /y_cc(n)
                         else
-                            dpres_dt = -5e-1*(L(advxe) + L(1))
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1))
                         end if
 
                         !$acc loop seq
@@ -957,7 +957,7 @@ contains
                                                                       + dpi_inf_dt &
                                                                       + dqv_dt &
                                                                       + rho*vel_dv_dt_sum &
-                                                                      + 5e-1*drho_dt*vel_K_sum)
+                                                                      + 5e-1_wp*drho_dt*vel_K_sum)
 
                         if (riemann_solver == 1) then
                             !$acc loop seq

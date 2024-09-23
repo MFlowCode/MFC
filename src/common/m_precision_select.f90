@@ -14,7 +14,7 @@ module m_precision_select
     integer, parameter :: double_precision = selected_real_kind(15, 307)
 
     ! Set the working precision (wp) to single or double precision
-    integer, parameter :: wp = single_precision  ! Change this to single_precision if needed
+    integer, parameter :: wp = double_precision  ! Change this to single_precision if needed
 
 #ifdef MFC_MPI
     ! Declare mpi_p as a module variable

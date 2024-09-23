@@ -679,7 +679,7 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
 
-                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2* &
+                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                      dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
                             end do
                         end do
@@ -698,7 +698,7 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
 
-                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2* &
+                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                      dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
 
                             end do
@@ -718,7 +718,7 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
 
-                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2* &
+                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                      dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
@@ -738,7 +738,7 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
 
-                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2* &
+                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                      dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
@@ -793,7 +793,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
 
-                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2* &
+                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                          dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
@@ -814,7 +814,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
 
-                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2* &
+                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                          dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
@@ -835,7 +835,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
 
-                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2* &
+                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                          dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
@@ -856,7 +856,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
 
-                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2* &
+                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                          dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
@@ -877,7 +877,7 @@ contains
                                          dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
                                          dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2* &
+                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -898,7 +898,7 @@ contains
                                          dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
                                          dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2* &
+                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -918,7 +918,7 @@ contains
                                          dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
                                          dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2* &
+                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -937,7 +937,7 @@ contains
                                          dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
                                          dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2* &
+                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do

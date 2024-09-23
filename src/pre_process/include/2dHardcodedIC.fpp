@@ -5,7 +5,7 @@
 
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
-    eps = 1e-9
+    eps = 1e-9_wp
 
 #:enddef
 
@@ -71,7 +71,7 @@
     case (204) ! Rayleigh-Taylor instability
         rhoH = 3
         rhoL = 1
-        pRef = 1e5
+        pRef = 1e5_wp
         pInt = pRef
         h = 0.7
         lam = 0.2
@@ -80,7 +80,7 @@
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
 
-        alph = 5e-1*(1 + tanh((y_cc(j) - intH)/2.5e-3))
+        alph = 5e-1_wp*(1 + tanh((y_cc(j) - intH)/2.5e-3_wp))
 
         if (alph < eps) alph = eps
         if (alph > 1 - eps) alph = 1 - eps

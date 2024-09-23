@@ -1006,7 +1006,7 @@ contains
                         momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp)
                         momsp(2)%sf(id1, id2, id3) = 4._wp*pi*nbub*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp)
                         momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 2._wp, 0._wp)
-                        if (abs(gam - 1._wp) <= 1.e-4) then
+                        if (abs(gam - 1._wp) <= 1.e-4_wp) then
                             ! Gam \approx 1, don't risk imaginary quadrature
                             momsp(4)%sf(id1, id2, id3) = 1._wp
                         else

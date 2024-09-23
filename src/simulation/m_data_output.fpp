@@ -985,7 +985,7 @@ contains
             if (t_step_old /= dflt_int) then
                 nondim_time = real(t_step + t_step_old, wp)*dt
             else
-                nondim_time = real(t_step, wp)*dt !*1.e-5/10.0761131451_wp
+                nondim_time = real(t_step, wp)*dt !*1.e-5_wp/10.0761131451_wp
             end if
         end if
 
@@ -1622,7 +1622,7 @@ contains
             @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0._wp
-            Rc_min = 1d3
+            Rc_min = 1e3_wp
         end if
 
         ! Associating the procedural pointer to the appropriate subroutine

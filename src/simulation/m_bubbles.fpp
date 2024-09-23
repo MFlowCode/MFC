@@ -139,7 +139,7 @@ contains
                         do j = 0, m
                             divu%sf(j, k, l) = 0._wp
                             divu%sf(j, k, l) = &
-                                5e-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                5e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
                                             q_prim_vf(contxe + idir)%sf(j - 1, k, l))
 
                         end do
@@ -154,7 +154,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5e-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                           5e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
                                                        q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
                     end do
@@ -168,7 +168,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5e-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                           5e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
                                                        q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do
@@ -352,15 +352,15 @@ contains
 
                                     err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
                                     err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
-                                    if (abs(myV_tmp1(4)) < 1e-12) err5 = 0._wp
+                                    if (abs(myV_tmp1(4)) < 1e-12_wp) err5 = 0._wp
 
                                     ! Determine acceptance/rejection and update step size
                                     !   Rule 1: err1, err2, err3 < tol
                                     !   Rule 2: myR_tmp1(4) > 0._wp
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
-                                    if ((err1 <= 1e-4) .and. (err2 <= 1e-4) .and. (err3 <= 1e-4) &
-                                        .and. (err4 < 1e-4) .and. (err5 < 1e-4) &
+                                    if ((err1 <= 1e-4_wp) .and. (err2 <= 1e-4_wp) .and. (err3 <= 1e-4_wp) &
+                                        .and. (err4 < 1e-4_wp) .and. (err5 < 1e-4_wp) &
                                         .and. myR_tmp1(4) > 0._wp) then
 
                                         ! Accepted. Finalize the sub-step
@@ -371,12 +371,12 @@ contains
                                         myV = myV_tmp1(4)
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2._wp, max(0.5_wp, (1e-4/err1)**(1._wp/3._wp)))
+                                        h = h*min(2._wp, max(0.5_wp, (1e-4_wp/err1)**(1._wp/3._wp)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (err2 <= 1e-4) then
+                                        if (err2 <= 1e-4_wp) then
                                             h = 0.5_wp*h
                                         else
                                             h = 0.25_wp*h
@@ -401,7 +401,7 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        if (alf < 1.e-11) then
+                        if (alf < 1.e-11_wp) then
                             bub_adv_src(j, k, l) = 0._wp
                             bub_r_src(j, k, l, q) = 0._wp
                             bub_v_src(j, k, l, q) = 0._wp
@@ -476,10 +476,10 @@ contains
         ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
         d0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
         d1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
-        if (d0 < 1e-5 .or. d1 < 1e-5) then
-            h0 = 1e-6
+        if (d0 < 1e-5_wp .or. d1 < 1e-5_wp) then
+            h0 = 1e-6_wp
         else
-            h0 = 1e-2*(d0/d1)
+            h0 = 1e-2_wp*(d0/d1)
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -493,11 +493,11 @@ contains
         d2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
 
         ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
-        !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-        if (max(d1, d2) < 1e-15) then
-            h1 = max(1e-6, h0*1e-3)
+        !      if max(d1,d2) < 1e-15_wp, h1 = max(1e-6_wp, h0*1e-3_wp)
+        if (max(d1, d2) < 1e-15_wp) then
+            h1 = max(1e-6_wp, h0*1e-3_wp)
         else
-            h1 = (1e-2/max(d1, d2))**(1._wp/3._wp)
+            h1 = (1e-2_wp/max(d1, d2))**(1._wp/3._wp)
         end if
 
         ! Set h = min(100*h0,h1)

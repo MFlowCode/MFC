@@ -153,7 +153,7 @@ contains
         if (thermal == 2) gamma_m = 1._wp
 
         temp = 293.15_wp
-        D_m = 0.242e-4
+        D_m = 0.242e-4_wp
         uu = sqrt(pl0/rhol0)
 
         omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
@@ -260,17 +260,17 @@ contains
         real(wp), dimension(nb) :: phi
 
         ! nondiml. min. & max. initial radii for numerical quadrature
-        !sd   = 0.05D0
-        !R0mn = 0.75D0
-        !R0mx = 1.3D0
+        !sd   = 0.05e0_wp
+        !R0mn = 0.75e0_wp
+        !R0mx = 1.3e0_wp
 
-        !sd   = 0.3D0
-        !R0mn = 0.3D0
-        !R0mx = 6.D0
+        !sd   = 0.3e0_wp
+        !R0mn = 0.3e0_wp
+        !R0mx = 6.e0_wp
 
-        !sd   = 0.7D0
-        !R0mn = 0.12D0
-        !R0mx = 150.D0
+        !sd   = 0.7e0_wp
+        !R0mn = 0.12e0_wp
+        !R0mx = 150.e0_wp
 
         sd = poly_sigma
         R0mn = 0.8_wp*exp(-2.8_wp*sd)
