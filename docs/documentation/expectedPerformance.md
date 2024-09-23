@@ -57,7 +57,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Cavium ThunderX2          | Arm                       | CPU           | 32 cores     | 21               | GNU 13.2.0           | SBU Ookami |
 | Arm Cortex-A78AE          | Arm, BlueField3           | CPU           | 16 cores     | 25               | NVHPC 24.5           | GT Rogues Gallery |
 | Intel Xeon E5-2650V4      | Broadwell                 | CPU           | 12 cores     | 27               | NVHPC 23.5           | GT CSE Internal  |
-| Apple M1                  |                           | CPU           |  8 cores     | 32               | GNU 14.1.0           | N/A     |
+| Apple M2                  |                           | CPU           |  8 cores     | 32               | GNU 14.1.0           | N/A     |
 | Intel Xeon E7-4850V3      | Haswell                   | CPU           | 14 cores     | 34               | GNU 9.4.0            | GT CSE Internal  |
 | Fujitsu A64FX             | Arm                       | CPU           | 48 cores     | 63               | GNU 13.2.0           | SBU Ookami |
 
