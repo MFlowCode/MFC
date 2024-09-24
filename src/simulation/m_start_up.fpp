@@ -1102,13 +1102,13 @@ contains
         integer :: i, j, k, l
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 1) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
             if (cfl_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt) call s_mpi_abort("Delta t has become too small")
         end if
 
         if (cfl_dt) then

@@ -1,51 +1,18 @@
-This file was created on 2024-09-04 20:39:27.711223.
+This file was created on 2024-09-17 14:42:07.274062.
 
 mfc.sh:
 
     Invocation: test --generate -o cfl_const_dt=T
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        23ee7b6c702ed08bc2b7281173943308d43772af on CFLDT (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        17eb3def840695d311145e1bbeb6d5b38cb74674 on dt_bug_fixes (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+        CMake v3.29.2 on Bens-MacBook-Air-6.local
     
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : ON
@@ -65,9 +32,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -76,9 +43,9 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+        CMake v3.29.2 on Bens-MacBook-Air-6.local
     
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
@@ -98,42 +65,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-documentation:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on ipsec-10-2-65-129.vpn.gatech.edu
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : ON
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : /opt/homebrew/bin/doxygen
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : gcc
-        CXX      : g++
-        FC       : gfortran
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -142,9 +76,9 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.29.2 on ipsec-10-2-194-202.vpn.gatech.edu
+        CMake v3.29.2 on Bens-MacBook-Air-6.local
     
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/gcc)
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
@@ -164,9 +98,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
