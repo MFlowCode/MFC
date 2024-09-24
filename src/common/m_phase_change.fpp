@@ -247,7 +247,7 @@ contains
 
                     ! entropy
                     sk(1:num_fluids) = cvs(1:num_fluids)*log((TS**gs_min(1:num_fluids)) &
-                                                              /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
+                                                             /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
 
                     ! enthalpy
                     hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &

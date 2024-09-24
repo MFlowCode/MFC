@@ -663,7 +663,7 @@ contains
         do j = 0, n
             do i = 0, m
                 myr = sqrt((x_cc(i) - x_centroid)**2 &
-                            + (y_cc(j) - y_centroid)**2)
+                           + (y_cc(j) - y_centroid)**2)
 
                 if (myr <= radius + thickness/2._wp .and. &
                     myr >= radius - thickness/2._wp .and. &
@@ -726,7 +726,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     myr = sqrt((x_cc(i) - x_centroid)**2 &
-                                + (y_cc(j) - y_centroid)**2)
+                               + (y_cc(j) - y_centroid)**2)
 
                     if (myr <= radius + thickness/2._wp .and. &
                         myr >= radius - thickness/2._wp .and. &
@@ -1054,8 +1054,8 @@ contains
 
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy) &
-                                           *(a*x_cc(i) + b*y_cc(j) + c) &
-                                           /sqrt(a**2 + b**2))
+                                                 *(a*x_cc(i) + b*y_cc(j) + c) &
+                                                 /sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp &
@@ -1949,10 +1949,10 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = 5e-1_wp + 5e-1_wp*tanh(smooth_coeff/min(dx, dy, dz) &
-                                               *(a*x_cc(i) + &
-                                                 b*cart_y + &
-                                                 c*cart_z + d) &
-                                               /sqrt(a**2 + b**2 + c**2))
+                                                     *(a*x_cc(i) + &
+                                                       b*cart_y + &
+                                                       c*cart_z + d) &
+                                                     /sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp &

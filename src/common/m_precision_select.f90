@@ -1,5 +1,4 @@
-!>
-!! @file m_precision_select.f90
+!> @file m_precision_select.f90
 !! @brief Contains module m_precision_select
 
 !> @brief This file contains the definition of floating point used in MFC
@@ -10,14 +9,18 @@ module m_precision_select
 
     implicit none
 
+    ! Define the available precision types
     integer, parameter :: single_precision = selected_real_kind(6, 37)
     integer, parameter :: double_precision = selected_real_kind(15, 307)
 
-    integer, parameter :: wp = double_precision
+    ! Set the working precision (wp) to single or double precision
+    integer, parameter :: wp = double_precision  ! Change to single_precision if needed
+
 #ifdef MFC_MPI
-    integer, parameter :: mpi_p = MPI_DOUBLE_PRECISION
+    ! Set mpi_p based on wp using the merge intrinsic function
+    integer, parameter :: mpi_p = merge(MPI_DOUBLE_PRECISION, MPI_FLOAT, wp == double_precision)
 #else
-    integer, parameter :: mpi_p = -100
+    integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
 #endif
 
 end module m_precision_select
