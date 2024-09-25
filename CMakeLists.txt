@@ -175,7 +175,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     
     if (MFC_Strict) 
         add_compile_options(
-            "SHELL:-h flex_mp=intolerant"
             "SHELL:-hfp0"
             "SHELL:-h vector0"
         )
