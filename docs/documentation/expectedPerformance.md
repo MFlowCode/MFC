@@ -40,7 +40,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA Grace CPU          | Arm, Neoverse V2          | CPU           | 72 cores     | 3.7              | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000            | FP32-only GPU             | GPU           | 1 GPU        | 3.9              | NVHPC 22.11          | GT Phoenix  |
 | AMD EPYC 7763             | Milan                     | CPU           | 64 cores     | 4.1              | GNU 11.4.0           | NCSA Delta  |
-| NVIDIA A10                | FP32-only GPU             | GPU           | 1 GPU        | 4.3              | NVHPC 24.5           | TAMU Faster |
+| NVIDIA A10                | FP32-only GPU             | GPU           | 1 GPU        | 4.3              | NVHPC 24.1           | TAMU Faster |
 | AMD EPYC 7713             | Milan                     | CPU           | 64 cores     | 5.0              | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon 8480CL         | Sapphire Rapids           | CPU           | 56 cores     | 5.0              | NVHPC 24.5           | GT Phoenix  |
 | Intel Xeon 6454S          | Sapphire Rapids           | CPU           | 32 cores     | 5.6              | NVHPC 24.5           | GT Rogues Gallery  |
