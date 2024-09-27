@@ -713,7 +713,8 @@ contains
                     ! ==================================================================
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
-                elseif (weno_order == 5) then
+                ! elseif (weno_order == 5) then
+                else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &

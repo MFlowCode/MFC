@@ -137,6 +137,9 @@ module m_global_parameters
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different weno_polyn for TENO(>5))
+        integer :: weno_dvd_ubound !< Upper limit for dvd used in s_compute_weno_coefficients
+
         integer :: num_fluids     !< number of fluids in the simulation
         logical :: wenojs         !< WENO-JS (default)
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
@@ -708,6 +711,13 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
+            if (teno) then
+                weno_num_stencils = weno_order - 3
+                weno_dvd_ubound = weno_order
+            else
+                weno_num_stencils = weno_polyn
+                weno_dvd_ubound = weno_polyn - 1
+            end if
             !$acc update device(weno_polyn)
             !$acc update device(nb)
             !$acc update device(num_dims, num_fluids)
