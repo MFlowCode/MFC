@@ -997,7 +997,7 @@ contains
 
         ! Reconstruction in s1-direction ===================================
 
-        print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values_visc started'
+        ! print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values_visc started'
 
         if (norm_dir == 1) then
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz

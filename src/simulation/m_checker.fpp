@@ -66,12 +66,14 @@ contains
         @:PROHIBIT(weno_order /= 1 .and. f_is_default(weno_eps), &
             "weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6")
         @:PROHIBIT(weno_eps <= 0d0, "weno_eps must be positive. A typical value of weno_eps is 1e-6")
+        @:PROHIBIT(wenoz .and. weno_order == 7 .and. f_is_default(wenoz_q), &
+            "wenoz is used at 7th order, but wenoz_q is not set. It should be either 2 or 4")
         @:PROHIBIT(teno .and. f_is_default(teno_CT), "teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6")
         @:PROHIBIT(teno .and. teno_CT <= 0d0, "teno_CT must be positive. A typical value of teno_CT is 1e-6")
         @:PROHIBIT(count([mapped_weno, wenoz, teno]) >= 2, "Only one of mapped_weno, wenoz, or teno can be set to true")
         @:PROHIBIT(weno_order == 1 .and. mapped_weno)
         @:PROHIBIT(weno_order == 1 .and. wenoz)
-        @:PROHIBIT(weno_order /= 5 .and. teno)
+        @:PROHIBIT((weno_order == 1 .or. weno_order == 3) .and. teno)
         @:PROHIBIT(weno_order /= 5 .and. mp_weno)
         @:PROHIBIT(model_eqns == 1 .and. weno_avg)
     end subroutine s_check_inputs_weno
