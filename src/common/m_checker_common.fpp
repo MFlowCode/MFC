@@ -194,7 +194,7 @@ contains
     !> Checks constraints regarding WENO order.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_weno
-        @:PROHIBIT(all(weno_order /= (/1, 3, 5/)), "weno_order must be 1, 3, or 5")
+        @:PROHIBIT(all(weno_order /= (/1, 3, 5, 7/)), "weno_order must be 1, 3, or 5")
         @:PROHIBIT(m + 1 < weno_order, "m must be at least weno_order - 1")
         @:PROHIBIT(n > 0 .and. n + 1 < weno_order, "n must be at least weno_order - 1")
         @:PROHIBIT(p > 0 .and. p + 1 < weno_order, "p must be at least weno_order - 1")

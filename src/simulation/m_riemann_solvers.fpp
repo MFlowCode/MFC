@@ -266,6 +266,7 @@ module m_riemann_solvers
 
 contains
 
+    ! DEBUG: 1D_test_WENO7 is using this
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
