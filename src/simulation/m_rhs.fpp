@@ -942,7 +942,7 @@ contains
                                   flux_src_n(id)%vf, &
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
-            print *, 'DEBUG riemann_solver completed'
+            ! print *, 'DEBUG riemann_solver completed'
             call nvtxEndRange
 
             ! Additional physics and source terms ==============================
@@ -2159,7 +2159,7 @@ contains
         integer :: ii
         ! Reconstruction in s1-direction ===================================
 
-        print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values started'
+        ! print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values started'
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
@@ -2199,7 +2199,7 @@ contains
                         is1, is2, is3)
         end if
 
-        print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values ended'
+        ! print *, 'DEBUG m_rhs s_reconstruct_cell_boundary_values ended'
 
         ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values

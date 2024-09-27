@@ -149,6 +149,7 @@ module m_global_parameters
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
     real(kind(0d0)) :: teno_CT        !< Smoothness threshold for TENO
+    real(kind(0d0)) :: wenoz_q        !< Power constant for WENO-Z
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
@@ -180,7 +181,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, wenoz_q, hypoelasticity, low_Mach)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -528,6 +529,7 @@ contains
         time_stepper = dflt_int
         weno_eps = dflt_real
         teno_CT = dflt_real
+        wenoz_q = dflt_real
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
@@ -1109,7 +1111,7 @@ contains
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
-        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach)
+        !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, wenoz_q, low_Mach)
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)

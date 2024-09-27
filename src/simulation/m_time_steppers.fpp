@@ -630,13 +630,13 @@ contains
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-        print *, 'DEBUG RK3 step 1 compute_rhs completed'
+        ! print *, 'DEBUG RK3 step 1 compute_rhs completed'
 
         ! if (run_time_info) then
         if (.true.) then ! DEBUG ALWAYS WRITE RUN_TIME INFO
             call s_write_run_time_information(q_prim_vf, t_step)
         end if
-        print *, 'DEBUG RK3 step 1 write run_time_information completed'
+        ! print *, 'DEBUG RK3 step 1 write run_time_information completed'
         ! call exit(66)
 
         if (probe_wrt) then
