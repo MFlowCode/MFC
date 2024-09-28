@@ -336,7 +336,7 @@ contains
                     ! END: Computing WENO3 Coefficients ================================
 
                     ! Computing WENO5 Coefficients =====================================
-                else
+                elseif (weno_order == 5) then
 
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
@@ -464,35 +464,6 @@ contains
 
                     end do
 
-                    if (weno_order == 7 .and. (.not. teno)) then ! WENO7 only supports uniform grid
-                        d_cbL_${XYZ}$ (0, :) = 4d0/35d0
-                        d_cbL_${XYZ}$ (1, :) = 18d0/35d0
-                        d_cbL_${XYZ}$ (2, :) = 12d0/35d0
-                        d_cbL_${XYZ}$ (3, :) = 1d0/35d0
-
-                        d_cbR_${XYZ}$ (0, :) = 1d0/35d0
-                        d_cbR_${XYZ}$ (1, :) = 12d0/35d0
-                        d_cbR_${XYZ}$ (2, :) = 18d0/35d0
-                        d_cbR_${XYZ}$ (3, :) = 4d0/35d0
-
-                    elseif (weno_order == 7 .and. teno) then
-                        d_cbL_${XYZ}$ (0, :) = 18d0/35d0
-                        d_cbL_${XYZ}$ (1, :) = 9d0/35d0
-                        d_cbL_${XYZ}$ (2, :) = 3d0/35d0
-                        d_cbL_${XYZ}$ (3, :) = 4d0/35d0
-                        d_cbL_${XYZ}$ (4, :) = 1d0/35d0
-
-                        d_cbR_${XYZ}$ (0, :) = 18d0/35d0
-                        d_cbR_${XYZ}$ (1, :) = 9d0/35d0
-                        d_cbR_${XYZ}$ (2, :) = 3d0/35d0
-                        d_cbR_${XYZ}$ (3, :) = 4d0/35d0
-                        d_cbR_${XYZ}$ (4, :) = 1d0/35d0
-
-                    end if
-
-                    ! print *, 'DEBUG size of d_cbL_x', size(d_cbL_x)
-                    ! call exit(66)
-
                     ! Modifying the ideal weights coefficients in the neighborhood
                     ! of beginning and end Riemann state extrapolation BC to avoid
                     ! any contributions from outside of the physical domain during
@@ -512,11 +483,42 @@ contains
                             d_cbL_${XYZ}$ (0:1, s) = 0d0; d_cbL_${XYZ}$ (2, s) = 1d0
                         end if
                     end if
+
+                else ! WENO7
+                    ! Note: WENO7 only supports uniform grid
+                    if (.not. teno) then
+                        ! (Balsara & Shu, 2000) Page 415 Section III.a
+                        d_cbL_${XYZ}$ (0, :) = 4d0/35d0
+                        d_cbL_${XYZ}$ (1, :) = 18d0/35d0
+                        d_cbL_${XYZ}$ (2, :) = 12d0/35d0
+                        d_cbL_${XYZ}$ (3, :) = 1d0/35d0
+
+                        d_cbR_${XYZ}$ (0, :) = 1d0/35d0
+                        d_cbR_${XYZ}$ (1, :) = 12d0/35d0
+                        d_cbR_${XYZ}$ (2, :) = 18d0/35d0
+                        d_cbR_${XYZ}$ (3, :) = 4d0/35d0
+
+                    else ! TENO
+                        ! (Fu, et al., 2016) Table 2
+                        d_cbL_${XYZ}$ (0, :) = 18d0/35d0
+                        d_cbL_${XYZ}$ (1, :) = 9d0/35d0
+                        d_cbL_${XYZ}$ (2, :) = 3d0/35d0
+                        d_cbL_${XYZ}$ (3, :) = 4d0/35d0
+                        d_cbL_${XYZ}$ (4, :) = 1d0/35d0
+
+                        d_cbR_${XYZ}$ (0, :) = 18d0/35d0
+                        d_cbR_${XYZ}$ (1, :) = 9d0/35d0
+                        d_cbR_${XYZ}$ (2, :) = 3d0/35d0
+                        d_cbR_${XYZ}$ (3, :) = 4d0/35d0
+                        d_cbR_${XYZ}$ (4, :) = 1d0/35d0
+
+                    end if
                 end if
+
             end if
         #:endfor
 
-! END: Computing WENO5 Coefficients ================================
+! END: Computing WENO Coefficients ================================
         if (weno_dir == 1) then
             !$acc update device(poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x)
         elseif (weno_dir == 2) then
@@ -542,13 +544,13 @@ contains
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
-        real(kind(0d0)), dimension(-weno_polyn:weno_dvd_ubound) :: dvd
+        real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(kind(0d0)), dimension(0:weno_num_stencils) :: poly
         real(kind(0d0)), dimension(0:weno_num_stencils) :: alpha
         real(kind(0d0)), dimension(0:weno_num_stencils) :: omega
         real(kind(0d0)), dimension(0:weno_num_stencils) :: beta
         real(kind(0d0)), dimension(0:weno_num_stencils) :: delta
-        real(kind(0d0)) :: tau5
+        real(kind(0d0)) :: tau
         real(kind(0d0)), pointer :: beta_p(:)
 
         real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
@@ -556,8 +558,6 @@ contains
         integer :: i, j, k, l, r, s, w
 
         integer :: t1, t2, c_rate, c_max
-
-        ! print *, 'DEBUG weno started'
 
         is1_weno = is1_weno_d
         is2_weno = is2_weno_d
@@ -614,7 +614,7 @@ contains
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha,tau5)
+                    !$acc parallel loop collapse(4) gang vector default(present) private(beta,dvd,poly,omega,alpha,tau)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -647,8 +647,8 @@ contains
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
-                                        tau5 = abs(beta(1) - beta(0))
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        tau = abs(beta(1) - beta(0))
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau/beta)
 
                                     end if
 
@@ -673,7 +673,7 @@ contains
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau/beta)
 
                                     end if
 
@@ -691,7 +691,7 @@ contains
         elseif (weno_order == 5) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau5, delta)
+                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau, delta)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -742,14 +742,14 @@ contains
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
-                                        tau5 = abs(beta(2) - beta(0))                   ! Equation 25
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
+                                        tau = abs(beta(2) - beta(0))                   ! Equation 25
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau/beta)  ! Equation 28 (note: weno_eps was already added to beta)
 
                                     elseif (teno) then
                                         ! Fu, et al. (2016)
                                         ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-                                        tau5 = abs(beta(2) - beta(0))
-                                        alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        tau = abs(beta(2) - beta(0))
+                                        alpha = (1d0 + tau/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                         delta = merge(0d0, 1d0, omega < teno_CT)    ! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
@@ -782,7 +782,7 @@ contains
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau/beta)
 
                                     elseif (teno) then
                                         alpha = delta*d_cbR_${XYZ}$ (:, j)
@@ -806,29 +806,15 @@ contains
                 end if
             #:endfor
         elseif (weno_order == 7) then
-            ! print *, 'calling >= WENO7 DEBUG'
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(dvd, poly, beta, alpha, omega, tau5)
+                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau)
+                    ! Note: dvd is not used as the equations are not cast in terms of the differences
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
                                 !$acc loop seq
                                 do i = 1, v_size
-                                    ! dvd(2) = v_rs_ws_${XYZ}$ (j + 3, k, l, i) &
-                                    !          - v_rs_ws_${XYZ}$ (j + 2, k, l, i)
-                                    ! dvd(1) = v_rs_ws_${XYZ}$ (j + 2, k, l, i) &
-                                    !          - v_rs_ws_${XYZ}$ (j + 1, k, l, i)
-                                    ! dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
-                                    !          - v_rs_ws_${XYZ}$ (j, k, l, i)
-                                    ! dvd(-1) = v_rs_ws_${XYZ}$ (j, k, l, i) &
-                                    !           - v_rs_ws_${XYZ}$ (j - 1, k, l, i)
-                                    ! dvd(-2) = v_rs_ws_${XYZ}$ (j - 1, k, l, i) &
-                                    !           - v_rs_ws_${XYZ}$ (j - 2, k, l, i)
-                                    ! dvd(-3) = v_rs_ws_${XYZ}$ (j - 2, k, l, i) &
-                                    !           - v_rs_ws_${XYZ}$ (j - 3, k, l, i)
-
-                                    ! TODO switch to using dvd in place of the long variable names
 
                                     if (.not. teno) then
                                         ! (Balsara & Shu, 2000) Page 415 Table I
@@ -840,70 +826,73 @@ contains
                                                   -  5d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) +  1d0*v_rs_ws_${XYZ}$ (j+2, k, l, i)) / 12d0 !&
                                         poly(3) = ( 25d0*v_rs_ws_${XYZ}$ (j  , k, l, i) - 23d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) & !&
                                                   + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) -  3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
-                                    else ! high order TENO stencils: (Fu, et al., 2016) Table 1
-                                        ! This part deserves an explanation. Consider first referring to the right-sided flux (at i+1/2) computed in the subsequent section
-                                        ! Then, by drawing out the stencils following Fig 2 (right) (Fu, et al., 2016), and writing each coefficient besides each stencil point,
-                                        ! we can then flip everything wrt the x=i point, so the formulas work for the left-sided flux (at i-1/2), which is what we want here
-                                        ! But the stencils must follow the same order as the right-sided flux (k=0: i-1 to i+1; k=1: i to i+2; k=2: i-1 to i; k=3: i to i+3, k=4: i-3 to i),
-                                        ! so by remapping the coefficients to these stencils, we get the correct poly coefficients for the left-sided flux
+                                    else
+                                        ! (Fu, et al., 2016) Table 1
+                                        ! Note: Unlike TENO5, TENO7 stencils differ from the WENO7 stencils. TENO7 stencils are explained below:
+                                        ! First, consider the right-sided flux (at i+1/2) computed in the subsequent section.
+                                        ! Then, by drawing the stencils following Fig 2 (right) (Fu, et al., 2016) and writing each coefficient beside each stencil point,
+                                        ! we can flip everything with respect to the x=i point. This allows the formulas to work for the left-sided flux (at i-1/2), which is what we want here.
+                                        ! However, the stencils must follow the same order as the right-sided flux (k=0: i-1 to i+1; k=1: i to i+2; k=2: i-1 to i; k=3: i to i+3, k=4: i-3 to i).
+                                        ! By remapping the coefficients to these stencils, we obtain the correct polynomial coefficients for the left-sided flux:
                                         poly(0) = ( 2d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  1d0*v_rs_ws_${XYZ}$ (j+1, k, l, i)) / 6d0 !&
                                         poly(1) = (11d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  7d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j+2, k, l, i)) / 6d0 !&
                                         poly(2) = (-1d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 6d0 !&
                                         poly(3) = (25d0*v_rs_ws_${XYZ}$ (j  , k, l, i) - 23d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) -  3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
                                         poly(4) = ( 1d0*v_rs_ws_${XYZ}$ (j-3, k, l, i) -  5d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  3d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 12d0 !&
                                     end if
-                                    
+
                                     if (.not. teno) then
+                                        ! (Balsara & Shu, 2000) Page 415 Section III.a
                                         beta(0) = ( v_rs_ws_${XYZ}$ (j - 3, k, l, i)*(   547d0*v_rs_ws_${XYZ}$ (j - 3, k, l, i) & !&
-                                                                                   -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
-                                                                                   +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   -  1854d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(  7043d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
-                                                                                   - 17246d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   +  7042d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*( 11003d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   -  9402d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                                                     -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
+                                                                                     +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     -  1854d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(    7043d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
+                                                                                     - 17246d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     +  7042d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(   11003d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     -  9402d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
                                                 + 2107d0*v_rs_ws_${XYZ}$ (j, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
 
                                         beta(1) = ( v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(  267d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
-                                                                                   - 1642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   + 1602d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   -  494d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*( 2843d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   - 5966d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   + 1922d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j    , k, l, i)*( 3443d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   - 2522d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
+                                                                                     - 1642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     + 1602d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
+                                                                                     -  494d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(   2843d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     - 5966d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
+                                                                                     + 1922d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j    , k, l, i)*(   3443d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
+                                                                                     - 2522d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
                                                 + 547d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
 
-                                        beta(2) = ( v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(  547d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i)  & !&
-                                                                                   - 2522d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   + 1922d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i)  & !&
-                                                                                   -  494d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j    , k, l, i)*( 3443d0*v_rs_ws_${XYZ}$ (j    , k, l, i)  & !&
-                                                                                   - 5966d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
-                                                                                   + 1602d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*( 2843d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i)  & !&
-                                                                                   - 1642d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
+                                        beta(2) = ( v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(  547d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     - 2522d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
+                                                                                     + 1922d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     -  494d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j    , k, l, i)*(   3443d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
+                                                                                     - 5966d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     + 1602d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*(   2843d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     - 1642d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
                                                 + 267d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
 
                                         beta(3) = ( v_rs_ws_${XYZ}$ (j    , k, l, i)*(  2107d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   -  9402d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
-                                                                                   +  7042d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   -  1854d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*( 11003d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
-                                                                                   - 17246d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   +  4642d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j + 2, k, l, i)*(  7043d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   -  3882d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                                                     -  9402d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     +  7042d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     -  1854d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*(   11003d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     - 17246d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     +  4642d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j + 2, k, l, i)*(    7043d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     -  3882d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
                                                 + 547d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
 
                                     else ! TENO
-                                        ! Section 3.2 of High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019)
+                                        ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019) Section 3.2
                                         beta(0) = 13d0/12d0*(v_rs_ws_${XYZ}$ (j - 1, k, l, i) - 2d0*v_rs_ws_${XYZ}$ (j, k, l, i) + v_rs_ws_${XYZ}$ (j + 1, k, l, i))**2d0 &
                                                   + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 1, k, l, i) - v_rs_ws_${XYZ}$ (j + 1, k, l, i))**2d0 &
                                                   + weno_eps
@@ -914,25 +903,25 @@ contains
                                                   + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 2, k, l, i) - 4d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) + 3d0*v_rs_ws_${XYZ}$ (j, k, l, i))**2d0 &
                                                   + weno_eps
                                         beta(3) = ( v_rs_ws_${XYZ}$ (j    , k, l, i)*(  2107d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
-                                                                                   -  9402d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
-                                                                                   +  7042d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   -  1854d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*( 11003d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
-                                                                                   - 17246d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   +  4642d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j + 2, k, l, i)*(  7043d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
-                                                                                   -  3882d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                                                     -  9402d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     +  7042d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     -  1854d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*(   11003d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
+                                                                                     - 17246d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     +  4642d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j + 2, k, l, i)*(    7043d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
+                                                                                     -  3882d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
                                                 + 547d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
                                         beta(4) = ( v_rs_ws_${XYZ}$ (j - 3, k, l, i)*(   547d0*v_rs_ws_${XYZ}$ (j - 3, k, l, i) & !&
-                                                                                   -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
-                                                                                   +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   -  1854d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(  7043d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
-                                                                                   - 17246d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   +  7042d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
-                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*( 11003d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
-                                                                                   -  9402d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                                                     -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
+                                                                                     +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     -  1854d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(    7043d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
+                                                                                     - 17246d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     +  7042d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
+                                                + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(   11003d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
+                                                                                     -  9402d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
                                                 + 2107d0*v_rs_ws_${XYZ}$ (j, k, l, i)**2d0 ) / 240d0 & !&
                                                 + weno_eps !&
                                     end if
@@ -948,24 +937,23 @@ contains
 
                                     elseif (wenoz) then
                                         ! Castro, et al. (2010)
-                                        tau5 = abs(beta(3) - beta(0)) ! Equation 50
-                                        ! alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + (tau5/beta)**wenoz_q)
+                                        ! Don & Borges (2013) also helps
+                                        tau = abs(beta(3) - beta(0)) ! Equation 50
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + (tau/beta)**wenoz_q) ! q = 2,3,4 for stability
 
                                     elseif (teno) then
-                                        ! Fu, et al. (2016)
-                                        tau5 = abs(beta(3) - beta(0))
-                                        alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                        omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
-                                        delta = merge(0d0, 1d0, omega < teno_CT)       ! Equation 26 !!! DEBUG NEED TO CHANGE TO teno_CT
-                                        alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
+                                        tau = abs(beta(3) - beta(0))
+                                        alpha = (1d0 + tau/beta)**6d0
+                                        omega = alpha/sum(alpha)
+                                        delta = merge(0d0, 1d0, omega < teno_CT)
+                                        alpha = delta*d_cbL_${XYZ}$ (:, j)
 
                                     end if
 
                                     omega = alpha/sum(alpha)
 
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = sum(omega*poly)
-                                    
+
                                     if (.not. teno) then
                                         poly(0) = ( -3d0*v_rs_ws_${XYZ}$ (j-3, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) & !&
                                                   - 23d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) + 25d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 12d0 !&
@@ -993,9 +981,7 @@ contains
                                                 *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
-                                        ! alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + (tau5/beta)**wenoz_q)
-
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + (tau/beta)**wenoz_q)
 
                                     elseif (teno) then
                                         alpha = delta*d_cbR_${XYZ}$ (:, j)
@@ -1015,8 +1001,6 @@ contains
                 end if
             #:endfor
         end if
-
-        ! print *, 'DEBUG weno ended'
 
     end subroutine s_weno
 

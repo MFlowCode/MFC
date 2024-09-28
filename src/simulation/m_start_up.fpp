@@ -1156,8 +1156,6 @@ contains
             call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. (.not. adap_dt)) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
-            ! print *, 'DEBUG RK3 completed'
-            ! call exit(33)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
