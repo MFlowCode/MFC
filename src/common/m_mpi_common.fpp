@@ -378,10 +378,10 @@ contains
 
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
-        call MPI_REDUCE(var_loc, var_glb, 1, MPI_2DOUBLE_PRECISION, &
+        call MPI_REDUCE(var_loc, var_glb, 1, MPI_2REAL, &
                         MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
 
-        call MPI_BCAST(var_glb, 1, MPI_2DOUBLE_PRECISION, &
+        call MPI_BCAST(var_glb, 1, MPI_2REAL, &
                        0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb
