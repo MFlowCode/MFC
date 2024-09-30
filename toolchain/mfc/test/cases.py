@@ -728,7 +728,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50
-                    case['t_step_save'] = 50
+                    case['t_step_save'] = 5
 
                 caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
                 if caseSize > 625:

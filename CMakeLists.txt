@@ -207,12 +207,13 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            -C 
-            -g 
-            -O0 
-            -traceback 
-            -Minform=inform 
-            -Mbounds
+            $<$<COMPILE_LANGUAGE:Fortran>:-O0>
+            $<$<COMPILE_LANGUAGE:Fortran>:-C> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-O0> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
 
