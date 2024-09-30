@@ -25,4 +25,4 @@ pandas
 
 # Chemistry
 cantera
-pyrometheus @ git+https://github.com/henryleberre/pyrometheus.git@multi-lang-part-2
+pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git@mfc
