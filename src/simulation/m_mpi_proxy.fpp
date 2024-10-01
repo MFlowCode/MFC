@@ -1070,6 +1070,7 @@ contains
                     !$acc update host(q_cons_buff_send, ib_buff_send)
                 #:endif
 
+                call nvtxStartRange("RHS-MPI-SENDRECV")
                 call MPI_SENDRECV( &
                     p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
                     p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
