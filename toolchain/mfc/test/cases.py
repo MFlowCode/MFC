@@ -80,7 +80,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     def alter_weno():
-        for weno_order in [3, 5]:
+        for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
@@ -96,6 +96,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if "teno" in data:
                     data["teno_CT"] = 1e-6
+                if "wenoz" in data and weno_order == 7:
+                    data["wenoz_q"] = 3.0
 
                 cases.append(define_case_d(stack, trace, data))
 
