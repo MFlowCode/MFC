@@ -86,7 +86,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
-                if mp_weno == 'T' and weno_order == 3:
+                if mp_weno == 'T' and weno_order != 5:
                     continue
                 if teno == 'T' and weno_order == 3:
                     continue
@@ -99,7 +99,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if "wenoz" in data and weno_order == 7:
                     data["wenoz_q"] = 3.0
 
+                if weno_order == 7:
+                    stack.push("", {'m': 35, 'n': 35, 'p': 35})
+
                 cases.append(define_case_d(stack, trace, data))
+                
+                if weno_order == 7:
+                    stack.pop()
 
             stack.pop()
 
