@@ -103,7 +103,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.push("", {'m': 35, 'n': 35, 'p': 35})
 
                 cases.append(define_case_d(stack, trace, data))
-                
+
                 if weno_order == 7:
                     stack.pop()
 
