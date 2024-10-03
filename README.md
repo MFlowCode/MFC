@@ -132,7 +132,7 @@ They are organized below. Just click the drop-downs!
 
 * Shock and interface capturing schemes
 	* First-order upwinding
- 	* WENO reconstructions of order 3 and 5
+ 	* WENO reconstructions of order 3, 5, and 7
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of high density ratios
