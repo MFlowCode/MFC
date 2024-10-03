@@ -3,6 +3,9 @@
 
 !> @brief This file contains the definition of floating point used in MFC
 module m_precision_select
+
+    use, intrinsic :: iso_c_binding
+
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -16,11 +19,16 @@ module m_precision_select
     ! Set the working precision (wp) to single or double precision
     integer, parameter :: wp = single_precision  ! Change to single_precision if needed
 
+    integer, parameter :: c_type = merge(c_double, c_float, wp == double_precision)
+    integer, parameter :: c_type_complex = merge(c_double_complex, c_float_complex, wp == double_precision)
+
 #ifdef MFC_MPI
     ! Set mpi_p based on wp using the merge intrinsic function
     integer, parameter :: mpi_p = merge(MPI_DOUBLE_PRECISION, MPI_REAL, wp == double_precision)
+    integer, parameter :: mpi_2p = merge(MPI_2DOUBLE_PRECISION, MPI_2REAL, wp == double_precision)
 #else
     integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
+    integer, parameter :: mpi_2p = -100
 #endif
 
 end module m_precision_select

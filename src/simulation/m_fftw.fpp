@@ -40,12 +40,12 @@ module m_fftw
     type(c_ptr) :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
     integer :: real_size, cmplx_size, x_size, batch_size, Nfq
 
-    real(c_double), pointer :: data_real(:) !< Real data
+    real(c_type), pointer :: data_real(:) !< Real data
 
-    complex(c_double_complex), pointer :: data_cmplx(:) !<
+    complex(c_type_complex), pointer :: data_cmplx(:) !<
     !! Complex data in Fourier space
 
-    complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
+    complex(c_type_complex), pointer :: data_fltr_cmplx(:) !<
     !! Filtered complex data in Fourier space
 
 #if defined(MFC_OpenACC)
@@ -141,8 +141,8 @@ contains
     subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(c_double), pointer :: p_real(:)
-        complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
+        real(c_type), pointer :: p_real(:)
+        complex(c_type_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
         integer :: i, j, k, l !< Generic loop iterators
 
         ! Restrict filter to processors that have cells adjacent to axis
