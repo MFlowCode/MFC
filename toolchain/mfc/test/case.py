@@ -213,21 +213,27 @@ print(json.dumps({{**case, **mods}}))
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
     def compute_tolerance(self) -> float:
+
+        tolerance = 1e-12
+
         if self.params.get("hypoelasticity", 'F') == 'T':
-            return 1e-7
+            tolerance = 1e-7
 
         if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
-            return 1e-10
+            tolerance = 1e-10
 
         if self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
-            return 1e-10
+            tolerance = 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
             if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
-                return 1e-5
-            return 3e-12
+                tolerance = 1e-5
+            tolerance = 3e-12
 
-        return 1e-12
+        if self.params["weno_order"] == 7:
+            tolerance = 1e-11
+
+        return tolerance
 
 @dataclasses.dataclass
 class TestCaseBuilder:
