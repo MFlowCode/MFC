@@ -230,9 +230,6 @@ print(json.dumps({{**case, **mods}}))
                 tolerance = 1e-5
             tolerance = 3e-12
 
-        if self.params["weno_order"] == 7:
-            tolerance = 1e-11
-
         return tolerance
 
 @dataclasses.dataclass

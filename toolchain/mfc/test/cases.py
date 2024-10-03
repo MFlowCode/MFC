@@ -79,7 +79,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
         stack.pop()
 
-    def alter_weno():
+    def alter_weno(dimInfo):
         for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
@@ -99,12 +99,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if "wenoz" in data and weno_order == 7:
                     data["wenoz_q"] = 3.0
 
-                if weno_order == 7:
+                if weno_order == 7 and "z" in dimInfo[0]:
                     stack.push("", {'m': 35, 'n': 35, 'p': 35})
 
                 cases.append(define_case_d(stack, trace, data))
 
-                if weno_order == 7:
+                if weno_order == 7 and "z" in dimInfo[0]:
                     stack.pop()
 
             stack.pop()
@@ -699,7 +699,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
-            alter_weno()
+            alter_weno(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
