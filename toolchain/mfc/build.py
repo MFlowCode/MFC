@@ -102,7 +102,6 @@ class MFCTarget:
         install_prefixes = ';'.join([
             t.get_install_dirpath(case) for t in self.requires.compute()
         ])
-        mod_dirs         = f"{HIPFORT.get_install_dirpath(case)}/include/hipfort/amdgcn"
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
@@ -133,10 +132,6 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            # Fortran .mod include directories. Currently used for the HIPFORT
-            # dependency that has this missing from its config files.
-            f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
-
             f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
         ]
 

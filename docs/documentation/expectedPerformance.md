@@ -40,6 +40,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | NVIDIA Grace CPU          | Arm, Neoverse V2          | CPU           | 72 cores     | 3.7              | NVHPC 24.1           | GT Rogues Gallery  |
 | NVIDIA RTX6000            | FP32-only GPU             | GPU           | 1 GPU        | 3.9              | NVHPC 22.11          | GT Phoenix  |
 | AMD EPYC 7763             | Milan                     | CPU           | 64 cores     | 4.1              | GNU 11.4.0           | NCSA Delta  |
+| NVIDIA A10                | FP32-only GPU             | GPU           | 1 GPU        | 4.3              | NVHPC 24.1           | TAMU Faster |
 | AMD EPYC 7713             | Milan                     | CPU           | 64 cores     | 5.0              | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon 8480CL         | Sapphire Rapids           | CPU           | 56 cores     | 5.0              | NVHPC 24.5           | GT Phoenix  |
 | Intel Xeon 6454S          | Sapphire Rapids           | CPU           | 32 cores     | 5.6              | NVHPC 24.5           | GT Rogues Gallery  |
@@ -49,6 +50,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat  | 
 | AMD EPYC 7513             | Milan                     | CPU           | 32 cores     | 7.4              | GNU 12.3.0           | GT ICE  |
 | AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
+| NVIDIA T4                 | FP32-only GPU             | GPU           | 1 GPU        | 8.8              | NVHPC 24.1           | TAMU Faster  |
 | IBM Power10               |                           | CPU           | 24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
 | AMD EPYC 7401             | Naples                    | CPU           | 24 cores     | 10               | GNU 10.3.1           | LLNL Corona  |
 | Intel Xeon 6226           | Cascade Lake              | CPU           | 12 cores     | 17               | GNU 12.3.0           | GT ICE  |
