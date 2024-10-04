@@ -26,12 +26,19 @@ option(MFC_POST_PROCESS  "Build post_process"                                OFF
 option(MFC_SYSCHECK      "Build syscheck"                                    OFF)
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
+option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
     set(MFC_SIMULATION    ON FORCE)
     set(MFC_POST_PROCESS  ON FORCE)
     set(MFC_DOCUMENTATION ON FORCE)
+endif()
+
+if (MFC_SINGLE_PRECISION)
+    add_compile_definitions(MFC_SINGLE_PRECISION)
+else()
+    add_compile_definitions(MFC_DOUBLE_PRECISION)
 endif()
 
 

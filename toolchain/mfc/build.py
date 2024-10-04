@@ -136,6 +136,8 @@ class MFCTarget:
             # Fortran .mod include directories. Currently used for the HIPFORT
             # dependency that has this missing from its config files.
             f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
+
+            f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
         ]
 
         if ARG("verbose"):
@@ -166,6 +168,7 @@ class MFCTarget:
                             "--target",   self.name,
                             "--parallel", ARG("jobs"),
                             "--config",   'Debug' if ARG('debug') else 'Release']
+        
         if ARG('verbose'):
             command.append("--verbose")
 
