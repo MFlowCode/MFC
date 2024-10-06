@@ -28,22 +28,10 @@ Please select your desired configuration from the list bellow:
 ```shell
 sudo apt update
 sudo apt upgrade
-sudo apt install tar wget make cmake gcc g++ \
-                   python3 python3-dev         \
-                   "openmpi-*" libopenmpi-dev \
-                   python3-venv
-```
-
-- **Via Pacman (Arch):**
-
-```shell
-sudo pacman -Syu
-sudo pacman -S base-devel coreutils  \
-                 git ninja gcc-fortran \
-                 cmake openmpi python3 \
-                 python-pip openssh    \
-                 python-virtualenv vim \
-                 wget tree
+sudo apt install tar wget make cmake gcc g++      \
+                 python3 python3-dev python3-venv \
+                 openmpi-bin libopenmpi-dev       \
+                 libhdf5-dev libfftw3-dev
 ```
 
 If you wish to build MFC using [NVidia's NVHPC SDK](https://developer.nvidia.com/hpc-sdk),
@@ -55,8 +43,8 @@ first follow the instructions [here](https://developer.nvidia.com/nvidia-hpc-sdk
   <summary><h2>Windows</h2></summary>
 
 On Windows, you can either use Intel Compilers with the standard Microsoft toolchain,
-[Docker](https://docs.docker.com/get-docker/) or the
-[Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) for a Linux experience.
+or the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/)
+for a Linux experience.
 
  <details>
 
@@ -113,79 +101,17 @@ You will also have access to the `.sln` Microsoft Visual Studio solution files f
 <details>
   <summary><h3>MacOS</h3></summary>
 
-  - **If you use [ZSH]** (Verify with `echo $SHELL`)
+Using [Homebrew](https://brew.sh/) you can install the necessary dependencies
+before configuring your environment:
 
 ```shell
-touch ~/.zshrc
-open ~/.zshrc
-```
-
-  - **If you use [BASH]** (Verify with `echo $SHELL`)
-  
-```shell
-touch ~/.bash_profile
-open ~/.bash_profile
-```
-  
-An editor should open.
-Please paste the following lines into it before saving the file.
-Modify the first assignment if you wish to use a different version of GNU's GCC.
-These lines ensure that LLVM's Clang and Apple's modified version of GCC are not used to compile MFC.
-Further reading on `open-mpi` incompatibility with `clang`-based `gcc` on macOS: [here](https://stackoverflow.com/questions/27930481/how-to-build-openmpi-with-homebrew-and-gcc-4-9).
-We do *not* support `clang` due to conflicts with the Silo dependency.
-
-```shell
-export MFC_GCC_VER=13
-export CC=gcc-$MFC_GCC_VER
-export CXX=g++-$MFC_GCC_VER
-export FC=gfortran-$MFC_GCC_VER
-```
-
-**Close the open editor and terminal window**. Open a **new terminal** window before executing the commands below.
-
-```shell
-brew install wget python cmake gcc@$MFC_GCC_VER mpich
+brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
+echo -e 'export BOOST_INCLUDE=/opt/homebrew/' | tee -a ~/.bash_profile ~/.zshrc
+. ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
+! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
 ```
 
 They will download the dependencies MFC requires to build itself.
-
-</details>
-
-<details>
-  <summary><h3>Docker</h3></summary>
-
-Docker is a lightweight, cross-platform, and performant alternative to Virtual Machines (VMs).
-We build a Docker Image that contains the packages required to build and run MFC on your local machine.
-  
-First, install Docker and Git:
-- Windows: [Docker](https://docs.docker.com/get-docker/) + [Git](https://git-scm.com/downloads).
-- macOS: `brew install git docker` (requires [Homebrew](https://brew.sh/)).
-- Other systems:
-```shell
-sudo apt install git docker # Debian / Ubuntu via Aptitude
-sudo pacman -S git docker   # Arch Linux via Pacman
-```
-
-Once Docker and Git are installed on your system, clone MFC with
-
-```shell
-git clone https://github.com/MFlowCode/MFC
-cd MFC 
-```
-
-To fetch the prebuilt Docker image and enter an interactive bash session with the
-recommended settings applied, run
-
-```shell
-  ./mfc.sh  docker # If on \*nix/macOS
-  .\mfc.bat docker # If on Windows
-```
-
-We automatically mount and configure the proper permissions for you to access your local copy of MFC, available at `~/MFC`.
-You will be logged in as the `me` user with root permissions.
-
-:warning: The state of your container is entirely transient, except for the MFC mount.
-Thus, any modification outside of `~/MFC` should be considered permanently lost upon session exit.
 
 </details>
 

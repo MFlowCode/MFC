@@ -157,6 +157,7 @@ module m_global_parameters
     logical :: null_weights   !< Null undesired WENO weights
     logical :: mixture_err    !< Mixture properties correction
     logical :: hypoelasticity !< hypoelasticity modeling
+    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
 
     logical :: bodyForces
@@ -231,6 +232,8 @@ module m_global_parameters
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     integer :: c_idx         ! Index of the color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
     !> @}
 
     !$acc declare create(bub_idx)
@@ -283,7 +286,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -405,6 +408,9 @@ module m_global_parameters
 #endif
     !> @}
 
+    type(chemistry_parameters) :: chem_params
+    !$acc declare create(chem_params)
+
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
     real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
@@ -445,7 +451,10 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
-!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
+    integer :: chemxb, chemxe
+    integer :: tempxb, tempxe
+
+!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe, tempxb, tempxe)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -543,6 +552,10 @@ contains
             wenoz = .false.
             teno = .false.
         #:endif
+
+        chem_params%advection = .false.
+        chem_params%diffusion = .false.
+        chem_params%reactions = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -1054,6 +1067,16 @@ contains
             grid_geometry = 3
         end if
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            temperature_idx%beg = sys_size + 1
+            temperature_idx%end = sys_size + 1
+            sys_size = temperature_idx%end
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -1066,8 +1089,13 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
+        tempxb = temperature_idx%beg
+        tempxe = temperature_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, tempxb, tempxe)
+        !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)

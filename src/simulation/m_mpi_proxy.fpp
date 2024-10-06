@@ -196,8 +196,8 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',                   &
-            & 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat',                &
+        #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
+            &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -206,6 +206,12 @@ contains
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
+
+        if (chemistry) then
+            #:for VAR in [ 'advection', 'diffusion', 'reactions' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
