@@ -37,7 +37,7 @@ cd - > /dev/null
 echo
 
 # Fixes Delta not being able to find core library file
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-22.11/openmpi-4.1.5-nzb4n4r/lib/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-24.1/openmpi-4.1.5-zkiklxi/lib/
 
 % for target in targets:
     ${helpers.run_prologue(target)}
