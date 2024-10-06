@@ -17,16 +17,11 @@ module m_precision_select
     integer, parameter :: double_precision = selected_real_kind(15, 307)
 
     ! Set the working precision (wp) to single or double precision
-! #ifdef MFC_SINGLE_PRECISION
-!     integer, parameter :: wp = single_precision  ! Change to single_precision if needed
-! #else
-!     integer, parameter :: wp = double_precision
-! #endif
-
-    integer, parameter :: wp = single_precision
-
-    ! integer, parameter :: c_type = c_double
-    ! integer, parameter :: c_type_complex = c_double_complex
+#ifdef MFC_SINGLE_PRECISION
+    integer, parameter :: wp = single_precision  ! Change to single_precision if needed
+#else
+    integer, parameter :: wp = double_precision
+#endif
 
 #ifdef MFC_MPI
     ! Set mpi_p based on wp using the merge intrinsic function
