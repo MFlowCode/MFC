@@ -232,7 +232,7 @@ module m_global_parameters
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     integer :: c_idx         ! Index of the color function
-    type(int_bounds_info) :: chemistry_idx          !< Indexes of first & last concentration eqns.
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
     type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
     !> @}
 
@@ -286,7 +286,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, chemistry_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -1068,9 +1068,9 @@ contains
         end if
 
         if (chemistry) then
-            chemistry_idx%beg = sys_size + 1
-            chemistry_idx%end = sys_size + num_species
-            sys_size = chemistry_idx%end
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
 
             temperature_idx%beg = sys_size + 1
             temperature_idx%end = sys_size + 1
@@ -1089,13 +1089,13 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
-        chemxb = chemistry_idx%beg
-        chemxe = chemistry_idx%end
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
         tempxb = temperature_idx%beg
         tempxe = temperature_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, tempxb, tempxe)
-        !$acc update device(chemistry_idx)
+        !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
