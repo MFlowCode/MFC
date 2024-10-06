@@ -130,17 +130,18 @@ def test():
     exit(nFAIL)
 
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
-    tol = case.compute_tolerance()
+    if ARG("single"):
+        tol = 1e-5
+    else:
+        tol = case.compute_tolerance()
 
     case.delete_output()
     case.create_directory()
-
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
-
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)

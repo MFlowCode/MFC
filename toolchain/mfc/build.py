@@ -163,7 +163,6 @@ class MFCTarget:
                             "--target",   self.name,
                             "--parallel", ARG("jobs"),
                             "--config",   'Debug' if ARG('debug') else 'Release']
-        
         if ARG('verbose'):
             command.append("--verbose")
 
