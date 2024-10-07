@@ -33,9 +33,13 @@ module m_time_steppers
 
     use m_helper
 
+    use m_sim_helpers
+
     use m_fftw
 
     use m_nvtx
+
+    use m_thermochem
 
     use m_body_forces
     ! ==========================================================================
@@ -59,10 +63,12 @@ module m_time_steppers
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
 
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
+
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -80,10 +86,12 @@ module m_time_steppers
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: max_dt
+
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #endif
 
 contains
@@ -217,6 +225,20 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(c_idx))
         end if
 
+        if (chemistry) then
+            do i = chemxb, chemxe
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+
+            @:ALLOCATE(q_prim_vf(tempxb)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(tempxb))
+        end if
+
         @:ALLOCATE_GLOBAL(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
@@ -295,6 +317,10 @@ contains
             call s_open_run_time_information_file()
         end if
 
+        if (cfl_dt) then
+            @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+        end if
+
     end subroutine s_initialize_time_steppers_module
 
     !> 1st order TVD RK time-stepping algorithm
@@ -306,6 +332,10 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: nR3bar
+        real(kind(0d0)) :: e_mix
+
+        real(kind(0d0)) :: T
+        real(kind(0d0)), dimension(num_species) :: Ys
 
         ! Stage 1 of 1 =====================================================
 
@@ -329,7 +359,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -430,7 +464,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -611,7 +649,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -680,7 +722,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
             end if
         end if
-
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
@@ -756,7 +797,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
             end if
         end if
-
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
@@ -904,6 +944,60 @@ contains
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+    subroutine s_compute_dt()
+
+        real(kind(0d0)) :: rho        !< Cell-avg. density
+        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
+        real(kind(0d0)) :: pres       !< Cell-avg. pressure
+        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
+        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(kind(0d0)) :: c          !< Cell-avg. sound speed
+        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
+        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        type(vector_field) :: gm_alpha_qp
+        real(kind(0d0)) :: dt_local
+        type(int_bounds_info) :: ix, iy, iz
+        integer :: i, j, k, l, q !< Generic loop iterators
+
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+
+                    ! Compute mixture sound speed
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+
+                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                end do
+            end do
+        end do
+
+        !$acc kernels
+        dt_local = minval(max_dt)
+        !$acc end kernels
+
+        if (num_procs == 1) then
+            dt = dt_local
+        else
+            call s_mpi_allreduce_min(dt_local, dt)
+        end if
+
+        !$acc update device(dt)
+
+    end subroutine s_compute_dt
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage

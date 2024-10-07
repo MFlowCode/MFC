@@ -23,6 +23,9 @@ module m_derived_variables
     use m_compile_specific
 
     use m_helper
+
+    use m_finite_differences
+
     ! ==========================================================================
 
     implicit none

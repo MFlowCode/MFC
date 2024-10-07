@@ -34,6 +34,12 @@ module m_start_up
     use m_checker_common
 
     use m_checker
+
+    use m_thermochem            !< Procedures used to compute thermodynamic
+                                !! quantities
+
+    use m_finite_differences
+
     ! ==========================================================================
 
     implicit none
@@ -64,6 +70,7 @@ contains
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
             hypoelasticity, G, &
+            chem_wrt_Y, chem_wrt_T, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
@@ -74,8 +81,10 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, ib, sim_data, &
-            hyperelasticity
+            relax_model, cf_wrt, sigma, adv_n, ib, &
+            cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
+            cfl_target, &
+            sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -103,6 +112,9 @@ contains
             p_glb = p
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if
@@ -143,11 +155,17 @@ contains
 
         integer, intent(inout) :: t_step
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
-                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                (t_step - t_step_start)/t_step_save + 1, &
-                (t_step_stop - t_step_start)/t_step_save + 1, &
-                t_step
+            if (cfl_dt) then
+                print '(" ["I3"%]  Saving "I8" of "I0"")', &
+                    int(ceiling(100d0*(real(t_step - n_start)/(n_save)))), &
+                    t_step, n_save
+            else
+                print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
+                    int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    (t_step - t_step_start)/t_step_save + 1, &
+                    (t_step_stop - t_step_start)/t_step_save + 1, &
+                    t_step
+            end if
         end if
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
@@ -287,6 +305,21 @@ contains
             end if
         end do
         ! ----------------------------------------------------------------------
+
+        ! Adding the species' concentrations to the formatted database file ----
+        do i = 1, num_species
+            if (chem_wrt_Y(i) .or. prim_vars_wrt) then
+                q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
+                                                    -offset_y%beg:n + offset_y%end, &
+                                                    -offset_z%beg:p + offset_z%end)
+
+                write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                varname(:) = ' '
+
+            end if
+        end do
 
         ! Adding the flux limiter function to the formatted database file
         do i = 1, E_idx - mom_idx%beg

@@ -38,6 +38,8 @@ module m_start_up
 
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
+    use m_chemistry            !< Chemistry module
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_time_steppers        !< Time-stepping algorithms
@@ -128,8 +130,6 @@ contains
         integer :: iostatus
             !! Integer to check iostat of file read
 
-        CHARACTER(len=511) :: CRAY_ACC_MODULE
-
         character(len=1000) :: line
 
         ! Namelist of the global parameters which may be specified by user
@@ -148,8 +148,8 @@ contains
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles, bubble_model, & 
- 
+            rhoref, pref, bubbles, bubble_model, &
+            R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
 #:endif
@@ -163,7 +163,9 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z, hyperelasticity, R0ref
+            g_x, g_y, g_z, hyperelasticity, R0ref, &
+            n_start, t_save, t_stop, &
+            cfl_adap_dt, cfl_const_dt, cfl_target
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -195,19 +197,11 @@ contains
             n_glb = n
             p_glb = p
 
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
-
-#ifdef _CRAYFTN
-#ifdef MFC_OpenACC
-        call get_environment_variable("CRAY_ACC_MODULE", CRAY_ACC_MODULE)
-
-        if (CRAY_ACC_MODULE == "") then
-            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
-        end if
-#endif
-#endif
 
     end subroutine s_read_input_file
 
@@ -263,8 +257,13 @@ contains
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
-        write (t_step_dir, '(A,I0,A,I0)') &
-            trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        if (cfl_dt) then
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
+        else
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        end if
 
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
@@ -561,9 +560,14 @@ contains
         end if
 
         if (file_per_process) then
-            call s_int_to_str(t_step_start, t_step_start_string)
-            ! Open the file to read conservative variables
-            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                call s_int_to_str(n_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                call s_int_to_str(t_step_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
+
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -649,9 +653,12 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         else
-
             ! Open the file to read conservative variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -1047,7 +1054,9 @@ contains
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: pres
 
-        integer :: i, j, k, l
+        integer :: i, j, k, l, c
+
+        real(kind(0d0)), dimension(num_species) :: rhoYks
 
         do j = 0, m
             do k = 0, n
@@ -1061,8 +1070,14 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
+                    if (chemistry) then
+                        do c = 1, num_species
+                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                        end do
+                    end if
+
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1086,16 +1101,43 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
+        real(kind(0d0)) :: dt_init
+
         integer :: i, j, k, l
 
-        if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
-                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                t_step - t_step_start + 1, &
-                t_step_stop - t_step_start + 1, &
-                t_step
+        if (cfl_dt) then
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
+
+            if (cfl_adap_dt) call s_compute_dt()
+
+            if (t_step == 0) dt_init = dt
+
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt) call s_mpi_abort("Delta t has become too small")
         end if
-        mytime = mytime + dt
+
+        if (cfl_dt) then
+            if ((mytime + dt) >= t_stop) dt = t_stop - mytime
+        else
+            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+        end if
+
+        if (cfl_dt) then
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
+                    int(ceiling(100d0*(mytime/t_stop))), &
+                    mytime, &
+                    dt, &
+                    t_step
+            end if
+        else
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    t_step - t_step_start + 1, &
+                    t_step_stop - t_step_start + 1, &
+                t_step
+            end if
+        end if
 
         if (probe_wrt) then
             do i = 1, sys_size
@@ -1109,6 +1151,8 @@ contains
         print *, 'Computed derived vars'
 #endif
 
+        mytime = mytime + dt
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -1119,9 +1163,15 @@ contains
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
+
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+
+        if (chemistry) then
+            call s_chemistry_normalize_cons(q_cons_ts(1)%vf)
+        end if
+
         ! Time-stepping loop controls
-        if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+
         t_step = t_step + 1
         
     end subroutine s_perform_time_step
@@ -1192,41 +1242,52 @@ contains
         integer, intent(inout) :: t_step
         real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
-        
+
         integer :: i, j, k, l
 
-        if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
+        integer :: save_count
 
-            call cpu_time(start)
-            !  call nvtxStartRange("I/O")
-            do i = 1, sys_size
-                !$acc update host(q_cons_ts(1)%vf(i)%sf)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                                error stop "NaN(s) in timestep output."
-                            end if
-                        end do
+        call cpu_time(start)
+        !  call nvtxStartRange("I/O")
+        do i = 1, sys_size
+            !$acc update host(q_cons_ts(1)%vf(i)%sf)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                            error stop "NaN(s) in timestep output."
+                        end if
                     end do
                 end do
             end do
+        end do
 
-            if (qbmm .and. .not. polytropic) then
-                !$acc update host(pb_ts(1)%sf)
-                !$acc update host(mv_ts(1)%sf)
-            end if
+        if (qbmm .and. .not. polytropic) then
+            !$acc update host(pb_ts(1)%sf)
+            !$acc update host(mv_ts(1)%sf)
+        end if
 
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
-            !  call nvtxEndRange
-            call cpu_time(finish)
+        if (cfl_dt) then
+            save_count = int(mytime/t_save)
+        else
+            save_count = t_step
+        end if
+
+        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+
+        !  call nvtxEndRange
+        call cpu_time(finish)
+        if (cfl_dt) then
+            nt = mytime/t_save
+        else
             nt = int((t_step - t_step_start)/(t_step_save))
-            if (nt == 1) then
-                io_time_avg = abs(finish - start)
-            else
-                io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
-            end if
+        end if
+
+        if (nt == 1) then
+            io_time_avg = abs(finish - start)
+        else
+            io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
         end if
 
     end subroutine s_save_data
@@ -1282,6 +1343,8 @@ contains
 #endif
 
         if (relax) call s_initialize_phasechange_module()
+        if (chemistry) call s_initialize_chemistry_module()
+
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()

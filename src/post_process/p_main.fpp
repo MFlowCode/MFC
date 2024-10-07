@@ -34,8 +34,13 @@ program p_main
 
     call s_initialize_modules()
 
-    ! Setting the time-step iterator to the first time step to be post-processed
-    t_step = t_step_start
+    if (cfl_dt) then
+        t_step = n_start
+        n_save = int(t_stop/t_save) + 1
+    else
+        ! Setting the time-step iterator to the first time step to be post-processed
+        t_step = t_step_start
+    end if
 
     ! Time-Marching Loop =======================================================
     do
@@ -44,19 +49,29 @@ program p_main
 
         call s_save_data(t_step, varname, pres, c, H)
 
-        ! Modifies the time-step iterator so that it may reach the final time-
-        ! step to be post-processed, in the case that this one is not originally
-        ! attainable through constant incrementation from the first time-step.
-        ! This modification is performed upon reaching the final time-step. In
-        ! case that it is not needed, the post-processor is done and may exit.
-        if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
-            t_step = t_step_stop - t_step_save
-        elseif (t_step == t_step_stop) then
-            exit
+        if (cfl_dt) then
+            if (t_step == n_save - 1) then
+                exit
+            end if
+        else
+            ! Modifies the time-step iterator so that it may reach the final time-
+            ! step to be post-processed, in the case that this one is not originally
+            ! attainable through constant incrementation from the first time-step.
+            ! This modification is performed upon reaching the final time-step. In
+            ! case that it is not needed, the post-processor is done and may exit.
+            if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
+                t_step = t_step_stop - t_step_save
+            elseif (t_step == t_step_stop) then
+                exit
+            end if
         end if
 
-        ! Incrementing time-step iterator to next time-step to be post-processed
-        t_step = t_step + t_step_save
+        if (cfl_dt) then
+            t_step = t_step + 1
+        else
+            ! Incrementing time-step iterator to next time-step to be post-processed
+            t_step = t_step + t_step_save
+        end if
 
     end do
     ! END: Time-Marching Loop ==================================================

@@ -17,7 +17,7 @@ module m_hyperelastic
 
     use m_variables_conversion !< State variables type conversion procedures
 
-    use m_helper
+    use m_finite_differences
 
     ! ==========================================================================
 

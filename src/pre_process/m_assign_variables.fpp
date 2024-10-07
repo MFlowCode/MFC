@@ -1,6 +1,9 @@
 !>
 !! @file m_assign_variables.f90
 !! @brief Contains module m_assign_variables
+
+#:include 'case.fpp'
+
 module m_assign_variables
 
     ! Dependencies =============================================================
@@ -10,7 +13,9 @@ module m_assign_variables
 
     use m_variables_conversion  ! Subroutines to change the state variables from
 
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic          !< Functions to compare floating point numbers
+
+    use m_thermochem            !< Thermodynamic and chemical properties
 
     ! one form to another
     ! ==========================================================================
@@ -116,6 +121,8 @@ contains
         real(kind(0d0)) :: gamma  !< specific heat ratio function
         real(kind(0d0)) :: x_centroid, y_centroid
         real(kind(0d0)) :: epsilon, beta
+        real(kind(0d0)) :: Ys(1:num_species)
+        real(kind(0d0)) :: mean_molecular_weight
 
         integer :: smooth_patch_id
         integer :: i !< generic loop operator
@@ -157,6 +164,37 @@ contains
         q_prim_vf(pi_inf_idx)%sf(j, k, l) = &
             eta*patch_icpp(patch_id)%pi_inf &
             + (1d0 - eta)*patch_icpp(smooth_patch_id)%pi_inf
+
+        ! Species Concentrations
+        #:if chemistry
+            block
+                real(kind(0d0)) :: sum, term
+
+                ! Accumulating the species concentrations
+                sum = 0d0
+                do i = 1, num_species
+                    term = &
+                        eta*patch_icpp(patch_id)%Y(i) &
+                        + (1d0 - eta)*patch_icpp(smooth_patch_id)%Y(i)
+                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = term
+                    sum = sum + term
+                end do
+
+                sum = max(sum, verysmall)
+
+                ! Normalizing the species concentrations
+                do i = 1, num_species
+                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = &
+                        q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
+                    Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
+                end do
+            end block
+
+            call get_mixture_molecular_weight(Ys, mean_molecular_weight)
+            q_prim_vf(tempxb)%sf(j, k, l) = &
+                q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight &
+                /(gas_constant*q_prim_vf(1)%sf(j, k, l))
+        #:endif
 
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
@@ -283,6 +321,9 @@ contains
         real(kind(0d0)) :: pres   !< pressure
         real(kind(0d0)) :: x_centroid, y_centroid
         real(kind(0d0)) :: epsilon, beta
+
+        real(kind(0d0)) :: Ys(1:num_species)
+        real(kind(0d0)) :: mean_molecular_weight
 
         real(kind(0d0)), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
@@ -528,6 +569,38 @@ contains
                 (eta*patch_icpp(patch_id)%vel(i) &
                  + (1d0 - eta)*orig_prim_vf(i + cont_idx%end))
         end do
+
+        ! Species Concentrations
+        #:if chemistry
+            block
+                real(kind(0d0)) :: sum, term
+
+                ! Accumulating the species concentrations
+                sum = 0d0
+                do i = 1, num_species
+                    term = &
+                        eta*patch_icpp(patch_id)%Y(i) &
+                        + (1d0 - eta)*patch_icpp(smooth_patch_id)%Y(i)
+                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = term
+                    sum = sum + term
+                end do
+
+                if (sum < verysmall) then
+                    sum = 1d0
+                end if
+
+                ! Normalizing the species concentrations
+                do i = 1, num_species
+                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = &
+                        q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
+                    Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
+                end do
+            end block
+
+            call get_mixture_molecular_weight(Ys, mean_molecular_weight)
+            q_prim_vf(tempxb)%sf(j, k, l) = &
+                q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight/(gas_constant*q_prim_vf(1)%sf(j, k, l))
+        #:endif
 
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (mixlayer_vel_profile) then

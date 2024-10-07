@@ -2,6 +2,8 @@
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
+#:include 'case.fpp'
+
 !> @brief This module contains all of the parameters characterizing the
 !!              computational domain, simulation algorithm, initial condition
 !!              and the stiffened equation of state.
@@ -15,6 +17,9 @@ module m_global_parameters
     use m_derived_types         ! Definitions of the derived types
 
     use m_helper_basic          ! Functions to compare floating point numbers
+
+    use m_thermochem            ! Thermodynamic and chemical properties
+
     ! ==========================================================================
 
     implicit none
@@ -26,6 +31,9 @@ module m_global_parameters
     logical :: old_ic, non_axis_sym               !< Use existing IC data
     integer :: t_step_old, t_step_start           !< Existing IC/grid folder
     ! ==========================================================================
+
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
+    integer :: n_start, n_start_old
 
     ! Computational Domain Parameters ==========================================
 
@@ -72,21 +80,22 @@ module m_global_parameters
     ! ==========================================================================
 
     ! Simulation Algorithm Parameters ==========================================
-    integer :: model_eqns      !< Multicomponent flow model
-    logical :: relax           !< activate phase change
-    integer :: relax_model     !< Relax Model
-    real(kind(0d0)) :: palpha_eps     !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
-    integer :: num_fluids      !< Number of different fluids present in the flow
-    logical :: mpp_lim         !< Alpha limiter
-    integer :: sys_size        !< Number of unknowns in the system of equations
-    integer :: weno_order      !< Order of accuracy for the WENO reconstruction
-    logical :: hypoelasticity  !< activate hypoelasticity
-    logical :: hyperelasticity !< activate hyperelasticity
-    logical :: elasticity      !< elasticity modeling, true for hyper or hypo
-    integer :: b_size          !< Number of components in the b tensor
-    integer :: tensor_size     !< Number of components in the nonsymmetric tensor
-    logical :: pre_stress      !< activate pre_stressed domain
+    integer :: model_eqns            !< Multicomponent flow model
+    logical :: relax                 !< activate phase change
+    integer :: relax_model           !< Relax Model
+    real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
+    real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    integer :: num_fluids            !< Number of different fluids present in the flow
+    logical :: mpp_lim               !< Alpha limiter
+    integer :: sys_size              !< Number of unknowns in the system of equations
+    integer :: weno_order            !< Order of accuracy for the WENO reconstruction
+    logical :: hypoelasticity        !< activate hypoelasticity
+    logical :: hyperelasticity       !< activate hyperelasticity
+    logical :: elasticity            !< elasticity modeling, true for hyper or hypo
+    integer :: b_size                !< Number of components in the b tensor
+    integer :: tensor_size           !< Number of components in the nonsymmetric tensor
+    logical :: pre_stress            !< activate pre_stressed domain
+    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -102,6 +111,8 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
@@ -225,6 +236,8 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: xibeg, xiend
+    integer :: chemxb, chemxe
+    integer :: tempxb, tempxe
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -247,6 +260,11 @@ contains
         old_ic = .false.
         t_step_old = dflt_int
         t_step_start = dflt_int
+
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
+        cfl_dt = .false.
+        n_start = dflt_int
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
@@ -373,6 +391,10 @@ contains
             patch_icpp(i)%m0 = dflt_real
 
             patch_icpp(i)%hcid = dflt_int
+
+            if (chemistry) then
+                patch_icpp(i)%Y(:) = 0d0
+            end if
         end do
 
         ! Tait EOS
@@ -724,6 +746,16 @@ contains
             end if
         end if
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            temperature_idx%beg = sys_size + 1
+            temperature_idx%end = sys_size + 1
+            sys_size = temperature_idx%end
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -738,6 +770,10 @@ contains
         intxe = internalEnergies_idx%end
         xibeg = xi_idx%beg
         xiend = xi_idx%end
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
+        tempxb = temperature_idx%beg
+        tempxe = temperature_idx%end
 
         ! ==================================================================
 

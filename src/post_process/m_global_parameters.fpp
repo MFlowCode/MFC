@@ -2,6 +2,8 @@
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
+#:include 'case.fpp'
+
 !> @brief This module contains all of the parameters characterizing the
 !!      computational domain, simulation algorithm, stiffened equation of
 !!      state and finally, the formatted database file(s) structure.
@@ -15,6 +17,9 @@ module m_global_parameters
     use m_derived_types         !< Definitions of the derived types
 
     use m_helper_basic          !< Functions to compare floating point numbers
+
+    use m_thermochem            !< Thermodynamic and chemical properties module
+
     ! ==========================================================================
 
     implicit none
@@ -76,6 +81,16 @@ module m_global_parameters
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
 
+    !> @name IO options for adaptive time-stepping
+    !> @{
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
+    real(kind(0d0)) :: t_save
+    real(kind(0d0)) :: t_stop
+    real(kind(0d0)) :: cfl_target
+    integer :: n_save
+    integer :: n_start
+    !> @}
+
     ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data
     ! of the defragmented computational domain. They are only used in 1D. For
     ! serial simulations, they are equal to m, x_cb and x_cc, respectively.
@@ -98,6 +113,7 @@ module m_global_parameters
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
+    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -115,6 +131,8 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -200,6 +218,8 @@ module m_global_parameters
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
+    logical :: chem_wrt_Y(1:num_species)
+    logical :: chem_wrt_T
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -262,6 +282,8 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: xibeg, xiend
+    integer :: chemxb, chemxe
+    integer :: tempxb, tempxe
     !> @}
 
 contains
@@ -284,6 +306,14 @@ contains
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
+
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
+        cfl_dt = .false.
+        cfl_target = dflt_real
+        t_save = dflt_real
+        n_start = dflt_int
+        t_stop = dflt_real
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
@@ -328,6 +358,8 @@ contains
         rho_wrt = .false.
         mom_wrt = .false.
         vel_wrt = .false.
+        chem_wrt_Y = .false.
+        chem_wrt_T = .false.
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
@@ -619,6 +651,21 @@ contains
             end if
         end if
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            temperature_idx%beg = sys_size + 1
+            temperature_idx%end = sys_size + 1
+            sys_size = temperature_idx%end
+        else
+            species_idx%beg = 1
+            species_idx%end = 1
+            temperature_idx%beg = 1
+            temperature_idx%end = 1
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -633,6 +680,11 @@ contains
         intxe = internalEnergies_idx%end
         xibeg = xi_idx%beg
         xiend = xi_idx%end
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
+        tempxb = temperature_idx%beg
+        tempxe = temperature_idx%end
+
         ! ==================================================================
 
 #ifdef MFC_MPI
