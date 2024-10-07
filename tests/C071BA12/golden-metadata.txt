@@ -1,16 +1,16 @@
-This file was created on 2024-09-30 02:35:05.798455.
+This file was created on 2024-10-07 06:17:19.597060.
 
 mfc.sh:
 
-    Invocation: test -o Example --generate -j 8
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & strict=Yes
-    Git:        99465ee3ad58b1094efa4bf95e589ec8efbd17ea on exampleCI2 (dirty)
+    Invocation: test -j 8 --generate
+    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & strict=Yes
+    Git:        b4e958f0af79097e4ed95c275b84884f7839c3dd on exampleCI2 (dirty)
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.30.3 on bok
+        CMake v3.30.4 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -28,7 +28,7 @@ simulation:
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -43,7 +43,7 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.30.3 on bok
+        CMake v3.30.4 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -61,7 +61,7 @@ syscheck:
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -76,7 +76,7 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.30.3 on bok
+        CMake v3.30.4 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -94,7 +94,7 @@ pre_process:
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -109,7 +109,7 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.30.3 on bok
+        CMake v3.30.4 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -127,7 +127,7 @@ post_process:
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   47%
+    CPU(s) scaling MHz:                   52%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00

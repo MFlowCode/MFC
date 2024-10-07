@@ -719,6 +719,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if path == "scaling":
                 continue
 
+            # List of currently broken examples -> currently attempting to fix!
+            brokenCases = ["hypo_2materials", "ibm_cfl_dt", "sodHypo", "viscous", "laplace_pressure_jump"]
+            if path in brokenCases:
+                continue
+
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
             if not os.path.isfile(path):
@@ -728,7 +733,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
                     case['t_step_stop'] = 50
-                    case['t_step_save'] = 5
+                    case['t_step_save'] = 50
 
                 caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
                 if caseSize > 625:

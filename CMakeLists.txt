@@ -137,11 +137,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 	    )
     endif()
 
-    if (MFC_Strict)
+    if (MFC_Strict) 
         add_compile_options(
-            -ffloat-store
-            -frounding-math 
-            -fsignaling-nans
+            -O0
         )
     endif()
 
@@ -173,10 +171,11 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
     
-    if (MFC_Strict) 
+    if (MFC_Strict)
         add_compile_options(
-            "SHELL:-hfp0"
-            "SHELL:-h vector0"
+            # "SHELL:-hfp0"
+            # "SHELL:-h vector0"
+            "SHELL:-o0"
         )
     endif()
 
@@ -194,7 +193,8 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     endif()
 
     if (MFC_Strict)
-        add_compile_options(-fp-model strict)
+        # add_compile_options(-fp-model strict)
+        add_compile_options(-O0)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -207,10 +207,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            $<$<COMPILE_LANGUAGE:Fortran>:-O0>
             $<$<COMPILE_LANGUAGE:Fortran>:-C> 
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
-            $<$<COMPILE_LANGUAGE:Fortran>:-O0> 
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
             $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
@@ -245,7 +243,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
 
         if (MFC_Strict)
-            add_compile_options(-Kieee)
+            # add_compile_options(-Kieee)
+            add_compile_options(-o0)
         endif()
 
     else()
