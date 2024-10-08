@@ -33,7 +33,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD MI100                 |                           | GPU           | 1 GPU        | 1.4              | CCE 16.0.1           | Cray internal system |
 | NVIDIA L40S               | FP32-only GPU             | GPU           | 1 GPU        | 1.7              | NVHPC 24.5           | GT ICE  |
 | AMD EPYC 9654             | Genoa                     | CPU           | 96 cores     | 1.7              | Intel 2021.9         | DOD Carpenter  |
-| AMD Xeon 6960P            | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud  |
+| Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud  |
 | NVIDIA P100               |                           | GPU           | 1 GPU        | 2.4              | NVHPC 23.5           | GT CSE Internal  |
 | AMD EPYC 9534             | Genoa                     | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
