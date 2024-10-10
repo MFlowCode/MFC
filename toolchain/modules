@@ -54,7 +54,7 @@ f-gpu craype-accel-amd-gfx90a
 d     NCSA Delta
 d-all python/3.11.6
 d-cpu gcc/11.4.0 openmpi
-d-gpu nvhpc/22.11 openmpi+cuda/4.1.5+cuda cmake
+d-gpu nvhpc/24.1 cuda/12.3.0 openmpi/4.1.5+cuda cmake
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 c     DoD Carpenter
