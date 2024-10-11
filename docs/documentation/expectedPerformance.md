@@ -35,6 +35,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | AMD EPYC 9654             | Genoa                     | CPU           | 96 cores     | 1.7              | Intel 2021.9         | DOD Carpenter  |
 | Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud  |
 | NVIDIA P100               |                           | GPU           | 1 GPU        | 2.4              | NVHPC 23.5           | GT CSE Internal  |
+| Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud  |
 | AMD EPYC 9534             | Genoa                     | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
 | Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
