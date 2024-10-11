@@ -24,18 +24,19 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Hardware                  | Details                   | Type          | Usage        | Grind Time [ns]  | Compiler             | Computer     |
 | ---:                      | ----:                     | ----:         | ----:        | ----:            | :---                 | :---         | 
 | NVIDIA GH200              | GPU only                  | APU           | 1 GPU        | 0.32             | NVHPC 24.1           | GT Rogues Gallery  |
-| NVIDIA H100               |                           | GPU           | 1 GPU        | 0.45             | NVHPC 24.5           | GT Rogues Gallery  |
-| AMD MI300A                |                           | APU           | 1 APU        | 0.60             | CCE 18.0.0           | LLNL Tioga |
+| NVIDIA H100 SXM5          |                           | GPU           | 1 GPU        | 0.38             | NVHPC 24.5           | GT ICE      |
+| NVIDIA H100 PCIe          |                           | GPU           | 1 GPU        | 0.45             | NVHPC 24.5           | GT Rogues Gallery  |
+| AMD MI300A                |                           | APU           | 1 APU        | 0.60             | CCE 18.0.0           | LLNL Tioga  |
 | NVIDIA A100               |                           | GPU           | 1 GPU        | 0.62             | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA V100               |                           | GPU           | 1 GPU        | 0.99             | NVHPC 22.11          | GT Phoenix  |
 | NVIDIA A30                |                           | GPU           | 1 GPU        | 1.1              | NVHPC 24.1           | GT Rogues Gallery  |
 | AMD MI250X                |                           | GPU           | 1 _GCD_*     | 1.1              | CCE 16.0.1           | OLCF Frontier |
 | AMD MI100                 |                           | GPU           | 1 GPU        | 1.4              | CCE 16.0.1           | Cray internal system |
 | NVIDIA L40S               | FP32-only GPU             | GPU           | 1 GPU        | 1.7              | NVHPC 24.5           | GT ICE  |
-| AMD EPYC 9654             | Genoa                     | CPU           | 96 cores     | 1.7              | Intel 2021.9         | DOD Carpenter  |
-| Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud  |
+| AMD EPYC 9654             | Genoa                     | CPU           | 96 cores     | 1.7              | Intel 2021.9         | DOD Carpenter    |
+| Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud   |
 | NVIDIA P100               |                           | GPU           | 1 GPU        | 2.4              | NVHPC 23.5           | GT CSE Internal  |
-| Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud  |
+| Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud   |
 | AMD EPYC 9534             | Genoa                     | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
 | Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
