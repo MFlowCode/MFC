@@ -22,6 +22,8 @@ module m_global_parameters
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
+    use m_global_parameters_common
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -184,6 +186,8 @@ module m_global_parameters
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    integer :: num_bc_patches
+    type(bc_patch_parameters) :: patch_bc(num_bc_patches_max)
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
 
@@ -191,8 +195,11 @@ module m_global_parameters
     logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
 
-    integer, allocatable, dimension(:) :: proc_coords !<
+    integer, dimension(1:3) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    integer, dimension(1:3) :: proc_nums !<
+    !! Processor dimensions in MPI_CART_COMM
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -295,9 +302,9 @@ module m_global_parameters
     !! in the flow. These include the stiffened gas equation of state parameters,
     !! the Reynolds numbers and the Weber numbers.
 
-    !$acc declare create(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
-    !$acc declare create(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
-    !$acc declare create(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
+    !$acc declare create(bc_x%vel_beg, bc_x%vel_end)
+    !$acc declare create(bc_y%vel_beg, bc_y%vel_end)
+    !$acc declare create(bc_z%vel_beg, bc_z%vel_end)
 
     ! ==========================================================================
 
@@ -535,15 +542,15 @@ contains
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
-            #:endfor
+            bc_${DIM}$%vel_beg = 0d0
+            bc_${DIM}$%vel_end = 0d0
         #:endfor
 
         x_domain%beg = dflt_int; x_domain%end = dflt_int
         y_domain%beg = dflt_int; y_domain%end = dflt_int
         z_domain%beg = dflt_int; z_domain%end = dflt_int
+
+        call s_bc_assign_default_values_to_user_inputs(num_bc_patches, patch_bc)
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -1130,8 +1137,6 @@ contains
             num_dims = 1 + min(1, n) + min(1, p)
         #:endif
 
-        allocate (proc_coords(1:num_dims))
-
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -1166,7 +1171,6 @@ contains
             @:DEALLOCATE(Re_idx)
         end if
 
-        deallocate (proc_coords)
         if (parallel_io) then
             deallocate (start_idx)
             do i = 1, sys_size

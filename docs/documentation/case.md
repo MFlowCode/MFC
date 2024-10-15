@@ -349,8 +349,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `bc_[x,y,z]%%beg[end]` | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
-| `bc_[x,y,z]%%vb[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
-| `bc_[x,y,z]%%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
+| `bc_[x,y,z]%%vel_beg[1,2,3]`‡| Real | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
+| `bc_[x,y,z]%%vel_end[1,2,3]`‡| Real | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
@@ -475,7 +475,7 @@ The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedric
 To newly start the simulation, set `t_step_start = 0`.
 To restart the simulation from $k$-th time step, set `t_step_start = k`; see [Restarting Cases](running.md#restarting-cases).
 
-##### Adaptive Time-Stepping
+##### Adaptive Time-Stepping (optional)
 
 - `cfl_adap_dt` enables adaptive time stepping with a constant CFL when true
 
@@ -491,6 +491,36 @@ To restart the simulation from $k$-th time step, set `t_step_start = k`; see [Re
 
 To newly start the simulation, set `n_start = 0`.
 To restart the simulation from $k$-th time step, see [Restarting Cases](running.md#restarting-cases).
+
+##### Boundary Condition Patches (optional and experimental)
+
+> [!WARNING]  
+> This feature is currently experimental and may not produce physicall correct
+> results when certain other features are turned on.
+
+Boundary condition patches allow you to define boundary conditions with more granularity
+than `bc_[x,y,z]`. When using this feature, any point along the edge of the domain can
+be assigned its own boundary condition type. Since the boundaries of a 3D domain are
+2D surfaces, the concept of patches is re-introduced.
+
+Boundary conditions are applied using the [Painter's algorithm](https://en.wikipedia.org/wiki/Painter%27s_algorithm)
+where patches with higher indices take priority, in layers. The lowest priority is given
+to `bc_[x,y,z]`. This feature is opt-in and enabled by assigning `num_bc_patches` to a
+positive value.
+
+| Parameter              | Type    | Description                                    |
+| ---:                   | :----:  | :---                                           |
+| `num_bc_patches`       | Integer | Number of boundary condition patches (default 0) |
+| `%%type` *             | Integer | Boundary condition type (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `%%dir` *              | Integer | About the [1] x; [2] y; [3] z; axis |
+| `%%loc` *              | Integer | About the line or surface at the [-1] beginning; [+2] end; of the `%%dir` axis. |
+| `%%geometry` *         | Integer | The geometry of the boundary condition patch. See table [Boundary Condition Patch Geometry Types](#boundary-condition-patch-geometry-types) |
+| `%%vel(i)` *           | Real    | Meaning depends on the boundary condition |
+| `%%centroid(i)` *      | Real    | Meaning depends on the patch geometry. Index $i = \text{dir}$ is always ignored |
+| `%%length(i)` *        | Real    | Meaning depends on the patch geometry. Index $i = \text{dir}$ is always ignored |
+| `%%radius` *           | Real    | Meaning depends on the patch geometry. Index $i = \text{dir}$ is always ignored |
+
+*: These parameters should be prepended with `patch_bc(j)%` where $j$ is the boundary condition patch index.
 
 ### 7. Formatted Output
 
@@ -873,6 +903,13 @@ The patch types supported by the MFC are listed in table [Patch Types](#patch-ty
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
+
+### Boundary Condition Patch Geometry Types
+
+| #    | Name               | Dim.   | Requirements                          |
+| ---: | :----:             | :---   | :---                                  |
+| 1    | Cuboid             | 1 & 2  | `%%centroid(1:3)` and `%%length(1:3)` |
+| 2    | Spheroid           | 1 & 2  | `%%centroid(1:3)` and `%%radius`      |
 
 ### Immersed Boundary Patch Types
 

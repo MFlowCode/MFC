@@ -61,6 +61,8 @@ module m_start_up
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
+    use m_boundary_conditions_common
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -78,6 +80,8 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
+    use m_boundary_conditions
     ! ==========================================================================
 
     implicit none
@@ -87,7 +91,7 @@ module m_start_up
  s_read_data_files, &
  s_read_serial_data_files, &
  s_read_parallel_data_files, &
- s_populate_grid_variables_buffers, &
+ s_mpi_sendrecv_grid_spacing_buffers, &
  s_initialize_internal_energy_equations, &
  s_initialize_modules, s_initialize_gpu_vars, &
  s_initialize_mpi_domain, s_finalize_modules, &
@@ -141,6 +145,7 @@ contains
             teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
+            num_bc_patches, patch_bc, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
@@ -252,6 +257,8 @@ contains
 
         integer :: i, r !< Generic loop iterator
 
+        integer :: iter_dir, iter_loc
+
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
         if (cfl_dt) then
@@ -268,6 +275,8 @@ contains
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
+
+        call s_read_boundary_condition_files(t_step_dir)
 
         ! Cell-boundary Locations in x-direction ===========================
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -502,6 +511,7 @@ contains
         logical :: file_exist
 
         character(len=10) :: t_step_start_string
+        character(len=path_len) :: step_dirpath
 
         integer :: i, j
 
@@ -509,8 +519,10 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
+        step_dirpath = trim(case_dir)//'/restart_data'
+
         ! Read in cell boundary locations in x-direction
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
+        file_loc = trim(step_dirpath)//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
         if (file_exist) then
@@ -541,7 +553,7 @@ contains
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
-            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
+            file_loc = trim(step_dirpath)//trim(mpiiofs)//'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
             if (file_exist) then
@@ -584,6 +596,8 @@ contains
             end if
         end if
 
+        call s_read_boundary_condition_files(trim(step_dirpath))
+
         if (file_per_process) then
             if (cfl_dt) then
                 call s_int_to_str(n_start, t_step_start_string)
@@ -592,7 +606,7 @@ contains
                 call s_int_to_str(t_step_start, t_step_start_string)
                 write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
             end if
-            file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
+            file_loc = trim(step_dirpath)//'/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
             if (file_exist) then
@@ -653,7 +667,7 @@ contains
                 if (ib) then
                     ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -673,7 +687,7 @@ contains
 
                     ! Read Levelset
                     write (file_loc, '(A)') 'levelset.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -693,7 +707,7 @@ contains
 
                     ! Read Levelset Norm
                     write (file_loc, '(A)') 'levelset_norm.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -724,7 +738,7 @@ contains
             else
                 write (file_loc, '(I0,A)') t_step_start, '.dat'
             end if
-            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+            file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
             if (file_exist) then
@@ -803,7 +817,7 @@ contains
 
                     ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -823,7 +837,7 @@ contains
 
                     ! Read Levelset
                     write (file_loc, '(A)') 'levelset.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -834,7 +848,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size, &
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
 
                     else
@@ -843,7 +857,7 @@ contains
 
                     ! Read Levelset Norm
                     write (file_loc, '(A)') 'levelset_norm.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
 
                     if (file_exist) then
@@ -880,7 +894,7 @@ contains
                     allocate (airfoil_grid_l(1:Np))
 
                     write (file_loc, '(A)') 'airfoil_l.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
                     if (file_exist) then
 
@@ -897,7 +911,7 @@ contains
                     end if
 
                     write (file_loc, '(A)') 'airfoil_u.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    file_loc = trim(step_dirpath)//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
                     if (file_exist) then
 
@@ -931,218 +945,6 @@ contains
 #endif
 
     end subroutine s_read_parallel_data_files
-
-    !> The purpose of this subroutine is to populate the buffers
-        !!          of the grid variables, which are constituted of the cell-
-        !!          boundary locations and cell-width distributions, based on
-        !!          the boundary conditions.
-    subroutine s_populate_grid_variables_buffers
-
-        integer :: i !< Generic loop iterator
-
-        ! Population of Buffers in x-direction =============================
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_x%beg <= -3) then
-            do i = 1, buff_size
-                dx(-i) = dx(0)
-            end do
-        elseif (bc_x%beg == -2) then
-            do i = 1, buff_size
-                dx(-i) = dx(i - 1)
-            end do
-        elseif (bc_x%beg == -1) then
-            do i = 1, buff_size
-                dx(-i) = dx(m - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(1, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            x_cb(-1 - i) = x_cb(-i) - dx(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_x%end <= -3) then
-            do i = 1, buff_size
-                dx(m + i) = dx(m)
-            end do
-        elseif (bc_x%end == -2) then
-            do i = 1, buff_size
-                dx(m + i) = dx(m - (i - 1))
-            end do
-        elseif (bc_x%end == -1) then
-            do i = 1, buff_size
-                dx(m + i) = dx(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(1, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
-        end do
-
-        ! END: Population of Buffers in x-direction ========================
-
-        ! Population of Buffers in y-direction =============================
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (n == 0) then
-            return
-        elseif (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
-            do i = 1, buff_size
-                dy(-i) = dy(0)
-            end do
-        elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
-            do i = 1, buff_size
-                dy(-i) = dy(i - 1)
-            end do
-        elseif (bc_y%beg == -1) then
-            do i = 1, buff_size
-                dy(-i) = dy(n - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(2, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            y_cb(-1 - i) = y_cb(-i) - dy(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_y%end <= -3) then
-            do i = 1, buff_size
-                dy(n + i) = dy(n)
-            end do
-        elseif (bc_y%end == -2) then
-            do i = 1, buff_size
-                dy(n + i) = dy(n - (i - 1))
-            end do
-        elseif (bc_y%end == -1) then
-            do i = 1, buff_size
-                dy(n + i) = dy(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(2, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
-        end do
-
-        ! END: Population of Buffers in y-direction ========================
-
-        ! Population of Buffers in z-direction =============================
-
-        ! Populating cell-width distribution buffer, at the beginning of the
-        ! coordinate direction, based on the selected boundary condition. In
-        ! order, these are the ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (p == 0) then
-            return
-        elseif (bc_z%beg <= -3) then
-            do i = 1, buff_size
-                dz(-i) = dz(0)
-            end do
-        elseif (bc_z%beg == -2) then
-            do i = 1, buff_size
-                dz(-i) = dz(i - 1)
-            end do
-        elseif (bc_z%beg == -1) then
-            do i = 1, buff_size
-                dz(-i) = dz(p - (i - 1))
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(3, -1)
-        end if
-
-        ! Computing the cell-boundary locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            z_cb(-1 - i) = z_cb(-i) - dz(-i)
-        end do
-        ! Computing the cell-center locations buffer, at the beginning of
-        ! the coordinate direction, from the cell-width distribution buffer
-        do i = 1, buff_size
-            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
-        end do
-
-        ! Populating the cell-width distribution buffer, at the end of the
-        ! coordinate direction, based on desired boundary condition. These
-        ! include, in order, ghost-cell extrapolation, symmetry, periodic,
-        ! and processor boundary conditions.
-        if (bc_z%end <= -3) then
-            do i = 1, buff_size
-                dz(p + i) = dz(p)
-            end do
-        elseif (bc_z%end == -2) then
-            do i = 1, buff_size
-                dz(p + i) = dz(p - (i - 1))
-            end do
-        elseif (bc_z%end == -1) then
-            do i = 1, buff_size
-                dz(p + i) = dz(i - 1)
-            end do
-        else
-            call s_mpi_sendrecv_grid_variables_buffers(3, 1)
-        end if
-
-        ! Populating the cell-boundary locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-        end do
-        ! Populating the cell-center locations buffer, at the end of the
-        ! coordinate direction, from buffer of the cell-width distribution
-        do i = 1, buff_size
-            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
-        end do
-
-        ! END: Population of Buffers in z-direction ========================
-
-    end subroutine s_populate_grid_variables_buffers
 
     !> The purpose of this procedure is to initialize the
         !!      values of the internal-energy equations of each phase
@@ -1398,6 +1200,7 @@ contains
 
     subroutine s_initialize_modules
         call s_initialize_global_parameters_module()
+
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
             call s_simpson
@@ -1417,6 +1220,7 @@ contains
         call acc_present_dump()
 #endif
 
+        call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
@@ -1458,6 +1262,8 @@ contains
         call acc_present_dump()
 #endif
 
+        call s_initialize_boundary_conditions_module()
+
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
 
@@ -1467,7 +1273,7 @@ contains
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
         ! Populating the buffers of the grid variables using the boundary conditions
-        call s_populate_grid_variables_buffers()
+        call s_mpi_sendrecv_grid_spacing_buffers(bc_id_sfs)
 
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
@@ -1573,11 +1379,10 @@ contains
         !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
-   
-        !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
-        !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
-        !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
+        !$acc update device(bc_x%vel_beg, bc_x%vel_end)
+        !$acc update device(bc_y%vel_beg, bc_y%vel_end)
+        !$acc update device(bc_z%vel_beg, bc_z%vel_end)
         !$acc update device(bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out)
         !$acc update device(bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out)
         !$acc update device(bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out)
@@ -1605,6 +1410,7 @@ contains
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
+        call s_finalize_mpi_common_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (viscous) then

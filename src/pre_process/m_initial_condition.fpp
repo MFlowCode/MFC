@@ -142,7 +142,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print *, 'Processing patch', i
+                    print *, 'Processing 3D patch', i
                 end if
 
                 !> ICPP Patches
@@ -222,7 +222,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print *, 'Processing patch', i
+                    print *, 'Processing 2D patch', i
                 end if
 
                 !> ICPP Patches
@@ -303,7 +303,7 @@ contains
             do i = 1, num_patches
 
                 if (proc_rank == 0) then
-                    print *, 'Processing patch', i
+                    print *, 'Processing 1D patch', i
                 end if
 
                 ! Line segment patch

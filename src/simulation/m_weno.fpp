@@ -96,10 +96,6 @@ module m_weno
 
     ! END: WENO Coefficients ===================================================
 
-    integer :: v_size !< Number of WENO-reconstructed cell-average variables
-
-    !$acc declare create(v_size)
-
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno

@@ -19,6 +19,10 @@ module m_ibm
 
     use m_helper
 
+    use m_constants
+
+    use m_boundary_conditions_common
+
     ! ==========================================================================
 
     implicit none
@@ -42,7 +46,6 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: inner_points
     !$acc declare create(ghost_points, inner_points)
 
-    integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
     !$acc declare create(gp_layers, num_gps, num_inner_gps)
@@ -51,8 +54,6 @@ contains
 
     !>  Allocates memory for the variables in the IBM module
     subroutine s_initialize_ibm_module()
-
-        gp_layers = 3
 
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
@@ -74,7 +75,7 @@ contains
         @:ACC_SETUP_SFs(levelset)
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
 
-        !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
+        !$acc enter data copyin(num_gps, num_inner_gps)
 
     end subroutine s_initialize_ibm_module
 
@@ -87,7 +88,7 @@ contains
         !$acc update device(ib_markers%sf)
 
         ! Get neighboring IB variables from other processors
-        call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
+        call s_mpi_sendrecv_ib_buffers(ib_markers, bc_id_sfs)
 
         !$acc update host(ib_markers%sf)
 
@@ -212,7 +213,9 @@ contains
 
             ! Calculate velocity of ghost cell
             if (gp%slip) then
-                norm = levelset_norm%sf(j, k, l, patch_id, :)
+                norm = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, :)
+                buf = sqrt(sum(norm**2))
+                norm = norm/buf
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
             else
@@ -445,6 +448,7 @@ contains
         integer :: i, j, k, l, q !< Iterator variables
 
         num_gps = 0
+        num_inner_gps = 0
 
         do i = 0, m
             do j = 0, n

@@ -55,7 +55,27 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
+    'num_bc_patches': ParamType.INT,
 }
+
+for i in range(100):
+    COMMON[f"patch_bc({i+1})%type"] = ParamType.INT
+    COMMON[f"patch_bc({i+1})%geometry"] = ParamType.INT
+    COMMON[f"patch_bc({i+1})%dir"] = ParamType.INT
+    COMMON[f"patch_bc({i+1})%loc"] = ParamType.INT
+    COMMON[f"patch_bc({i+1})%radius"] = ParamType.REAL
+
+    for j in range(1, 3+1):
+        COMMON[f"patch_bc({i+1})%centroid({j})"] = ParamType.REAL
+        COMMON[f"patch_bc({i+1})%length({j})"] = ParamType.REAL
+        COMMON[f"patch_bc({i+1})%vel({j})"] = ParamType.REAL
+
+for cmp in ["x", "y", "z"]:
+    for loc in ["beg", "end"]:
+        COMMON[f'bc_{cmp}%{loc}'] = ParamType.INT
+
+        for dir in range(1, 3+1):
+            COMMON[f'bc_{cmp}%vel_{loc}({dir})'] = ParamType.REAL
 
 PRE_PROCESS = COMMON.copy()
 PRE_PROCESS.update({
@@ -257,14 +277,6 @@ for ib_id in range(1, 10+1):
         SIMULATION[f'patch_ib({ib_id})%length_{cmp}'] = ParamType.REAL
 
 for cmp in ["x", "y", "z"]:
-    SIMULATION[f'bc_{cmp}%beg'] = ParamType.INT
-    SIMULATION[f'bc_{cmp}%end'] = ParamType.INT
-    SIMULATION[f'bc_{cmp}%vb1'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%vb2'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%vb3'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve1'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%pres_in'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%pres_out'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%grcbc_in'] = ParamType.LOG
@@ -282,7 +294,6 @@ for cmp in ["x", "y", "z"]:
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
     SIMULATION[f'bf_{cmp}'] = ParamType.LOG
-
 
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL

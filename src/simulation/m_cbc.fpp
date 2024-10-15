@@ -30,6 +30,8 @@ module m_cbc
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compute_cbc
+
+    use m_boundary_conditions_common
     ! ==========================================================================
 
     implicit none
@@ -126,15 +128,14 @@ contains
     subroutine s_initialize_cbc_module
 
         integer :: i
-        logical :: is_cbc
+        logical :: has_cbc_beg, has_cbc_end
 
-        call s_any_cbc_boundaries(is_cbc)
-
-        if (is_cbc .eqv. .false.) return
+        if (.not. f_any_cbc_boundaries()) then
+            return
+        end if
 
         if (n == 0) then
             is2%beg = 0
-
         else
             is2%beg = -buff_size
         end if
@@ -143,7 +144,6 @@ contains
 
         if (p == 0) then
             is3%beg = 0
-
         else
             is3%beg = -buff_size
         end if
@@ -266,117 +266,48 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
-        ! Allocating/Computing CBC Coefficients in x-direction =============
-        if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
+        #:for dir, cmp in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (${dir}$ <= num_dims) then
+                has_cbc_beg = any(bc_id_has_bc(${dir}$, -1, cbc_range_beg:cbc_range_end))
+                has_cbc_end = any(bc_id_has_bc(${dir}$, +1, cbc_range_beg:cbc_range_end))
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
+                ! Allocating/Computing CBC Coefficients in ${dir}$-direction =============
+                if (has_cbc_beg .and. has_cbc_end) then
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
-            end if
+                    @:ALLOCATE(fd_coef_${cmp}$(0:buff_size, -1:1))
 
-            call s_compute_cbc_coefficients(1, -1)
-            call s_compute_cbc_coefficients(1, 1)
+                    if (weno_order > 1) then
+                        @:ALLOCATE(pi_coef_${cmp}$(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
+                    end if
 
-        elseif (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
+                elseif (has_cbc_beg) then
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, -1:-1))
+                    @:ALLOCATE(fd_coef_${cmp}$(0:buff_size, -1:-1))
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
-            end if
+                    if (weno_order > 1) then
+                        @:ALLOCATE(pi_coef_${cmp}$(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                    end if
 
-            call s_compute_cbc_coefficients(1, -1)
+                elseif (has_cbc_end) then
 
-        elseif (bc_x%end <= -5 .and. bc_x%end >= -13) then
+                    @:ALLOCATE(fd_coef_${cmp}$(0:buff_size, 1:1))
 
-            @:ALLOCATE(fd_coef_x(0:buff_size, 1:1))
+                    if (weno_order > 1) then
+                        @:ALLOCATE(pi_coef_${cmp}$(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                    end if
 
-            if (weno_order > 1) then
-                @:ALLOCATE(pi_coef_x(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
-            end if
-
-            call s_compute_cbc_coefficients(1, 1)
-
-        end if
-        ! ==================================================================
-
-        ! Allocating/Computing CBC Coefficients in y-direction =============
-        if (n > 0) then
-
-            if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13)) then
-
-                @:ALLOCATE(fd_coef_y(0:buff_size, -1:1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
                 end if
 
-                call s_compute_cbc_coefficients(2, -1)
-                call s_compute_cbc_coefficients(2, 1)
-
-            elseif (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
-
-                @:ALLOCATE(fd_coef_y(0:buff_size, -1:-1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
+                if (has_cbc_beg) then
+                    call s_compute_cbc_coefficients(${dir}$, -1)
                 end if
 
-                call s_compute_cbc_coefficients(2, -1)
-
-            elseif (bc_y%end <= -5 .and. bc_y%end >= -13) then
-
-                @:ALLOCATE(fd_coef_y(0:buff_size, 1:1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_y(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
+                if (has_cbc_end) then
+                    call s_compute_cbc_coefficients(${dir}$, +1)
                 end if
-
-                call s_compute_cbc_coefficients(2, 1)
 
             end if
-
-        end if
-        ! ==================================================================
-
-        ! Allocating/Computing CBC Coefficients in z-direction =============
-        if (p > 0) then
-
-            if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13)) then
-
-                @:ALLOCATE(fd_coef_z(0:buff_size, -1:1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:1))
-                end if
-
-                call s_compute_cbc_coefficients(3, -1)
-                call s_compute_cbc_coefficients(3, 1)
-
-            elseif (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
-
-                @:ALLOCATE(fd_coef_z(0:buff_size, -1:-1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, -1:-1))
-                end if
-
-                call s_compute_cbc_coefficients(3, -1)
-
-            elseif (bc_z%end <= -5 .and. bc_z%end >= -13) then
-
-                @:ALLOCATE(fd_coef_z(0:buff_size, 1:1))
-
-                if (weno_order > 1) then
-                    @:ALLOCATE(pi_coef_z(0:weno_polyn - 1, 0:weno_order - 3, 1:1))
-                end if
-
-                call s_compute_cbc_coefficients(3, 1)
-
-            end if
-
-        end if
+        #:endfor
         ! ==================================================================
 
         !$acc update device(fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z)
@@ -1042,6 +973,7 @@ contains
         ! CBC coordinate direction.
         call s_finalize_cbc(flux_vf, flux_src_vf, &
                             ix, iy, iz)
+
     end subroutine s_cbc
 
     !>  The computation of parameters, the allocation of memory,
@@ -1517,28 +1449,30 @@ contains
     end subroutine s_finalize_cbc
 
     ! Detext if the problem has any characteristic boundary conditions
-    subroutine s_any_cbc_boundaries(toggle)
+    function f_any_cbc_boundaries() result(toggle)
 
-        logical, intent(inout) :: toggle
+        logical :: toggle
+        integer :: iter_dir, iter_loc
 
         toggle = .false.
 
-        #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
-            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
-                toggle = .true.
-            end if
-        #:endfor
+        do iter_dir = 1, num_dims
+            do iter_loc = -1, 1, 2
+                if (any(bc_id_has_bc(iter_dir, iter_loc, cbc_range_beg:cbc_range_end))) then
+                    toggle = .true.
+                    return
+                end if
+            end do
+        end do
 
-    end subroutine
+    end function f_any_cbc_boundaries
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module
 
-        logical :: is_cbc
-
-        call s_any_cbc_boundaries(is_cbc)
-
-        if (is_cbc .eqv. .false.) return
+        if (.not. f_any_cbc_boundaries()) then
+            return
+        end if
 
         ! Deallocating the cell-average primitive variables
         @:DEALLOCATE(q_prim_rsx_vf)
@@ -1568,33 +1502,16 @@ contains
         ! Deallocating GRCBC inputs
         @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
 
-        ! Deallocating CBC Coefficients in x-direction =====================
-        if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
-            @:DEALLOCATE(fd_coef_x)
-            if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_x)
+        #:for dir, cmp in zip([1, 2, 3], ['x', 'y', 'z'])
+            ! Deallocating the CBC Coefficients in ${cmp}-direction =====================
+            if (${dir}$ <= num_dims .and. any(bc_id_has_bc(${dir}$, :, cbc_range_beg:cbc_range_end))) then
+                @:DEALLOCATE(fd_coef_${cmp}$)
+                if (weno_order > 1) then
+                    @:DEALLOCATE(pi_coef_${cmp}$)
+                end if
             end if
-        end if
-        ! ==================================================================
-
-        ! Deallocating CBC Coefficients in y-direction =====================
-        if (n > 0 .and. any((/bc_y%beg, bc_y%end/) <= -5) .and. &
-            any((/bc_y%beg, bc_y%end/) >= -13 .and. bc_y%beg /= -14)) then
-            @:DEALLOCATE(fd_coef_y)
-            if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_y)
-            end if
-        end if
-        ! ==================================================================
-
-        ! Deallocating CBC Coefficients in z-direction =====================
-        if (p > 0 .and. any((/bc_z%beg, bc_z%end/) <= -5) .and. any((/bc_z%beg, bc_z%end/) >= -13)) then
-            @:DEALLOCATE(fd_coef_z)
-            if (weno_order > 1) then
-                @:DEALLOCATE(pi_coef_z)
-            end if
-        end if
-        ! ==================================================================
+            ! ==================================================================
+        #:endfor
 
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
