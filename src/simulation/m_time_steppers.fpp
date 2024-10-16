@@ -415,7 +415,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -524,7 +524,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
@@ -601,7 +601,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 2)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 2)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -713,7 +713,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 1)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
@@ -790,7 +790,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 2)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 2)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
@@ -866,11 +866,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        q_cons_ts(1)%vf(advxb)%sf(10, 10, 0) = -1
-        q_cons_ts(1)%vf(contxe)%sf(10, 10, 0) = -1
-        q_Cons_ts(1)%vf(advxe)%sf(5, 5, 0) = 1.1
-
-        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 3)
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 3)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -1034,9 +1030,9 @@ contains
 
     end subroutine s_apply_bodyforces
 
-    subroutine s_comprehensive_debug(q_cons_vf, q_prim_vf, t_step, stage)
+    subroutine s_comprehensive_debug(q_cons_vf, t_step, stage)
 
-        type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
         integer, intent(in) :: t_step, stage
 
         integer :: errors
@@ -1044,13 +1040,13 @@ contains
         call s_check_cells(q_cons_vf, q_prim_vf, t_step, stage, errors)
 
         if (errors /= 0) then
-            close(12)
+            close (12)
             call s_write_data_files(q_cons_vf, q_prim_vf, t_step)
             call s_mpi_abort("Errors found in conservative variables")
-        endif
+        end if
 
-        write(12, "(I3)") -1
-        close(12)
+        write (12, "(I3)") - 1
+        close (12)
 
     end subroutine s_comprehensive_debug
 

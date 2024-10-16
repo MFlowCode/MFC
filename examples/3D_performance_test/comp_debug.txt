@@ -1,0 +1,3 @@
+        0 Volume fraction < 0 after RK stage   2 at (j,k,l)   10  10   0 equation 7 proc    0 (m, n, p)  200  200  200
+        0 Volume fraction > 1 after RK stage   2 at (j,k,l)    5   5   0 equation 8 proc    0 (m, n, p)  200  200  200
+        0 Density is negative after RK stage   2 at (j,k,l)   10  10   0 equation 2 proc    0 (m, n, p)  200  200  200

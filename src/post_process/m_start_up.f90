@@ -198,15 +198,15 @@ contains
         ! Opening the run-time information file
         file_path = trim(case_dir)//'/'//trim(file_name)
 
-        inquire(file=file_path, exist=exists)
+        inquire (file=file_path, exist=exists)
         if (exists) then
-            open(12, file=file_path)
-              ! Read the file line by line
-              do
-                 read(12, '(I9)', iostat=ios) t_fail
-                 if (ios /= 0) exit  ! Exit loop on error or end-of-file
-              end do
-              if (t_fail == -1) return
+            open (12, file=file_path)
+            ! Read the file line by line
+            do
+                read (12, '(I9)', iostat=ios) t_fail
+                if (ios /= 0) exit  ! Exit loop on error or end-of-file
+            end do
+            if (t_fail == -1) return
         else
             return
         end if

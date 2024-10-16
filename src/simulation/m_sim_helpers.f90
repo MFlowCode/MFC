@@ -248,9 +248,9 @@ contains
 
     end subroutine s_compute_dt_from_cfl
 
-    subroutine s_check_cells(q_cons_Vf, q_prim_Vf, t_step, stage, errors)
+    subroutine s_check_cells(q_cons_Vf, t_step, stage, errors)
 
-        type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
         integer, intent(in) :: t_step, stage
         integer :: j, k, l, i
         integer errors
@@ -266,7 +266,7 @@ contains
         str_format = "(I9, A, I3, A, I4, I4, I4, A, I2, A, I5, A, I5, I5, I5)"
 
         open (12, FILE=trim(file_path), &
-          STATUS='replace')
+              STATUS='replace')
 
         errors = 0
 
@@ -277,7 +277,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                            write(12, str_format) t_step, " NaN(s) in conservative variables after RK stage ", &
+                            write (12, str_format) t_step, " NaN(s) in conservative variables after RK stage ", &
                                 stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
                                 " (m, n, p)", m, n, p
                             errors = errors + 1
@@ -293,12 +293,12 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (q_cons_vf(i)%sf(j, k, l) < 0d0) then
-                            write(12, str_format) t_step, " Volume fraction < 0 after RK stage ", &
+                            write (12, str_format) t_step, " Volume fraction < 0 after RK stage ", &
                                 stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
                                 " (m, n, p)", m, n, p
                             errors = errors + 1
                         elseif (q_cons_vf(i)%sf(j, k, l) > 1d0 + verysmall) then
-                            write(12, str_format) t_step, " Volume fraction > 1 after RK stage ", &
+                            write (12, str_format) t_step, " Volume fraction > 1 after RK stage ", &
                                 stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
                                 " (m, n, p)", m, n, p
                             errors = errors + 1
@@ -313,10 +313,10 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (q_cons_vf(advxb + i -1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) < 0d0 .or. &
-                            q_cons_vf(advxb + i -1)%sf(j, k, l) > 0d0 .and. q_cons_Vf(i)%sf(j, k, l) < 0d0) then
-                            print*, q_cons_vf(advxb + i - 1)%sf(j, k, l), q_cons_vf(i)%sf(j, k, l)
-                            write(12, str_format) t_step, " Density is negative after RK stage ", &
+                        if (q_cons_vf(advxb + i - 1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) < 0d0 .or. &
+                            q_cons_vf(advxb + i - 1)%sf(j, k, l) > 0d0 .and. q_cons_Vf(i)%sf(j, k, l) < 0d0) then
+                            print *, q_cons_vf(advxb + i - 1)%sf(j, k, l), q_cons_vf(i)%sf(j, k, l)
+                            write (12, str_format) t_step, " Density is negative after RK stage ", &
                                 stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
                                 " (m, n, p)", m, n, p
                             errors = errors + 1
