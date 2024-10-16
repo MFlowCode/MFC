@@ -990,6 +990,16 @@ contains
         end if
         ! END: Volume Fraction Model =======================================
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            temperature_idx%beg = sys_size + 1
+            temperature_idx%end = sys_size + 1
+            sys_size = temperature_idx%end
+        end if
+
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
@@ -1076,16 +1086,6 @@ contains
             grid_geometry = 2
         else ! Fully 3D cylindrical grid
             grid_geometry = 3
-        end if
-
-        if (chemistry) then
-            species_idx%beg = sys_size + 1
-            species_idx%end = sys_size + num_species
-            sys_size = species_idx%end
-
-            temperature_idx%beg = sys_size + 1
-            temperature_idx%end = sys_size + 1
-            sys_size = temperature_idx%end
         end if
 
         momxb = mom_idx%beg

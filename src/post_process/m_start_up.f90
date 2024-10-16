@@ -296,19 +296,32 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the species' concentrations to the formatted database file ----
-        do i = 1, num_species
-            if (chem_wrt_Y(i) .or. prim_vars_wrt) then
-                q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
-                                                    -offset_y%beg:n + offset_y%end, &
-                                                    -offset_z%beg:p + offset_z%end)
+        if (chemistry) then
+            do i = 1, num_species
+                if (chem_wrt_Y(i) .or. prim_vars_wrt) then
+                    q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
+                                                        -offset_y%beg:n + offset_y%end, &
+                                                        -offset_z%beg:p + offset_z%end)
 
-                write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                    write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+
+                end if
+            end do
+
+            if (chem_wrt_T) then
+                q_sf = q_prim_vf(tempxb)%sf(-offset_x%beg:m + offset_x%end, &
+                                            -offset_y%beg:n + offset_y%end, &
+                                            -offset_z%beg:p + offset_z%end)
+
+                write (varname, '(A)') 'T'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
-
             end if
-        end do
+        end if
 
         ! Adding the flux limiter function to the formatted database file
         do i = 1, E_idx - mom_idx%beg

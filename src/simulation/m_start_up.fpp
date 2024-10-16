@@ -1050,7 +1050,7 @@ contains
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: pres
+        real(kind(0d0)) :: pres, T
 
         integer :: i, j, k, l, c
 
@@ -1075,7 +1075,7 @@ contains
                     end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &

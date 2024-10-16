@@ -55,40 +55,52 @@ contains
 
     end subroutine s_finalize_chemistry_module
 
-    #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-        subroutine s_compute_chemistry_rhs_${XYZ}$ (flux_n, rhs_vf, flux_src_vf, q_prim_vf)
+    subroutine s_compute_chemistry_advection_flux(flux_n, rhs_vf)
 
-            type(vector_field), dimension(:), intent(IN) :: flux_n
-            type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, flux_src_vf, q_prim_vf
-            type(int_bounds_info) :: ix, iy, iz
+        type(vector_field), dimension(:), intent(IN) :: flux_n
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        type(int_bounds_info) :: ix, iy, iz
 
-            integer :: x, y, z
-            integer :: eqn
+        integer :: x, y, z
+        integer :: eqn
 
-            integer, parameter :: mx = ${1 if NORM_DIR == 1 else 0}$
-            integer, parameter :: my = ${1 if NORM_DIR == 2 else 0}$
-            integer, parameter :: mz = ${1 if NORM_DIR == 3 else 0}$
+        real(kind(0d0)) :: flux_x, flux_y, flux_z
 
-            !$acc parallel loop collapse(4) present(rhs_vf, flux_n)
-            do x = 0, m
-                do y = 0, n
-                    do z = 0, p
+        #:for num_dims in range(1, 4)
+            if (num_dims == ${num_dims}$) then
+                !$acc parallel loop collapse(4) gang vector default(present) &
+                !$acc private(flux_x, flux_y, flux_z)
+                do x = 0, m
+                    do y = 0, n
+                        do z = 0, p
+                            do eqn = chemxb, chemxe
+                                ! \nabla \cdot (F)
+                                flux_x = (flux_n(1)%vf(eqn)%sf(x - 1, y, z) - &
+                                          flux_n(1)%vf(eqn)%sf(x, y, z))/dx(x)
 
-                        do eqn = chemxb, chemxe
+                                #:if num_dims >= 2
+                                    flux_x = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
+                                              flux_n(2)%vf(eqn)%sf(x, y, z))/dy(y)
+                                #:else
+                                    flux_y = 0d0
+                                #:endif
 
-                            ! \nabla \cdot (F)
-                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + &
-                                                      (flux_n(${NORM_DIR}$)%vf(eqn)%sf(x - mx, y - my, z - mz) - &
-                                                       flux_n(${NORM_DIR}$)%vf(eqn)%sf(x, y, z))/d${XYZ}$ (${XYZ}$)
+                                #:if num_dims == 3
+                                    flux_z = (flux_n(3)%vf(eqn)%sf(x, y, z - 1) - &
+                                              flux_n(3)%vf(eqn)%sf(x, y, z))/dz(z)
+                                #:else
+                                    flux_z = 0d0
+                                #:endif
 
+                                rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
+                            end do
                         end do
-
                     end do
                 end do
-            end do
+            end if
+        #:endfor
 
-        end subroutine s_compute_chemistry_rhs_${XYZ}$
-    #:endfor
+    end subroutine s_compute_chemistry_advection_flux
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_prim_qp)
 
@@ -104,50 +116,47 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: E
 
-        real(kind(0d0)) :: rho
-        real(kind(1.d0)), dimension(num_species) :: Ys
-        real(kind(1.d0)), dimension(num_species) :: omega
+        real(kind(0d0)) :: rho, omega_m, omega_T
+        real(kind(0d0)), dimension(num_species) :: Ys
+        real(kind(0d0)), dimension(num_species) :: omega
         real(kind(0d0)), dimension(num_species) :: enthalpies
         real(kind(0d0)) :: cp_mix
 
         #:if chemistry
 
-            !$acc parallel loop collapse(4) private(rho)
+            !$acc parallel loop collapse(3) private(rho)
             do x = 0, m
                 do y = 0, n
                     do z = 0, p
 
-                        ! Maybe use q_prim_vf instead?
                         rho = 0d0
                         do eqn = chemxb, chemxe
                             rho = rho + q_cons_qp(eqn)%sf(x, y, z)
                         end do
 
                         do eqn = chemxb, chemxe
-                            Ys(eqn - chemxb + 1) = q_cons_qp(eqn)%sf(x, y, z)/rho
+                            Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
                         end do
 
                         dyn_pres = 0d0
-
                         do i = momxb, momxe
-                            dyn_pres = dyn_pres + rho*q_cons_qp(i)%sf(x, y, z)* &
-                                       q_cons_qp(i)%sf(x, y, z)/2d0
+                            dyn_pres = dyn_pres + q_cons_qp(i)%sf(x, y, z)* &
+                                       q_prim_qp(i)%sf(x, y, z)/2d0
                         end do
 
-                        call get_temperature(.true., q_cons_qp(E_idx)%sf(x, y, z) - dyn_pres, &
-                            & q_prim_qp(tempxb)%sf(x, y, z), Ys, T)
+                        call get_temperature(q_cons_qp(E_idx)%sf(x, y, z)/rho - dyn_pres/rho, &
+                            & 1200d0, Ys, .true., T)
 
                         call get_net_production_rates(rho, T, Ys, omega)
 
-                        q_cons_qp(tempxb)%sf(x, y, z) = T
-                        q_prim_qp(tempxb)%sf(x, y, z) = T
-
-                        !print*, x, y, z, T, rho, Ys, omega, q_cons_qp(E_idx)%sf(x, y, z), dyn_pres
+                        call get_species_enthalpies_rt(T, enthalpies)
 
                         do eqn = chemxb, chemxe
 
-                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + &
-                                                      mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                            omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                            omega_T = omega_m*enthalpies(eqn - chemxb + 1)*gas_constant*T
+
+                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 
                         end do
 
@@ -171,9 +180,9 @@ contains
         integer :: eqn
 
         !$acc parallel loop collapse(4)
-        do x = ix%beg, ix%end
-            do y = iy%beg, iy%end
-                do z = iz%beg, iz%end
+        do x = 0, m
+            do y = 0, n
+                do z = 0, p
 
                     do eqn = chemxb, chemxe
                         q_cons_qp(eqn)%sf(x, y, z) = max(0d0, q_cons_qp(eqn)%sf(x, y, z))

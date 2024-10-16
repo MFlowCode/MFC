@@ -305,7 +305,14 @@ contains
         real(kind(0d0)) :: E_L, E_R
         real(kind(0d0)) :: H_L, H_R
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R
+        real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: Y_L, Y_R
+        real(kind(0d0)) :: MW_L, MW_R
+        real(kind(0d0)) :: R_gas_L, R_gas_R
+        real(kind(0d0)) :: Cp_L, Cp_R
+        real(kind(0d0)) :: Cv_L, Cv_R
+        real(kind(0d0)) :: Gamm_L, Gamm_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
         real(kind(0d0)) :: qv_L, qv_R
@@ -357,7 +364,7 @@ contains
 
             if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Y_L, Y_R)
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Y_L, Ys_L, Y_R, Ys_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -469,11 +476,46 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                            #:if chemistry
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                end do
 
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
+                                call get_mixture_molecular_weight(Ys_L, MW_L)
+                                call get_mixture_molecular_weight(Ys_R, MW_R)
+
+                                R_gas_L = gas_constant/MW_L
+                                R_gas_R = gas_constant/MW_R
+
+                                T_L = qL_prim_rs${XYZ}$_vf(j, k, l, tempxb)
+                                T_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, tempxb)
+
+                                call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                call get_mixture_energy_mass(T_R, Ys_R, E_R)
+
+                                call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+
+                                Gamm_L = Cp_L/Cv_L
+                                gamma_L = 1.0d0/(Gamm_L - 1.0d0)
+                                Gamm_R = Cp_R/Cv_R
+                                gamma_R = 1.0d0/(Gamm_R - 1.0d0)
+
+                                E_L = rho_L*E_L + 5d-1*rho_L*vel_L_rms
+                                E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
+
+                                H_L = T_L*(1 + gamma_L)*R_gas_L + 0.5d0*vel_L_rms
+                                H_R = T_R*(1 + gamma_R)*R_gas_R + 0.5d0*vel_R_rms
+                            #:else
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                H_L = (E_L + pres_L)/rho_L
+                                H_R = (E_R + pres_R)/rho_R
+                            #:endif
 
                             if (hypoelasticity) then
                                 !$acc loop seq
