@@ -7,7 +7,8 @@ module m_thermochem
             num_species, species_names, gas_constant, mol_weights, &
             get_temperature, get_net_production_rates, get_pressure, &
             get_mixture_molecular_weight, get_mixture_energy_mass, &
-            get_temperature
+            get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
+            get_species_enthalpies_rt
     #:endif
 
     implicit none
