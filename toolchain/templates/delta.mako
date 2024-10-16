@@ -47,7 +47,6 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rh
     % else:
         (set -x; ${profiler}                                   \
             srun --ntasks ${nodes*tasks_per_node}                 \
-                   ${' '.join([f"'{x}'" for x in ARG('--') ])} \
                    "${target.get_install_binpath(case)}")
     % endif
 
