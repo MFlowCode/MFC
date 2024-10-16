@@ -866,6 +866,10 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        q_cons_ts(1)%vf(advxb)%sf(10, 10, 0) = -1
+        q_cons_ts(1)%vf(contxe)%sf(10, 10, 0) = -1
+        q_Cons_ts(1)%vf(advxe)%sf(5, 5, 0) = 1.1
+
         if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, q_prim_vf, t_step, 3)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
@@ -1034,79 +1038,10 @@ contains
 
         type(scalar_field), dimension(sys_size) :: q_cons_vf, q_prim_vf
         integer, intent(in) :: t_step, stage
-        integer :: j, k, l, i
-        integer errors
-        logical :: exists
 
-        character(LEN=name_len) :: file_name = 'comp_debug.txt'
-        character(LEN=path_len + name_len) :: file_path
-        character(100) :: str_format
+        integer :: errors
 
-        ! Opening the run-time information file
-        file_path = trim(case_dir)//'/'//trim(file_name)
-
-        str_format = "(I9, A, I3, A, I4, I4, I4, A, I2, A, I5, A, I5, I5, I5)"
-
-        open (12, FILE=trim(file_path), &
-          STATUS='replace')
-
-        errors = 0
-
-        ! Check all variables for NaNs
-        do i = 1, sys_size
-            !$acc update host(q_cons_vf(i)%sf)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                            write(12, str_format) t_step, " NaN(s) in conservative variables after RK stage ", &
-                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
-                                " (m, n, p)", m, n, p
-                            errors = errors + 1
-                        end if
-                    end do
-                end do
-            end do
-        end do
-
-        ! Check for invalid volume fractions
-        do i = advxb, advxe
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (q_cons_vf(i)%sf(j, k, l) < 0d0) then
-                            write(12, str_format) t_step, " Volume fraction < 0 after RK stage ", &
-                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
-                                " (m, n, p)", m, n, p
-                            errors = errors + 1
-                        elseif (q_cons_vf(i)%sf(j, k, l) > 1d0 + verysmall) then
-                            write(12, str_format) t_step, " Volume fraction > 1 after RK stage ", &
-                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
-                                " (m, n, p)", m, n, p
-                            errors = errors + 1
-                        end if
-                    end do
-                end do
-            end do
-        end do
-
-        ! Check for invalid densities
-        do i = contxb, contxe
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (q_cons_vf(advxb + i -1)%sf(j, k, l) < 0d0 .and. q_cons_vf(i)%sf(j, k, l) < 0d0 .or. &
-                            q_cons_vf(advxb + i -1)%sf(j, k, l) > 0d0 .and. q_cons_Vf(i)%sf(j, k, l) < 0d0) then
-                            print*, q_cons_vf(advxb + i - 1)%sf(j, k, l), q_cons_vf(i)%sf(j, k, l)
-                            write(12, str_format) t_step, " Density is negative after RK stage ", &
-                                stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
-                                " (m, n, p)", m, n, p
-                            errors = errors + 1
-                        end if
-                    end do
-                end do
-            end do
-        end do
+        call s_check_cells(q_cons_vf, q_prim_vf, t_step, stage, errors)
 
         if (errors /= 0) then
             close(12)
