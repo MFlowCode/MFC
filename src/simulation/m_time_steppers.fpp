@@ -325,11 +325,6 @@ contains
         real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: nR3bar
-        real(kind(0d0)) :: e_mix
-
-        real(kind(0d0)) :: T
-        real(kind(0d0)), dimension(num_species) :: Ys
 
         ! Stage 1 of 1 =====================================================
 
@@ -442,7 +437,6 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -628,9 +622,7 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
@@ -897,7 +889,6 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         call cpu_time(start)
@@ -932,8 +923,6 @@ contains
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
         ix%beg = 0; iy%beg = 0; iz%beg = 0
         ix%end = m; iy%end = n; iz%end = p
         call s_convert_conservative_to_primitive_variables( &
@@ -963,7 +952,7 @@ contains
         type(vector_field) :: gm_alpha_qp
         real(kind(0d0)) :: dt_local
         type(int_bounds_info) :: ix, iy, iz
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l !< Generic loop iterators
 
         ix%beg = 0; iy%beg = 0; iz%beg = 0
         ix%end = m; iy%end = n; iz%end = p
