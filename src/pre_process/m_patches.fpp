@@ -2077,6 +2077,9 @@ contains
                     ! if defining them analytically.
                     @:analytical()
 
+                    call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                            eta, q_prim_vf, patch_id_fp)
+
                 end do; end do; end do
 
         if (proc_rank == 0) then
