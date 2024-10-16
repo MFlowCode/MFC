@@ -78,20 +78,40 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
-
-    use m_sim_helpers
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_read_input_file, &
  s_check_input_file, &
+ s_read_data_files, &
+ s_read_serial_data_files, &
+ s_read_parallel_data_files, &
  s_populate_grid_variables_buffers, &
  s_initialize_internal_energy_equations, &
  s_initialize_modules, s_initialize_gpu_vars, &
  s_initialize_mpi_domain, s_finalize_modules, &
  s_perform_time_step, s_save_data, &
  s_save_performance_metrics
+
+    abstract interface ! ===================================================
+
+        !! @param q_cons_vf  Conservative variables
+        subroutine s_read_abstract_data_files(q_cons_vf)
+
+            import :: scalar_field, sys_size, pres_field
+
+            type(scalar_field), &
+                dimension(sys_size), &
+                intent(inout) :: q_cons_vf
+
+        end subroutine s_read_abstract_data_files
+
+    end interface ! ========================================================
+
+    type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+
+    procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
 contains
 
@@ -211,6 +231,596 @@ contains
         call s_check_inputs()
 
     end subroutine s_check_input_file
+
+        !!              initial condition and grid data files. The cell-average
+        !!              conservative variables constitute the former, while the
+        !!              cell-boundary locations in x-, y- and z-directions make
+        !!              up the latter. This procedure also calculates the cell-
+        !!              width distributions from the cell-boundary locations.
+        !! @param q_cons_vf Cell-averaged conservative variables
+    subroutine s_read_serial_data_files(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+
+        character(LEN=path_len + 2*name_len) :: t_step_dir !<
+            !! Relative path to the starting time-step directory
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+            !! Relative path to the grid and conservative variables data files
+
+        logical :: file_exist !<
+        ! Logical used to check the existence of the data files
+
+        integer :: i, r !< Generic loop iterator
+
+        ! Confirming that the directory from which the initial condition and
+        ! the grid data files are to be read in exists and exiting otherwise
+        if (cfl_dt) then
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
+        else
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        end if
+
+        file_path = trim(t_step_dir)//'/.'
+        call my_inquire(file_path, file_exist)
+
+        if (file_exist .neqv. .true.) then
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+        end if
+
+        ! Cell-boundary Locations in x-direction ===========================
+        file_path = trim(t_step_dir)//'/x_cb.dat'
+
+        inquire (FILE=trim(file_path), EXIST=file_exist)
+
+        if (file_exist) then
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  ACTION='read', &
+                  STATUS='old')
+            read (2) x_cb(-1:m); close (2)
+        else
+            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+        end if
+
+        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                end if
+            end do
+        end if
+        ! ==================================================================
+
+        ! Cell-boundary Locations in y-direction ===========================
+        if (n > 0) then
+
+            file_path = trim(t_step_dir)//'/y_cb.dat'
+
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) y_cb(-1:n); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+
+        end if
+        ! ==================================================================
+
+        ! Cell-boundary Locations in z-direction ===========================
+        if (p > 0) then
+
+            file_path = trim(t_step_dir)//'/z_cb.dat'
+
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) z_cb(-1:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
+            z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+
+        end if
+        ! ==================================================================
+
+        do i = 1, sys_size
+            write (file_path, '(A,I0,A)') &
+                trim(t_step_dir)//'/q_cons_vf', i, '.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+        end do
+
+        if ((bubbles .eqv. .true.) .or. (hypoelasticity .eqv. .true.)) then
+            ! Read pb and mv for non-polytropic qbmm
+            if (qbmm .and. .not. polytropic) then
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/pb', sys_size + (i - 1)*nnode + r, '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do
+                do i = 1, nb
+                    do r = 1, nnode
+                        write (file_path, '(A,I0,A)') &
+                            trim(t_step_dir)//'/mv', sys_size + (i - 1)*nnode + r, '.dat'
+                        inquire (FILE=trim(file_path), EXIST=file_exist)
+                        if (file_exist) then
+                            open (2, FILE=trim(file_path), &
+                                  FORM='unformatted', &
+                                  ACTION='read', &
+                                  STATUS='old')
+                            read (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                        else
+                            call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                        end if
+                    end do
+                end do
+            end if
+        end if
+        ! ==================================================================
+
+        ! Read IBM Data ====================================================
+
+        if (ib) then
+            do i = 1, num_ibs
+                write (file_path, '(A,I0,A)') &
+                    trim(t_step_dir)//'/ib.dat'
+                inquire (FILE=trim(file_path), EXIST=file_exist)
+                if (file_exist) then
+                    open (2, FILE=trim(file_path), &
+                          FORM='unformatted', &
+                          ACTION='read', &
+                          STATUS='old')
+                    read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+                else
+                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                end if
+
+                if (patch_ib(i)%c > 0) then
+
+                    print *, "HERE Np", Np
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_u.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_u; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+
+                    write (file_path, '(A)') &
+                        trim(t_step_dir)//'/airfoil_l.dat'
+                    inquire (FILE=trim(file_path), EXIST=file_exist)
+                    if (file_exist) then
+                        open (2, FILE=trim(file_path), &
+                              FORM='unformatted', &
+                              ACTION='read', &
+                              STATUS='old')
+                        read (2) airfoil_grid_l; close (2)
+                    else
+                        call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+                    end if
+                end if
+            end do
+
+        end if
+
+    end subroutine s_read_serial_data_files
+
+        !! @param q_cons_vf Conservative variables
+    subroutine s_read_parallel_data_files(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: q_cons_vf
+
+#ifdef MFC_MPI
+
+        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+
+        integer :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp
+        integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
+        integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
+        integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
+        integer(KIND=MPI_OFFSET_KIND) :: MOK
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+
+        character(len=10) :: t_step_start_string
+
+        integer :: i, j
+
+        allocate (x_cb_glb(-1:m_glb))
+        allocate (y_cb_glb(-1:n_glb))
+        allocate (z_cb_glb(-1:p_glb))
+
+        ! Read in cell boundary locations in x-direction
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if (file_exist) then
+            data_size = m_glb + 2
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        else
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+        end if
+
+        ! Assigning local cell boundary locations
+        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
+        ! Computing the cell width distribution
+        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
+        ! Computing the cell center locations
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+
+        if (ib) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%c > 0) then
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0))*20) + 1
+                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
+                    print *, "HERE Np", Np
+                end if
+            end do
+        end if
+
+        if (n > 0) then
+            ! Read in cell boundary locations in y-direction
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+                data_size = n_glb + 2
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_CLOSE(ifile, ierr)
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+
+            ! Assigning local cell boundary locations
+            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
+            ! Computing the cell width distribution
+            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
+            ! Computing the cell center locations
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+
+            if (p > 0) then
+                ! Read in cell boundary locations in z-direction
+                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                if (file_exist) then
+                    data_size = p_glb + 2
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_CLOSE(ifile, ierr)
+                else
+                    call s_mpi_abort('File '//trim(file_loc)//'is missing. Exiting...')
+                end if
+
+                ! Assigning local cell boundary locations
+                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
+                ! Computing the cell width distribution
+                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
+                ! Computing the cell center locations
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+
+            end if
+        end if
+
+        if (file_per_process) then
+            if (cfl_dt) then
+                call s_int_to_str(n_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                call s_int_to_str(t_step_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
+
+            file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                ! Initialize MPI data I/O
+
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
+
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
+
+                    do i = 1, sys_size!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if (qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+        else
+            ! Open the file to read conservative variables
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+            if (file_exist) then
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                ! Initialize MPI data I/O
+
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                else
+
+                    call s_initialize_mpi_data(q_cons_vf)
+
+                end if
+
+
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8d0, MPI_OFFSET_KIND)
+                MOK = int(1d0, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+
+                ! Read the data for each variable
+                if (bubbles .or. hypoelasticity) then
+
+                    do i = 1, sys_size!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end do
+                    !Read pb and mv for non-polytropic qbmm
+                    if (qbmm .and. .not. polytropic) then
+                        do i = sys_size + 1, sys_size + 2*nb*nnode
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+                            ! Initial displacement to skip at beginning of file
+                            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               MPI_DOUBLE_PRECISION, status, ierr)
+                        end do
+                    end if
+                else
+                    do i = 1, sys_size
+                        var_MOK = int(i, MPI_OFFSET_KIND)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    end do
+                end if
+
+                call s_mpi_barrier()
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+
+                if (ib) then
+
+                    write (file_loc, '(A)') 'ib.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                           MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                end if
+
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+            end if
+
+        end if
+
+        if (ib) then
+
+            do j = 1, num_ibs
+                if (patch_ib(j)%c > 0) then
+
+                    print *, "HERE Np", Np
+
+                    allocate (airfoil_grid_u(1:Np))
+                    allocate (airfoil_grid_l(1:Np))
+
+                    write (file_loc, '(A)') 'airfoil_l.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(1), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    end if
+
+                    write (file_loc, '(A)') 'airfoil_u.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        ! Initial displacement to skip at beginning of file
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_airfoil_IB_DATA%view(2), &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+                    end if
+
+                    do i = 1, Np
+                        airfoil_grid_l(i)%x = MPI_IO_airfoil_IB_DATA%var(i)%x
+                        airfoil_grid_l(i)%y = MPI_IO_airfoil_IB_DATA%var(i)%y
+                    end do
+
+                    do i = 1, Np
+                        airfoil_grid_u(i)%x = MPI_IO_airfoil_IB_DATA%var(Np + i)%x
+                        airfoil_grid_u(i)%y = MPI_IO_airfoil_IB_DATA%var(Np + i)%y
+                    end do
+
+                end if
+            end do
+        end if
+
+        deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+#endif
+
+    end subroutine s_read_parallel_data_files
 
     !> The purpose of this subroutine is to populate the buffers
         !!          of the grid variables, which are constituted of the cell-
@@ -696,8 +1306,6 @@ contains
             pref = 1d0
         end if
 
-        call s_initialize_sim_helpers_module()
-
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
@@ -743,8 +1351,17 @@ contains
         call acc_present_dump()
 #endif
 
+        ! Associate pointers for serial or parallel I/O
+        if (parallel_io .neqv. .true.) then
+            s_read_data_files => s_read_serial_data_files
+            s_write_data_files => s_write_serial_data_files
+        else
+            s_read_data_files => s_read_parallel_data_files
+            s_write_data_files => s_write_parallel_data_files
+        end if
+
         ! Reading in the user provided initial condition and grid data
-        call s_read_data_files(q_cons_ts(1)%vf, ib_markers)
+        call s_read_data_files(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
@@ -880,7 +1497,6 @@ contains
         s_read_data_files => null()
         s_write_data_files => null()
 
-        call s_finalize_sim_helpers_module()
         call s_finalize_time_steppers_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()

@@ -26,6 +26,8 @@ module m_data_output
 
     use m_helper
 
+    use m_sim_helpers
+
     use m_delay_file_access
 
     use m_ibm
@@ -35,11 +37,14 @@ module m_data_output
 
     private; 
     public :: s_initialize_data_output_module, &
+              s_open_run_time_information_file, &
               s_open_probe_files, &
+              s_write_run_time_information, &
               s_write_data_files, &
               s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_probe_files, &
+              s_close_run_time_information_file, &
               s_close_probe_files, &
               s_finalize_data_output_module
 
@@ -65,10 +70,102 @@ module m_data_output
 
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
+    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#else
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
+    !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
+#endif
+
+    real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+    real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+    real(kind(0d0)) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+    real(kind(0d0)) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+    !$acc declare create(icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb, ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb)
+
+    !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
+    !> @{
+    real(kind(0d0)) :: icfl_max !< ICFL criterion maximum
+    real(kind(0d0)) :: vcfl_max !< VCFL criterion maximum
+    real(kind(0d0)) :: ccfl_max !< CCFL criterion maximum
+    real(kind(0d0)) :: Rc_min !< Rc criterion maximum
+    !> @}
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
+
+    !>  The purpose of this subroutine is to open a new or pre-
+        !!          existing run-time information file and append to it the
+        !!      basic header information relevant to current simulation.
+        !!      In general, this requires generating a table header for
+        !!      those stability criteria which will be written at every
+        !!      time-step.
+    subroutine s_open_run_time_information_file
+
+        character(LEN=name_len) :: file_name = 'run_time.inf' !<
+            !! Name of the run-time information file
+
+        character(LEN=path_len + name_len) :: file_path !<
+            !! Relative path to a file in the case directory
+
+        character(LEN=8) :: file_date !<
+            !! Creation date of the run-time information file
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+
+        open (3, FILE=trim(file_path), &
+              FORM='formatted', &
+              STATUS='replace')
+
+        write (3, '(A)') 'Description: Stability information at '// &
+            'each time-step of the simulation. This'
+        write (3, '(13X,A)') 'data is composed of the inviscid '// &
+            'Courant–Friedrichs–Lewy (ICFL)'
+        write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
+            'the capillary CFL (CCFL)'
+        write (3, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
+            'number. Please note that only'
+        write (3, '(13X,A)') 'those stability conditions pertinent '// &
+            'to the physics included in'
+        write (3, '(13X,A)') 'the current computation are displayed.'
+
+        call date_and_time(DATE=file_date)
+
+        write (3, '(A)') 'Date: '//file_date(5:6)//'/'// &
+            file_date(7:8)//'/'// &
+            file_date(3:4)
+
+        write (3, '(A)') ''; write (3, '(A)') ''
+
+        ! Generating table header for the stability criteria to be outputted
+        if (cfl_dt) then
+            if (any(Re_size > 0)) then
+                write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== dt ===== Time '// &
+                    '============== ICFL Max ============='
+            end if
+        else
+            if (any(Re_size > 0)) then
+                write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== Time '// &
+                    '============== ICFL Max ============='
+            end if
+        end if
+
+    end subroutine s_open_run_time_information_file
 
     !>  This opens a formatted data file where the root processor
         !!      can write out flow probe information
@@ -118,6 +215,155 @@ contains
         end if
 
     end subroutine s_open_probe_files
+
+    !>  The goal of the procedure is to output to the run-time
+        !!      information file the stability criteria extrema in the
+        !!      entire computational domain and at the given time-step.
+        !!      Moreover, the subroutine is also in charge of tracking
+        !!      these stability criteria extrema over all time-steps.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param t_step Current time step
+    subroutine s_write_run_time_information(q_prim_vf, t_step)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer, intent(IN) :: t_step
+
+        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
+        real(kind(0d0)) :: rho        !< Cell-avg. density
+        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
+        real(kind(0d0)) :: pres       !< Cell-avg. pressure
+        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
+        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
+        real(kind(0d0)) :: c          !< Cell-avg. sound speed
+        real(kind(0d0)) :: E          !< Cell-avg. energy
+        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
+        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+
+        ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
+        ! time-step and located on both the local (loc) and the global (glb)
+        ! computational domains
+
+        real(kind(0d0)) :: blkmod1, blkmod2 !<
+            !! Fluid bulk modulus for Woods mixture sound speed
+
+        integer :: i, j, k, l, q !< Generic loop iterators
+
+        integer :: Nfq
+        real(kind(0d0)) :: fltr_dtheta   !<
+            !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+
+        ! Computing Stability Criteria at Current Time-step ================
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+
+                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+
+                    ! Compute mixture sound speed
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+
+                    if (any(Re_size > 0)) then
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+                    else
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
+                    end if
+
+                end do
+            end do
+        end do
+        ! END: Computing Stability Criteria at Current Time-step ===========
+
+        ! Determining local stability criteria extrema at current time-step
+
+#ifdef CRAY_ACC_WAR
+        !$acc update host(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            !$acc update host(vcfl_sf, Rc_sf)
+        end if
+
+        icfl_max_loc = maxval(icfl_sf)
+
+        if (any(Re_size > 0)) then
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        end if
+#else
+        !$acc kernels
+        icfl_max_loc = maxval(icfl_sf)
+        !$acc end kernels
+
+        if (any(Re_size > 0)) then
+            !$acc kernels
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+            !$acc end kernels
+        end if
+#endif
+
+        ! Determining global stability criteria extrema at current time-step
+        if (num_procs > 1) then
+            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
+                                                         vcfl_max_loc, &
+                                                         ccfl_max_loc, &
+                                                         Rc_min_loc, &
+                                                         icfl_max_glb, &
+                                                         vcfl_max_glb, &
+                                                         ccfl_max_glb, &
+                                                         Rc_min_glb)
+        else
+            icfl_max_glb = icfl_max_loc
+            if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
+            if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
+        end if
+
+        ! Determining the stability criteria extrema over all the time-steps
+        if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
+
+        if (any(Re_size > 0)) then
+            if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
+            if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
+        end if
+
+        ! Outputting global stability criteria extrema at current time-step
+        if (proc_rank == 0) then
+            if (any(Re_size > 0)) then
+                write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb, &
+                    vcfl_max_glb, &
+                    Rc_min_glb
+            else
+                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb
+            end if
+
+            if (icfl_max_glb /= icfl_max_glb) then
+                call s_mpi_abort('ICFL is NaN. Exiting ...')
+            elseif (icfl_max_glb > 1d0) then
+                print *, 'icfl', icfl_max_glb
+                call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
+            end if
+
+            do i = chemxb, chemxe
+                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) >= -1d0), "bad conc")
+                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) <=  2d0), "bad conc")
+            end do
+
+            if (vcfl_max_glb /= vcfl_max_glb) then
+                call s_mpi_abort('VCFL is NaN. Exiting ...')
+            elseif (vcfl_max_glb > 1d0) then
+                print *, 'vcfl', vcfl_max_glb
+                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+            end if
+        end if
+
+        call s_mpi_barrier()
+
+    end subroutine s_write_run_time_information
 
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
@@ -1320,6 +1566,33 @@ contains
 
     end subroutine s_write_probe_files
 
+    !>  The goal of this subroutine is to write to the run-time
+        !!      information file basic footer information applicable to
+        !!      the current computation and to close the file when done.
+        !!      The footer contains the stability criteria extrema over
+        !!      all of the time-steps and the simulation run-time.
+    subroutine s_close_run_time_information_file
+
+        real(kind(0d0)) :: run_time !< Run-time of the simulation
+        ! Writing the footer of and closing the run-time information file
+        write (3, '(A)') '----------------------------------------'// &
+            '----------------------------------------'
+        write (3, '(A)') ''
+
+        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (any(Re_size > 0)) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
+        if (any(Re_size > 0)) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+
+        call cpu_time(run_time)
+
+        write (3, '(A)') ''
+        write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
+        write (3, '(A)') '========================================'// &
+            '========================================'
+        close (3)
+
+    end subroutine s_close_run_time_information_file
+
     !> Closes probe files
     subroutine s_close_probe_files
 
@@ -1339,6 +1612,18 @@ contains
         type(int_bounds_info) :: ix, iy, iz
 
         integer :: i !< Generic loop iterator
+
+        ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
+        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
+        icfl_max = 0d0
+
+        if (any(Re_size > 0)) then
+            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
+
+            vcfl_max = 0d0
+            Rc_min = 1d3
+        end if
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -1366,6 +1651,12 @@ contains
     subroutine s_finalize_data_output_module
 
         integer :: i !< Generic loop iterator
+
+        ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
+        @:DEALLOCATE_GLOBAL(icfl_sf)
+        if (any(Re_size > 0)) then
+            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
+        end if
 
         ! Disassociating the pointer to the procedure that was utilized to
         ! to convert mixture or species variables to the mixture variables
