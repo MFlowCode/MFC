@@ -996,26 +996,6 @@ contains
             call nvtxEndRange
             ! END: Additional physics and source terms =========================
 
-            #:if chemistry
-                if (chem_params%advection) then
-                    call nvtxStartRange("RHS_Chem_Advection")
-
-                    #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-
-                        if (id == ${NORM_DIR}$) then
-                            call s_compute_chemistry_rhs_${XYZ}$ ( &
-                                flux_n, &
-                                rhs_vf, &
-                                flux_src_n(${NORM_DIR}$)%vf, &
-                                q_prim_vf)
-                        end if
-
-                    #:endfor
-
-                    call nvtxEndRange
-                end if
-            #:endif
-
         end do
         ! END: Dimensional Splitting Loop =================================
 
@@ -1055,7 +1035,7 @@ contains
         #:if chemistry
             if (chem_params%reactions) then
                 call nvtxStartRange("RHS_Chem_Reactions")
-                call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_vf, q_prim_qp%vf)
+                call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
                 call nvtxEndRange
             end if
         #:endif

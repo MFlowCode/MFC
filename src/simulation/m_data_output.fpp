@@ -960,7 +960,7 @@ contains
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
         real(kind(0d0)) :: G
-        real(kind(0d0)) :: dyn_p
+        real(kind(0d0)) :: dyn_p, Temp
 
         integer :: i, j, k, l, s, q, d !< Generic loop iterator
 
@@ -1054,14 +1054,14 @@ contains
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp)
                     end if
 
                     if (model_eqns == 4) then
@@ -1163,13 +1163,14 @@ contains
                                 dyn_p, pi_inf, gamma, rho, qv, &
                                 rhoYks, &
                                 pres, &
+                                Temp, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                                    rhoYks, pres)
+                                                    rhoYks, pres, Temp)
                         end if
 
                         if (model_eqns == 4) then
@@ -1253,14 +1254,14 @@ contains
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                    rhoYks, pres, &
+                                    rhoYks, pres, Temp, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
-                                                        rhoYks, pres)
+                                                        rhoYks, pres, Temp)
                             end if
 
                             ! Compute mixture sound speed
