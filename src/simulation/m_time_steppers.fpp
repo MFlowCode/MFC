@@ -1037,7 +1037,7 @@ contains
 
         integer :: errors
 
-        call s_check_cells(q_cons_vf, q_prim_vf, t_step, stage, errors)
+        call s_check_cells(q_cons_vf, t_step, stage, errors)
 
         if (errors /= 0) then
             close (12)
