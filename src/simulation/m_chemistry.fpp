@@ -172,26 +172,4 @@ contains
 
     end subroutine s_compute_chemistry_reaction_flux
 
-    subroutine s_chemistry_normalize_cons(q_cons_qp)
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_qp
-
-        integer :: x, y, z
-        integer :: eqn
-
-        !$acc parallel loop collapse(4)
-        do x = 0, m
-            do y = 0, n
-                do z = 0, p
-
-                    do eqn = chemxb, chemxe
-                        q_cons_qp(eqn)%sf(x, y, z) = max(0d0, q_cons_qp(eqn)%sf(x, y, z))
-                    end do
-
-                end do
-            end do
-        end do
-
-    end subroutine s_chemistry_normalize_cons
-
 end module m_chemistry

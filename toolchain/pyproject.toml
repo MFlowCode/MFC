@@ -37,7 +37,7 @@ dependencies = [
 
     # Chemistry
     "cantera",
-    "pyrometheus==1.0.1"
+    "pyrometheus==1.0.2"
 ]
 
 [tool.hatch.metadata]

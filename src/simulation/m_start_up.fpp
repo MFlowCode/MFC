@@ -1165,10 +1165,6 @@ contains
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
-        if (chemistry) then
-            call s_chemistry_normalize_cons(q_cons_ts(1)%vf)
-        end if
-
         ! Time-stepping loop controls
 
         t_step = t_step + 1
