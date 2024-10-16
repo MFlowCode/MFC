@@ -34,6 +34,16 @@ module m_derived_types
         integer, pointer, dimension(:, :, :) :: sf => null()
     end type integer_field
 
+    !> Derived type for levelset
+    type levelset_field
+        real(kind(0d0)), pointer, dimension(:, :, :, :) :: sf => null()
+    end type levelset_field
+
+    !> Derived type for levelset norm
+    type levelset_norm_field
+        real(kind(0d0)), pointer, dimension(:, :, :, :, :) :: sf => null()
+    end type levelset_norm_field
+
     type mpi_io_var
         integer, allocatable, dimension(:) :: view
         type(scalar_field), allocatable, dimension(:) :: var
@@ -43,6 +53,16 @@ module m_derived_types
         integer :: view
         type(integer_field) :: var
     end type mpi_io_ib_var
+
+    type mpi_io_levelset_var
+        integer :: view
+        type(levelset_field) :: var
+    end type mpi_io_levelset_var
+
+    type mpi_io_levelset_norm_var
+        integer :: view
+        type(levelset_norm_field) :: var
+    end type mpi_io_levelset_norm_var
 
     !> Derived type annexing a vector field (VF)
     type vector_field
