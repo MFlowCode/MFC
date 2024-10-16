@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser(
     description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT")
+parser.add_argument("--mfc", type=str, metavar="MFC")
 parser.add_argument("-s", "--scaling",       type=str, metavar="SCALING", choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
 parser.add_argument("-m", "--memory",        type=int, metavar="MEMORY",  help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.")
 parser.add_argument("-f", "--fidelity",      type=str, metavar="FIDELITY", choices=["ideal", "exact"], default="ideal")
@@ -20,7 +20,7 @@ if args.scaling is None:
     parser.print_help()
     sys.exit(1)
 
-DICT = json.loads(args.dict)
+DICT = json.loads(args.mfc)
 
 # \approx The number of cells per GB of memory. The exact value is not important.
 cpg    = 8000000 / 16.0

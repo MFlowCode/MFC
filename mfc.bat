@@ -31,11 +31,11 @@ if %errorlevel% neq 0 (
 	exit /b 1
 )
 
-fc /b "%cd%\build\requirements.txt" "%cd%\toolchain\requirements.txt" 2> NUL
+fc /b "%cd%\build\pyproject.toml" "%cd%\toolchain\pyproject.toml" 2> NUL
 if %errorlevel% neq 0 (
-    pip3 install -r toolchain/requirements.txt
+    pip3 install -e toolchain
 
-    copy "%cd%\toolchain\requirements.txt" "%cd%\build" 2> NUL
+    copy "%cd%\toolchain\pyproject.toml" "%cd%\build" 2> NUL
 )
 
 python "%cd%\toolchain\main.py" %*
