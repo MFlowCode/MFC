@@ -20,7 +20,7 @@ module m_precision_select
 #ifdef MFC_SINGLE_PRECISION
     integer, parameter :: wp = single_precision  ! Change to single_precision if needed
 #else
-    integer, parameter :: wp = double_precision
+    integer, parameter :: wp = single_precision
 #endif
 
 #ifdef MFC_MPI

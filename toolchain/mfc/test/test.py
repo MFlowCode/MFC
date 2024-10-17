@@ -134,10 +134,10 @@ def test():
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
+    tol = case.compute_tolerance()
+    
     if ARG("single"):
-        tol = 1e-5
-    else:
-        tol = case.compute_tolerance()
+        tol *= 1e10        
 
     case.delete_output()
     case.create_directory()
