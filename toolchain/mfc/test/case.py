@@ -215,18 +215,14 @@ print(json.dumps({{**case, **mods}}))
     def compute_tolerance(self) -> float:
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
-
         if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             return 1e-10
-
         if self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
             return 1e-10
-
         if self.params.get("acoustic_source", 'F') == 'T':
             if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
                 return 1e-5
             return 3e-12
-
         return 1e-12
 
 @dataclasses.dataclass

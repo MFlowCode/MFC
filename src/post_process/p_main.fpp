@@ -26,9 +26,9 @@ program p_main
     !! Generic storage for the name(s) of the flow variable(s) that will be added
     !! to the formatted database file(s)
 
-    real(kind(0d0)) :: pres
-    real(kind(0d0)) :: c
-    real(kind(0d0)) :: H
+    real(wp) :: pres
+    real(wp) :: c
+    real(wp) :: H
 
     call s_initialize_mpi_domain()
 
