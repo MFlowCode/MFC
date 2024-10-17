@@ -55,7 +55,35 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
-
+    
+    case (302) ! (3D lung geometry in X direction - axisym, with smoothing)
+        h = 0.0
+        lam = 1.0*200.E-06
+        amp = patch_icpp(patch_id)%a2
+        
+        intH = amp/2*(sin(2*pi*y_cc(j)/lam + pi/2) + sin(2*pi*z_cc(k)/lam + pi/2))+h
+        
+        alph = patch_icpp(2)%alpha(1) + (patch_icpp(1)%alpha(1)-patch_icpp(2)%alpha(1))/(amp)*(x_cc(i)-(intH-amp/2))
+        
+    ! Version 2    
+        if (x_cc(i) > intH + amp/2) then
+        
+            q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
+            q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
+        
+        else if ((x_cc(i) .le. intH + amp/2) .and. (x_cc(i) .ge. intH - amp/2)) then
+        
+            q_prim_vf(advxb)%sf(i, j, k) = alph !0.5
+            q_prim_vf(advxe)%sf(i, j, k) = 1- alph !0.5
+            q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)*alph!0.5
+            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(2)%alpha_rho(2)/patch_icpp(2)%alpha(2)*(1-alph)!0.5
+            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
+        
+        end if
+    
         ! Put your variable assignments here
     case default
         call s_int_to_str(patch_id, iStr)
