@@ -804,9 +804,9 @@ contains
 !     finds sqrt(a**2+b**2) without overflow or destructive underflow
 !
         real(wp) :: p, r, s, t, u
-        p = dmax1(abs(a), abs(b))
+        p = max(abs(a), abs(b))
         if (p == 0.0_wp) go to 20
-        r = (dmin1(abs(a), abs(b))/p)**2
+        r = (min(abs(a), abs(b))/p)**2
 10      continue
         t = 4.0_wp + r
         if (t == 4.0_wp) go to 20
