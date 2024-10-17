@@ -669,7 +669,7 @@ contains
             gm_alpha_qp%vf)
         call nvtxEndRange
 
-        call nvtxStartRange("RHS-MPI")
+        call nvtxStartRange("RHS-COMMUNICATION")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
@@ -849,6 +849,26 @@ contains
             call nvtxEndRange
             ! END: Additional physics and source terms =========================
 
+            #:if chemistry
+                if (chem_params%advection) then
+                    call nvtxStartRange("RHS-CHEM-ADVECTION")
+
+                    #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+
+                        if (id == ${NORM_DIR}$) then
+                            call s_compute_chemistry_rhs_${XYZ}$ ( &
+                                flux_n, &
+                                rhs_vf, &
+                                flux_src_n(${NORM_DIR}$)%vf, &
+                                q_prim_vf)
+                        end if
+
+                    #:endfor
+
+                    call nvtxEndRange
+                end if
+            #:endif
+
         end do
         ! END: Dimensional Splitting Loop =================================
 
@@ -883,7 +903,7 @@ contains
         call nvtxEndRange
 
         ! Add bubles source term
-        call nvtxStartRange("RHS_bubbles")
+        call nvtxStartRange("RHS-BUBBLES-SRC")
         if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source( &
             q_cons_qp%vf(1:sys_size), &
             q_prim_qp%vf(1:sys_size), &
