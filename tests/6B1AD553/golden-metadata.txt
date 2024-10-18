@@ -1,10 +1,43 @@
-This file was created on 2024-10-17 13:39:48.926489.
+This file was created on 2024-10-18 03:23:20.804630.
 
 mfc.sh:
 
     Invocation: test -j 8 --generate
-    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & strict=No
-    Git:        fdd5162df3722936598a9627a9739dd61f916179 on exampleCI2 (dirty)
+    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & strict=Yes
+    Git:        f34a911f2d8ceec9cd9f6ffa84d932a7e41ded89 on exampleCI2 (dirty)
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.5 on bok
+    
+        C       : GNU v14.2.1 (/usr/bin/cc)
+        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -105,39 +138,6 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.5 on bok
-    
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   54%
+    CPU(s) scaling MHz:                   45%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00
