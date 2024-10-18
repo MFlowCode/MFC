@@ -58,14 +58,14 @@ contains
 
         ! Generic loop iterator
         integer :: i, j             !< generic loop operators
-        real(kind(0d0)) :: length   !< domain lengths
+        real(wp) :: length   !< domain lengths
 
         ! Grid Generation in the x-direction ===============================
-        dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+        dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
         do i = 0, m
-            x_cc(i) = x_domain%beg + 5d-1*dx*real(2*i + 1, kind(0d0))
-            x_cb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+            x_cc(i) = x_domain%beg + 5e-1_wp*dx*real(2*i + 1, wp)
+            x_cb(i - 1) = x_domain%beg + dx*real(i, wp)
         end do
 
         x_cb(m) = x_domain%end
@@ -82,12 +82,12 @@ contains
                     x_cb(i) = x_cb(i)/a_x* &
                               (a_x + log(cosh(a_x*(x_cb(i) - x_a))) &
                                + log(cosh(a_x*(x_cb(i) - x_b))) &
-                               - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
+                               - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
                 end do
             end do
             x_cb = x_cb*length
 
-            x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2d0
+            x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
 
             dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
             print *, 'Stretched grid: min/max x grid: ', minval(x_cc(:)), maxval(x_cc(:))
@@ -99,26 +99,26 @@ contains
         ! Grid Generation in the y-direction ===============================
         if (n == 0) return
 
-        if (grid_geometry == 2 .and. y_domain%beg == 0.0d0) then
+        if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
             !IF (grid_geometry == 2) THEN
 
-            dy = (y_domain%end - y_domain%beg)/real(2*n + 1, kind(0d0))
+            dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
 
-            y_cc(0) = y_domain%beg + 5d-1*dy
+            y_cc(0) = y_domain%beg + 5e-1_wp*dy
             y_cb(-1) = y_domain%beg
 
             do i = 1, n
-                y_cc(i) = y_domain%beg + 2d0*dy*real(i, kind(0d0))
-                y_cb(i - 1) = y_domain%beg + dy*real(2*i - 1, kind(0d0))
+                y_cc(i) = y_domain%beg + 2._wp*dy*real(i, wp)
+                y_cb(i - 1) = y_domain%beg + dy*real(2*i - 1, wp)
             end do
 
         else
 
-            dy = (y_domain%end - y_domain%beg)/real(n + 1, kind(0d0))
+            dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
 
             do i = 0, n
-                y_cc(i) = y_domain%beg + 5d-1*dy*real(2*i + 1, kind(0d0))
-                y_cb(i - 1) = y_domain%beg + dy*real(i, kind(0d0))
+                y_cc(i) = y_domain%beg + 5e-1_wp*dy*real(2*i + 1, wp)
+                y_cb(i - 1) = y_domain%beg + dy*real(i, wp)
             end do
 
         end if
@@ -137,12 +137,12 @@ contains
                     y_cb(i) = y_cb(i)/a_y* &
                               (a_y + log(cosh(a_y*(y_cb(i) - y_a))) &
                                + log(cosh(a_y*(y_cb(i) - y_b))) &
-                               - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
+                               - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
                 end do
             end do
 
             y_cb = y_cb*length
-            y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2d0
+            y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
@@ -154,11 +154,11 @@ contains
         ! Grid Generation in the z-direction ===============================
         if (p == 0) return
 
-        dz = (z_domain%end - z_domain%beg)/real(p + 1, kind(0d0))
+        dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
 
         do i = 0, p
-            z_cc(i) = z_domain%beg + 5d-1*dz*real(2*i + 1, kind(0d0))
-            z_cb(i - 1) = z_domain%beg + dz*real(i, kind(0d0))
+            z_cc(i) = z_domain%beg + 5e-1_wp*dz*real(2*i + 1, wp)
+            z_cb(i - 1) = z_domain%beg + dz*real(i, wp)
         end do
 
         z_cb(p) = z_domain%end
@@ -175,12 +175,12 @@ contains
                     z_cb(i) = z_cb(i)/a_z* &
                               (a_z + log(cosh(a_z*(z_cb(i) - z_a))) &
                                + log(cosh(a_z*(z_cb(i) - z_b))) &
-                               - 2d0*log(cosh(a_z*(z_b - z_a)/2d0)))
+                               - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
                 end do
             end do
 
             z_cb = z_cb*length
-            z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2d0
+            z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
 
             dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
@@ -200,10 +200,10 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)) :: length   !< domain lengths
+        real(wp) :: length   !< domain lengths
 
         ! Locations of cell boundaries
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb !<
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb !<
             !! Locations of cell boundaries
 
         character(LEN=path_len + name_len) :: file_loc !<
@@ -219,9 +219,9 @@ contains
         allocate (z_cb_glb(-1:p_glb))
 
         ! Grid generation in the x-direction
-        dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, kind(0d0))
+        dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
         do i = 0, m_glb
-            x_cb_glb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+            x_cb_glb(i - 1) = x_domain%beg + dx*real(i, wp)
         end do
         x_cb_glb(m_glb) = x_domain%end
         if (stretch_x) then
@@ -237,7 +237,7 @@ contains
                     x_cb_glb(i) = x_cb_glb(i)/a_x* &
                                   (a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) &
                                    + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
-                                   - 2d0*log(cosh(a_x*(x_b - x_a)/2d0)))
+                                   - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
                 end do
             end do
 
@@ -248,16 +248,16 @@ contains
         ! Grid generation in the y-direction
         if (n_glb > 0) then
 
-            if (grid_geometry == 2 .and. y_domain%beg == 0.0d0) then
-                dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, kind(0d0))
+            if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
+                dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(2*i - 1, kind(0d0))
+                    y_cb_glb(i - 1) = y_domain%beg + dy*real(2*i - 1, wp)
                 end do
             else
-                dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, kind(0d0))
+                dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
                 do i = 0, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(i, kind(0d0))
+                    y_cb_glb(i - 1) = y_domain%beg + dy*real(i, wp)
                 end do
             end if
             y_cb_glb(n_glb) = y_domain%end
@@ -274,7 +274,7 @@ contains
                         y_cb_glb(i) = y_cb_glb(i)/a_y* &
                                       (a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) &
                                        + log(cosh(a_y*(y_cb_glb(i) - y_b))) &
-                                       - 2d0*log(cosh(a_y*(y_b - y_a)/2d0)))
+                                       - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
                     end do
                 end do
 
@@ -284,9 +284,9 @@ contains
 
             ! Grid generation in the z-direction
             if (p_glb > 0) then
-                dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, kind(0d0))
+                dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
                 do i = 0, p_glb
-                    z_cb_glb(i - 1) = z_domain%beg + dz*real(i, kind(0d0))
+                    z_cb_glb(i - 1) = z_domain%beg + dz*real(i, wp)
                 end do
                 z_cb_glb(p_glb) = z_domain%end
                 if (stretch_z) then
@@ -301,7 +301,7 @@ contains
                             z_cb_glb(i) = z_cb_glb(i)/a_z* &
                                           (a_z + log(cosh(a_z*(z_cb_glb(i) - z_a))) &
                                            + log(cosh(a_z*(z_cb_glb(i) - z_b))) &
-                                           - 2d0*log(cosh(a_z*(z_b - z_a)/2d0)))
+                                           - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
                         end do
                     end do
 
@@ -316,7 +316,7 @@ contains
         data_size = m_glb + 2
         call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                            mpi_info_int, ifile, ierr)
-        call MPI_FILE_WRITE(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+        call MPI_FILE_WRITE(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 
         if (n > 0) then
@@ -324,7 +324,7 @@ contains
             data_size = n_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
-            call MPI_FILE_WRITE(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_WRITE(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
 
             if (p > 0) then
@@ -332,7 +332,7 @@ contains
                 data_size = p_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                    mpi_info_int, ifile, ierr)
-                call MPI_FILE_WRITE(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_WRITE(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             end if
         end if
