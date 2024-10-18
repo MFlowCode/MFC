@@ -7,10 +7,10 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-    
+
       gtag('config', 'G-SY496B9L99');
     </script>
-    
+
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,7 +38,7 @@
 
         ghapi("https://api.github.com/repos/MFlowCode/MFC/releases/latest").then((r) => {
             onHTML(() => {
-                document.getElementById("release-ver").innerText = r["tag_name"];    
+                document.getElementById("release-ver").innerText = r["tag_name"];
             })
         });
 
@@ -72,12 +72,15 @@
                 this.source       = source;
             }
         };
-    
+
         const sims = [
+            new FS("Viscous Taylor-Green vortex","res/simulations/h.png","Delta", "128 A100s", "17h" , "https://vimeo.com/1019922003?share=copy"),
             new FS("Shedding water droplet", "res/simulations/a.png", "Summit", "960 V100s", "4h", "https://player.vimeo.com/video/905208069"),
             new FS("Flow over an airfoil (vorticity)", "res/simulations/g.png", "Delta", "128 A100s", "19h", "https://vimeo.com/917305340/c05fd414c8?share=copy"),
             new FS("Cavitation fragments kidney stone", "res/simulations/d.png", "Summit", "576 V100s", "30 min", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Breakup of vibrated interface", "res/simulations/f.png", "Summit", "128 V100s", "4h","https://player.vimeo.com/video/922022757"), 
+            new FS("Breakup of vibrated interface", "res/simulations/f.png", "Summit", "128 V100s", "4h","https://player.vimeo.com/video/922022757"),
+            new FS("Mach 2 flow over a sphere", "res/simulations/i.png", "Phoenix", "36 V100s", "30m", "https://vimeo.com/1020775531?share=copy"),
+            new FS("Mach 2 shear layer", "res/simulations/j.png", "Phoenix", "32 V100s", "15m", "https://vimeo.com/1020775541?share=copy"),
             new FS("Collapsing bubbles (pressure)", "res/simulations/b.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
             new FS("Collapsing bubbles (streamlines)", "res/simulations/c.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
         ];
@@ -91,10 +94,10 @@
                 <img class="h-10 bg-white" src="res/logo.png" />
                 <div class="flex-1 font-semibold text-center">
                     Bubble collapse from acoustic source
-                </div>  
+                </div>
                 <a class="w-10 text-center" href="#">
                     <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>                              
+                </a>
             </div>
             <div class="grid grid-cols-3 gap-4 px-4 py-2">
                 <div class="flex flex-row items-center">
@@ -130,14 +133,14 @@
 
                 let middiv = document.createElement("div");
                 middiv.classList.add("flex", "flex-row", "items-center");
-                
+
                 let logoDiv = document.createElement("div");
                 logoDiv.classList.add("flex", "flex-col", "h-full", "bg-white", "justify-center");
 
                 let logo = document.createElement("img");
                 logo.src = "res/logo.png";
                 logo.classList.add("h-10");
-                
+
                 logoDiv.appendChild(logo);
                 middiv.appendChild(logoDiv);
 
@@ -222,7 +225,7 @@
 
                 let middiv = document.createElement("div");
                 middiv.classList.add("flex", "flex-row", "items-center");
-                
+
                 let logoDiv = document.createElement("div");
                 logoDiv.classList.add("flex", "flex-col", "h-full", "bg-white", "justify-center");
 
@@ -307,7 +310,7 @@
                 <div id="ft-sim" class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8">
                     <!-- ... -->
                 </div>
-            </div> 
+            </div>
             <div class="weak-scaling flex flex-col gap-4">
                 <h1 class="flex-1 flex flex-col justify-center gap-y-4">
                     <div class="text-xl md:text-2xl font-extrabold">
