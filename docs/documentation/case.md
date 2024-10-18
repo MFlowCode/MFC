@@ -90,11 +90,18 @@ Definition of the parameters is described in the following subsections.
 | ---:             |    :----:      |          :---                             |
 | `run_time_info`  | Logical        | Output run-time information               |
 | `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
+| `comp_debug`     | Logical        | Comprehensive variable checking           |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.
+- `comp_debug` enables comprehensive error checking.
+At each Runge-Kutta sub-step, all conservative variables are checked for NaNs.
+The volume fractions are checked to ensure they are in the range [0, 1].
+Negative densities are also checked for.
+If any of these checks find problems, the file `comp_debug.txt` will be written to the case directory with information
+about what problems were found and the simulation state will be saved for visualization.
 
 ### 2. Computational Domain
 
