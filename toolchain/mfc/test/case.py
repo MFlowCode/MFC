@@ -179,16 +179,16 @@ parser = argparse.ArgumentParser(
     description="{self.get_filepath()}: {self.trace}",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+parser.add_argument("--mfc", type=str, metavar="MFC", help=argparse.SUPPRESS)
 
 ARGS = vars(parser.parse_args())
 
-ARGS["dict"] = json.loads(ARGS["dict"])
+ARGS["mfc"] = json.loads(ARGS["mfc"])
 
 case = {self.gen_json_dict_str()}
 mods = {{}}
 
-if "post_process" in ARGS["dict"]["targets"]:
+if "post_process" in ARGS["mfc"]["targets"]:
     mods = {{
         'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
         'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
