@@ -19,13 +19,13 @@ print(json.dumps({
                     # Computational Domain Parameters ==========================
                     'x_domain%beg'                 : 0.E+00,                    
                     'x_domain%end'                 : 1.E+00,                    
-                    'm'                            : Nx,                        
+                    'm'                            : 25,                        
                     'n'                            : 0,                         
                     'p'                            : 0,                         
                     'dt'                           : mydt,                      
                     't_step_start'                 : 0,                         
-                    't_step_stop'                  : int(Nt),                        
-                    't_step_save'                  : int(math.ceil(Nt/1.)),    
+                    't_step_stop'                  : 50,                   
+                    't_step_save'                  : 50,    
 		    # ==========================================================
                                                                                 
                     # Simulation Algorithm Parameters ==========================
