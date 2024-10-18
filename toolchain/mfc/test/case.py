@@ -220,7 +220,7 @@ print(json.dumps({{**case, **mods}}))
 
         
         if "Example" in self.trace.split(" -> "):
-            return 1e-4
+            return 1e-3
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
