@@ -1,7 +1,10 @@
-import typing, itertools
+import os, typing, itertools
 
 from mfc   import common
-from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
+from .case import (
+    define_case_d, define_case_f,
+    CaseGeneratorStack, TestCaseBuilder
+)
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -711,7 +714,44 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
             stack.pop()
 
+    def foreach_example():
+        for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
+            if path == "scaling":
+                continue
+
+            # List of currently broken examples -> currently attempting to fix!
+            brokenCases = ["hypo_2materials", "ibm_cfl_dt", "sodHypo", "viscous", "laplace_pressure_jump"]
+            if path in brokenCases:
+                continue
+
+            name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
+            path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
+            if not os.path.isfile(path):
+                continue
+            def modify_example_case(case: dict):
+                case['parallel_io'] = 'F'
+                if 't_step_stop' in case and case['t_step_stop'] >= 50:
+                    case['t_step_start'] = 0
+                    case['t_step_stop'] = 50
+                    case['t_step_save'] = 50
+
+                caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
+                if caseSize > 625:
+                    if case['n'] == 0 and case['p'] == 0:
+                        case['m'] = 625
+                    elif case['p'] == 0:
+                        case['m'] = 25
+                        case['n'] = 25
+                    # m, n, p < 25 causes errors
+                    elif caseSize > 15625:
+                        case['m'] = 25
+                        case['n'] = 25
+                        case['p'] = 25
+
+            cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
+
     foreach_dimension()
+    foreach_example()
 
     # Sanity Check 1
     if stack.size() != 0:
