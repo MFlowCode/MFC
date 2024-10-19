@@ -106,7 +106,7 @@ before configuring your environment:
 
 ```shell
 brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
-echo -e 'export BOOST_INCLUDE=/opt/homebrew/' | tee -a ~/.bash_profile ~/.zshrc
+echo -e "export BOOST_INCLUDE='$(brew --prefix --installed boost)/include'" | tee -a ~/.bash_profile ~/.zshrc
 . ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
 ! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
 ```
