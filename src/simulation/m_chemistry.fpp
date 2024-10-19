@@ -43,7 +43,7 @@ contains
 
         !$acc kernels
         do i = 1, num_dims
-            grads(i)%sf(:, :, :) = 0.0d0
+            grads(i)%sf(:, :, :) = 0.0_wp
         end do
         !$acc end kernels
 
@@ -99,16 +99,16 @@ contains
         integer :: x, y, z
         integer :: eqn
 
-        real(kind(0d0)) :: T
+        real(wp) :: T
         integer :: o
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: E
+        real(wp) :: dyn_pres
+        real(wp) :: E
 
-        real(kind(0d0)) :: rho
-        real(kind(1.d0)), dimension(num_species) :: Ys
-        real(kind(1.d0)), dimension(num_species) :: omega
-        real(kind(0d0)), dimension(num_species) :: enthalpies
-        real(kind(0d0)) :: cp_mix
+        real(wp) :: rho
+        real(kind(1._wp)), dimension(num_species) :: Ys
+        real(kind(1._wp)), dimension(num_species) :: omega
+        real(wp), dimension(num_species) :: enthalpies
+        real(wp) :: cp_mix
 
         #:if chemistry
 
@@ -118,7 +118,7 @@ contains
                     do z = 0, p
 
                         ! Maybe use q_prim_vf instead?
-                        rho = 0d0
+                        rho = 0._wp
                         do eqn = chemxb, chemxe
                             rho = rho + q_cons_qp(eqn)%sf(x, y, z)
                         end do
@@ -127,11 +127,11 @@ contains
                             Ys(eqn - chemxb + 1) = q_cons_qp(eqn)%sf(x, y, z)/rho
                         end do
 
-                        dyn_pres = 0d0
+                        dyn_pres = 0._wp
 
                         do i = momxb, momxe
                             dyn_pres = dyn_pres + rho*q_cons_qp(i)%sf(x, y, z)* &
-                                       q_cons_qp(i)%sf(x, y, z)/2d0
+                                       q_cons_qp(i)%sf(x, y, z)/2._wp
                         end do
 
                         call get_temperature(.true., q_cons_qp(E_idx)%sf(x, y, z) - dyn_pres, &
@@ -176,7 +176,7 @@ contains
                 do z = iz%beg, iz%end
 
                     do eqn = chemxb, chemxe
-                        q_cons_qp(eqn)%sf(x, y, z) = max(0d0, q_cons_qp(eqn)%sf(x, y, z))
+                        q_cons_qp(eqn)%sf(x, y, z) = max(0._wp, q_cons_qp(eqn)%sf(x, y, z))
                     end do
 
                 end do
