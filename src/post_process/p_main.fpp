@@ -34,6 +34,8 @@ program p_main
 
     call s_initialize_modules()
 
+    if (comp_debug) call s_perform_comprehensive_debug(varname, pres, c, H)
+
     if (cfl_dt) then
         t_step = n_start
         n_save = int(t_stop/t_save) + 1
