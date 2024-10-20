@@ -104,7 +104,7 @@ contains
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(kind(0d0)) :: pres, Temp                         !< Temporary pressure
 
         real(kind(0d0)) :: nR3
         real(kind(0d0)) :: ntmp
@@ -273,7 +273,7 @@ contains
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, qv, rhoYks, pres)
+                                pi_inf, gamma, rho, qv, rhoYks, pres, Temp)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
