@@ -1,10 +1,10 @@
-This file was created on 2024-10-21 10:03:43.896906.
+This file was created on 2024-10-21 10:27:05.390595.
 
 mfc.sh:
 
     Invocation: test -o viscous --generate
     Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & strict=Yes
-    Git:        f27d0cef8bb3061ff9505e43a77ee0fcee84be7f on exampleCI2 (dirty)
+    Git:        1d47274637fe018aa99b96ceaef2c43b192f09b2 on exampleCI2 (dirty)
 
 pre_process:
 
@@ -72,7 +72,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -82,8 +82,8 @@ post_process:
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -105,7 +105,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -115,8 +115,8 @@ simulation:
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   63%
+    CPU(s) scaling MHz:                   64%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00

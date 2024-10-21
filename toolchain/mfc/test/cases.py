@@ -750,9 +750,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['n'] = 25
                         case['p'] = 25
                 
-                if ('2D_viscous' in name.split('/')):
-                    case['m'] = 99
-                    case['n'] = 99
+                # if ('2D_viscous' in name.split('/')):
+                #     case['m'] = 99
+                #     case['n'] = 99
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
 
