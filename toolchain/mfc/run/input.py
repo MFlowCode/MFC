@@ -82,7 +82,6 @@ class MFCInputFile(Case):
         cons.print()
         self.generate_fpp(target)
 
-
     def clean(self, _targets) -> None:
         targets = [build.get_target(target) for target in _targets]
 
@@ -124,7 +123,7 @@ class MFCInputFile(Case):
 
 
 # Load the input file
-def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict = None) -> MFCInputFile:
+def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict = None, do_print: bool = True) -> MFCInputFile:
     if not filepath:
         if empty_data is None:
             raise common.MFCException("Please provide an input file.")
@@ -135,7 +134,8 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
 
     filename: str = filepath.strip()
 
-    cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
+    if do_print:
+        cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
 
     dirpath:    str  = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}
