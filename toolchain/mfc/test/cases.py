@@ -718,17 +718,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
             if path == "scaling":
                 continue
+            if path == "2D_viscous":
+                pass
 
             # List of currently broken examples -> currently attempting to fix!
             brokenCases = ["hypo_2materials", "ibm_cfl_dt", "sodHypo", "viscous", "laplace_pressure_jump"]
-            if path in brokenCases:
-                continue
+            # if brokenCases in path:
+            #     continue
 
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
             if not os.path.isfile(path):
                 continue
-            def modify_example_case(case: dict):
+            def modify_example_case(case: dict, name: str ):
                 case['parallel_io'] = 'F'
                 if 't_step_stop' in case and case['t_step_stop'] >= 50:
                     case['t_step_start'] = 0
@@ -747,6 +749,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['m'] = 25
                         case['n'] = 25
                         case['p'] = 25
+                
+                if ('2D_viscous' in name.split('/')):
+                    case['m'] = 99
+                    case['n'] = 99
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
 

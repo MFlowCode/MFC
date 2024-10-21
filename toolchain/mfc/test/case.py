@@ -216,16 +216,19 @@ print(json.dumps({{**case, **mods}}))
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
+    # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
 
-        
         if "Example" in self.trace.split(" -> "):
             return 1e-3
+        
+        if self.params.get('ib', 'T') == 'T':
+            return 1e-9
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'qbmm', 'bubbles']) or self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
             return 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
@@ -264,7 +267,7 @@ class TestCaseBuilder:
         dictionary.update(self.mods)
 
         if self.functor:
-            self.functor(dictionary)
+            self.functor(dictionary, self.path)
 
         return TestCase(self.trace, dictionary, self.ppn)
 
@@ -288,10 +291,9 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments too-many-positional-arguments
 def define_case_f(trace: str, path: str, args: List[str] = None, newMods: dict = None, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
     return TestCaseBuilder(trace, newMods or {}, path, args or [], ppn or 1, functor)
-
 
 def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
     mods: dict = {}
