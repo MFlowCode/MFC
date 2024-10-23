@@ -35,7 +35,7 @@ module m_data_output
 
     implicit none
 
-    private; 
+    private;
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_probe_files, &
@@ -255,7 +255,9 @@ contains
         real(kind(0d0)) :: fltr_dtheta   !<
             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
+        call nvtxStartRange("TSTEP-RUNTIME-INFO")
         ! Computing Stability Criteria at Current Time-step ================
+        call nvtxStartRange("TSTEP-RUNTIME-INFO-COMPUTE-LOCAL")
         !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
         do l = 0, p
             do k = 0, n
@@ -275,6 +277,7 @@ contains
                 end do
             end do
         end do
+
         ! END: Computing Stability Criteria at Current Time-step ===========
 
         ! Determining local stability criteria extrema at current time-step
@@ -304,7 +307,7 @@ contains
             !$acc end kernels
         end if
 #endif
-
+        call nvtxEndRange ! RUNTIME-INFO-COMPUTE-LOCAL
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
@@ -362,6 +365,7 @@ contains
         end if
 
         call s_mpi_barrier()
+        call nvtxEndRange ! RUNTIME-INFO
 
     end subroutine s_write_run_time_information
 
