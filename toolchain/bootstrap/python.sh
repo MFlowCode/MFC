@@ -74,7 +74,7 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
 
     ok "Created a$MAGENTA Python$COLOR_RESET virtual environment (venv)."
 
-    rm "$(pwd)/build/requirements.txt" > /dev/null 2>&1 || true
+    rm "$(pwd)/build/pyproject.toml" > /dev/null 2>&1 || true
 fi
 
 
@@ -111,8 +111,8 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 # Install Python dependencies if, either:
 # - This script is running for the first time
 # (or)
-# - The requirements.txt file has changed
-if ! cmp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/requirements.txt" > /dev/null 2>&1; then
+# - The pyproject.toml file has changed
+if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
     log "(venv) (Re)Installing mfc.sh's Python dependencies (via Pip)."
 
     next_arg=0
@@ -129,7 +129,7 @@ if ! cmp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/requirements.txt" > /
         fi
     done
 
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install -r "$(pwd)/toolchain/requirements.txt"; then
+    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install -e "$(pwd)/toolchain"; then
         error "(venv) Installation failed."
 
         log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
@@ -140,6 +140,6 @@ if ! cmp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/requirements.txt" > /
 
     ok "(venv) Installation succeeded."
 
-    # Save the new/current requirements.txt
-    cp "$(pwd)/toolchain/requirements.txt" "$(pwd)/build/"
+    # Save the new/current pyproject.toml
+    cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
 fi

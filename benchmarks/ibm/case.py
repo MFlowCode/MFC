@@ -11,11 +11,11 @@ parser = argparse.ArgumentParser(
     description="This MFC case was created for the purposes of benchmarking MFC.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("--mfc", type=str, metavar="DICT", help=argparse.SUPPRESS)
+parser.add_argument("--gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
 
 ARGS = vars(parser.parse_args())
-DICT = json.loads(ARGS["dict"])
+DICT = json.loads(ARGS["mfc"])
 
 size = 1 if DICT["gpu"] else 0
 
