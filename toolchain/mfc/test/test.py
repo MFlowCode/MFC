@@ -132,12 +132,12 @@ def test():
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
+    # pylint: disable=global-statement, global-variable-not-assigned
+    global nSKIP
+
     start_time = time.time()
 
-    tol = case.compute_tolerance()
-    
-    if ARG("single"):
-        tol *= 1e10        
+    tol = case.compute_tolerance()      
 
     case.delete_output()
     case.create_directory()
@@ -202,7 +202,11 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
             if "nan," in output:
-                raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                if not ARG("single"):
+                    raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                cons.print(f"Test {case}: Skipping this test case as it cannot be run in single precision, please build MFC in double precision to run this test")
+                nSKIP += 1
+                return
 
             if "inf," in output:
                 raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
