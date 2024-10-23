@@ -40,6 +40,10 @@ module m_time_steppers
     use m_thermochem
 
     use m_body_forces
+
+    use ieee_arithmetic
+
+    use m_sim_helpers
     ! ==========================================================================
 
     implicit none
@@ -321,11 +325,6 @@ contains
         real(kind(0d0)), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: nR3bar
-        real(kind(0d0)) :: e_mix
-
-        real(kind(0d0)) :: T
-        real(kind(0d0)), dimension(num_species) :: Ys
 
         ! Stage 1 of 1 =====================================================
 
@@ -411,6 +410,8 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -436,7 +437,6 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -518,6 +518,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -593,6 +595,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 2)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -618,9 +622,7 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
@@ -703,6 +705,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 1)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -778,6 +782,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 2)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
@@ -852,6 +858,8 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
+        if (comp_debug) call s_comprehensive_debug(q_cons_ts(1)%vf, t_step, 3)
+
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -881,7 +889,6 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         call cpu_time(start)
@@ -916,8 +923,6 @@ contains
         type(int_bounds_info) :: ix, iy, iz
         type(vector_field) :: gm_alpha_qp
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
         ix%beg = 0; iy%beg = 0; iz%beg = 0
         ix%end = m; iy%end = n; iz%end = p
         call s_convert_conservative_to_primitive_variables( &
@@ -947,7 +952,7 @@ contains
         type(vector_field) :: gm_alpha_qp
         real(kind(0d0)) :: dt_local
         type(int_bounds_info) :: ix, iy, iz
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l !< Generic loop iterators
 
         ix%beg = 0; iy%beg = 0; iz%beg = 0
         ix%end = m; iy%end = n; iz%end = p
@@ -1014,6 +1019,26 @@ contains
 
     end subroutine s_apply_bodyforces
 
+    subroutine s_comprehensive_debug(q_cons_vf, t_step, stage)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
+        integer, intent(in) :: t_step, stage
+
+        integer :: errors
+
+        call s_check_cells(q_cons_vf, t_step, stage, errors)
+
+        if (errors /= 0) then
+            close (12)
+            call s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+            call s_mpi_abort("Errors found in conservative variables")
+        end if
+
+        write (12, "(I3)") - 1
+        close (12)
+
+    end subroutine s_comprehensive_debug
+
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
         !! @param t_step current time-step
@@ -1053,6 +1078,7 @@ contains
         end if
 
     end subroutine s_time_step_cycling
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
