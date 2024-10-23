@@ -11,7 +11,7 @@ from .cases    import list_cases
 from ..        import sched
 from ..run.input import MFCInputFile
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
+from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS, REQUIRED_TARGETS
 
 from ..packer import tol as packtol
 from ..packer import packer
@@ -64,7 +64,7 @@ def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
 
-    cases = [ _.to_case() for _ in list_cases() ]
+    cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
@@ -77,7 +77,7 @@ def test():
 
         return
 
-    cases = __filter(cases)
+    cases = [ _.to_case() for _ in __filter(cases) ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -92,13 +92,18 @@ def test():
 
         return
 
-    codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
-    if not ARG("case_optimization"):
-        build(codes)
+    codes = list(REQUIRED_TARGETS) + [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
 
+    built_slugs = set()
     for case in cases:
-        if case.rebuild:
-            build(codes, MFCInputFile(os.path.basename(case.get_dirpath()), case.get_dirpath(), case.params))
+        case.delete_output()
+        case.create_directory()
+
+        for code in codes:
+            slug = code.get_slug(case)
+            if slug not in built_slugs:
+                build(code, case.to_MFCInputFile())
+                built_slugs.add(slug)
 
     cons.print()
 
@@ -135,12 +140,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
     tol = case.compute_tolerance()
-
-    case.delete_output()
-    case.create_directory()
-
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
-
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
