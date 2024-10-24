@@ -212,6 +212,7 @@ print(json.dumps({{**case, **mods}}))
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
+    # pylint: disable=global-statement, global-variable-not-assigned, too-many-return-statements
     def compute_tolerance(self) -> float:
         if ARG("single"):
             return 1e-1

@@ -65,6 +65,7 @@ module m_global_parameters
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
+    real(sp), allocatable, dimension(:) :: x_root_cc_s, x_cc_s
     !> @}
 
     !> Cell-width distributions in the x-, y- and z-coordinate directions
@@ -700,6 +701,8 @@ contains
                     allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end))
                 end if
             end if
+        else
+            allocate (x_cc_s(-buff_size:m + buff_size))
         end if
 
         ! Allocating the grid variables in the x-coordinate direction
@@ -726,6 +729,10 @@ contains
 
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
+
+            if (precision == 1) then
+                allocate (x_root_cc_s(0:m_root))
+            end if
 
         end if
 

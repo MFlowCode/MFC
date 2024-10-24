@@ -1414,7 +1414,7 @@ contains
         !!  the second dimension corresponds to the processor rank.
     subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(wp), dimension(1:, 0:), intent(inout) :: spatial_extents
+        real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
 #ifdef MFC_MPI
 
@@ -1600,11 +1600,11 @@ contains
     subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(wp), &
-            dimension(0:m, 0:0, 0:0), &
+            dimension(0:m), &
             intent(in) :: q_sf
 
         real(wp), &
-            dimension(0:m_root, 0:0, 0:0), &
+            dimension(0:m), &
             intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
@@ -1612,8 +1612,8 @@ contains
         ! Gathering the sub-domain flow variable data from all the processes
         ! and putting it back together for the entire computational domain
         ! on the process with rank 0
-        call MPI_GATHERV(q_sf(0, 0, 0), m + 1, mpi_p, &
-                         q_root_sf(0, 0, 0), recvcounts, displs, &
+        call MPI_GATHERV(q_sf(0), m + 1, mpi_p, &
+                         q_root_sf(0), recvcounts, displs, &
                          mpi_p, 0, MPI_COMM_WORLD, ierr)
 
 #endif

@@ -133,8 +133,6 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nSKIP
-
     start_time = time.time()
 
     tol = case.compute_tolerance()      
@@ -202,11 +200,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
             if "nan," in output:
-                if not ARG("single"):
-                    raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
-                cons.print(f"Test {case}: Skipping this test case as it cannot be run in single precision, please build MFC in double precision to run this test")
-                nSKIP += 1
-                return
+                raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
             if "inf," in output:
                 raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
@@ -224,6 +218,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
     global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
+    if ARG('single'):
+        max_attempts = max(ARG('max_attempts'), 3)
+    else:
+        max_attempts = ARG('max_attempts')
 
     while True:
         nAttempts += 1
@@ -232,8 +230,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             _handle_case(case, devices)
             nPASS += 1
         except Exception as exc:
-            if nAttempts < ARG("max_attempts"):
-                cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
+            if nAttempts < max_attempts:
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")

@@ -18,7 +18,7 @@ module m_checker_common
 
     implicit none
 
-    private; public :: s_check_inputs_common
+    private; public :: s_check_inputs_common, wp
 
 contains
 
