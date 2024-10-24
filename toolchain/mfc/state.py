@@ -8,6 +8,7 @@ class MFCConfig:
     debug:   bool = False
     gcov:    bool = False
     unified: bool = False
+    single: bool = False
 
     @staticmethod
     def from_dict(d: dict):

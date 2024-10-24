@@ -130,17 +130,16 @@ def test():
     exit(nFAIL)
 
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _handle_case(case: TestCase, devices: typing.Set[int]):
+    # pylint: disable=global-statement, global-variable-not-assigned
     start_time = time.time()
 
-    tol = case.compute_tolerance()
+    tol = case.compute_tolerance()      
 
     case.delete_output()
     case.create_directory()
-
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
-
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
     common.file_write(out_filepath, cmd.stdout)
@@ -219,6 +218,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
     global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
+    if ARG('single'):
+        max_attempts = max(ARG('max_attempts'), 3)
+    else:
+        max_attempts = ARG('max_attempts')
 
     while True:
         nAttempts += 1
@@ -227,8 +230,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             _handle_case(case, devices)
             nPASS += 1
         except Exception as exc:
-            if nAttempts < ARG("max_attempts"):
-                cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
+            if nAttempts < max_attempts:
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")

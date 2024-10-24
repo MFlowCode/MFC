@@ -45,10 +45,10 @@ module m_weno
     !> @{
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
     !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
+    real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
 #endif
     !> @}
 
@@ -61,27 +61,27 @@ module m_weno
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_z)
     !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
     !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
 
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
+    real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
 #endif
 
-    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
+    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
+    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
@@ -90,25 +90,25 @@ module m_weno
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_z)
     !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_z
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
+    real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
 
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_x
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
-    real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
+    real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
 #endif
-!    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
-!    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
+!    real(wp), pointer, dimension(:, :) :: d_L => null()
+!    real(wp), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -117,16 +117,16 @@ module m_weno
     !! the cell-location in the relevant coordinate direction.
     !> @{
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_x)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_y)
+    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_z)
     !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z)
 #else
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_x
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
+    real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
 #endif
-!    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
+!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients ===================================================
@@ -142,7 +142,7 @@ module m_weno
     !
     !> @}
 
-    real(kind(0d0)) :: test
+    real(wp) :: test
 !$acc declare create(test)
 
 #ifndef CRAY_ACC_WAR
@@ -271,7 +271,7 @@ contains
         type(int_bounds_info), intent(in) :: is
         integer :: s
 
-        real(kind(0d0)), pointer, dimension(:) :: s_cb => null() !<
+        real(wp), pointer, dimension(:) :: s_cb => null() !<
             !! Cell-boundary locations in the s-direction
 
         type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
@@ -308,13 +308,13 @@ contains
                         d_cbL_${XYZ}$ (0, i + 1) = (s_cb(i - 1) - s_cb(i))/ &
                                                    (s_cb(i - 1) - s_cb(i + 2))
 
-                        d_cbR_${XYZ}$ (1, i + 1) = 1d0 - d_cbR_${XYZ}$ (0, i + 1)
-                        d_cbL_${XYZ}$ (1, i + 1) = 1d0 - d_cbL_${XYZ}$ (0, i + 1)
+                        d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1)
+                        d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1)
 
-                        beta_coef_${XYZ}$ (i + 1, 0, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                                          (s_cb(i) - s_cb(i + 2))**2d0
-                        beta_coef_${XYZ}$ (i + 1, 1, 0) = 4d0*(s_cb(i) - s_cb(i + 1))**2d0/ &
-                                                          (s_cb(i - 1) - s_cb(i + 1))**2d0
+                        beta_coef_${XYZ}$ (i + 1, 0, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/ &
+                                                          (s_cb(i) - s_cb(i + 2))**2._wp
+                        beta_coef_${XYZ}$ (i + 1, 1, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/ &
+                                                          (s_cb(i - 1) - s_cb(i + 1))**2._wp
 
                     end do
 
@@ -324,13 +324,13 @@ contains
                     ! the WENO reconstruction
                     if (null_weights) then
                         if (bc_s%beg == -4) then
-                            d_cbR_${XYZ}$ (1, 0) = 0d0; d_cbR_${XYZ}$ (0, 0) = 1d0
-                            d_cbL_${XYZ}$ (1, 0) = 0d0; d_cbL_${XYZ}$ (0, 0) = 1d0
+                            d_cbR_${XYZ}$ (1, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
+                            d_cbL_${XYZ}$ (1, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
                         end if
 
                         if (bc_s%end == -4) then
-                            d_cbR_${XYZ}$ (0, s) = 0d0; d_cbR_${XYZ}$ (1, s) = 1d0
-                            d_cbL_${XYZ}$ (0, s) = 0d0; d_cbL_${XYZ}$ (1, s) = 1d0
+                            d_cbR_${XYZ}$ (0, s) = 0._wp; d_cbR_${XYZ}$ (1, s) = 1._wp
+                            d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
                     end if
                     ! END: Computing WENO3 Coefficients ================================
@@ -395,72 +395,72 @@ contains
                             ((s_cb(i) - s_cb(i + 2))*(s_cb(i) - s_cb(i + 3)))/ &
                             ((s_cb(i - 2) - s_cb(i + 2))*(s_cb(i - 2) - s_cb(i + 3)))
 
-                        d_cbR_${XYZ}$ (1, i + 1) = 1d0 - d_cbR_${XYZ}$ (0, i + 1) - d_cbR_${XYZ}$ (2, i + 1)
-                        d_cbL_${XYZ}$ (1, i + 1) = 1d0 - d_cbL_${XYZ}$ (0, i + 1) - d_cbL_${XYZ}$ (2, i + 1)
+                        d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1) - d_cbR_${XYZ}$ (2, i + 1)
+                        d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1) - d_cbL_${XYZ}$ (2, i + 1)
 
                         beta_coef_${XYZ}$ (i + 1, 0, 0) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/((s_cb(i) - &
-                                                                                                                                                                s_cb(i + 3))**2d0*(s_cb(i + 1) - s_cb(i + 3))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/((s_cb(i) - &
+                                                                                                                                                                          s_cb(i + 3))**2._wp*(s_cb(i + 1) - s_cb(i + 3))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 0, 1) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
-                                                                                                             s_cb(i + 1)) + 2d0*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
-                                                                                                                                                                                                     s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2d0*(s_cb(i + 3) - &
-                                                                                                                                                                                                                                                s_cb(i + 1)))
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(19._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp - (s_cb(i + 1) - s_cb(i))*(s_cb(i + 3) - &
+                                                                                                                     s_cb(i + 1)) + 2._wp*(s_cb(i + 2) - s_cb(i))*((s_cb(i + 2) - &
+                                                                                                                                                                    s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))))/((s_cb(i) - &
+                                                                                                                                                                                                               s_cb(i + 2))*(s_cb(i) - s_cb(i + 3))**2._wp*(s_cb(i + 3) - &
+                                                                                                                                                                                                                                                            s_cb(i + 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 0, 2) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
-                                                                                                              s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
-                                                                                                                                                          s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2d0)/((s_cb(i) - &
-                                                                                                                                                                                                          s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 3))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*((s_cb(i + 2) - &
+                                                                                                                      s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1))) + ((s_cb(i + 2) - &
+                                                                                                                                                                  s_cb(i)) + (s_cb(i + 3) - s_cb(i + 1)))**2._wp)/((s_cb(i) - &
+                                                                                                                                                                                                                    s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 3))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 0) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
-                                                                                                                                                            s_cb(i + 2))**2d0*(s_cb(i) - s_cb(i + 2))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
+                                                                                                                              s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 1) - &
+                                                                                                                                                                      s_cb(i + 2))**2._wp*(s_cb(i) - s_cb(i + 2))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 1, 1) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*((s_cb(i) - &
-                                                               s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20d0*(s_cb(i + 1) - &
-                                                                                                             s_cb(i))) + (2d0*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
-                                                                                                                                                         s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
-                                                                                                                                                                                              s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2d0*(s_cb(i + 2) - &
-                                                                                                                                                                                                                                             s_cb(i)))
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*((s_cb(i) - &
+                                                                   s_cb(i + 1))*((s_cb(i) - s_cb(i - 1)) + 20._wp*(s_cb(i + 1) - &
+                                                                                                                   s_cb(i))) + (2._wp*(s_cb(i) - s_cb(i - 1)) + (s_cb(i + 1) - &
+                                                                                                                                                                 s_cb(i)))*(s_cb(i + 2) - s_cb(i)))/((s_cb(i + 1) - &
+                                                                                                                                                                                                      s_cb(i - 1))*(s_cb(i - 1) - s_cb(i + 2))**2._wp*(s_cb(i + 2) - &
+                                                                                                                                                                                                                                                       s_cb(i)))
 
                         beta_coef_${XYZ}$ (i + 1, 1, 2) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
-                                                                                                             s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2d0)/ &
-                            ((s_cb(i - 1) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                                                               s_cb(i + 2))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - &
+                                                                                                                     s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1))**2._wp)/ &
+                            ((s_cb(i - 1) - s_cb(i + 1))**2._wp*(s_cb(i - 1) - &
+                                                                 s_cb(i + 2))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 0) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(12d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
-                                                                                                                s_cb(i - 1)))**2d0 + 3d0*((s_cb(i) - s_cb(i - 2)) + &
-                                                                                                                                          (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
-                            ((s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i - 1) - &
-                                                               s_cb(i + 1))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(12._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2)) + (s_cb(i) - &
+                                                                                                                        s_cb(i - 1)))**2._wp + 3._wp*((s_cb(i) - s_cb(i - 2)) + &
+                                                                                                                                                      (s_cb(i) - s_cb(i - 1)))*(s_cb(i + 1) - s_cb(i)))/ &
+                            ((s_cb(i - 2) - s_cb(i + 1))**2._wp*(s_cb(i - 1) - &
+                                                                 s_cb(i + 1))**2._wp)
 
                         beta_coef_${XYZ}$ (i + 1, 2, 1) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(19d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
-                                                                                                              s_cb(i + 1))) + 2d0*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
-                                                                                                                                                                s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
-                                                                                                                                                                                                               s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2d0*(s_cb(i + 1) - &
-                                                                                                                                                                                                                                                          s_cb(i - 1)))
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(19._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + ((s_cb(i) - s_cb(i - 2))*(s_cb(i) - &
+                                                                                                                      s_cb(i + 1))) + 2._wp*(s_cb(i + 1) - s_cb(i - 1))*((s_cb(i) - &
+                                                                                                                                                                          s_cb(i - 2)) + (s_cb(i + 1) - s_cb(i - 1))))/((s_cb(i - 2) - &
+                                                                                                                                                                                                                         s_cb(i))*(s_cb(i - 2) - s_cb(i + 1))**2._wp*(s_cb(i + 1) - &
+                                                                                                                                                                                                                                                                      s_cb(i - 1)))
 
                         beta_coef_${XYZ}$ (i + 1, 2, 2) = &
-                            4d0*(s_cb(i) - s_cb(i + 1))**2d0*(10d0*(s_cb(i + 1) - &
-                                                                    s_cb(i))**2d0 + (s_cb(i) - s_cb(i - 1))**2d0 + (s_cb(i) - &
-                                                                                                                    s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
-                                                                                                                                                            s_cb(i))**2d0*(s_cb(i - 2) - s_cb(i + 1))**2d0)
+                            4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - &
+                                                                          s_cb(i))**2._wp + (s_cb(i) - s_cb(i - 1))**2._wp + (s_cb(i) - &
+                                                                                                                              s_cb(i - 1))*(s_cb(i + 1) - s_cb(i)))/((s_cb(i - 2) - &
+                                                                                                                                                                      s_cb(i))**2._wp*(s_cb(i - 2) - s_cb(i + 1))**2._wp)
 
                     end do
 
@@ -470,17 +470,17 @@ contains
                     ! the WENO reconstruction
                     if (null_weights) then
                         if (bc_s%beg == -4) then
-                            d_cbR_${XYZ}$ (1:2, 0) = 0d0; d_cbR_${XYZ}$ (0, 0) = 1d0
-                            d_cbL_${XYZ}$ (1:2, 0) = 0d0; d_cbL_${XYZ}$ (0, 0) = 1d0
-                            d_cbR_${XYZ}$ (2, 1) = 0d0; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
-                            d_cbL_${XYZ}$ (2, 1) = 0d0; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
+                            d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
+                            d_cbL_${XYZ}$ (1:2, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
+                            d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
+                            d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
                         end if
 
                         if (bc_s%end == -4) then
-                            d_cbR_${XYZ}$ (0, s - 1) = 0d0; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
-                            d_cbL_${XYZ}$ (0, s - 1) = 0d0; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
-                            d_cbR_${XYZ}$ (0:1, s) = 0d0; d_cbR_${XYZ}$ (2, s) = 1d0
-                            d_cbL_${XYZ}$ (0:1, s) = 0d0; d_cbL_${XYZ}$ (2, s) = 1d0
+                            d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
+                            d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
+                            d_cbR_${XYZ}$ (0:1, s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
+                            d_cbL_${XYZ}$ (0:1, s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
                         end if
                     end if
                 end if
@@ -507,22 +507,22 @@ contains
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
-        real(kind(0d0)), dimension(-weno_polyn:weno_polyn - 1) :: dvd
-        real(kind(0d0)), dimension(0:weno_polyn) :: poly
-        real(kind(0d0)), dimension(0:weno_polyn) :: alpha
-        real(kind(0d0)), dimension(0:weno_polyn) :: omega
-        real(kind(0d0)), dimension(0:weno_polyn) :: beta
-        real(kind(0d0)), dimension(0:weno_polyn) :: delta
-        real(kind(0d0)) :: tau5
-        real(kind(0d0)), pointer :: beta_p(:)
+        real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
+        real(wp), dimension(0:weno_polyn) :: poly
+        real(wp), dimension(0:weno_polyn) :: alpha
+        real(wp), dimension(0:weno_polyn) :: omega
+        real(wp), dimension(0:weno_polyn) :: beta
+        real(wp), dimension(0:weno_polyn) :: delta
+        real(wp) :: tau5
+        real(wp), pointer :: beta_p(:)
 
-        real(kind(0d0)) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
+        real(wp) :: v_rs1, v_rs2, v_rs3, v_rs4, v_rs5
 
         integer :: i, j, k, l, r, s, w
 
@@ -611,13 +611,13 @@ contains
                                     elseif (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
+                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1._wp + d_cbL_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
+                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbL_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
                                         tau5 = abs(beta(1) - beta(0))
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1._wp + tau5/beta)
 
                                     end if
 
@@ -638,11 +638,11 @@ contains
                                     elseif (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
+                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1._wp + d_cbR_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
+                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbR_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1._wp + tau5/beta)
 
                                     end if
 
@@ -706,21 +706,21 @@ contains
                                     elseif (mapped_weno) then
                                         alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1d0 + d_cbL_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbL_${XYZ}$ (:, j))))
+                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1._wp + d_cbL_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
+                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbL_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
                                         tau5 = abs(beta(2) - beta(0))                   ! Equation 25
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
+                                        alpha = d_cbL_${XYZ}$ (:, j)*(1._wp + tau5/beta)  ! Equation 28 (note: weno_eps was already added to beta)
 
                                     elseif (teno) then
                                         ! Fu, et al. (2016)
                                         ! Fu's code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                         tau5 = abs(beta(2) - beta(0))
-                                        alpha = (1d0 + tau5/beta)**6d0              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        alpha = (1._wp + tau5/beta)**6._wp              ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
-                                        delta = merge(0d0, 1d0, omega < teno_CT)    ! Equation 26
+                                        delta = merge(0._wp, 1._wp, omega < teno_CT)    ! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
 
                                     end if
@@ -747,11 +747,11 @@ contains
                                     elseif (mapped_weno) then
                                         alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1d0 + d_cbR_${XYZ}$ (:, j) - 3d0*omega) + omega**2d0) &
-                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2d0 + omega*(1d0 - 2d0*d_cbR_${XYZ}$ (:, j))))
+                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1._wp + d_cbR_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
+                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbR_${XYZ}$ (:, j))))
 
                                     elseif (wenoz) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1d0 + tau5/beta)
+                                        alpha = d_cbR_${XYZ}$ (:, j)*(1._wp + tau5/beta)
 
                                     elseif (teno) then
                                         alpha = delta*d_cbR_${XYZ}$ (:, j)
@@ -909,41 +909,41 @@ contains
         !!      stencil.
         !!  @param i Equation number
         !!  @param j First-coordinate cell index
-        !!  @param k Second-coordinate cell index
-        !!  @param l Third-coordinate cell index
+        !!  @param k Secone-coordinate cell index
+        !!  @param l Thire-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
         integer :: i, j, k, l
 
-        real(kind(0d0)), dimension(-1:1) :: d !< Curvature measures at the zone centers
+        real(wp), dimension(-1:1) :: d !< Curvature measures at the zone centers
 
-        real(kind(0d0)) :: d_MD, d_LC !<
+        real(wp) :: d_MD, d_LC !<
             !! Median (md) curvature and large curvature (LC) measures
 
         ! The left and right upper bounds (UL), medians, large curvatures,
         ! minima, and maxima of the WENO-reconstructed values of the cell-
         ! average variables.
-        real(kind(0d0)) :: vL_UL, vR_UL
-        real(kind(0d0)) :: vL_MD, vR_MD
-        real(kind(0d0)) :: vL_LC, vR_LC
-        real(kind(0d0)) :: vL_min, vR_min
-        real(kind(0d0)) :: vL_max, vR_max
+        real(wp) :: vL_UL, vR_UL
+        real(wp) :: vL_MD, vR_MD
+        real(wp) :: vL_LC, vR_LC
+        real(wp) :: vL_min, vR_min
+        real(wp) :: vL_max, vR_max
 
-        real(kind(0d0)), parameter :: alpha = 2d0 !>
+        real(wp), parameter :: alpha = 2._wp !>
             !! Determines the maximum Courant–Friedrichs–Lewy (CFL) number that
             !! may be utilized with the scheme. In theory, for stability, a CFL
             !! number less than 1/(1+alpha) is necessary. The default value for
             !! alpha is 2.
 
-        real(kind(0d0)), parameter :: beta = 4d0/3d0 !<
+        real(wp), parameter :: beta = 4._wp/3._wp !<
             !! Determines the amount of freedom available from utilizing a large
             !! value for the local curvature. The default value for beta is 4/3.
 
-        real(kind(0d0)), parameter :: alpha_mp = 2d0
-        real(kind(0d0)), parameter :: beta_mp = 4d0/3d0
+        real(wp), parameter :: alpha_mp = 2._wp
+        real(wp), parameter :: beta_mp = 4._wp/3._wp
 
         !$acc parallel loop gang vector collapse (4)  default(present) private(d)
         do l = is3_weno%beg, is3_weno%end
@@ -953,27 +953,27 @@ contains
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
                                 - v_rs_ws(j - 1, k, l, i) &
-                                *2d0
+                                *2._wp
                         d(0) = v_rs_ws(j + 1, k, l, i) &
                                + v_rs_ws(j - 1, k, l, i) &
                                - v_rs_ws(j, k, l, i) &
-                               *2d0
+                               *2._wp
                         d(1) = v_rs_ws(j + 2, k, l, i) &
                                + v_rs_ws(j, k, l, i) &
                                - v_rs_ws(j + 1, k, l, i) &
-                               *2d0
+                               *2._wp
 
-                        d_MD = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-                               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-                               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
+                        d_MD = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1))) &
+                               *abs((sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1))) &
+                                    *(sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, d(0)))) &
+                               *min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), &
+                                    abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
 
-                        d_LC = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-                               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-                               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
+                        d_LC = (sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, 4._wp*d(1) - d(0))) &
+                               *abs((sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, d(0))) &
+                                    *(sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, d(1)))) &
+                               *min(abs(4._wp*d(0) - d(1)), abs(d(0)), &
+                                    abs(4._wp*d(1) - d(0)), abs(d(1)))/8._wp
 
                         vL_UL = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
@@ -981,11 +981,11 @@ contains
 
                         vL_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j - 1, k, l, i) &
-                                 - d_MD)*5d-1
+                                 - d_MD)*5e-1_wp
 
                         vL_LC = v_rs_ws(j, k, l, i) &
                                 - (v_rs_ws(j + 1, k, l, i) &
-                                   - v_rs_ws(j, k, l, i))*5d-1 + beta_mp*d_LC
+                                   - v_rs_ws(j, k, l, i))*5e-1_wp + beta_mp*d_LC
 
                         vL_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j - 1, k, l, i), &
@@ -1002,8 +1002,8 @@ contains
                                          vL_LC))
 
                         vL_rs_vf(j, k, l, i) = vL_rs_vf(j, k, l, i) &
-                                               + (sign(5d-1, vL_min - vL_rs_vf(j, k, l, i)) &
-                                                  + sign(5d-1, vL_max - vL_rs_vf(j, k, l, i))) &
+                                               + (sign(5e-1_wp, vL_min - vL_rs_vf(j, k, l, i)) &
+                                                  + sign(5e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
                         ! END: Left Monotonicity Preserving Bound ==========================
@@ -1012,27 +1012,27 @@ contains
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
                                 - v_rs_ws(j - 1, k, l, i) &
-                                *2d0
+                                *2._wp
                         d(0) = v_rs_ws(j + 1, k, l, i) &
                                + v_rs_ws(j - 1, k, l, i) &
                                - v_rs_ws(j, k, l, i) &
-                               *2d0
+                               *2._wp
                         d(1) = v_rs_ws(j + 2, k, l, i) &
                                + v_rs_ws(j, k, l, i) &
                                - v_rs_ws(j + 1, k, l, i) &
-                               *2d0
+                               *2._wp
 
-                        d_MD = (sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, 4d0*d(1) - d(0))) &
-                               *abs((sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(0))) &
-                                    *(sign(1d0, 4d0*d(0) - d(1)) + sign(1d0, d(1)))) &
-                               *min(abs(4d0*d(0) - d(1)), abs(d(0)), &
-                                    abs(4d0*d(1) - d(0)), abs(d(1)))/8d0
+                        d_MD = (sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, 4._wp*d(1) - d(0))) &
+                               *abs((sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, d(0))) &
+                                    *(sign(1._wp, 4._wp*d(0) - d(1)) + sign(1._wp, d(1)))) &
+                               *min(abs(4._wp*d(0) - d(1)), abs(d(0)), &
+                                    abs(4._wp*d(1) - d(0)), abs(d(1)))/8._wp
 
-                        d_LC = (sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, 4d0*d(0) - d(-1))) &
-                               *abs((sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(-1))) &
-                                    *(sign(1d0, 4d0*d(-1) - d(0)) + sign(1d0, d(0)))) &
-                               *min(abs(4d0*d(-1) - d(0)), abs(d(-1)), &
-                                    abs(4d0*d(0) - d(-1)), abs(d(0)))/8d0
+                        d_LC = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1))) &
+                               *abs((sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1))) &
+                                    *(sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, d(0)))) &
+                               *min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), &
+                                    abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
 
                         vR_UL = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
@@ -1040,11 +1040,11 @@ contains
 
                         vR_MD = (v_rs_ws(j, k, l, i) &
                                  + v_rs_ws(j + 1, k, l, i) &
-                                 - d_MD)*5d-1
+                                 - d_MD)*5e-1_wp
 
                         vR_LC = v_rs_ws(j, k, l, i) &
                                 + (v_rs_ws(j, k, l, i) &
-                                   - v_rs_ws(j - 1, k, l, i))*5d-1 + beta_mp*d_LC
+                                   - v_rs_ws(j - 1, k, l, i))*5e-1_wp + beta_mp*d_LC
 
                         vR_min = max(min(v_rs_ws(j, k, l, i), &
                                          v_rs_ws(j + 1, k, l, i), &
@@ -1061,8 +1061,8 @@ contains
                                          vR_LC))
 
                         vR_rs_vf(j, k, l, i) = vR_rs_vf(j, k, l, i) &
-                                               + (sign(5d-1, vR_min - vR_rs_vf(j, k, l, i)) &
-                                                  + sign(5d-1, vR_max - vR_rs_vf(j, k, l, i))) &
+                                               + (sign(5e-1_wp, vR_min - vR_rs_vf(j, k, l, i)) &
+                                                  + sign(5e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
                         ! END: Right Monotonicity Preserving Bound =========================
