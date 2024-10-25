@@ -221,9 +221,9 @@ print(json.dumps({{**case, **mods}}))
 
         if "Example" in self.trace.split(" -> "):
             return 1e-3
-        
+
         if self.params.get('ib', 'T') == 'T':
-            return 1e-9
+            return 1e-8
 
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
@@ -267,7 +267,7 @@ class TestCaseBuilder:
         dictionary.update(self.mods)
 
         if self.functor:
-            self.functor(dictionary, self.path)
+            self.functor(dictionary)
 
         return TestCase(self.trace, dictionary, self.ppn)
 

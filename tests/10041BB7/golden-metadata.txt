@@ -7,6 +7,7 @@ mfc.sh:
     Git:        f34a911f2d8ceec9cd9f6ffa84d932a7e41ded89 on exampleCI2 (dirty)
 
 post_process:
+post_process:
 
     CMake Configuration:
     
@@ -16,13 +17,16 @@ post_process:
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
+        POST_PROCESS  : ON
         POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
+        OpenACC : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
@@ -122,6 +126,7 @@ simulation:
         ALL           : OFF
     
         MPI     : ON
+        OpenACC : OFF
         OpenACC : OFF
     
         Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp

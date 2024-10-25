@@ -1,43 +1,10 @@
-This file was created on 2024-10-21 10:27:05.390595.
+This file was created on 2024-10-25 01:22:48.686526.
 
 mfc.sh:
 
-    Invocation: test -o viscous --generate
+    Invocation: test -j 8 --generate -o Example
     Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & strict=Yes
-    Git:        1d47274637fe018aa99b96ceaef2c43b192f09b2 on exampleCI2 (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.5 on bok
-    
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        4c9636d5abdee5de0a9e7a7e8fc61ec03e1d0597 on exampleCI2 (dirty)
 
 syscheck:
 
@@ -138,6 +105,39 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.5 on bok
+    
+        C       : GNU v14.2.1 (/usr/bin/cc)
+        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   64%
+    CPU(s) scaling MHz:                   53%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00
