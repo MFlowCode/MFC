@@ -4,7 +4,20 @@
 # + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.3. Multi-component inert shock tube
 
 import json
+import argparse
+
 import cantera as ct
+
+parser = argparse.ArgumentParser(
+    prog="nD_inert_shocktube",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("--no-chem", dest='chemistry', default=True, action="store_false",
+                    help="Disable chemistry.")
+
+args = parser.parse_args()
 
 ctfile    = 'h2o2.yaml'
 sol_L     = ct.Solution(ctfile)
@@ -18,7 +31,6 @@ dx   = L / Nx
 dt   = 5e-9
 Tend = 40e-6
 
-chemistry  = True
 NT         = int(Tend / dt)
 SAVE_COUNT = 200
 NS         = NT // SAVE_COUNT
@@ -62,8 +74,7 @@ case = {
     # ==========================================================================
 
     # Chemistry ================================================================
-    'chemistry'                    : 'F' if not chemistry else 'T',
-    'chem_params%advection'        : 'T',
+    'chemistry'                    : 'F' if not args.chemistry else 'T',
     'chem_params%diffusion'        : 'F',
     'chem_params%reactions'        : 'T',
     # ==========================================================================
@@ -104,7 +115,7 @@ case = {
     # ==========================================================================
 }
 
-if chemistry:
+if args.chemistry:
     for i in range(len(sol_L.Y)):
         case[f'patch_icpp(1)%Y({i+1})'] = sol_L.Y[i]
         case[f'patch_icpp(2)%Y({i+1})'] = sol_R.Y[i]

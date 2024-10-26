@@ -768,13 +768,6 @@ contains
             end do
         end do
 
-        if (chemistry) then
-            !$acc parallel loop default(present)
-            do i = chemxb, chemxe
-                rhs_vf(i)%sf(:, :, :) = 0d0
-            end do
-        end if
-
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -809,7 +802,6 @@ contains
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
-
         call nvtxEndRange
 
         if (cfl_dt) then

@@ -824,6 +824,8 @@ contains
             do i = 1, num_species
                 write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
             end do
+
+            write (1, '(I3,A20,A20)') tempxb, "T", "T"
         end if
 
         write (1, '(A)') ""

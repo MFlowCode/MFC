@@ -3,7 +3,7 @@ import re
 def remove_higher_dimensional_keys(case: dict, ndims: int) -> dict:
     assert 1 <= ndims <= 3
 
-    rm_dims = [set(), set(['y', 'z']), set(['z'])][ndims]
+    rm_dims = [set(), set(['y', 'z']), set(['z']), set()][ndims]
     dim_ids = {dim: i + 1 for i, dim in enumerate(['x', 'y', 'z'])}
     dim_mnp = {'x': 'm', 'y': 'n', 'z': 'p'}
 

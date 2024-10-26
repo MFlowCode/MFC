@@ -4,7 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import mfc.viz
-from case import dt, NS, Tend, SAVE_COUNT, sol
+from case import dt, Tend, SAVE_COUNT, sol
 
 
 case = mfc.viz.Case(".", dt)

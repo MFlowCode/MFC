@@ -311,7 +311,6 @@ module m_derived_types
     type chemistry_parameters
         character(LEN=name_len) :: cantera_file !< Path to Cantera file
 
-        logical :: advection
         logical :: diffusion
         logical :: reactions
     end type chemistry_parameters

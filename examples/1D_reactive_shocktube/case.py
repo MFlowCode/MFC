@@ -4,8 +4,20 @@
 # + https://doi.org/10.1016/j.ijhydene.2023.03.190:  Verification of numerical method
 # + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.7. Multi-species reactive shock tube
 
-import json
+import json, argparse
 import cantera as ct
+
+parser = argparse.ArgumentParser(
+    prog="1D_reactive_shocktube",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("--no-chem", dest='chemistry', default=True, action="store_false",
+                                 help="Disable chemistry.")
+parser.add_argument("--scale",   type=float,  default=1,    help="Scale.")
+
+args = parser.parse_args()
 
 ctfile    = 'h2o2.yaml'
 sol_L     = ct.Solution(ctfile)
@@ -18,7 +30,7 @@ u_l = 0
 u_r = -487.34
 
 L  = 0.12
-Nx = 800
+Nx = 800 * args.scale
 dx = L/Nx
 dt = dx/abs(u_r)*0.01
 Tend=230e-6
@@ -26,8 +38,6 @@ Tend=230e-6
 NT=int(Tend/dt)
 SAVE_COUNT=100
 NS=NT//SAVE_COUNT
-
-chemistry = True
 
 case = {
     # Logistics ================================================================
@@ -45,7 +55,7 @@ case = {
     't_step_stop'                  : NT,
     't_step_save'                  : NS,
     't_step_print'                 : NS,
-    'parallel_io'                  : 'F',
+    'parallel_io'                  : 'T' if args.mfc.get("mpi", True) else 'F',
 
     # Simulation Algorithm Parameters ==========================================
     'model_eqns'                   : 2,
@@ -66,8 +76,7 @@ case = {
     'bc_x%end'                     :-3,
 
     # Chemistry ================================================================
-    'chemistry'                    : 'F' if not chemistry else 'T',
-    'chem_params%advection'        : 'T',
+    'chemistry'                    : 'F' if not args.chemistry else 'T',
     'chem_params%diffusion'        : 'F',
     'chem_params%reactions'        : 'T',
     'cantera_file'                 : ctfile,
@@ -77,6 +86,7 @@ case = {
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                : 'T',
+    'chem_wrt_T'                   : 'T',
     # ==========================================================================
 
     # ==========================================================================
@@ -105,8 +115,9 @@ case = {
     # ==========================================================================
 }
 
-if chemistry:
+if args.chemistry:
     for i in range(len(sol_L.Y)):
+        case[f'chem_wrt_Y({i + 1})']    = 'T'
         case[f'patch_icpp(1)%Y({i+1})'] = sol_L.Y[i]
         case[f'patch_icpp(2)%Y({i+1})'] = sol_R.Y[i]
 

@@ -9,14 +9,15 @@ import json, argparse
 import cantera as ct
 
 parser = argparse.ArgumentParser(
-    prog="nD_Reactor",
+    prog="nD_perfect_reactor",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("--mfc",     type=str,    default='{}', metavar="DICT")
-parser.add_argument("--no-chem", dest='chem', default=True, action="store_false",
-                                 help="Disable chemistry.")
-parser.add_argument("--scale",   type=float,  default=1,    help="Scale.")
-parser.add_argument("--ndim",    type=int,    default=1,    help="Number of dimensions.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("--no-chem", dest='chemistry', default=True, action="store_false",
+                    help="Disable chemistry.")
+parser.add_argument("--scale",   type=float,       default=1,    help="Scale.")
+parser.add_argument("--ndim",    type=int,         default=1,    help="Number of dimensions.")
 
 args = parser.parse_args()
 
@@ -28,10 +29,10 @@ sol.TPX = 1_600, ct.one_atm, 'H2:0.04, O2:0.02, AR:0.94'
 Nx   = 25 * args.scale
 Tend = 1e-4
 s    = 1e-2
-dt   = 1e-9
+dt   = 1e-7
 
 NT         = int(Tend / dt)
-SAVE_COUNT = 2000
+SAVE_COUNT = 20
 NS         = NT // SAVE_COUNT
 
 case = {
@@ -54,7 +55,7 @@ case = {
     't_step_stop'                  : NT,
     't_step_save'                  : NS,
     't_step_print'                 : NS,
-    'parallel_io'                  : 'T' if args.ndim > 1 else 'F',
+    'parallel_io'                  : 'T' if args.ndim > 1 and args.mfc.get("mpi", True) else 'F',
 
     # Simulation Algorithm Parameters ==========================================
     'model_eqns'                   : 2,
@@ -82,6 +83,7 @@ case = {
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                : 'T',
+    'chem_wrt_T'                   : 'T',
     # ==========================================================================
 
     # Patch 1 ==================================================================
@@ -106,11 +108,10 @@ case = {
     # ==========================================================================
 }
 
-if args.chem:
+if args.chemistry:
     case.update({
         # Chemistry ============================================================
         'chemistry'             : 'T',
-        'chem_params%advection' : 'F',
         'chem_params%diffusion' : 'F',
         'chem_params%reactions' : 'T',
         'cantera_file'          : ctfile,
@@ -118,6 +119,7 @@ if args.chem:
     })
 
     for i in range(len(sol.Y)):
+        case[f'chem_wrt_Y({i + 1})']    = 'T'
         case[f'patch_icpp(1)%Y({i+1})'] = sol.Y[i]
 
 case = remove_higher_dimensional_keys(case, args.ndim)

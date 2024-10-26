@@ -558,7 +558,6 @@ contains
             wenoz_q = dflt_real
         #:endif
 
-        chem_params%advection = .false.
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
 

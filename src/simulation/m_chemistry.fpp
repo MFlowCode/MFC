@@ -116,7 +116,7 @@ contains
         real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: E
 
-        real(kind(0d0)) :: rho, omega_m, omega_T
+        real(kind(0d0)) :: rho, omega_m
         real(kind(0d0)), dimension(num_species) :: Ys
         real(kind(0d0)), dimension(num_species) :: omega
         real(kind(0d0)), dimension(num_species) :: enthalpies
@@ -124,7 +124,7 @@ contains
 
         #:if chemistry
 
-            !$acc parallel loop collapse(3) private(rho)
+            !$acc parallel loop collapse(3) private(Ys)
             do x = 0, m
                 do y = 0, n
                     do z = 0, p
@@ -139,6 +139,7 @@ contains
                         end do
 
                         dyn_pres = 0d0
+                        !$acc loop seq
                         do i = momxb, momxe
                             dyn_pres = dyn_pres + q_cons_qp(i)%sf(x, y, z)* &
                                        q_prim_qp(i)%sf(x, y, z)/2d0
@@ -149,12 +150,10 @@ contains
 
                         call get_net_production_rates(rho, T, Ys, omega)
 
-                        call get_species_enthalpies_rt(T, enthalpies)
-
+                        !$acc routine seq
                         do eqn = chemxb, chemxe
 
                             omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-                            omega_T = omega_m*enthalpies(eqn - chemxb + 1)*gas_constant*T
 
                             rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 

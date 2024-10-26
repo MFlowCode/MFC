@@ -779,7 +779,7 @@ contains
                                 end if
                             end if
 
-                            if (chemistry .and. chem_params%advection) then
+                            if (chemistry) then
                                 !$acc loop seq
                                 do i = chemxb, chemxe
                                     Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)

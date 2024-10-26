@@ -1,5 +1,9 @@
+import fastjsonschema
+
 from enum import Enum
 from ..state import ARG
+from functools import cache
+
 
 class ParamType(Enum):
     INT = {"type": "integer"}
@@ -223,7 +227,7 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
 })
 
-for var in [ 'advection', 'diffusion', 'reactions' ]:
+for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
 
 for ib_id in range(1, 10+1):
@@ -367,7 +371,8 @@ _properties = { k: v.value for k, v in ALL.items() }
 
 SCHEMA = {
     "type": "object",
-    "properties": _properties
+    "properties": _properties,
+    "additionalProperties": False
 }
 
 
@@ -382,3 +387,8 @@ def get_input_dict_keys(target_name: str) -> list:
         return result
 
     return [ x for x in result if x not in CASE_OPTIMIZATION ]
+
+
+@cache
+def get_validator():
+    return fastjsonschema.compile(SCHEMA)
