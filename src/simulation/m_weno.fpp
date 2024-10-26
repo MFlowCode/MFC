@@ -808,7 +808,7 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau)
+                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau, delta)
                     ! Note: dvd is not used as the equations are not cast in terms of the differences
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
@@ -828,12 +828,10 @@ contains
                                                   + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) -  3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
                                     else
                                         ! (Fu, et al., 2016) Table 1
-                                        ! Note: Unlike TENO5, TENO7 stencils differ from the WENO7 stencils. TENO7 stencils are explained below:
-                                        ! First, consider the right-sided flux (at i+1/2) computed in the subsequent section.
-                                        ! Then, by drawing the stencils following Fig 2 (right) (Fu, et al., 2016) and writing each coefficient beside each stencil point,
-                                        ! we can flip everything with respect to the x=i point. This allows the formulas to work for the left-sided flux (at i-1/2), which is what we want here.
-                                        ! However, the stencils must follow the same order as the right-sided flux (k=0: i-1 to i+1; k=1: i to i+2; k=2: i-1 to i; k=3: i to i+3, k=4: i-3 to i).
-                                        ! By remapping the coefficients to these stencils, we obtain the correct polynomial coefficients for the left-sided flux:
+                                        ! Note: Unlike TENO5, TENO7 stencils differ from WENO7 stencils.
+                                        ! See Figure 2 (right) in Fu et al. (2016).
+                                        ! Flip the weights with respect to the x=i point, but keep the stencil order to obtain left-sided flux (at i-1/2).
+                                        ! It is easier to first consider the right-sided flux (at i+1/2) later in the code.
                                         poly(0) = ( 2d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  1d0*v_rs_ws_${XYZ}$ (j+1, k, l, i)) / 6d0 !&
                                         poly(1) = (11d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  7d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j+2, k, l, i)) / 6d0 !&
                                         poly(2) = (-1d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 6d0 !&

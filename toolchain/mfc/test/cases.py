@@ -99,13 +99,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if "wenoz" in data and weno_order == 7:
                     data["wenoz_q"] = 3.0
 
-                if weno_order == 7 and "z" in dimInfo[0]:
-                    stack.push("", {'m': 35, 'n': 35, 'p': 35})
+                if weno_order == 7:
+                    data = {**data, 'weno_eps': 1e-6} # increase damping for stability
+
+                    if "z" in dimInfo[0]:
+                        data = {**data, 'm': 35, 'n': 35, 'p': 35}
 
                 cases.append(define_case_d(stack, trace, data))
-
-                if weno_order == 7 and "z" in dimInfo[0]:
-                    stack.pop()
 
             stack.pop()
 

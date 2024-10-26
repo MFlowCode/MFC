@@ -1,10 +1,10 @@
-This file was created on 2024-10-02 20:14:35.202713.
+This file was created on 2024-10-26 02:52:59.874719.
 
 mfc.sh:
 
-    Invocation: test --generate -f 7B71820F -t 5D68B0F5 -j 8
+    Invocation: test --generate -f 7B71820F -t 5D68B0F5 -j 4
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        653904deb137b4b516deee9bc47a484f8377f913 on weno7 (dirty)
+    Git:        01b4c833abcd0450e1fe4618fb03e51b1a27380c on weno7 (dirty)
 
 post_process:
 
@@ -19,39 +19,6 @@ post_process:
         SIMULATION    : OFF
         POST_PROCESS  : ON
         SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/chris/source/MFC_weno7/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on LAPTOP-OMEN
-    
-        C       : GNU v11.4.0 (/usr/bin/cc)
-        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -138,6 +105,39 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on LAPTOP-OMEN
+    
+        C       : GNU v11.4.0 (/usr/bin/cc)
+        Fortran : GNU v11.4.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/chris/source/MFC_weno7/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:              8
     Socket(s):                       1
     Stepping:                        0
-    BogoMIPS:                        6387.98
+    BogoMIPS:                        6387.70
     Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr arat umip vaes vpclmulqdq rdpid fsrm
     Hypervisor vendor:               Microsoft
     Virtualization type:             full
