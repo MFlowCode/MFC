@@ -242,6 +242,15 @@ module m_global_parameters
 
     !$acc declare create(bub_idx)
 
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    type(int_bounds_info) :: idwint(1:3)
+    !$acc declare create(idwint)
+
+    ! Cell Indices for the entire (local) domain. In simulation and post_process,
+    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    type(int_bounds_info) :: idwbuff(1:3)
+    !$acc declare create(idwbuff)
+
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
     !! numbers, will be non-negligible.
@@ -707,8 +716,6 @@ contains
         integer :: i, j, k
         integer :: fac
 
-        type(int_bounds_info) :: ix, iy, iz
-
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
@@ -1048,18 +1055,25 @@ contains
         end if
 
         ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        idwbuff(1)%beg = -buff_size
+        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
+        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
+
+        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
+        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
+        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
+        !$acc update device(idwint, idwbuff)
+        ! ==================================================================
+
+        ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
-            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) then
-                iy%beg = -buff_size
-                if (p > 0) then
-                    iz%beg = -buff_size
-                end if
-            end if
-
-            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-            @:ALLOCATE_GLOBAL(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE_GLOBAL(ptil(&
+                & idwbuff(1)%beg:idwbuff(1)%end, &
+                & idwbuff(2)%beg:idwbuff(2)%end, &
+                & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
         if (probe_wrt) then

@@ -510,7 +510,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwbuff)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do

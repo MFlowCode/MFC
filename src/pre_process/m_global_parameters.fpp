@@ -108,6 +108,13 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
     type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
 
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    type(int_bounds_info) :: idwint(1:3)
+
+    ! Cell Indices for the entire (local) domain. In simulation and post_process,
+    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    type(int_bounds_info) :: idwbuff(1:3)
+
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
@@ -722,6 +729,12 @@ contains
         tempxb = temperature_idx%beg
         tempxe = temperature_idx%end
 
+        ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        ! There is no buffer region in pre_process.
+        idwbuff(1) = idwint(1); idwbuff(2) = idwint(2); idwbuff(3) = idwint(3)
         ! ==================================================================
 
 #ifdef MFC_MPI

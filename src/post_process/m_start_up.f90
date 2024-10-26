@@ -180,7 +180,7 @@ contains
         end if
 
         ! Converting the conservative variables to the primitive ones
-        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwbuff)
 
     end subroutine s_perform_time_step
 

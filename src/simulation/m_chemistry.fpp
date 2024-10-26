@@ -17,10 +17,8 @@ module m_chemistry
 
     implicit none
 
-    type(int_bounds_info), private :: ix, iy, iz
     type(scalar_field), private :: grads(1:3)
 
-    !$acc declare create(ix, iy, iz)
     !$acc declare create(grads)
 
 contains
@@ -29,16 +27,11 @@ contains
 
         integer :: i
 
-        ix%beg = -buff_size
-        if (n > 0) then; iy%beg = -buff_size; else; iy%beg = 0; end if
-        if (p > 0) then; iz%beg = -buff_size; else; iz%beg = 0; end if
-
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        !$acc update device(ix, iy, iz)
-
         do i = 1, 3
-            @:ALLOCATE(grads(i)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(grads(i)%sf(&
+                & idwbuff(1)%beg:idwbuff(1)%end, &
+                & idwbuff(2)%beg:idwbuff(2)%end, &
+                & idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         !$acc kernels

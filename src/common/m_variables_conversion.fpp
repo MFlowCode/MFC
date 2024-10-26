@@ -81,9 +81,6 @@ module m_variables_conversion
 
     end interface ! ============================================================
 
-    integer, public :: ixb, ixe, iyb, iye, izb, ize
-    !$acc declare create(ixb, ixe, iyb, iye, izb, ize)
-
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
@@ -628,26 +625,7 @@ contains
 
         integer :: i, j
 
-#ifdef MFC_PRE_PROCESS
-        ixb = 0; iyb = 0; izb = 0; 
-        ixe = m; iye = n; ize = p; 
-#else
-        ixb = -buff_size
-        ixe = m - ixb
-
-        iyb = 0; iye = 0; izb = 0; ize = 0; 
-        if (n > 0) then
-            iyb = -buff_size; iye = n - iyb
-
-            if (p > 0) then
-                izb = -buff_size; ize = p - izb
-            end if
-        end if
-#endif
-
-!$acc enter data copyin(ixb, ixe, iyb, iye, izb, ize)
 !$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
-!$acc update device(ixb, ixe, iyb, iye, izb, ize)
 
 #ifdef MFC_SIMULATION
         @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
@@ -784,15 +762,16 @@ contains
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     subroutine s_initialize_mv(qK_cons_vf, mv)
+
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: mv
+        real(kind(0d0)), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
 
         integer :: i, j, k, l
         real(kind(0d0)) :: mu, sig, nbub_sc
 
-        do l = izb, ize
-            do k = iyb, iye
-                do j = ixb, ixe
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
@@ -816,15 +795,15 @@ contains
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(in) :: mv
-        real(kind(0d0)), dimension(ixb:, iyb:, izb:, 1:, 1:), intent(inout) :: pb
+        real(kind(0d0)), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(in) :: mv
+        real(kind(0d0)), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         integer :: i, j, k, l
         real(kind(0d0)) :: mu, sig, nbub_sc
 
-        do l = izb, ize
-            do k = iyb, iye
-                do j = ixb, ixe
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
 
                     nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
 
@@ -855,18 +834,15 @@ contains
         !! @param iz Index bounds in third coordinate direction
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              qK_prim_vf, &
-                                                             gm_alphaK_vf, &
-                                                             ix, iy, iz)
+                                                             ibounds, &
+                                                             gm_alphaK_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
+        type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
         type(scalar_field), &
             allocatable, optional, dimension(:), &
             intent(in) :: gm_alphaK_vf
-
-        type(int_bounds_info), optional, intent(in) :: ix, iy, iz
-
-        type(int_bounds_info) :: aix, aiy, aiz
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
@@ -910,14 +886,10 @@ contains
             end if
         #:endif
 
-        if (present(ix)) then; aix = ix; else; aix%beg = ixb; aix%end = ixe; end if
-        if (present(iy)) then; aiy = iy; else; aiy%beg = iyb; aiy%end = iye; end if
-        if (present(iz)) then; aiz = iz; else; aiz%beg = izb; aiz%end = ize; end if
-
-        !$acc parallel loop collapse(3) gang vector default(present) copyin(aix, aiy, aiz) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
-        do l = aiz%beg, aiz%end
-            do k = aiy%beg, aiy%end
-                do j = aix%beg, aix%end
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
+        do l = ibounds(3)%beg, ibounds(3)%end
+            do k = ibounds(2)%beg, ibounds(2)%end
+                do j = ibounds(1)%beg, ibounds(1)%end
                     dyn_pres_K = 0d0
 
                     !$acc loop seq
