@@ -172,6 +172,12 @@ module m_rhs
     type(int_bounds_info) :: ix, iy, iz
     !$acc declare create(ix, iy, iz)
 
+    type(int_bounds_info) :: ibounds_interior(1:3)
+    !$acc declare create(ibounds_interior)
+
+    type(int_bounds_info) :: ibounds_wbuffer(1:3)
+    !$acc declare create(ibounds_wbuffer)
+
     type(int_bounds_info) :: is1, is2, is3
     !$acc declare create(is1, is2, is3)
 
@@ -236,15 +242,24 @@ contains
         integer :: i, j, k, l, id !< Generic loop iterators
 
         ! Configuring Coordinate Direction Indexes =========================
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+        ibounds_interior(1)%beg = 0; ibounds_interior(2)%beg = 0; ibounds_interior(3)%beg = 0
+        ibounds_interior(1)%end = m; ibounds_interior(2)%end = n; ibounds_interior(3)%end = p
 
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+        ibounds_wbuffer(1)%beg = -buff_size
+        ibounds_wbuffer(2)%beg = 0
+        ibounds_wbuffer(3)%beg = 0
+        if (num_dims > 1) then ibounds_wbuffer(2)%beg = -buff_size; end if
+        if (num_dims > 2) then ibounds_wbuffer(3)%beg = -buff_size; end if
 
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ibounds_wbuffer(1)%end = m + buff_size
+        ibounds_wbuffer(2)%end = n + buff_size
+        ibounds_wbuffer(3)%end = p + buff_size
+
+        ix = ibounds_interior(1); iy = ibounds_interior(2); iz = ibounds_interior(3)
         ! ==================================================================
 
-        !$acc enter data copyin(ix, iy, iz)
-        !$acc update device(ix, iy, iz)
+        !$acc enter data copyin(ibounds_interior, ibounds_wbuffer, ix, iy, iz)
+        !$acc update device(ibounds_interior, ibounds_wbuffer, ix, iy, iz)
 
         ixt = ix; iyt = iy; izt = iz
 
@@ -797,7 +812,7 @@ contains
             q_cons_qp%vf, &
             q_prim_qp%vf, &
             gm_alpha_qp%vf, &
-            ix, iy, iz)
+            ibounds_interior(1), ibounds_interior(2), ibounds_interior(3))
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")

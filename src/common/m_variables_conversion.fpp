@@ -866,6 +866,8 @@ contains
 
         type(int_bounds_info), optional, intent(in) :: ix, iy, iz
 
+        type(int_bounds_info) :: aix, aiy, aiz
+
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
         real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
@@ -908,10 +910,14 @@ contains
             end if
         #:endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
-        do l = izb, ize
-            do k = iyb, iye
-                do j = ixb, ixe
+        if (present(ix)) then; aix = ix; else; aix%beg = ixb; aix%end = ixe; end if
+        if (present(iy)) then; aiy = iy; else; aiy%beg = iyb; aiy%end = iye; end if
+        if (present(iz)) then; aiz = iz; else; aiz%beg = izb; aiz%end = ize; end if
+
+        !$acc parallel loop collapse(3) gang vector default(present) copyin(aix, aiy, aiz) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
+        do l = aiz%beg, aiz%end
+            do k = aiy%beg, aiy%end
+                do j = aix%beg, aix%end
                     dyn_pres_K = 0d0
 
                     !$acc loop seq
