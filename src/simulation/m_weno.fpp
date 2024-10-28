@@ -841,6 +841,7 @@ contains
 
                                     if (.not. teno) then
                                         ! (Balsara & Shu, 2000) Page 11 Section III.a
+                                        ! Note: paratheses are needed to group the terms before '+ weno_eps' to avoid unintended floating point errors
                                         beta(0) = ( v_rs_ws_${XYZ}$ (j - 3, k, l, i)*(   547d0*v_rs_ws_${XYZ}$ (j - 3, k, l, i) & !&
                                                                                      -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
                                                                                      +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
@@ -850,7 +851,7 @@ contains
                                                                                      +  7042d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
                                                 + v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(   11003d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
                                                                                      -  9402d0*v_rs_ws_${XYZ}$ (j    , k, l, i) ) & !&
-                                                + 2107d0*v_rs_ws_${XYZ}$ (j, k, l, i)**2d0 ) / 240d0 & !&
+                                                + 2107d0*v_rs_ws_${XYZ}$ (j, k, l, i)**2d0 ) & !&
                                                 + weno_eps !&
 
                                         beta(1) = ( v_rs_ws_${XYZ}$ (j - 2, k, l, i)*(  267d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
@@ -862,7 +863,7 @@ contains
                                                                                      + 1922d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
                                                 + v_rs_ws_${XYZ}$ (j    , k, l, i)*(   3443d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
                                                                                      - 2522d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) ) & !&
-                                                + 547d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i)**2d0 ) / 240d0 & !&
+                                                + 547d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i)**2d0 ) & !&
                                                 + weno_eps !&
 
                                         beta(2) = ( v_rs_ws_${XYZ}$ (j - 1, k, l, i)*(  547d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
@@ -874,7 +875,7 @@ contains
                                                                                      + 1602d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
                                                 + v_rs_ws_${XYZ}$ (j + 1, k, l, i)*(   2843d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
                                                                                      - 1642d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) ) & !&
-                                                + 267d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i)**2d0 ) / 240d0 & !&
+                                                + 267d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i)**2d0 ) & !&
                                                 + weno_eps !&
 
                                         beta(3) = ( v_rs_ws_${XYZ}$ (j    , k, l, i)*(  2107d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
@@ -886,7 +887,7 @@ contains
                                                                                      +  4642d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
                                                 + v_rs_ws_${XYZ}$ (j + 2, k, l, i)*(    7043d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
                                                                                      -  3882d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i) ) & !&
-                                                + 547d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i)**2d0 ) / 240d0 & !&
+                                                + 547d0*v_rs_ws_${XYZ}$ (j + 3, k, l, i)**2d0 ) & !&
                                                 + weno_eps !&
 
                                     else ! TENO
