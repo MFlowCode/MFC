@@ -30,7 +30,7 @@ BASE_CFG = {
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
-    'weno_eps'                     : 1.E-6,
+    'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'F',
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
