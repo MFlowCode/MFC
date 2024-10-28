@@ -220,7 +220,7 @@ print(json.dumps({{**case, **mods}}))
     def compute_tolerance(self) -> float:
 
         if "Example" in self.trace.split(" -> "):
-            return 1e-3 
+            return 1e-3
 
         if self.params.get('ib', 'T') == 'T':
             return 1e-8
