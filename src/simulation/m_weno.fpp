@@ -940,7 +940,7 @@ contains
                                         alpha = d_cbL_${XYZ}$ (:, j)*(1d0 + (tau/beta)**wenoz_q) ! q = 2,3,4 for stability
 
                                     elseif (teno) then
-                                        tau = abs(beta(3) - beta(0))
+                                        tau = abs(beta(4) - beta(3)) ! Note the reordering of stencils
                                         alpha = (1d0 + tau/beta)**6d0
                                         omega = alpha/sum(alpha)
                                         delta = merge(0d0, 1d0, omega < teno_CT)
