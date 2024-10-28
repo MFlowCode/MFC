@@ -30,7 +30,7 @@ BASE_CFG = {
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
-    'weno_eps'                     : 1.E-16,
+    'weno_eps'                     : 1.E-6,
     'mapped_weno'                  : 'F',
     'null_weights'                 : 'F',
     'mp_weno'                      : 'F',
@@ -220,7 +220,7 @@ print(json.dumps({{**case, **mods}}))
     def compute_tolerance(self) -> float:
 
         if "Example" in self.trace.split(" -> "):
-            return 1e-3
+            return 1e-3 
 
         if self.params.get('ib', 'T') == 'T':
             return 1e-8

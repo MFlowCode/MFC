@@ -20,7 +20,6 @@ option(MFC_MPI           "Build with MPI"                                     ON
 option(MFC_OpenACC       "Build with OpenACC"                                OFF)
 option(MFC_GCov          "Build with GCov"                                   OFF)
 option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
-option(MFC_Strict        "Build with strict floating point operations"       OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
 option(MFC_SIMULATION    "Build simulation"                                  OFF)
 option(MFC_POST_PROCESS  "Build post_process"                                OFF)
@@ -137,12 +136,6 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 	    )
     endif()
 
-    if (MFC_Strict) 
-        add_compile_options(
-            -O0
-        )
-    endif()
-
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
@@ -170,14 +163,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
-    
-    if (MFC_Strict)
-        add_compile_options(
-            # "SHELL:-hfp0"
-            # "SHELL:-h vector0"
-            "SHELL:-o0"
-        )
-    endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
@@ -190,11 +175,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-g -Og -traceback -debug)
-    endif()
-
-    if (MFC_Strict)
-        add_compile_options(-fp-model precise)
-        add_compile_options(-O0)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -241,12 +221,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
         endif()
-
-        if (MFC_Strict)
-            # add_compile_options(-Kieee)
-            add_compile_options(-o0)
-        endif()
-
     else()
         CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
         if (SUPPORTS_IPO)
