@@ -221,14 +221,11 @@ print(json.dumps({{**case, **mods}}))
 
         if "Example" in self.trace.split(" -> "):
             return 1e-3
-
-        if self.params.get('ib', 'T') == 'T':
-            return 1e-8
-
+        
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'qbmm', 'bubbles']) or self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
             return 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
