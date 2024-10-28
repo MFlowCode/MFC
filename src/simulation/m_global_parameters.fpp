@@ -164,6 +164,8 @@ module m_global_parameters
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
 
+    !$acc declare create(chemistry)
+
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
     !< amplitude, frequency, and phase shift sinusoid in each direction

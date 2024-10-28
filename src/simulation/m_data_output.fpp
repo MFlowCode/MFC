@@ -348,16 +348,13 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
-            do i = chemxb, chemxe
-                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) >= -1d0), "bad conc")
-                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) <=  2d0), "bad conc")
-            end do
-
-            if (vcfl_max_glb /= vcfl_max_glb) then
-                call s_mpi_abort('VCFL is NaN. Exiting ...')
-            elseif (vcfl_max_glb > 1d0) then
-                print *, 'vcfl', vcfl_max_glb
-                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+            if (any(Re_size > 0)) then
+                if (vcfl_max_glb /= vcfl_max_glb) then
+                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                elseif (vcfl_max_glb > 1d0) then
+                    print *, 'vcfl', vcfl_max_glb
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                end if
             end if
         end if
 
@@ -510,7 +507,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwbuff)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do

@@ -363,8 +363,11 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Y_L, Ys_L, Y_R, Ys_R)
+                !$acc parallel loop collapse(3) gang vector default(present)    &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L,  &
+                !$acc alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Y_L, Ys_L, Y_R, &
+                !$acc Ys_R)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end

@@ -958,14 +958,14 @@ contains
             call nvtxEndRange
             ! END: Additional physics and source terms =========================
 
-            #:if chemistry
-                call nvtxStartRange("RHS_Chem_Advection")
-                call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
-                call nvtxEndRange
-            #:endif
-
         end do
         ! END: Dimensional Splitting Loop =================================
+
+        #:if chemistry
+            call nvtxStartRange("RHS_Chem_Advection")
+            call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
+            call nvtxEndRange
+        #:endif
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)

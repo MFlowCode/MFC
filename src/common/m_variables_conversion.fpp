@@ -126,7 +126,11 @@ contains
         !! @param mom Momentum
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G)
 
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_compute_pressure
+#else
         !$acc routine seq
+#endif
 
         real(kind(0d0)), intent(in) :: energy, alf
         real(kind(0d0)), intent(in) :: dyn_p
@@ -135,7 +139,6 @@ contains
         real(kind(0d0)), intent(in), optional :: stress, mom, G
 
         ! Chemistry
-        integer :: i
         real(kind(0d0)), dimension(1:num_species), intent(in) :: rhoYks
         real(kind(0d0)) :: E_e
         real(kind(0d0)) :: e_Per_Kg, Pdyn_Per_Kg
@@ -182,11 +185,8 @@ contains
             end if
 
         #:else
-            !$acc loop seq
-            do i = 1, num_species
-                Y_rs(i) = rhoYks(i)/rho
-            end do
 
+            Y_rs(:) = rhoYks(:)/rho
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
 
@@ -886,7 +886,9 @@ contains
             end if
         #:endif
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoyks)
+        !$acc parallel loop collapse(3) gang vector default(present) &
+        !$acc private(alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, &
+        !$acc pi_inf_K, qv_K, dyn_pres_K, R3tmp, rhoYks)
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -927,7 +929,6 @@ contains
                         rho_K = 0d0
                         !$acc loop seq
                         do i = chemxb, chemxe
-                            !print*, j,k,l, qK_cons_vf(i)%sf(j, k, l)
                             rho_K = rho_K + max(0d0, qK_cons_vf(i)%sf(j, k, l))
                         end do
 
@@ -936,16 +937,9 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = rho_K
                         end do
 
-                        Yksum = 0d0
                         !$acc loop seq
                         do i = chemxb, chemxe
                             qK_prim_vf(i)%sf(j, k, l) = max(0d0, qK_cons_vf(i)%sf(j, k, l)/rho_K)
-                            Yksum = Yksum + qK_prim_vf(i)%sf(j, k, l)
-                        end do
-
-                        !$acc loop seq
-                        do i = chemxb, chemxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_prim_vf(i)%sf(j, k, l)/Yksum
                         end do
 
                         qK_prim_vf(tempxb)%sf(j, k, l) = qK_cons_vf(tempxb)%sf(j, k, l)

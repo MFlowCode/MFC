@@ -63,16 +63,16 @@ contains
             if (num_dims == ${num_dims}$) then
                 !$acc parallel loop collapse(4) gang vector default(present) &
                 !$acc private(flux_x, flux_y, flux_z)
-                do x = 0, m
-                    do y = 0, n
-                        do z = 0, p
+                do z = idwint(3)%beg, idwint(3)%end
+                    do y = idwint(2)%beg, idwint(2)%end
+                        do x = idwint(1)%beg, idwint(1)%end
                             do eqn = chemxb, chemxe
                                 ! \nabla \cdot (F)
                                 flux_x = (flux_n(1)%vf(eqn)%sf(x - 1, y, z) - &
                                           flux_n(1)%vf(eqn)%sf(x, y, z))/dx(x)
 
                                 #:if num_dims >= 2
-                                    flux_x = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
+                                    flux_y = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
                                               flux_n(2)%vf(eqn)%sf(x, y, z))/dy(y)
                                 #:else
                                     flux_y = 0d0
@@ -87,6 +87,8 @@ contains
 
                                 rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
                             end do
+
+                            rhs_vf(tempxb)%sf(x, y, z) = 0d0
                         end do
                     end do
                 end do
@@ -112,38 +114,27 @@ contains
         real(kind(0d0)) :: rho, omega_m
         real(kind(0d0)), dimension(num_species) :: Ys
         real(kind(0d0)), dimension(num_species) :: omega
-        real(kind(0d0)), dimension(num_species) :: enthalpies
         real(kind(0d0)) :: cp_mix
 
         #:if chemistry
 
-            !$acc parallel loop collapse(3) private(Ys)
-            do x = 0, m
-                do y = 0, n
-                    do z = 0, p
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(Ys, omega)
+            do z = idwint(3)%beg, idwint(3)%end
+                do y = idwint(2)%beg, idwint(2)%end
+                    do x = idwint(1)%beg, idwint(1)%end
 
-                        rho = 0d0
-                        do eqn = chemxb, chemxe
-                            rho = rho + q_cons_qp(eqn)%sf(x, y, z)
-                        end do
-
+                        !$acc loop seq
                         do eqn = chemxb, chemxe
                             Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
                         end do
 
-                        dyn_pres = 0d0
-                        !$acc loop seq
-                        do i = momxb, momxe
-                            dyn_pres = dyn_pres + q_cons_qp(i)%sf(x, y, z)* &
-                                       q_prim_qp(i)%sf(x, y, z)/2d0
-                        end do
-
-                        call get_temperature(q_cons_qp(E_idx)%sf(x, y, z)/rho - dyn_pres/rho, &
-                            & 1200d0, Ys, .true., T)
+                        rho = q_cons_qp(contxe)%sf(x, y, z)
+                        T = q_prim_qp(tempxb)%sf(x, y, z)
 
                         call get_net_production_rates(rho, T, Ys, omega)
 
-                        !$acc routine seq
+                        !$acc loop seq
                         do eqn = chemxb, chemxe
 
                             omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
