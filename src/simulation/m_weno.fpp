@@ -836,7 +836,7 @@ contains
 
                                     if (.not. teno) then
                                         ! (Balsara & Shu, 2000) Page 11 Section III.a
-                                        ! Note: paratheses are needed to group the terms before '+ weno_eps' to avoid unintended floating point errors
+                                        ! Note: parentheses are needed to group the terms before '+ weno_eps' to avoid unintended floating point errors
                                         beta(0) = ( v(-3)*(547d0*v(-3) - 3882d0*v(-2) +  4642d0*v(-1) - 1854d0*v( 0)) & !&
                                                   + v(-2)*(              7043d0*v(-2) - 17246d0*v(-1) + 7042d0*v( 0)) & !&
                                                   + v(-1)*(                             11003d0*v(-1) - 9402d0*v( 0)) & !&
