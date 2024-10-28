@@ -190,11 +190,20 @@ class Case:
             wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
             teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
+            
+            weno_order = int(self.params["weno_order"])
+            weno_polyn = int((self.params["weno_order"] - 1) / 2)
+            
+            if teno:
+                weno_num_stencils = weno_order - 3
+            else:
+                weno_num_stencils = weno_polyn
 
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
-#:set weno_order            = {int(self.params["weno_order"])}
-#:set weno_polyn            = {int((self.params["weno_order"] - 1) / 2)}
+#:set weno_order            = {weno_order}
+#:set weno_polyn            = {weno_polyn}
+#:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
 #:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
 #:set nterms                = {nterms}

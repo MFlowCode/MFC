@@ -129,6 +129,7 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
@@ -137,7 +138,7 @@ module m_global_parameters
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
-        integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different weno_polyn for TENO(>5))
+        integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer :: num_fluids     !< number of fluids in the simulation
         logical :: wenojs         !< WENO-JS (default)
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
@@ -176,7 +177,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
+        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, wenoz_q, hypoelasticity, low_Mach)
@@ -717,6 +718,7 @@ contains
                 weno_num_stencils = weno_polyn
             end if
             !$acc update device(weno_polyn)
+            !$acc update device(weno_num_stencils)
             !$acc update device(nb)
             !$acc update device(num_dims, num_fluids)
         #:endif
