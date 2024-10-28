@@ -487,7 +487,7 @@ contains
                 else ! WENO7
                     ! Note: WENO7 only supports uniform grid
                     if (.not. teno) then
-                        ! (Balsara & Shu, 2000) Page 415 Section III.a
+                        ! (Balsara & Shu, 2000) Page 11 Section III.a
                         d_cbL_${XYZ}$ (0, :) = 4d0/35d0
                         d_cbL_${XYZ}$ (1, :) = 18d0/35d0
                         d_cbL_${XYZ}$ (2, :) = 12d0/35d0
@@ -499,12 +499,12 @@ contains
                         d_cbR_${XYZ}$ (3, :) = 4d0/35d0
 
                     else ! TENO
-                        ! (Fu, et al., 2016) Table 2
+                        ! (Fu, et al., 2016) Table 2 (for right flux)
                         d_cbL_${XYZ}$ (0, :) = 18d0/35d0
-                        d_cbL_${XYZ}$ (1, :) = 9d0/35d0
-                        d_cbL_${XYZ}$ (2, :) = 3d0/35d0
-                        d_cbL_${XYZ}$ (3, :) = 4d0/35d0
-                        d_cbL_${XYZ}$ (4, :) = 1d0/35d0
+                        d_cbL_${XYZ}$ (1, :) = 3d0/35d0
+                        d_cbL_${XYZ}$ (2, :) = 9d0/35d0
+                        d_cbL_${XYZ}$ (3, :) = 1d0/35d0
+                        d_cbL_${XYZ}$ (4, :) = 4d0/35d0
 
                         d_cbR_${XYZ}$ (0, :) = 18d0/35d0
                         d_cbR_${XYZ}$ (1, :) = 9d0/35d0
@@ -817,7 +817,7 @@ contains
                                 do i = 1, v_size
 
                                     if (.not. teno) then
-                                        ! (Balsara & Shu, 2000) Page 415 Table I
+                                        ! (Balsara & Shu, 2000) Page 11 Table I
                                         poly(0) = (  1d0*v_rs_ws_${XYZ}$ (j-3, k, l, i) -  5d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) & !&
                                                   + 13d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  3d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 12d0 !&
                                         poly(1) = ( -1d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) +  7d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) & !&
@@ -828,19 +828,19 @@ contains
                                                   + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) -  3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
                                     else
                                         ! (Fu, et al., 2016) Table 1
-                                        ! Note: Unlike TENO5, TENO7 stencils differ from WENO7 stencils.
-                                        ! See Figure 2 (right) in Fu et al. (2016).
-                                        ! Flip the weights with respect to the x=i point, but keep the stencil order to obtain left-sided flux (at i-1/2).
-                                        ! It is easier to first consider the right-sided flux (at i+1/2) later in the code.
+                                        ! Note: Unlike TENO5, TENO7 stencils differ from WENO7 stencils
+                                        ! See Figure 2 (right) for right-sided flux (at i+1/2)
+                                        ! Here we need the left-sided flux, so we flip the weights with respect to the x=i point
+                                        ! But we need to keep the stencil order to reuse the beta coefficients
                                         poly(0) = ( 2d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  1d0*v_rs_ws_${XYZ}$ (j+1, k, l, i)) / 6d0 !&
                                         poly(1) = (11d0*v_rs_ws_${XYZ}$ (j  , k, l, i) -  7d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j+2, k, l, i)) / 6d0 !&
                                         poly(2) = (-1d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) +  5d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  2d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 6d0 !&
-                                        poly(3) = (25d0*v_rs_ws_${XYZ}$ (j  , k, l, i) - 23d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) -  3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
-                                        poly(4) = ( 1d0*v_rs_ws_${XYZ}$ (j-3, k, l, i) -  5d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) +  3d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 12d0 !&
+                                        poly(3) = (25d0*v_rs_ws_${XYZ}$ (j  , k, l, i) - 23d0*v_rs_ws_${XYZ}$ (j+1, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j+2, k, l, i) - 3d0*v_rs_ws_${XYZ}$ (j+3, k, l, i)) / 12d0 !&
+                                        poly(4) = ( 1d0*v_rs_ws_${XYZ}$ (j-3, k, l, i) -  5d0*v_rs_ws_${XYZ}$ (j-2, k, l, i) + 13d0*v_rs_ws_${XYZ}$ (j-1, k, l, i) + 3d0*v_rs_ws_${XYZ}$ (j  , k, l, i)) / 12d0 !&
                                     end if
 
                                     if (.not. teno) then
-                                        ! (Balsara & Shu, 2000) Page 415 Section III.a
+                                        ! (Balsara & Shu, 2000) Page 11 Section III.a
                                         beta(0) = ( v_rs_ws_${XYZ}$ (j - 3, k, l, i)*(   547d0*v_rs_ws_${XYZ}$ (j - 3, k, l, i) & !&
                                                                                      -  3882d0*v_rs_ws_${XYZ}$ (j - 2, k, l, i) & !&
                                                                                      +  4642d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) & !&
@@ -892,14 +892,14 @@ contains
                                     else ! TENO
                                         ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019) Section 3.2
                                         beta(0) = 13d0/12d0*(v_rs_ws_${XYZ}$ (j - 1, k, l, i) - 2d0*v_rs_ws_${XYZ}$ (j, k, l, i) + v_rs_ws_${XYZ}$ (j + 1, k, l, i))**2d0 &
-                                                  + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 1, k, l, i) - v_rs_ws_${XYZ}$ (j + 1, k, l, i))**2d0 &
-                                                  + weno_eps
+                                                + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 1, k, l, i) - v_rs_ws_${XYZ}$ (j + 1, k, l, i))**2d0 &
+                                                + weno_eps
                                         beta(1) = 13d0/12d0*(v_rs_ws_${XYZ}$ (j, k, l, i) - 2d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) + v_rs_ws_${XYZ}$ (j + 2, k, l, i))**2d0 &
-                                                  + 1d0/4d0*(3d0*v_rs_ws_${XYZ}$ (j, k, l, i) - 4d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) + v_rs_ws_${XYZ}$ (j + 2, k, l, i))**2d0 &
-                                                  + weno_eps
+                                                + 1d0/4d0*(3d0*v_rs_ws_${XYZ}$ (j, k, l, i) - 4d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) + v_rs_ws_${XYZ}$ (j + 2, k, l, i))**2d0 &
+                                                + weno_eps
                                         beta(2) = 13d0/12d0*(v_rs_ws_${XYZ}$ (j - 2, k, l, i) - 2d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) + v_rs_ws_${XYZ}$ (j, k, l, i))**2d0 &
-                                                  + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 2, k, l, i) - 4d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) + 3d0*v_rs_ws_${XYZ}$ (j, k, l, i))**2d0 &
-                                                  + weno_eps
+                                                + 1d0/4d0*(v_rs_ws_${XYZ}$ (j - 2, k, l, i) - 4d0*v_rs_ws_${XYZ}$ (j - 1, k, l, i) + 3d0*v_rs_ws_${XYZ}$ (j, k, l, i))**2d0 &
+                                                + weno_eps
                                         beta(3) = ( v_rs_ws_${XYZ}$ (j    , k, l, i)*(  2107d0*v_rs_ws_${XYZ}$ (j    , k, l, i) & !&
                                                                                      -  9402d0*v_rs_ws_${XYZ}$ (j + 1, k, l, i) & !&
                                                                                      +  7042d0*v_rs_ws_${XYZ}$ (j + 2, k, l, i) & !&
