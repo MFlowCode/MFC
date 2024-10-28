@@ -199,6 +199,7 @@ class Case:
             else:
                 weno_num_stencils = weno_polyn
 
+            # Throw error if wenoz_q or teno_CT are required but not set
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
 #:set weno_order            = {weno_order}
@@ -212,6 +213,8 @@ class Case:
 #:set mapped_weno           = {mapped_weno}
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
+#:set wenoz_q               = {int(self.params.get("wenoz_q", -1))}
+#:set teno_CT               = {self.params.get("teno_CT", -1.0)}
 """
 
         return """\
