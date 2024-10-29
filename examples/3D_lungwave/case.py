@@ -27,7 +27,7 @@ gammal = 5.5
 Bl = 492.E+06
 rhol = 996.0
 c_l = 1540#1648.7
-G_l = 1.0E3
+G_l = 5.0E3
 Cv_l = 1816
 
 #primitive vartiables
@@ -63,10 +63,14 @@ patmos_n = patmos/stress_char
 P_amp_n = P_amp/stress_char
 
 #geometry
-dlengx = 10.*lambda_wave
+amp = 0.12
+interface_amp = amp*lambda_wave
+Namp = 10
+
+dlengx = 6.*lambda_wave
 dlengy = 1.*lambda_wave/2.
 dlengz = 1.*lambda_wave/2.
-Ny = 48
+Ny = int(Namp*0.5/amp)
 Nx = dlengx*Ny/dlengy
 Nz = dlengz*Ny/dlengy
 dx = dlengx/Nx
@@ -79,15 +83,14 @@ alphag_back = 1.0 - alphal_back
 alphag_lung = 0.99
 alphal_lung = 1.0 - alphag_lung
 
-interface_amp = 0.03*lambda_wave
 
 # time stepping requirements
-time_end = 5.0e-5#1.5E-04
-cfl = 0.3
+time_end = 5.5e-5#1.5E-04
+cfl = 0.4
 
 dt = cfl * dx/c_l_n 
 Nt = int(time_end/dt)
-Nframes = 500
+Nframes = 250
 tstart = 0
 tstop = Nt
 tsave = int(Nt/Nframes)
@@ -111,13 +114,13 @@ print(json.dumps({
     'p'                            : int(Nz),
     'stretch_x'                    : 'T',
     'a_x'                          : 4.0E+00,
-    'x_a'                          : -3.*lambda_wave,
-    'x_b'                          : 3.*lambda_wave,
+    'x_a'                          : -2.*lambda_wave,
+    'x_b'                          : 2.*lambda_wave,
     'loops_x'                      : 2,
     'dt'                           : dt,
     't_step_start'                 : tstart,
     't_step_stop'                  : tstop,
-    't_step_save'                  : 10,#tsave,
+    't_step_save'                  : tsave,
     # ==========================================================================
 
     # Simulation Algorithm Parameters ==========================================
@@ -168,9 +171,9 @@ print(json.dumps({
     'acoustic_source'               : 'T',      
     'num_source'                    : 1,
     'acoustic(1)%support'           : 3,
-    'acoustic(1)%loc(1)'            : 0.1*lambda_wave,
-    'acoustic(1)%loc(2)'            : 0,#lambda_wave/2,
-    'acoustic(1)%loc(3)'            : 0,
+    'acoustic(1)%loc(1)'            : 1.0*lambda_wave,
+    'acoustic(1)%loc(2)'            : dlengy/2,
+    'acoustic(1)%loc(3)'            : dlengz/2,
     'acoustic(1)%pulse'             : 3,
     'acoustic(1)%npulse'            : 1,
     'acoustic(1)%wavelength'        : P_len,            #wavelength of the signal
