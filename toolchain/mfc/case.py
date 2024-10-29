@@ -214,7 +214,6 @@ class Case:
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
 #:set wenoz_q               = {int(self.params.get("wenoz_q", -1))}
-#:set teno_CT               = {self.params.get("teno_CT", -1.0)}
 """
 
         return """\

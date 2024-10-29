@@ -136,7 +136,7 @@ contains
             t_step_start, t_step_stop, t_step_save, t_step_print, &
             model_eqns, mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
-            mp_weno, weno_avg, &
+            teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
             x_domain, y_domain, z_domain, &
@@ -149,7 +149,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, teno_CT, wenoz_q, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
