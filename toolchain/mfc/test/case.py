@@ -9,6 +9,7 @@ from ..state import ARG
 from ..run   import input
 from ..build import MFCTarget, get_target
 
+count = 0
 Tend = 0.25
 Nt   = 50
 mydt = 0.0005
@@ -225,7 +226,7 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_mach") == [1, 2]:
             return 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
