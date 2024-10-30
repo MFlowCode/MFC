@@ -226,7 +226,7 @@ print(json.dumps({{**case, **mods}}))
         if self.params.get("hypoelasticity", 'F') == 'T':
             return 1e-7
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_mach") == [1, 2]:
+        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_mach") == 1 or self.params.get("low_mach") == 2:
             return 1e-10
 
         if self.params.get("acoustic_source", 'F') == 'T':
