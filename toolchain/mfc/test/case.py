@@ -219,22 +219,24 @@ print(json.dumps({{**case, **mods}}))
 
     # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
-
+        tolerance = 1e-12 # Default
         if "Example" in self.trace.split(" -> "):
-            return 1e-3
-
+            tolerance = 1e-3
         if self.params.get("hypoelasticity", 'F') == 'T':
-            return 1e-7
+            tolerance = 1e-7
+        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
+            tolerance = 1e-10
+        elif self.params.get("low_Mach", 'F') in [1, 2]:
+            tolerance = 1e-10
+        elif self.params.get("acoustic_source", 'F') == 'T':
+            if self.params.get("acoustic(1)%pulse") == 3:  # Square wave
+                tolerance = 1e-5
+            else:
+                tolerance = 3e-12
+        elif self.params.get("weno_order") == 7:
+            tolerance = 1e-9
 
-        if any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']) or self.params.get("low_mach") == 1 or self.params.get("low_mach") == 2:
-            return 1e-10
-
-        if self.params.get("acoustic_source", 'F') == 'T':
-            if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
-                return 1e-5
-            return 3e-12
-
-        return 1e-12
+        return tolerance
 
 @dataclasses.dataclass
 class TestCaseBuilder:
