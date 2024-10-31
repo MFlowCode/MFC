@@ -63,9 +63,9 @@ patmos_n = patmos/stress_char
 P_amp_n = P_amp/stress_char
 
 #geometry
-amp = 0.12
+amp = 0.5
 interface_amp = amp*lambda_wave
-Namp = 10
+Namp = 25               #20                                                     # Dont Change
 
 dlengx = 6.*lambda_wave
 dlengy = 1.*lambda_wave/2.
@@ -77,23 +77,25 @@ dx = dlengx/Nx
 dy = dlengy/Ny
 dz = dlengz/Nz
 
-alphal_back = 0.99
+alphal_back = 0.99999
 alphag_back = 1.0 - alphal_back
 
-alphag_lung = 0.99
+alphag_lung = 0.99999
 alphal_lung = 1.0 - alphag_lung
 
 
 # time stepping requirements
 time_end = 5.5e-5#1.5E-04
-cfl = 0.4
+time_save = 0.01
+cfl = 0.5                                                                       # Should not change
 
 dt = cfl * dx/c_l_n 
 Nt = int(time_end/dt)
-Nframes = 250
 tstart = 0
 tstop = Nt
-tsave = int(Nt/Nframes)
+tsave = int(time_save*Nt)
+#Nframes = 100
+#tsave = int(Nt/Nframes)
 
 # Configuring case dictionary
 print(json.dumps({
@@ -171,7 +173,7 @@ print(json.dumps({
     'acoustic_source'               : 'T',      
     'num_source'                    : 1,
     'acoustic(1)%support'           : 3,
-    'acoustic(1)%loc(1)'            : 1.0*lambda_wave,
+    'acoustic(1)%loc(1)'            : (amp+0.5)*lambda_wave, #1.0*lambda_wave,
     'acoustic(1)%loc(2)'            : dlengy/2,
     'acoustic(1)%loc(3)'            : dlengz/2,
     'acoustic(1)%pulse'             : 3,
