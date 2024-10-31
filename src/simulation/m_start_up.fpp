@@ -149,7 +149,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
