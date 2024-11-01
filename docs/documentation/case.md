@@ -452,7 +452,7 @@ The value of `dt` needs to be sufficiently small such that the Courant-Friedrich
 
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
-To restart simulation from $k$-th time step, set `t_step_start = k`, see [Restarting Cases](running.md#restarting-cases).
+To restart simulation from $k$-th time step, set `t_step_start = k`, see [Restarting Cases](md_running.html#restarting_cases).
 
 ##### Adaptive Time-Stepping
 
@@ -469,7 +469,7 @@ To restart simulation from $k$-th time step, set `t_step_start = k`, see [Restar
 - `t_stop` specifies at what time the simulation should stop
 
 To newly start the simulation, set `n_start = 0`.
-To restart simulation from $k$-th time step, see [Restarting Cases](running.md#restarting-cases).
+To restart simulation from $k$-th time step, see [Restarting Cases](md_running.html#restarting_cases).).
 
 ### 7. Formatted Output
 
