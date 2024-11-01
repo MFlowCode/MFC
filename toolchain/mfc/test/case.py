@@ -226,7 +226,7 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             tolerance = 1e-10
-        elif self.params.get("low_Mach", 'F') in [1, 2]:
+        elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
         elif self.params.get("acoustic_source", 'F') == 'T':
             if self.params.get("acoustic(1)%pulse") == 3:  # Square wave
