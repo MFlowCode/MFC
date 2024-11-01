@@ -222,7 +222,7 @@ print(json.dumps({{**case, **mods}}))
         tolerance = 1e-12 # Default
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
-        if self.params.get("hypoelasticity", 'F') == 'T':
+        elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             tolerance = 1e-10
