@@ -53,8 +53,9 @@ Note:
 | Intel Xeon 6548Y+         | Emerald Rapids            | CPU           | 32 cores     | 6.6              | Intel 2021.9         | GT ICE  |
 | Intel Xeon 8352Y          | Ice Lake                  | CPU           | 32 cores     | 6.6              | NVHPC 24.5           | GT Rogues Gallery  |
 | Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat        | 
-| AMD EPYC 7513             | Milan                     | CPU           | 32 cores     | 7.4              | GNU 12.3.0           | GT ICE  |
-| AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
+| AMD EPYC 7513             | Milan                     | CPU           | 32 cores     | 7.4              | GNU 12.3.0           | GT ICE    |
+| Intel Xeon 8268           | Cascade Lake              | CPU           | 24 cores     | 7.5              | Intel 2024.2         | TAMU ACES |
+| AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE    |
 | NVIDIA T4                 | FP32-only GPU             | GPU           | 1 GPU        | 8.8              | NVHPC 24.1           | TAMU Faster       |
 | Intel Xeon 8160           | Skylake                   | CPU           | 24 cores     | 8.9              | Intel 2024.0         | TACC Stampede3    |
 | IBM Power10               |                           | CPU           | 24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
