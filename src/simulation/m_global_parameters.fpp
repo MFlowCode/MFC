@@ -163,6 +163,7 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
+    logical :: comp_debug     !< Variable checking at every RK step
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -641,6 +642,9 @@ contains
 
         ! Cuda aware MPI
         cu_tensor = .false.
+
+        ! Comprehensive debugging
+        comp_debug = .false.
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
