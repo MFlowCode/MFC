@@ -646,6 +646,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
         real(kind(0d0)), dimension(sys_size) :: L
         real(kind(0d0)), dimension(3) :: lambda
+        real(kind(0d0)), dimension(num_species) :: Y_s
 
         real(kind(0d0)) :: rho         !< Cell averaged density
         real(kind(0d0)) :: pres        !< Cell averaged pressure
@@ -803,11 +804,10 @@ contains
                         end do
 
                         E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
-
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0d0, c)
                         ! ============================================================
 
                         ! First-Order Spatial Derivatives of Primitive Variables =====
