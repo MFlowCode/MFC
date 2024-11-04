@@ -18,7 +18,6 @@ Similar performance is also seen for other problem configurations, such as the E
 All results are for the compiler that gave the best performance.
 Note:
 * CPU results may be performed on CPUs with more cores than reported in the table; we report results for the best performance given the full processor die by checking the performance for different core counts on that device. CPU results are the best performance we achieved using a single socket (or die).
-These are reported as (X/Y cores), where X is the used cores, and Y is the total on the die.
 * GPU results are for a single GPU device. For single-precision (SP) GPUs, we performed computation in double-precision via conversion in compiler/software; these numbers are _not_ for single-precision computation. AMD MI250X and MI300A GPUs have multiple compute dies per socket; we report results for one _GCD_* for the MI250X and the entire APU (6 XCDs) for MI300A, though one can quickly estimate full device runtime by dividing the grind time number by the number of GCDs on the device (the MI250X has 2 GCDs). We gratefully acknowledge the permission of LLNL, HPE/Cray, and AMD for permission to release MI300A performance numbers.
 
 | Hardware                  | Details                   | Type          | Usage        | Grind Time [ns]  | Compiler             | Computer     |
@@ -38,7 +37,7 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud   |
 | NVIDIA P100               |                           | GPU           | 1 GPU        | 2.4              | NVHPC 23.5           | GT CSE Internal  |
 | Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud   |
-| Intel Xeon SF-AP          | Sierra Forest Advanced, 2.8GHz Boost, 384 MiB L3    | CPU           | 192 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud   |
+| Intel Xeon 6900E          | Sierra Forest Advanced, 2.8GHz Boost, 384 MiB L3    | CPU           | 192 cores     | 2.6       | Intel 2024.2         | Intel AI Cloud   |
 | AMD EPYC 9534             | Genoa                     | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
 | Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
@@ -53,10 +52,12 @@ These are reported as (X/Y cores), where X is the used cores, and Y is the total
 | Intel Xeon 8462Y+         | Sapphire Rapids           | CPU           | 32 cores     | 6.2              | GNU 12.3.0           | GT ICE  |
 | Intel Xeon 6548Y+         | Emerald Rapids            | CPU           | 32 cores     | 6.6              | Intel 2021.9         | GT ICE  |
 | Intel Xeon 8352Y          | Ice Lake                  | CPU           | 32 cores     | 6.6              | NVHPC 24.5           | GT Rogues Gallery  |
-| Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat  | 
-| AMD EPYC 7513             | Milan                     | CPU           | 32 cores     | 7.4              | GNU 12.3.0           | GT ICE  |
-| AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE  |
-| NVIDIA T4                 | FP32-only GPU             | GPU           | 1 GPU        | 8.8              | NVHPC 24.1           | TAMU Faster  |
+| Ampere Altra Q80-28       | Arm, Neoverse-N1          | CPU           | 80 cores     | 6.8              | GNU 12.2.0           | OLCF Wombat        | 
+| AMD EPYC 7513             | Milan                     | CPU           | 32 cores     | 7.4              | GNU 12.3.0           | GT ICE    |
+| Intel Xeon 8268           | Cascade Lake              | CPU           | 24 cores     | 7.5              | Intel 2024.2         | TAMU ACES |
+| AMD EPYC 7452             | Rome                      | CPU           | 32 cores     | 8.4              | GNU 12.3.0           | GT ICE    |
+| NVIDIA T4                 | FP32-only GPU             | GPU           | 1 GPU        | 8.8              | NVHPC 24.1           | TAMU Faster       |
+| Intel Xeon 8160           | Skylake                   | CPU           | 24 cores     | 8.9              | Intel 2024.0         | TACC Stampede3    |
 | IBM Power10               |                           | CPU           | 24 cores     | 10               | GNU 13.3.1           | GT Rogues Gallery |
 | AMD EPYC 7401             | Naples                    | CPU           | 24 cores     | 10               | GNU 10.3.1           | LLNL Corona  |
 | Intel Xeon 6226           | Cascade Lake              | CPU           | 12 cores     | 17               | GNU 12.3.0           | GT ICE  |

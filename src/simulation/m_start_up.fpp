@@ -113,6 +113,8 @@ module m_start_up
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
+    real(kind(0d0)) :: dt_init
+
 contains
 
     !>  The purpose of this procedure is to first verify that an
@@ -1097,8 +1099,6 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(kind(0d0)) :: dt_init
-
         integer :: i, j, k, l
 
         if (cfl_dt) then
@@ -1108,7 +1108,10 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1d-3*dt_init .and. cfl_adap_dt) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+                print*, "Delta t = ", dt
+                call s_mpi_abort("Delta t has become too small")
+            end if
         end if
 
         if (cfl_dt) then

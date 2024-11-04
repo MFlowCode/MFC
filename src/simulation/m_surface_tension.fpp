@@ -81,8 +81,8 @@ contains
         @:ALLOCATE_GLOBAL(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
 
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
-            @:ALLOCATE_GLOBAL(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+            @:ALLOCATE_GLOBAL(gL_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
+            @:ALLOCATE_GLOBAL(gR_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
         end if
     end subroutine s_initialize_surface_tension_module
 
