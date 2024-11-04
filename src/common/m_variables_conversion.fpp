@@ -942,7 +942,7 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = max(0d0, qK_cons_vf(i)%sf(j, k, l)/rho_K)
                         end do
 
-                        qK_prim_vf(tempxb)%sf(j, k, l) = qK_cons_vf(tempxb)%sf(j, k, l)
+                        qK_prim_vf(T_idx)%sf(j, k, l) = qK_cons_vf(T_idx)%sf(j, k, l)
                     else
                         !$acc loop seq
                         do i = 1, contxe
@@ -980,7 +980,7 @@ contains
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
                     if (chemistry) then
-                        qK_prim_vf(tempxb)%sf(j, k, l) = T
+                        qK_prim_vf(T_idx)%sf(j, k, l) = T
                     end if
 
                     if (bubbles) then
@@ -1133,13 +1133,13 @@ contains
                         end do
 
                         call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                        T = q_prim_vf(tempxb)%sf(j, k, l)
+                        T = q_prim_vf(T_idx)%sf(j, k, l)
                         call get_mixture_energy_mass(T, Ys, e_mix)
 
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             dyn_pres + rho*e_mix
 
-                        q_cons_vf(tempxb)%sf(j, k, l) = q_prim_vf(tempxb)%sf(j, k, l)
+                        q_cons_vf(T_idx)%sf(j, k, l) = q_prim_vf(T_idx)%sf(j, k, l)
                     #:else
                         ! Computing the energy from the pressure
                         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
@@ -1398,7 +1398,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_avggg, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
@@ -1409,16 +1409,14 @@ contains
         real(kind(0d0)), intent(in) :: H
         real(kind(0d0)), dimension(num_fluids), intent(in) :: adv
         real(kind(0d0)), intent(in) :: vel_sum
-        real(kind(0d0)), intent(in) :: c_avggg
+        real(kind(0d0)), intent(in) :: c_c
         real(kind(0d0)), intent(out) :: c
 
         real(kind(0d0)) :: blkmod1, blkmod2
-        real(kind(0d0)) :: Tolerance, c_c
+        real(kind(0d0)) :: Tolerance
         integer :: q
 
         if (chemistry) then
-            c_c = c_avggg
-
             if (avg_state == 1 .and. abs(c_c) > Tolerance) then
                 c = sqrt(c_c - (gamma - 1.0d0)*(vel_sum - H))
             else

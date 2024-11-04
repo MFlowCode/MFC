@@ -308,7 +308,7 @@ contains
         real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R
         real(kind(0d0)), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-        real(kind(0d0)) :: Cp_avg, Cv_avg, gamma_avggg, T_avg, eps, c_avggg
+        real(kind(0d0)) :: Cp_avg, Cv_avg, gamma_avggg, T_avg, eps, c_sum_Yi_Phi
         real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: MW_L, MW_R
@@ -506,12 +506,14 @@ contains
                                 call get_species_specific_heats_r(T_R, Cp_iR)
 
                                 if (chem_params%gamma_method == 1) then
+                                    ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                     Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
                                     Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
 
                                     gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
                                     gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
                                 else if (chem_params%gamma_method == 2) then
+                                    ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                     call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
                                     call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
                                     call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
@@ -580,7 +582,7 @@ contains
                             ! variables are placeholders to call the subroutine.
 
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                          vel_avg_rms, c_avggg, c_avg)
+                                                          vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -924,7 +926,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
         real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
         real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-        real(kind(0d0)) :: Cp_avg, Cv_avg, T_avg, c_avggg, eps
+        real(kind(0d0)) :: Cp_avg, Cv_avg, T_avg, c_sum_Yi_Phi, eps
         real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: MW_L, MW_R
         real(kind(0d0)) :: R_gas_L, R_gas_R
@@ -2181,7 +2183,7 @@ contains
                                 end if
 
                                 #:if chemistry
-                                    c_avggg = 0.0d0
+                                    c_sum_Yi_Phi = 0.0d0
                                     !$acc loop seq
                                     do i = chemxb, chemxe
                                         Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -2204,12 +2206,14 @@ contains
                                     call get_species_specific_heats_r(T_R, Cp_iR)
 
                                     if (chem_params%gamma_method == 1) then
+                                        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                         Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
                                         Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
 
                                         gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
                                         gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
                                     else if (chem_params%gamma_method == 2) then
+                                        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                         call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
                                         call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
                                         call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
@@ -2238,7 +2242,6 @@ contains
                                 #:endif
 
                                 @:compute_average_state()
-                                !print *, c_avggg
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
                                                               vel_L_rms, 0d0, c_L)
@@ -2250,7 +2253,7 @@ contains
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avggg, c_avg)
+                                                              vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq

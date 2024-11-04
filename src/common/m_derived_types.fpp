@@ -314,6 +314,9 @@ module m_derived_types
         logical :: diffusion
         logical :: reactions
 
+        !> Method of determining gamma.
+        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
         integer :: gamma_method
     end type chemistry_parameters
 

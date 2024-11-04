@@ -88,7 +88,7 @@ contains
                                 rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
                             end do
 
-                            rhs_vf(tempxb)%sf(x, y, z) = 0d0
+                            rhs_vf(T_idx)%sf(x, y, z) = 0d0
                         end do
                     end do
                 end do
@@ -130,7 +130,7 @@ contains
                         end do
 
                         rho = q_cons_qp(contxe)%sf(x, y, z)
-                        T = q_prim_qp(tempxb)%sf(x, y, z)
+                        T = q_prim_qp(T_idx)%sf(x, y, z)
 
                         call get_net_production_rates(rho, T, Ys, omega)
 

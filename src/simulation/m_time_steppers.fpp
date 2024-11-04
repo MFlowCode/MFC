@@ -204,10 +204,10 @@ contains
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
-            @:ALLOCATE(q_prim_vf(tempxb)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_prim_vf(T_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(tempxb))
+            @:ACC_SETUP_SFs(q_prim_vf(T_idx))
         end if
 
         @:ALLOCATE_GLOBAL(pb_ts(1:2))

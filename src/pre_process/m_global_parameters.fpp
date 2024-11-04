@@ -106,13 +106,15 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
     integer :: c_idx                               !< Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
+    integer :: T_idx                               !< Index of temperature eqn.
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
     ! Cell Indices for the entire (local) domain. In simulation and post_process,
     ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
@@ -237,7 +239,6 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
-    integer :: tempxb, tempxe
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -707,9 +708,8 @@ contains
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
 
-            temperature_idx%beg = sys_size + 1
-            temperature_idx%end = sys_size + 1
-            sys_size = temperature_idx%end
+            T_idx = sys_size + 1
+            sys_size = T_idx
         end if
 
         momxb = mom_idx%beg
@@ -726,8 +726,6 @@ contains
         intxe = internalEnergies_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        tempxb = temperature_idx%beg
-        tempxe = temperature_idx%end
 
         ! Configuring Coordinate Direction Indexes =========================
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0

@@ -58,7 +58,7 @@
         gamma_avg = Cp_avg/Cv_avg
 
         Phi_avg(:) = (gamma_avg - 1.d0)*(vel_avg_rms/2.0d0 - h_avg_2(:)) + gamma_avg*gas_constant/mol_weights(:)*T_avg
-        c_avggg = sum(Yi_avg(:)*Phi_avg(:))
+        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
     #:endif
 
 #:enddef roe_avg

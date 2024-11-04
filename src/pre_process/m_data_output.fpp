@@ -261,7 +261,7 @@ contains
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
                                  .or. &
-                                 ((i == tempxb)) &
+                                 ((i == T_idx)) &
                                  ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
@@ -825,7 +825,7 @@ contains
                 write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
             end do
 
-            write (1, '(I3,A20,A20)') tempxb, "T", "T"
+            write (1, '(I3,A20,A20)') T_idx, "T", "T"
         end if
 
         write (1, '(A)') ""
@@ -837,7 +837,7 @@ contains
         if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
         if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
-        if (tempxb /= 0) write (1, '("[",I2,",",I2,"]",A)') tempxb, tempxe, " Temperature"
+        if (T_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') T_idx, T_idx, " Temperature"
 
         close (1)
 

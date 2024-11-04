@@ -312,9 +312,9 @@ contains
             end do
 
             if (chem_wrt_T) then
-                q_sf = q_prim_vf(tempxb)%sf(-offset_x%beg:m + offset_x%end, &
-                                            -offset_y%beg:n + offset_y%end, &
-                                            -offset_z%beg:p + offset_z%end)
+                q_sf = q_prim_vf(T_idx)%sf(-offset_x%beg:m + offset_x%end, &
+                                           -offset_y%beg:n + offset_y%end, &
+                                           -offset_z%beg:p + offset_z%end)
 
                 write (varname, '(A)') 'T'
                 call s_write_variable_to_formatted_database_file(varname, t_step)

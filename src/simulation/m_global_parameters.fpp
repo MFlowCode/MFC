@@ -239,17 +239,19 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     integer :: c_idx         ! Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
+    integer :: T_idx       !< Index of the temperature equation
     !> @}
 
     !$acc declare create(bub_idx)
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
     !$acc declare create(idwint)
 
     ! Cell Indices for the entire (local) domain. In simulation and post_process,
     ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     !$acc declare create(idwbuff)
 
@@ -301,7 +303,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, T_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -467,9 +469,8 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
-    integer :: tempxb, tempxe
 
-!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe, tempxb, tempxe)
+!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -1004,9 +1005,8 @@ contains
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
 
-            temperature_idx%beg = sys_size + 1
-            temperature_idx%end = sys_size + 1
-            sys_size = temperature_idx%end
+            T_idx = sys_size + 1
+            sys_size = T_idx
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -1118,10 +1118,8 @@ contains
         intxe = internalEnergies_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        tempxb = temperature_idx%beg
-        tempxe = temperature_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, tempxb, tempxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, T_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
