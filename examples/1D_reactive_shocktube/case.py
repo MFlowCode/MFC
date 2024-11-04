@@ -30,9 +30,9 @@ u_l = 0
 u_r = -487.34
 
 L  = 0.12
-Nx = 800 * args.scale
+Nx = 400 * args.scale
 dx = L/Nx
-dt = dx/abs(u_r)*0.01
+dt = dx/abs(u_r)*0.02
 Tend=230e-6
 
 NT=int(Tend/dt)
@@ -55,7 +55,7 @@ case = {
     't_step_stop'                  : NT,
     't_step_save'                  : NS,
     't_step_print'                 : NS,
-    'parallel_io'                  : 'T' if args.mfc.get("mpi", True) else 'F',
+    'parallel_io'                  : 'F' if args.mfc.get("mpi", True) else 'F',
 
     # Simulation Algorithm Parameters ==========================================
     'model_eqns'                   : 2,
@@ -69,7 +69,7 @@ case = {
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'mp_weno'                      : 'T',
-    'riemann_solver'               : 1,
+    'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
     'bc_x%beg'                     :-2,

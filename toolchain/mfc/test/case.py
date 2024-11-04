@@ -97,12 +97,14 @@ def trace_to_uuid(trace: str) -> str:
 
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
-    ppn:   int
-    trace: str
+    ppn:          int
+    trace:        str
+    override_tol: Optional[float] = None
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
-        self.trace   = trace
-        self.ppn     = ppn or 1
+    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None) -> None:
+        self.trace        = trace
+        self.ppn          = ppn or 1
+        self.override_tol = override_tol
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
@@ -221,6 +223,9 @@ print(json.dumps({{**case, **mods}}))
             self.get_parameters())
 
     def compute_tolerance(self) -> float:
+        if self.override_tol:
+            return self.override_tol
+
         tolerance = 1e-12 # Default
 
         if self.params.get("hypoelasticity", 'F') == 'T':
@@ -239,14 +244,16 @@ print(json.dumps({{**case, **mods}}))
 
         return tolerance
 
+
 @dataclasses.dataclass
 class TestCaseBuilder:
-    trace:   str
-    mods:    dict
-    path:    str
-    args:    List[str]
-    ppn:     int
-    functor: Optional[Callable]
+    trace:        str
+    mods:         dict
+    path:         str
+    args:         List[str]
+    ppn:          int
+    functor:      Optional[Callable]
+    override_tol: Optional[float] = None
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -269,7 +276,7 @@ class TestCaseBuilder:
         if self.mods:
             dictionary.update(self.mods)
 
-        return TestCase(self.trace, dictionary, self.ppn)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol)
 
 
 @dataclasses.dataclass
@@ -292,12 +299,12 @@ class CaseGeneratorStack:
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor)
+def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
+def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -313,4 +320,4 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)

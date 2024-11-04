@@ -44,27 +44,21 @@
         h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
         Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
         T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
-        Cp_avg = 0.0d0
-        Cv_avg = 0.0d0
 
-        do i = 1, num_species
-            if (abs(T_L - T_R) < eps) then
-                ! Case when T_L and T_R are very close
-                Cp_avg = Cp_avg + Yi_avg(i)*(0.5d0*Cp_iL(i) + 0.5d0*Cp_iR(i))*gas_constant/mol_weights(i)
-                Cv_avg = Cv_avg + Yi_avg(i)*((0.5d0*Cp_iL(i) + 0.5d0*Cp_iR(i))*gas_constant/mol_weights(i) - gas_constant/mol_weights(i))
-            else
-                ! Normal calculation when T_L and T_R are sufficiently different
-                Cp_avg = Cp_avg + Yi_avg(i)*(h_iR(i) - h_iL(i))/(T_R - T_L)
-                Cv_avg = Cv_avg + Yi_avg(i)*((h_iR(i) - h_iL(i))/(T_R - T_L) - gas_constant/mol_weights(i))
-            end if
-        end do
+        if (abs(T_L - T_R) < eps) then
+            ! Case when T_L and T_R are very close
+            Cp_avg = sum(Yi_avg(:)*(0.5d0*Cp_iL(i) + 0.5d0*Cp_iR(:))*gas_constant/mol_weights(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5d0*Cp_iL(i) + 0.5d0*Cp_iR(:))*gas_constant/mol_weights(:) - gas_constant/mol_weights(:)))
+        else
+            ! Normal calculation when T_L and T_R are sufficiently different
+            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/mol_weights(:)))
+        end if
+
         gamma_avg = Cp_avg/Cv_avg
-        c_avggg = 0.0d0
 
-        do i = 1, num_species
-            Phi_avg(i) = (gamma_avg - 1.d0)*(vel_avg_rms/2.0d0 - h_avg_2(i)) + gamma_avg*gas_constant/mol_weights(i)*T_avg
-            c_avggg = c_avggg + Yi_avg(i)*Phi_avg(i)
-        end do
+        Phi_avg(:) = (gamma_avg - 1.d0)*(vel_avg_rms/2.0d0 - h_avg_2(:)) + gamma_avg*gas_constant/mol_weights(:)*T_avg
+        c_avggg = sum(Yi_avg(:)*Phi_avg(:))
     #:endif
 
 #:enddef roe_avg

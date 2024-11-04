@@ -1398,7 +1398,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c, c_avggg)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_avggg, c)
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
@@ -1409,18 +1409,15 @@ contains
         real(kind(0d0)), intent(in) :: H
         real(kind(0d0)), dimension(num_fluids), intent(in) :: adv
         real(kind(0d0)), intent(in) :: vel_sum
+        real(kind(0d0)), intent(in) :: c_avggg
         real(kind(0d0)), intent(out) :: c
 
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: Tolerance, c_c
-        real(kind(0d0)), optional, intent(in) :: c_avggg
         integer :: q
+
         if (chemistry) then
-            if (present(c_avggg)) then
-                c_c = c_avggg
-            else
-                c_c = 0.0d0  ! Default value if 'b' is absent
-            end if
+            c_c = c_avggg
 
             if (avg_state == 1 .and. abs(c_c) > Tolerance) then
                 c = sqrt(c_c - (gamma - 1.0d0)*(vel_sum - H))
