@@ -104,7 +104,7 @@ contains
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(kind(0d0)) :: pres, Temp                         !< Temporary pressure
 
         real(kind(0d0)) :: nR3
         real(kind(0d0)) :: ntmp
@@ -261,7 +261,7 @@ contains
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
                                  .or. &
-                                 ((i == tempxb)) &
+                                 ((i == T_idx)) &
                                  ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
@@ -273,7 +273,7 @@ contains
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, qv, rhoYks, pres)
+                                pi_inf, gamma, rho, qv, rhoYks, pres, Temp)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
@@ -824,6 +824,8 @@ contains
             do i = 1, num_species
                 write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
             end do
+
+            write (1, '(I3,A20,A20)') T_idx, "T", "T"
         end if
 
         write (1, '(A)') ""
@@ -835,7 +837,7 @@ contains
         if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
         if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
-        if (tempxb /= 0) write (1, '("[",I2,",",I2,"]",A)') tempxb, tempxe, " Temperature"
+        if (T_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') T_idx, T_idx, " Temperature"
 
         close (1)
 

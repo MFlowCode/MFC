@@ -256,6 +256,8 @@ def __generate_header(step_name: str, targets: typing.List):
 def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[str] = None):
     if history is None:
         history = set()
+    if isinstance(targets, (MFCTarget, str)):
+        targets = [ targets ]
     if targets is None:
         targets = ARG("targets")
 

@@ -208,8 +208,12 @@ contains
         #:endfor
 
         if (chemistry) then
-            #:for VAR in [ 'advection', 'diffusion', 'reactions' ]
+            #:for VAR in [ 'diffusion', 'reactions' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'gamma_method' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
 

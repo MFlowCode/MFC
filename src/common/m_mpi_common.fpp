@@ -236,8 +236,8 @@ contains
         real(kind(0d0)), intent(out) :: ccfl_max_glb
         real(kind(0d0)), intent(out) :: Rc_min_glb
 
-#ifdef MFC_MPI
 #ifdef MFC_SIMULATION
+#ifdef MFC_MPI
 
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
@@ -252,6 +252,15 @@ contains
             call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, &
                             MPI_DOUBLE_PRECISION, MPI_MIN, 0, &
                             MPI_COMM_WORLD, ierr)
+        end if
+
+#else
+
+        icfl_max_glb = icfl_max_loc
+
+        if (any(Re_size > 0)) then
+            vcfl_max_glb = vcfl_max_loc
+            Rc_min_glb = Rc_min_loc
         end if
 
 #endif

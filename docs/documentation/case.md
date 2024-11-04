@@ -34,24 +34,26 @@ Input files can accept command line arguments, forwarded by `mfc.sh run`.
 Consider this example from the `scaling` case:
 
 ```python
-import argparse
+import json, argparse
 
 parser = argparse.ArgumentParser(
     prog="scaling",
     description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT")
-parser.add_argument("-s", "--scaling",  type=str, metavar="SCALING",  choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-s", "--scaling", type=str, metavar="SCALING", choices=["weak", "strong"],
+                    help="Whether weak- or strong-scaling is being exercised.")
 
 # Your parsed arguments are here
 args = parser.parse_args()
 ```
 
-The first argument is always a JSON string representing `mfc.sh run`'s internal
-state.
+The `--mfc` argument is a JSON string representing `mfc.sh run`'s internal
+state, passed in when MFC runs your input file.
 It contains all the runtime information you might want from the build/run system.
-You can add as many additional arguments as you may need.
+You can add as many additional arguments and options as you may need.
 
 To run such a case, use the following format:
 
