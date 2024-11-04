@@ -571,6 +571,7 @@ contains
 
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
+        chem_params%gamma_method = 1
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

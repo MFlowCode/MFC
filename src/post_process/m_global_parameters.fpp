@@ -112,6 +112,8 @@ module m_global_parameters
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
+    integer :: avg_state       !< Average state evaluation method
+
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -379,6 +381,7 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
+        avg_state = dflt_int
 
         ! Tait EOS
         rhoref = dflt_real

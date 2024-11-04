@@ -230,6 +230,9 @@ SIMULATION.update({
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
 
+for var in [ 'gamma_method' ]:
+    SIMULATION[f'chem_params%{var}'] = ParamType.INT
+
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),

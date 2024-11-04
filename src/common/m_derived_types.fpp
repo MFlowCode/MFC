@@ -313,6 +313,8 @@ module m_derived_types
 
         logical :: diffusion
         logical :: reactions
+
+        integer :: gamma_method
     end type chemistry_parameters
 
 end module m_derived_types

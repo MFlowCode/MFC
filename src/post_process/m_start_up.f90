@@ -70,7 +70,7 @@ contains
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
             hypoelasticity, G, &
-            chem_wrt_Y, chem_wrt_T, &
+            chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
