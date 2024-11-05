@@ -21,6 +21,8 @@ program p_main
     use m_start_up
 
     use m_time_steppers
+
+    use m_nvtx
     ! ==========================================================================
 
     implicit none
@@ -61,6 +63,7 @@ program p_main
         finaltime = t_step_stop*dt
     end if
 
+    call nvtxStartRange("Simulation")
     ! Time-stepping Loop =======================================================
     do
 
@@ -94,6 +97,8 @@ program p_main
         call system_clock(cpu_end)
     end do
     ! ==========================================================================
+
+    call nvtxEndRange ! Simulation
 
     deallocate (proc_time, io_proc_time)
 
