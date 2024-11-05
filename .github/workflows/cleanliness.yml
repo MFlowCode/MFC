@@ -35,33 +35,33 @@ jobs:
             
             - name: Unused Variables Diff
               run: |
-                grep -F 'Wunused-variable' master.txt > mUnused.txt
-                grep -F 'Wunused-variable' pr.txt > prUnused.txt
+                grep -F 'Wunused-variable' master.txt > mUnused.txt || true
+                grep -F 'Wunused-variable' pr.txt > prUnused.txt || true
                 diff prUnused.txt mUnused.txt || true
             
             - name: Unused Dummy Arguments Diff
               run: |
-                grep -F 'Wunused-dummy-argument' pr.txt > prDummy.txt
-                grep -F 'Wunused-dummy-argument' master.txt > mDummy.txt
+                grep -F 'Wunused-dummy-argument' pr.txt > prDummy.txt || true
+                grep -F 'Wunused-dummy-argument' master.txt > mDummy.txt || true 
                 diff prDummy.txt mDummy.txt || true
 
             - name: Unused Value Diff
               run: |
-                grep -F 'Wunused-value' pr.txt > prUnused_val.txt
-                grep -F 'Wunused-value' master.txt > mUnused_val.txt
+                grep -F 'Wunused-value' pr.txt > prUnused_val.txt || true
+                grep -F 'Wunused-value' master.txt > mUnused_val.txt || true
                 diff prUnused_val.txt mUnused_val.txt || true
 
             - name: Maybe Uninitialized Variables Diff
               run: |
-                grep -F 'Wmaybe-uninitialized' pr.txt > prMaybe.txt
-                grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt
+                grep -F 'Wmaybe-uninitialized' pr.txt > prMaybe.txt || true
+                grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt || true
                 diff prMaybe.txt mMaybe.txt || true
 
 
             - name: Everything Diff
               run: |
-                grep '\-W' pr.txt > pr_every.txt 
-                grep '\-W' master.txt > m_every.txt
+                grep '\-W' pr.txt > pr_every.txt || true
+                grep '\-W' master.txt > m_every.txt || true
                 diff pr_every.txt m_every.txt || true
 
             - name: List of Warnings
