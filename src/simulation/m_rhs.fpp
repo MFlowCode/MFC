@@ -248,8 +248,8 @@ contains
 
         if (surface_tension) then
             ! This assumes that the color function advection equation is
-            ! the last equation. If this changes then this logic will
-            ! need updated
+            ! the last equation. If this changes, then this logic will
+            ! need updating
             do l = adv_idx%end + 1, sys_size - 1
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             end do
@@ -455,8 +455,6 @@ contains
                 @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
                 @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
 
-                if (viscous) then
-
                     do l = mom_idx%beg, mom_idx%end
                         @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -494,15 +492,11 @@ contains
                         end do
                     end if
 
-                end if
-
                 @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
                 @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
             end do
-        end if
-        ! END: Allocation/Association of d K_prim_ds_n ==================
+            ! END: Allocation/Association of d K_prim_ds_n ==================
 
-        if (viscous) then
             if (weno_Re_flux) then
                 @:ALLOCATE_GLOBAL(dqL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
@@ -535,10 +529,7 @@ contains
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
 
                 end if
-            end if
         end if
-
-        ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
         @:ALLOCATE_GLOBAL(gm_alphaL_n(1:num_dims))
@@ -568,7 +559,7 @@ contains
                             & idwbuff(3)%beg:idwbuff(3)%end))
                 end do
 
-                if (viscous .or. (surface_tension)) then
+                if (viscous .or. surface_tension) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -927,7 +918,7 @@ contains
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
-            if (viscous .or. (surface_tension)) then
+            if (viscous .or. surface_tension) then
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
