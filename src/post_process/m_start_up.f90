@@ -114,6 +114,8 @@ contains
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
+            if (.not. f_is_default(sigma)) surface_tension = .true.
+
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
         end if

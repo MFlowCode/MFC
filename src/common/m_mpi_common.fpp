@@ -245,7 +245,7 @@ contains
                         MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
                         MPI_COMM_WORLD, ierr)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, &
                             MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
                             MPI_COMM_WORLD, ierr)
@@ -258,7 +258,7 @@ contains
 
         icfl_max_glb = icfl_max_loc
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             vcfl_max_glb = vcfl_max_loc
             Rc_min_glb = Rc_min_loc
         end if
