@@ -184,18 +184,18 @@ contains
 
             ! Creating the formatted data file and setting up its
             ! structure
-            inquire(file=trim(file_path), exist=file_exist)
+            inquire (file=trim(file_path), exist=file_exist)
 
             if (file_exist) then
                 open (i + 30, FILE=trim(file_path), &
-                            FORM='formatted', &
-                            STATUS='old', &
-                            POSITION='append')
+                      FORM='formatted', &
+                      STATUS='old', &
+                      POSITION='append')
             else
                 open (i + 30, FILE=trim(file_path), &
-                                FORM='formatted', &
-                                STATUS='unknown')
-            endif
+                      FORM='formatted', &
+                      STATUS='unknown')
+            end if
         end do
 
         if (integral_wrt) then
