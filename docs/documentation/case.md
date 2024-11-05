@@ -682,7 +682,7 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 | Parameter              | Type    | Description |
 | ---:                   | :----:  | :--- |
-| `perturb_flow`         | Logical | Perturb the initlial velocity field by random noise |
+| `perturb_flow`         | Logical | Perturb the initial velocity field by random noise |
 | `perturb_flow_fluid`   | Integer | Fluid density whose flow is to be perturbed |
 | `perturb_flow_mag`     | Real    | Set the magnitude of flow perturbations |
 | `perturb_sph`          | Logical | Perturb the initial partial density by random noise |
@@ -697,7 +697,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
-- `perturb_flow_fluid` specifies the fluid component whose flow is to be perturbed.
+- `perturb_flow_fluid` specifies the fluid component whose flow will be perturbed.
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
@@ -737,7 +737,7 @@ $$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
 
 - `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`).
-This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
+This parameter enables the use of true `pi_\infty` in bubble dynamics models when the `pi_\infty` given in the `case.py` file is an artificial value.
 
 ### 13. Body Forces
 
@@ -753,21 +753,21 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 
 $$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
 
-Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]` direction by convention.
+By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
 
 ### 14. Cylindrical Coordinates
 
-When `cyl_coord = 'T'` is set in 3D the following constraints must be met:
+When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
 
-- `bc_y%beg = -14` to enable to axis boundary condition
+- `bc_y%beg = -14`  enables the axis boundary condition
 
-- `bc_z%beg = bc_z%end = -1` to enable periodic boundary conditions in the azimuthal direction
+- `bc_z%beg = bc_z%end = -1`  enables periodic boundary conditions in the azimuthal direction
 
-- `z_domain%beg = 0` to set the azithmuthal starting point to 0
+- `z_domain%beg = 0`  sets the azimuthal starting point to 0
 
-- `z_comain%end = 2*math.pi` to set the azithmuthal ending point to $2\pi$ (note, requires `import math` in the case file)
+- `z_comain%end = 2*math.pi` to set the azimuthal ending point to $2\pi$ (note, requires `import math` in the case file)
 
-When `cyl_coord = 'T'` is set in 2D the following constraints must be met:
+When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `bc_y%beg = -2` to enable reflective boundary conditions
 
