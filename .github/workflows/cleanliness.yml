@@ -34,40 +34,40 @@ jobs:
                 sed -i '/\/master\//d' master.txt
             
             - name: Unused Variables Diff
+              continue-on-error: true
               run: |
                 grep -F 'Wunused-variable' master.txt > mUnused.txt
                 grep -F 'Wunused-variable' pr.txt > prUnused.txt
                 diff prUnused.txt mUnused.txt
-                true
             
             - name: Unused Dummy Arguments Diff
+              continue-on-error: true
               run: |
                 grep -F 'Wunused-dummy-argument' pr.txt > prDummy.txt 
                 grep -F 'Wunused-dummy-argument' master.txt > mDummy.txt
                 diff prDummy.txt mDummy.txt
-                true
 
             - name: Unused Value Diff
+              continue-on-error: true
               run: |
                 grep -F 'Wunused-value' pr.txt > prUnused_val.txt
                 grep -F 'Wunused-value' master.txt > mUnused_val.txt
                 diff prUnused_val.txt mUnused_val.txt
-                true
 
             - name: Maybe Uninitialized Variables Diff
+              continue-on-error: true
               run: |
                 grep -F 'Wmaybe-uninitialized' pr.txt > prMaybe.txt
                 grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt
                 diff prMaybe.txt mMaybe.txt
-                true
 
 
             - name: Everything Diff
+              continue-on-error: true
               run: |
                 grep '\-W' pr.txt > pr_every.txt
                 grep '\-W' master.txt > m_every.txt
                 diff pr_every.txt m_every.txt
-                true
 
             - name: List of Warnings
               run: |
@@ -75,6 +75,7 @@ jobs:
                 
 
             - name: Summary
+              continue-on-error: true
               run: |  
                 pr_variable=$(grep -c -F 'Wunused-variable' pr.txt)
                 pr_argument=$(grep -c -F 'Wunused-dummy-argument' pr.txt)
@@ -99,7 +100,6 @@ jobs:
                 echo "Unused Value: $pr_value, Difference: $((pr_value - master_value))"
                 echo "Maybe Uninitialized: $pr_uninit, Difference: $((pr_uninit - master_uninit))"
                 echo "Everything: $pr_everything, Difference: $((pr_everything - master_everything))"
-                true
             
             
             - name: Check Differences
