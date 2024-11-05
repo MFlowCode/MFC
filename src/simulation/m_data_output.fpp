@@ -175,6 +175,7 @@ contains
             !! Relative path to the probe data file in the case directory
 
         integer :: i !< Generic loop iterator
+        logical :: file_exist
 
         do i = 1, num_probes
             ! Generating the relative path to the data file
@@ -183,9 +184,19 @@ contains
 
             ! Creating the formatted data file and setting up its
             ! structure
-            open (i + 30, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  STATUS='unknown')
+            inquire(file=trim(file_path), exist=file_exist)
+
+            if (file_exist) then
+                open (i + 30, FILE=trim(file_path), &
+                            FORM='formatted', &
+                            STATUS='old', &
+                            POSITION='append')
+            else
+                open (i + 30, FILE=trim(file_path), &
+                                FORM='formatted', &
+                                STATUS='unknown')
+            endif
+
             ! POSITION = 'append', &
             !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
             !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
