@@ -40,6 +40,9 @@ class MFCTarget:
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
 
+        if case.params.get('chemistry', 'F') == 'T':
+            m.update(case.get_cantera_solution().name.encode())
+
         return m.hexdigest()[:10]
 
     # Get path to directory that will store the build files
@@ -99,7 +102,6 @@ class MFCTarget:
         install_prefixes = ';'.join([
             t.get_install_dirpath(case) for t in self.requires.compute()
         ])
-        mod_dirs         = f"{HIPFORT.get_install_dirpath(case)}/include/hipfort/amdgcn"
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
@@ -130,9 +132,6 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            # Fortran .mod include directories. Currently used for the HIPFORT
-            # dependency that has this missing from its config files.
-            f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
         ]
 
         if ARG("verbose"):
@@ -257,6 +256,8 @@ def __generate_header(step_name: str, targets: typing.List):
 def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[str] = None):
     if history is None:
         history = set()
+    if isinstance(targets, (MFCTarget, str)):
+        targets = [ targets ]
     if targets is None:
         targets = ARG("targets")
 

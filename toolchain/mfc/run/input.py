@@ -1,5 +1,8 @@
 import os, json, glob, typing, dataclasses
 
+import pyrometheus as pyro
+import cantera     as ct
+
 from ..printer import cons
 from ..        import common, build
 from ..state   import ARGS
@@ -30,6 +33,23 @@ class MFCInputFile(Case):
         cons.print("Writing a (new) custom case.fpp file.")
         common.file_write(fpp_path, contents, True)
 
+    def get_cantera_solution(self) -> ct.Solution:
+        cantera_file = self.params["cantera_file"]
+
+        candidates = [
+            cantera_file,
+            os.path.join(self.dirpath, cantera_file),
+            os.path.join(common.MFC_MECHANISMS_DIR, cantera_file),
+        ]
+
+        for candidate in candidates:
+            try:
+                return ct.Solution(candidate)
+            except Exception:
+                continue
+
+        raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
+
     def generate_fpp(self, target) -> None:
         if target.isDependency:
             return
@@ -39,6 +59,20 @@ class MFCInputFile(Case):
 
         # Case FPP file
         self.__save_fpp(target, self.get_fpp(target))
+
+        # Chemistry Rates FPP file
+        modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
+        common.create_directory(modules_dir)
+
+        if self.params.get("chemistry", 'F') == 'T':
+            common.file_write(
+                os.path.join(modules_dir, "m_pyrometheus.f90"),
+                pyro.codegen.fortran90.gen_thermochem_code(
+                    self.get_cantera_solution(),
+                    module_name="m_pyrometheus"
+                ),
+                True
+            )
 
         cons.unindent()
 
@@ -90,7 +124,7 @@ class MFCInputFile(Case):
 
 
 # Load the input file
-def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict = None) -> MFCInputFile:
+def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict = None, do_print: bool = True) -> MFCInputFile:
     if not filepath:
         if empty_data is None:
             raise common.MFCException("Please provide an input file.")
@@ -101,7 +135,8 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
 
     filename: str = filepath.strip()
 
-    cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
+    if do_print:
+        cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
 
     dirpath:    str  = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}
@@ -110,7 +145,7 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
         raise common.MFCException(f"Input file '{filename}' does not exist. Please check the path is valid.")
 
     if filename.endswith(".py"):
-        (json_str, err) = common.get_py_program_output(filename, [json.dumps(ARGS())] + (args or []))
+        (json_str, err) = common.get_py_program_output(filename, ["--mfc", json.dumps(ARGS())] + (args or []))
 
         if err != 0:
             raise common.MFCException(f"Input file {filename} terminated with a non-zero exit code. Please make sure running the file doesn't produce any errors.")

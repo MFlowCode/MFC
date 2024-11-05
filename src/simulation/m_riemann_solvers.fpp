@@ -18,6 +18,7 @@
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
 
@@ -35,6 +36,8 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension      !< To get the capilary fluxes
+
+    use m_chemistry
     ! ==========================================================================
 
     implicit none
@@ -302,7 +305,17 @@ contains
         real(kind(0d0)) :: E_L, E_R
         real(kind(0d0)) :: H_L, H_R
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R
+        real(kind(0d0)), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+        real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+        real(kind(0d0)) :: Cp_avg, Cv_avg, gamma_avggg, T_avg, eps, c_sum_Yi_Phi
+        real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: Y_L, Y_R
+        real(kind(0d0)) :: MW_L, MW_R
+        real(kind(0d0)) :: R_gas_L, R_gas_R
+        real(kind(0d0)) :: Cp_L, Cp_R
+        real(kind(0d0)) :: Cv_L, Cv_R
+        real(kind(0d0)) :: Gamm_L, Gamm_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
         real(kind(0d0)) :: qv_L, qv_R
@@ -353,8 +366,12 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
+                !$acc parallel loop collapse(3) gang vector default(present)    &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L,  &
+                !$acc alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R,     &
+                !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
+                !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -466,11 +483,61 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                            #:if chemistry
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                end do
 
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
+                                call get_mixture_molecular_weight(Ys_L, MW_L)
+                                call get_mixture_molecular_weight(Ys_R, MW_R)
+
+                                Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+
+                                R_gas_L = gas_constant/MW_L
+                                R_gas_R = gas_constant/MW_R
+
+                                T_L = pres_L/rho_L/R_gas_L
+                                T_R = pres_R/rho_R/R_gas_R
+
+                                call get_species_specific_heats_r(T_L, Cp_iL)
+                                call get_species_specific_heats_r(T_R, Cp_iR)
+
+                                if (chem_params%gamma_method == 1) then
+                                    ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                    Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
+                                    Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
+
+                                    gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
+                                    gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
+                                else if (chem_params%gamma_method == 2) then
+                                    ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                    call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                    call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                    call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                    call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+
+                                    Gamm_L = Cp_L/Cv_L
+                                    gamma_L = 1.0d0/(Gamm_L - 1.0d0)
+                                    Gamm_R = Cp_R/Cv_R
+                                    gamma_R = 1.0d0/(Gamm_R - 1.0d0)
+                                end if
+
+                                call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                call get_mixture_energy_mass(T_R, Ys_R, E_R)
+
+                                E_L = rho_L*E_L + 5d-1*rho_L*vel_L_rms
+                                E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
+                                H_L = (E_L + pres_L)/rho_L
+                                H_R = (E_R + pres_R)/rho_R
+                            #:else
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                H_L = (E_L + pres_L)/rho_L
+                                H_R = (E_R + pres_R)/rho_R
+                            #:endif
 
                             if (hypoelasticity) then
                                 !$acc loop seq
@@ -506,16 +573,16 @@ contains
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                          vel_L_rms, c_L)
+                                                          vel_L_rms, 0d0, c_L)
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                          vel_R_rms, c_R)
+                                                          vel_R_rms, 0d0, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                             ! variables are placeholders to call the subroutine.
 
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                          vel_avg_rms, c_avg)
+                                                          vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                             if (any(Re_size > 0)) then
                                 !$acc loop seq
@@ -733,6 +800,20 @@ contains
                                     flux_rs${XYZ}$_vf(j, k, l, contxe) = 0d0
                                 end if
                             end if
+
+                            if (chemistry) then
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
+                                                                     + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
+                                                                    /(s_M - s_P)
+                                    flux_src_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                end do
+                            end if
                         end do
                     end do
                 end do
@@ -843,6 +924,15 @@ contains
         real(kind(0d0)) :: E_L, E_R
         real(kind(0d0)) :: H_L, H_R
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
+        real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+        real(kind(0d0)) :: Cp_avg, Cv_avg, T_avg, c_sum_Yi_Phi, eps
+        real(kind(0d0)) :: T_L, T_R
+        real(kind(0d0)) :: MW_L, MW_R
+        real(kind(0d0)) :: R_gas_L, R_gas_R
+        real(kind(0d0)) :: Cp_L, Cp_R
+        real(kind(0d0)) :: Cv_L, Cv_R
+        real(kind(0d0)) :: Gamm_L, Gamm_R
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
@@ -1030,16 +1120,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1329,16 +1419,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1745,16 +1835,16 @@ contains
                                 end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -1978,7 +2068,9 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef,   &
+                    !$acc vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR,          &
+                    !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2090,26 +2182,78 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                #:if chemistry
+                                    c_sum_Yi_Phi = 0.0d0
+                                    !$acc loop seq
+                                    do i = chemxb, chemxe
+                                        Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    end do
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                    call get_mixture_molecular_weight(Ys_L, MW_L)
+                                    call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                    Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+
+                                    R_gas_L = gas_constant/MW_L
+                                    R_gas_R = gas_constant/MW_R
+
+                                    T_L = pres_L/rho_L/R_gas_L
+                                    T_R = pres_R/rho_R/R_gas_R
+
+                                    call get_species_specific_heats_r(T_L, Cp_iL)
+                                    call get_species_specific_heats_r(T_R, Cp_iR)
+
+                                    if (chem_params%gamma_method == 1) then
+                                        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                        Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
+                                        Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
+
+                                        gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
+                                        gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
+                                    else if (chem_params%gamma_method == 2) then
+                                        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                        call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                        call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                        call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                        call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+
+                                        Gamm_L = Cp_L/Cv_L
+                                        gamma_L = 1.0d0/(Gamm_L - 1.0d0)
+                                        Gamm_R = Cp_R/Cv_R
+                                        gamma_R = 1.0d0/(Gamm_R - 1.0d0)
+                                    end if
+
+                                    call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                    call get_mixture_energy_mass(T_R, Ys_R, E_R)
+
+                                    E_L = rho_L*E_L + 5d-1*rho_L*vel_L_rms
+                                    E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
+                                    H_L = (E_L + pres_L)/rho_L
+                                    H_R = (E_R + pres_R)/rho_R
+                                #:else
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+
+                                    H_L = (E_L + pres_L)/rho_L
+                                    H_R = (E_R + pres_R)/rho_R
+                                #:endif
 
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
                                 if (any(Re_size > 0)) then
                                     !$acc loop seq
@@ -2244,6 +2388,18 @@ contains
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
+
+                                if (chemistry) then
+                                    !$acc loop seq
+                                    do i = chemxb, chemxe
+                                        Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*rho_L*Y_L*(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                                                        + xi_P*rho_R*Y_R*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = 0.0d0
+                                    end do
+                                end if
 
                                 ! Geometrical source flux for cylindrical coordinates
 

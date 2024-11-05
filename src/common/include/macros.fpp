@@ -140,17 +140,19 @@
 #endif
 #:enddef
 
-#:def PROHIBIT(*args)
-    #:set condition = args[0]
-    #:if len(args) == 1
-        #:set message = '""'
-    #:else
-        #:set message = args[1]
-    #:endif
+#:def PROHIBIT(condition, message = None)
     if (${condition}$) then
-        call s_prohibit_abort("${condition}$", ${message}$)
+        call s_prohibit_abort("${condition}$", ${message or '""'}$)
     end if
 #:enddef
 
 #define t_vec3   real(kind(0d0)), dimension(1:3)
 #define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)
+
+#:def ASSERT(predicate, message = None)
+    if (.not. (${predicate}$)) then
+        call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
+                         "Assertion failed: ${predicate}$. " &
+                         //${message or '"No error description."'}$)
+    end if
+#:enddef

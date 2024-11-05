@@ -34,24 +34,26 @@ Input files can accept command line arguments, forwarded by `mfc.sh run`.
 Consider this example from the `scaling` case:
 
 ```python
-import argparse
+import json, argparse
 
 parser = argparse.ArgumentParser(
     prog="scaling",
     description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT")
-parser.add_argument("-s", "--scaling",  type=str, metavar="SCALING",  choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-s", "--scaling", type=str, metavar="SCALING", choices=["weak", "strong"],
+                    help="Whether weak- or strong-scaling is being exercised.")
 
 # Your parsed arguments are here
 args = parser.parse_args()
 ```
 
-The first argument is always a JSON string representing `mfc.sh run`'s internal
-state.
+The `--mfc` argument is a JSON string representing `mfc.sh run`'s internal
+state, passed in when MFC runs your input file.
 It contains all the runtime information you might want from the build/run system.
-You can add as many additional arguments as you may need.
+You can add as many additional arguments and options as you may need.
 
 To run such a case, use the following format:
 
@@ -123,7 +125,7 @@ For example, $m=n=p=499$ discretizes the domain into $500^3$ cells.
 When the simulation is 2D/axi-symmetric or 1D, it requires that $p=0$ or $p=n=0$, respectively.
 
 - `stretch_[x,y,z]` activates grid stretching in the $[x,y,z]$ directions.
-The grid is gradually stretched such that the domain boundaries are pushed away from the origin along a specified axis.
+The grid is gradually stretched such that the domain boundaries are pushed away from the origin along a specified axis. WENO7 does not support grid stretching.
 
 - `a_[x,y,z]`, `[x,y,z]_a`, and `[x,y,z]_b` are parameters that define the grid stretching function. When grid stretching along the $x$ axis is considered, the stretching function is given as:
 
@@ -347,6 +349,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
 | `wenoz`	             | Logical | WENO-Z |
+| `wenoz_q`              | Real    | WENO-Z power parameter q (only for WENO7) |
 | `teno`                 | Logical | TENO (Targeted ENO) |
 | `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
@@ -406,18 +409,20 @@ Note that `time_stepper = 3` specifies the total variation diminishing (TVD), th
 
 - `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
 
-- `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
+- `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively. WENO7 does not support grid stretching.
 
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
-Practically, `weno_eps` $<10^{-6}$ is used.
+It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ for other WENO variants.
 
 - `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](references.md#Henrick05)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
 
 - `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](references.md#Borges08)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
 
-- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5`. Requires `teno_CT` to be set.
+- `wenoz_q` specifies the power parameter `q` used in the WENO-Z scheme. It controls how aggressively the smoothness coefficients scale the weights. A higher value of `wenoz_q` increases the sensitivity to smoothness, improving stability but worsening numerical dissipation. For WENO3 and WENO5, `q=1` is fixed, so `wenoz_q` must not be set. For WENO7, `wenoz_q` can be set to 2, 3, or 4.
 
-- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`.
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set.
+
+- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7` for TENO5. A smaller value can be used for TENO7.
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]%%beg[end]} = -4`).
 
