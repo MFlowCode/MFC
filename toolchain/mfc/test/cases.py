@@ -648,7 +648,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
             stack.push("Viscosity -> Bubbles",
-                {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
+                       {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T', "viscous": 'T'})
 
             stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,

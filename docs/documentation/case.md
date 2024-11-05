@@ -371,6 +371,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `n_start`              | Integer | Save file from which to start simulation |
 | `t_save`               | Real    | Time duration between data output |
 | `t_stop`               | Real    | Simulation stop time |
+| `surface_tension`      | Logical | Activate surface tension. Requires `surface_tension = T` |
+| `viscous`              | Logical | Activate viscosity Requires `viscous = T` |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -444,6 +446,10 @@ If this option is false, velocity gradient is computed using finite difference s
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
+
+- `surface_tension` activates surface tension when set to `'T'`. Requires `sigma` to be set.
+
+- `viscous` activates viscosity when set to `'T'`. Requires `Re(1)` and `Re(2)` to be set.
 
 #### Constant Time-Stepping
 

@@ -981,7 +981,6 @@ contains
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
 
-            if (any(Re_size > 0d0)) viscous = .true.
             if (Re_size(1) > 0d0) shear_stress = .true.
             if (Re_size(2) > 0d0) bulk_stress = .true.
 

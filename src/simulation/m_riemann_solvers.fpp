@@ -4363,7 +4363,7 @@ contains
         ! to convert mixture or species variables to the mixture variables
         ! s_convert_to_mixture_variables => null()
 
-        if (shear_stress) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsx_vf)
@@ -4376,7 +4376,7 @@ contains
 
         if (n == 0) return
 
-        if (shear_stress) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsy_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsy_vf)
@@ -4389,7 +4389,7 @@ contains
 
         if (p == 0) return
 
-        if (shear_stress) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsz_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsz_vf)

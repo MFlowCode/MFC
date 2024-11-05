@@ -164,7 +164,8 @@ contains
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
-            cfl_adap_dt, cfl_const_dt, cfl_target
+            cfl_adap_dt, cfl_const_dt, cfl_target, &
+            viscous, surface_tension
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -197,8 +198,6 @@ contains
             p_glb = p
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
-
-            if (.not. f_is_default(sigma)) surface_tension = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
