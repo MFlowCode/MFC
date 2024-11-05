@@ -196,21 +196,6 @@ contains
                                 FORM='formatted', &
                                 STATUS='unknown')
             endif
-
-            ! POSITION = 'append', &
-            !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
-            !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
-            !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
-            !WRITE(i+30,'(A,F10.6)') 'z = ',probe(i)%z
-            !WRITE(i+30, *)
-            !WRITE(i+30,'(A)') '=== Non-Dimensional Time ' // &
-            !                '=== Density ' // &
-            !                '=== Velocity ' // &
-            !                '=== Pressure ' // &
-            !                '=== Gamma ' // &
-            !                '=== Stiffness ' // &
-            !                '=== Sound Speed ' // &
-            !                '=== Acceleration ==='
         end do
 
         if (integral_wrt) then
