@@ -530,7 +530,6 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-
 ### 8. Acoustic Source {#acoustic-source}
 
 | Parameter                             | Type    | Description |
@@ -755,6 +754,22 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 $$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
 
 Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]` direction by convention.
+
+### 14. Cylindrical Coordinates
+
+When `cyl_coord = 'T'` is set in 3D the following constraints must be met:
+
+- `bc_y%beg = -14` to enable to axis boundary condition
+
+- `bc_z%beg = bc_z%end = -1` to enable periodic boundary conditions in the azimuthal direction
+
+- `z_domain%beg = 0` to set the azithmuthal starting point to 0
+
+- `z_comain%end = 2*math.pi` to set the azithmuthal ending point to $2\pi$ (note, requires `import math` in the case file)
+
+When `cyl_coord = 'T'` is set in 2D the following constraints must be met:
+
+- `bc_y%beg = -2` to enable reflective boundary conditions
 
 ## Enumerations
 
