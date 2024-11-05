@@ -38,6 +38,12 @@ module m_riemann_solvers
     use m_surface_tension      !< To get the capilary fluxes
 
     use m_chemistry
+
+    use m_thermochem, only: &
+        gas_constant, get_mixture_molecular_weight, &
+        get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
+        get_species_specific_heats_r, get_species_enthalpies_rt, &
+        get_mixture_specific_heat_cp_mass
     ! ==========================================================================
 
     implicit none
@@ -483,7 +489,7 @@ contains
                                 end do
                             end if
 
-                            #:if chemistry
+                            if (chemistry) then
                                 !$acc loop seq
                                 do i = chemxb, chemxe
                                     Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -532,12 +538,12 @@ contains
                                 E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                            #:else
+                            else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                            #:endif
+                            end if
 
                             if (hypoelasticity) then
                                 !$acc loop seq
@@ -1002,8 +1008,10 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) &
+                    !$acc private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                    !$acc s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
+                    !$acc Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -2182,7 +2190,7 @@ contains
                                     end do
                                 end if
 
-                                #:if chemistry
+                                if (chemistry) then
                                     c_sum_Yi_Phi = 0.0d0
                                     !$acc loop seq
                                     do i = chemxb, chemxe
@@ -2232,14 +2240,14 @@ contains
                                     E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
-                                #:else
+                                else
                                     E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
 
                                     E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
-                                #:endif
+                                end if
 
                                 @:compute_average_state()
 

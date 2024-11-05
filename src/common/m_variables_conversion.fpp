@@ -22,7 +22,9 @@ module m_variables_conversion
 
     use m_helper
 
-    use m_thermochem
+    use m_thermochem, only: &
+        num_species, get_temperature, get_pressure, &
+        get_mixture_molecular_weight, get_mixture_energy_mass
 
     ! ==========================================================================
 
@@ -1126,7 +1128,7 @@ contains
                                    q_prim_vf(i)%sf(j, k, l)/2d0
                     end do
 
-                    #:if chemistry
+                    if (chemistry) then
                         do i = chemxb, chemxe
                             Ys(i - chemxb + 1) = q_prim_vf(i)%sf(j, k, l)
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -1140,7 +1142,7 @@ contains
                             dyn_pres + rho*e_mix
 
                         q_cons_vf(T_idx)%sf(j, k, l) = q_prim_vf(T_idx)%sf(j, k, l)
-                    #:else
+                    else
                         ! Computing the energy from the pressure
                         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
                             ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
@@ -1156,7 +1158,7 @@ contains
                             !Tait EOS, no conserved energy variable
                             q_cons_vf(E_idx)%sf(j, k, l) = 0.
                         end if
-                    #:endif
+                    end if
 
                     ! Computing the internal energies from the pressure and continuities
                     if (model_eqns == 3) then

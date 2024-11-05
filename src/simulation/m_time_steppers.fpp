@@ -37,7 +37,7 @@ module m_time_steppers
 
     use m_nvtx
 
-    use m_thermochem
+    use m_thermochem, only: num_species
 
     use m_body_forces
     ! ==========================================================================
