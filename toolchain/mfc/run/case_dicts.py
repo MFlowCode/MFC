@@ -311,7 +311,6 @@ for f_id in range(1,10+1):
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
 
 
-
 # Removed: 'fourier_modes%beg', 'fourier_modes%end'.
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
