@@ -175,6 +175,7 @@ contains
             !! Relative path to the probe data file in the case directory
 
         integer :: i !< Generic loop iterator
+        logical :: file_exist
 
         do i = 1, num_probes
             ! Generating the relative path to the data file
@@ -183,23 +184,18 @@ contains
 
             ! Creating the formatted data file and setting up its
             ! structure
-            open (i + 30, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  STATUS='unknown')
-            ! POSITION = 'append', &
-            !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
-            !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
-            !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
-            !WRITE(i+30,'(A,F10.6)') 'z = ',probe(i)%z
-            !WRITE(i+30, *)
-            !WRITE(i+30,'(A)') '=== Non-Dimensional Time ' // &
-            !                '=== Density ' // &
-            !                '=== Velocity ' // &
-            !                '=== Pressure ' // &
-            !                '=== Gamma ' // &
-            !                '=== Stiffness ' // &
-            !                '=== Sound Speed ' // &
-            !                '=== Acceleration ==='
+            inquire (file=trim(file_path), exist=file_exist)
+
+            if (file_exist) then
+                open (i + 30, FILE=trim(file_path), &
+                      FORM='formatted', &
+                      STATUS='old', &
+                      POSITION='append')
+            else
+                open (i + 30, FILE=trim(file_path), &
+                      FORM='formatted', &
+                      STATUS='unknown')
+            end if
         end do
 
         if (integral_wrt) then
@@ -264,7 +260,7 @@ contains
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
                     if (any(Re_size > 0)) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
@@ -348,16 +344,13 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
-            do i = chemxb, chemxe
-                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) >= -1._wp), "bad conc")
-                !@:ASSERT(all(q_prim_vf(i)%sf(:,:,:) <=  2._wp), "bad conc")
-            end do
-
-            if (vcfl_max_glb /= vcfl_max_glb) then
-                call s_mpi_abort('VCFL is NaN. Exiting ...')
-            elseif (vcfl_max_glb > 1._wp) then
-                print *, 'vcfl', vcfl_max_glb
-                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+            if (any(Re_size > 0)) then
+                if (vcfl_max_glb /= vcfl_max_glb) then
+                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                elseif (vcfl_max_glb > 1._wp) then
+                    print *, 'vcfl', vcfl_max_glb
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                end if
             end if
         end if
 
@@ -510,7 +503,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
@@ -936,6 +929,7 @@ contains
         ! The cell-averaged partial densities, density, velocity, pressure,
         ! volume fractions, specific heat ratio function, liquid stiffness
         ! function, and sound speed.
+
         real(wp) :: lit_gamma, nbub
         real(wp) :: rho
         real(wp), dimension(num_dims) :: vel
@@ -960,7 +954,7 @@ contains
         real(wp) :: E_e
         real(wp), dimension(6) :: tau_e
         real(wp) :: G
-        real(wp) :: dyn_p
+        real(wp) :: dyn_p, Temp
 
         integer :: i, j, k, l, s, q, d !< Generic loop iterator
 
@@ -1054,14 +1048,14 @@ contains
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp)
                     end if
 
                     if (model_eqns == 4) then
@@ -1119,7 +1113,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, c)
+                                                  ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1163,13 +1157,14 @@ contains
                                 dyn_p, pi_inf, gamma, rho, qv, &
                                 rhoYks, &
                                 pres, &
+                                Temp, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                                    rhoYks, pres)
+                                                    rhoYks, pres, Temp)
                         end if
 
                         if (model_eqns == 4) then
@@ -1204,7 +1199,7 @@ contains
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, c)
+                                                      ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1253,19 +1248,19 @@ contains
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                    rhoYks, pres, &
+                                    rhoYks, pres, Temp, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
-                                                        rhoYks, pres)
+                                                        rhoYks, pres, Temp)
                             end if
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, c)
+                                                          ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if

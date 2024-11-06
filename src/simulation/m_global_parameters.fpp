@@ -129,19 +129,23 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
         logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)  !< WENO-M (WENO with mapping of nonlinear weights)
         logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
+        real(kind(0d0)), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer :: num_fluids     !< number of fluids in the simulation
         logical :: wenojs         !< WENO-JS (default)
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
+        real(kind(0d0)) :: wenoz_q  !< Power constant for WENO-Z
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -160,6 +164,8 @@ module m_global_parameters
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
 
+    !$acc declare create(chemistry)
+
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
     !< amplitude, frequency, and phase shift sinusoid in each direction
@@ -174,7 +180,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
+        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach)
@@ -233,10 +239,21 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     integer :: c_idx         ! Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
+    integer :: T_idx       !< Index of the temperature equation
     !> @}
 
     !$acc declare create(bub_idx)
+
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With INTerior".
+    type(int_bounds_info) :: idwint(1:3)
+    !$acc declare create(idwint)
+
+    ! Cell Indices for the entire (local) domain. In simulation and post_process,
+    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwbuff(1:3)
+    !$acc declare create(idwbuff)
 
     !> @name The number of fluids, along with their identifying indexes, respectively,
     !! for which viscous effects, e.g. the shear and/or the volume Reynolds (Re)
@@ -286,7 +303,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, T_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -452,9 +469,8 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
-    integer :: tempxb, tempxe
 
-!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe, tempxb, tempxe)
+!$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
@@ -551,11 +567,12 @@ contains
             mapped_weno = .false.
             wenoz = .false.
             teno = .false.
+            wenoz_q = dflt_real
         #:endif
 
-        chem_params%advection = .false.
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
+        chem_params%gamma_method = 1
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -703,12 +720,16 @@ contains
         integer :: i, j, k
         integer :: fac
 
-        type(int_bounds_info) :: ix, iy, iz
-
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
+            if (teno) then
+                weno_num_stencils = weno_order - 3
+            else
+                weno_num_stencils = weno_polyn
+            end if
             !$acc update device(weno_polyn)
+            !$acc update device(weno_num_stencils)
             !$acc update device(nb)
             !$acc update device(num_dims, num_fluids)
         #:endif
@@ -979,6 +1000,15 @@ contains
         end if
         ! END: Volume Fraction Model =======================================
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            T_idx = sys_size + 1
+            sys_size = T_idx
+        end if
+
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
@@ -1028,18 +1058,25 @@ contains
         end if
 
         ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        idwbuff(1)%beg = -buff_size
+        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
+        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
+
+        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
+        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
+        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
+        !$acc update device(idwint, idwbuff)
+        ! ==================================================================
+
+        ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
-            ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-            if (n > 0) then
-                iy%beg = -buff_size
-                if (p > 0) then
-                    iz%beg = -buff_size
-                end if
-            end if
-
-            ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-            @:ALLOCATE_GLOBAL(ptil(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE_GLOBAL(ptil(&
+                & idwbuff(1)%beg:idwbuff(1)%end, &
+                & idwbuff(2)%beg:idwbuff(2)%end, &
+                & idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
         if (probe_wrt) then
@@ -1067,16 +1104,6 @@ contains
             grid_geometry = 3
         end if
 
-        if (chemistry) then
-            species_idx%beg = sys_size + 1
-            species_idx%end = sys_size + num_species
-            sys_size = species_idx%end
-
-            temperature_idx%beg = sys_size + 1
-            temperature_idx%end = sys_size + 1
-            sys_size = temperature_idx%end
-        end if
-
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -1091,10 +1118,8 @@ contains
         intxe = internalEnergies_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        tempxb = temperature_idx%beg
-        tempxe = temperature_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, tempxb, tempxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, T_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 
@@ -1103,6 +1128,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             !$acc update device(wenojs, mapped_weno, wenoz, teno)
+            !$acc update device(wenoz_q)
         #:endif
 
         !$acc enter data copyin(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)

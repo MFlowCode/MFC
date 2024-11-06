@@ -11,16 +11,17 @@ module m_chemistry
     use ieee_arithmetic
 
     use m_mpi_proxy
-    use m_thermochem
+    use m_thermochem, only: &
+        num_species, mol_weights, get_net_production_rates
+
     use m_global_parameters
+
     use m_finite_differences
 
     implicit none
 
-    type(int_bounds_info), private :: ix, iy, iz
     type(scalar_field), private :: grads(1:3)
 
-    !$acc declare create(ix, iy, iz)
     !$acc declare create(grads)
 
 contains
@@ -29,16 +30,11 @@ contains
 
         integer :: i
 
-        ix%beg = -buff_size
-        if (n > 0) then; iy%beg = -buff_size; else; iy%beg = 0; end if
-        if (p > 0) then; iz%beg = -buff_size; else; iz%beg = 0; end if
-
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
-        !$acc update device(ix, iy, iz)
-
         do i = 1, 3
-            @:ALLOCATE(grads(i)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(grads(i)%sf(&
+                & idwbuff(1)%beg:idwbuff(1)%end, &
+                & idwbuff(2)%beg:idwbuff(2)%end, &
+                & idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         !$acc kernels
@@ -55,40 +51,54 @@ contains
 
     end subroutine s_finalize_chemistry_module
 
-    #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-        subroutine s_compute_chemistry_rhs_${XYZ}$ (flux_n, rhs_vf, flux_src_vf, q_prim_vf)
+    subroutine s_compute_chemistry_advection_flux(flux_n, rhs_vf)
 
-            type(vector_field), dimension(:), intent(IN) :: flux_n
-            type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, flux_src_vf, q_prim_vf
-            type(int_bounds_info) :: ix, iy, iz
+        type(vector_field), dimension(:), intent(IN) :: flux_n
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        type(int_bounds_info) :: ix, iy, iz
 
-            integer :: x, y, z
-            integer :: eqn
+        integer :: x, y, z
+        integer :: eqn
 
-            integer, parameter :: mx = ${1 if NORM_DIR == 1 else 0}$
-            integer, parameter :: my = ${1 if NORM_DIR == 2 else 0}$
-            integer, parameter :: mz = ${1 if NORM_DIR == 3 else 0}$
+        real(kind(0d0)) :: flux_x, flux_y, flux_z
 
-            !$acc parallel loop collapse(4) present(rhs_vf, flux_n)
-            do x = 0, m
-                do y = 0, n
-                    do z = 0, p
+        #:for num_dims in range(1, 4)
+            if (num_dims == ${num_dims}$) then
+                !$acc parallel loop collapse(4) gang vector default(present) &
+                !$acc private(flux_x, flux_y, flux_z)
+                do z = idwint(3)%beg, idwint(3)%end
+                    do y = idwint(2)%beg, idwint(2)%end
+                        do x = idwint(1)%beg, idwint(1)%end
+                            do eqn = chemxb, chemxe
+                                ! \nabla \cdot (F)
+                                flux_x = (flux_n(1)%vf(eqn)%sf(x - 1, y, z) - &
+                                          flux_n(1)%vf(eqn)%sf(x, y, z))/dx(x)
 
-                        do eqn = chemxb, chemxe
+                                #:if num_dims >= 2
+                                    flux_y = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
+                                              flux_n(2)%vf(eqn)%sf(x, y, z))/dy(y)
+                                #:else
+                                    flux_y = 0d0
+                                #:endif
 
-                            ! \nabla \cdot (F)
-                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + &
-                                                      (flux_n(${NORM_DIR}$)%vf(eqn)%sf(x - mx, y - my, z - mz) - &
-                                                       flux_n(${NORM_DIR}$)%vf(eqn)%sf(x, y, z))/d${XYZ}$ (${XYZ}$)
+                                #:if num_dims == 3
+                                    flux_z = (flux_n(3)%vf(eqn)%sf(x, y, z - 1) - &
+                                              flux_n(3)%vf(eqn)%sf(x, y, z))/dz(z)
+                                #:else
+                                    flux_z = 0d0
+                                #:endif
 
+                                rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
+                            end do
+
+                            rhs_vf(T_idx)%sf(x, y, z) = 0d0
                         end do
-
                     end do
                 end do
-            end do
+            end if
+        #:endfor
 
-        end subroutine s_compute_chemistry_rhs_${XYZ}$
-    #:endfor
+    end subroutine s_compute_chemistry_advection_flux
 
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_prim_qp)
 
@@ -104,50 +114,35 @@ contains
         real(wp) :: dyn_pres
         real(wp) :: E
 
-        real(wp) :: rho
-        real(kind(1._wp)), dimension(num_species) :: Ys
-        real(kind(1._wp)), dimension(num_species) :: omega
-        real(wp), dimension(num_species) :: enthalpies
+
+        real(wp) :: rho, omega_m
+        real(wp), dimension(num_species) :: Ys
+        real(wp), dimension(num_species) :: omega
         real(wp) :: cp_mix
 
-        #:if chemistry
+        if (chemistry) then
+            !$acc parallel loop collapse(3) gang vector default(present) &
+            !$acc private(Ys, omega)
+            do z = idwint(3)%beg, idwint(3)%end
+                do y = idwint(2)%beg, idwint(2)%end
+                    do x = idwint(1)%beg, idwint(1)%end
 
-            !$acc parallel loop collapse(4) private(rho)
-            do x = 0, m
-                do y = 0, n
-                    do z = 0, p
-
-                        ! Maybe use q_prim_vf instead?
-                        rho = 0._wp
+                        !$acc loop seq
                         do eqn = chemxb, chemxe
-                            rho = rho + q_cons_qp(eqn)%sf(x, y, z)
+                            Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
                         end do
 
-                        do eqn = chemxb, chemxe
-                            Ys(eqn - chemxb + 1) = q_cons_qp(eqn)%sf(x, y, z)/rho
-                        end do
-
-                        dyn_pres = 0._wp
-
-                        do i = momxb, momxe
-                            dyn_pres = dyn_pres + rho*q_cons_qp(i)%sf(x, y, z)* &
-                                       q_cons_qp(i)%sf(x, y, z)/2._wp
-                        end do
-
-                        call get_temperature(.true., q_cons_qp(E_idx)%sf(x, y, z) - dyn_pres, &
-                            & q_prim_qp(tempxb)%sf(x, y, z), Ys, T)
+                        rho = q_cons_qp(contxe)%sf(x, y, z)
+                        T = q_prim_qp(T_idx)%sf(x, y, z)
 
                         call get_net_production_rates(rho, T, Ys, omega)
 
-                        q_cons_qp(tempxb)%sf(x, y, z) = T
-                        q_prim_qp(tempxb)%sf(x, y, z) = T
-
-                        !print*, x, y, z, T, rho, Ys, omega, q_cons_qp(E_idx)%sf(x, y, z), dyn_pres
-
+                        !$acc loop seq
                         do eqn = chemxb, chemxe
 
-                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + &
-                                                      mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                            omega_m = mol_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+
+                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 
                         end do
 
@@ -155,34 +150,12 @@ contains
                 end do
             end do
 
-        #:else
+        else
 
             @:ASSERT(.false., "Chemistry is not enabled")
 
-        #:endif
+        end if
 
     end subroutine s_compute_chemistry_reaction_flux
-
-    subroutine s_chemistry_normalize_cons(q_cons_qp)
-
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_qp
-
-        integer :: x, y, z
-        integer :: eqn
-
-        !$acc parallel loop collapse(4)
-        do x = ix%beg, ix%end
-            do y = iy%beg, iy%end
-                do z = iz%beg, iz%end
-
-                    do eqn = chemxb, chemxe
-                        q_cons_qp(eqn)%sf(x, y, z) = max(0._wp, q_cons_qp(eqn)%sf(x, y, z))
-                    end do
-
-                end do
-            end do
-        end do
-
-    end subroutine s_chemistry_normalize_cons
 
 end module m_chemistry

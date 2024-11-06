@@ -113,6 +113,8 @@ module m_start_up
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
+    real(wp) :: dt_init
+
 contains
 
     !>  The purpose of this procedure is to first verify that an
@@ -149,7 +151,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -1048,7 +1050,7 @@ contains
         real(wp) :: pi_inf
         real(wp) :: qv
         real(wp), dimension(2) :: Re
-        real(wp) :: pres
+        real(wp) :: pres, T
 
         integer :: i, j, k, l, c
 
@@ -1072,8 +1074,9 @@ contains
                         end do
                     end if
 
+
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1097,7 +1100,6 @@ contains
         real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        real(wp) :: dt_init
 
         integer :: i, j, k, l
 
@@ -1108,7 +1110,10 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt) call s_mpi_abort("Delta t has become too small")
+            if (dt < 1e-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+                print*, "Delta t = ", dt
+                call s_mpi_abort("Delta t has become too small")
+            end if
         end if
 
         if (cfl_dt) then
@@ -1161,10 +1166,6 @@ contains
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
-
-        if (chemistry) then
-            call s_chemistry_normalize_cons(q_cons_ts(1)%vf)
-        end if
 
         ! Time-stepping loop controls
 

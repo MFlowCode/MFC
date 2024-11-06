@@ -124,7 +124,8 @@ contains
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-                                                               q_prim_vf)
+                                                               q_prim_vf, &
+                                                               idwbuff)
         end if
 
         !  3D Patch Geometries =============================================

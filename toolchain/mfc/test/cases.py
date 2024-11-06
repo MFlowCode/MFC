@@ -1,7 +1,7 @@
 import typing, itertools
 
 from mfc   import common
-from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
+from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -79,14 +79,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
         stack.pop()
 
-    def alter_weno():
-        for weno_order in [3, 5]:
+    def alter_weno(dimInfo):
+        for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
                 if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
-                if mp_weno == 'T' and weno_order == 3:
+                if mp_weno == 'T' and weno_order != 5:
                     continue
                 if teno == 'T' and weno_order == 3:
                     continue
@@ -96,6 +96,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if "teno" in data:
                     data["teno_CT"] = 1e-6
+                if "wenoz" in data and weno_order == 7:
+                    data["wenoz_q"] = 3.0
+
+                if weno_order == 7:
+                    data = {**data, 'weno_eps': 1e-6} # increase damping for stability
+
+                    if "z" in dimInfo[0]:
+                        data = {**data, 'm': 35, 'n': 35, 'p': 35}
 
                 cases.append(define_case_d(stack, trace, data))
 
@@ -692,7 +700,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
-            alter_weno()
+            alter_weno(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -712,7 +720,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
             stack.pop()
 
+    def chemistry_cases():
+        common_mods = {
+            't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(1, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> Chemistry -> Perfect Reactor',
+                'examples/nD_perfect_reactor/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+
+        for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
+            cases.append(define_case_f(
+                f'1D -> Chemistry -> Inert Shocktube -> Riemann Solver {riemann_solver} -> Gamma Method {gamma_method}',
+                'examples/1D_inert_shocktube/case.py',
+                mods={
+                    **common_mods,
+                    'riemann_solver': riemann_solver,
+                    'chem_params%gamma_method': gamma_method
+                },
+                override_tol=1
+            ))
+
     foreach_dimension()
+    chemistry_cases()
 
     # Sanity Check 1
     if stack.size() != 0:

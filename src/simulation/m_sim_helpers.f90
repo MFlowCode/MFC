@@ -31,7 +31,12 @@ contains
         !! @param k y index
         !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+#ifdef CRAY_ACC_WAR
+        !DIR$ INLINEALWAYS s_compute_enthalpy
+#else
         !$acc routine seq
+#endif
+
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp), dimension(num_fluids) :: alpha_rho
         real(wp), dimension(num_fluids) :: alpha

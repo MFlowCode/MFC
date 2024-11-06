@@ -58,15 +58,6 @@ contains
     subroutine s_initialize_bubbles_module
 
         integer :: i, j, k, l, q
-        type(int_bounds_info) :: ix, iy, iz
-
-        ! Configuring Coordinate Direction Indexes =========================
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        ! ==================================================================
 
         @:ALLOCATE_GLOBAL(rs(1:nb))
         @:ALLOCATE_GLOBAL(vs(1:nb))
@@ -89,7 +80,7 @@ contains
             !$acc update device(ps, ms)
         end if
 
-        @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+        @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ACC_SETUP_SFs(divu)
 
         @:ALLOCATE_GLOBAL(bub_adv_src(0:m, 0:n, 0:p))

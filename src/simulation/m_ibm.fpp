@@ -451,6 +451,8 @@ contains
             :: subsection_3D
         integer :: i, j, k, l, q !< Iterator variables
 
+        num_gps = 0
+
         do i = 0, m
             do j = 0, n
                 if (p == 0) then

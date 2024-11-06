@@ -15,7 +15,7 @@ module m_assign_variables
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
-    use m_thermochem            !< Thermodynamic and chemical properties
+    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     ! one form to another
     ! ==========================================================================
@@ -166,7 +166,7 @@ contains
             + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
         ! Species Concentrations
-        #:if chemistry
+        if (chemistry) then
             block
                 real(wp) :: sum, term
 
@@ -191,10 +191,10 @@ contains
             end block
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
-            q_prim_vf(tempxb)%sf(j, k, l) = &
+            q_prim_vf(T_idx)%sf(j, k, l) = &
                 q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight &
                 /(gas_constant*q_prim_vf(1)%sf(j, k, l))
-        #:endif
+        end if
 
         ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1e-16_wp) patch_id_fp(j, k, l) = patch_id
@@ -543,7 +543,7 @@ contains
         end do
 
         ! Species Concentrations
-        #:if chemistry
+        if (chemistry) then
             block
                 real(wp) :: sum, term
 
@@ -570,9 +570,9 @@ contains
             end block
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
-            q_prim_vf(tempxb)%sf(j, k, l) = &
+            q_prim_vf(T_idx)%sf(j, k, l) = &
                 q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight/(gas_constant*q_prim_vf(1)%sf(j, k, l))
-        #:endif
+        end if
 
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (mixlayer_vel_profile) then

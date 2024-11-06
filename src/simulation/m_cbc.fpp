@@ -632,6 +632,7 @@ contains
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
         ! ratio and liquid stiffness functions
+
         real(wp), dimension(num_fluids) :: dalpha_rho_dt
         real(wp) :: drho_dt
         real(wp), dimension(num_dims) :: dvel_dt
@@ -646,6 +647,7 @@ contains
         real(wp), dimension(num_fluids) :: adv, dadv_ds
         real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
+        real(wp), dimension(num_species) :: Y_s
 
         real(wp) :: rho         !< Cell averaged density
         real(wp) :: pres        !< Cell averaged pressure
@@ -713,7 +715,7 @@ contains
                     ! ==================================================================
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
-                elseif (weno_order == 5) then
+                else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -802,12 +804,12 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
 
+                        E = gamma*pres + pi_inf + 5e-1*rho*vel_K_sum
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0._wp, c)
                         ! ============================================================
 
                         ! First-Order Spatial Derivatives of Primitive Variables =====

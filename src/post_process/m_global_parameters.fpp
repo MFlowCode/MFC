@@ -18,7 +18,7 @@ module m_global_parameters
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
-    use m_thermochem            !< Thermodynamic and chemical properties module
+    use m_thermochem, only: num_species, species_names
 
     ! ==========================================================================
 
@@ -113,6 +113,8 @@ module m_global_parameters
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
+    integer :: avg_state       !< Average state evaluation method
+
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -128,8 +130,17 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     integer :: c_idx                               !< Index of color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    type(int_bounds_info) :: temperature_idx       !< Indexes of first & last temperature eqns.
+    integer :: T_idx                               !< Index of temperature eqn.
     !> @}
+
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwint(1:3)
+
+    ! Cell Indices for the entire (local) domain. In simulation, this includes
+    ! the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwbuff(1:3)
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
@@ -260,7 +271,6 @@ module m_global_parameters
     real(wp) :: poly_sigma
     real(wp) :: sigR
     integer :: nmom
-
     !> @}
 
     !> @name surface tension coefficient
@@ -277,7 +287,6 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
-    integer :: tempxb, tempxe
     !> @}
 
 contains
@@ -374,6 +383,7 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
+        avg_state = dflt_int
 
         ! Tait EOS
         rhoref = dflt_real
@@ -616,14 +626,12 @@ contains
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
 
-            temperature_idx%beg = sys_size + 1
-            temperature_idx%end = sys_size + 1
-            sys_size = temperature_idx%end
+            T_idx = sys_size + 1
+            sys_size = T_idx
         else
             species_idx%beg = 1
             species_idx%end = 1
-            temperature_idx%beg = 1
-            temperature_idx%end = 1
+            T_idx = 1
         end if
 
         momxb = mom_idx%beg
@@ -640,10 +648,6 @@ contains
         intxe = internalEnergies_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
-        tempxb = temperature_idx%beg
-        tempxe = temperature_idx%end
-
-        ! ==================================================================
 
 #ifdef MFC_MPI
         allocate (MPI_IO_DATA%view(1:sys_size))
@@ -691,6 +695,19 @@ contains
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
+
+        ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        idwbuff(1)%beg = -buff_size
+        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
+        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
+
+        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
+        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
+        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
+        ! ==================================================================
 
         ! Allocating single precision grid variables if needed
         if (precision == 1) then
