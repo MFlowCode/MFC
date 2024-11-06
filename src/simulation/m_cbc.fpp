@@ -71,14 +71,14 @@ module m_cbc
 #endif
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf, flux_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf, flux_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf, flux_src_rsz_vf)
-    !$acc declare link(flux_rsx_vf, flux_src_rsx_vf, flux_rsy_vf, flux_src_rsy_vf, flux_rsz_vf, flux_src_rsz_vf)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf_l, flux_src_rsx_vf_l)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf_l, flux_src_rsy_vf_l)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf_l, flux_src_rsz_vf_l)
+    !$acc declare link(flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l)
 #else
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf, flux_src_rsx_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf, flux_src_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf, flux_src_rsz_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
+    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
 #endif
 
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
@@ -135,8 +135,8 @@ module m_cbc
 !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
 #ifndef CRAY_ACC_WAR
-!$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
-!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf, &
+!$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
+!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
 !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
 !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
 #endif
@@ -188,11 +188,11 @@ contains
 
         end if
 
-        @:ALLOCATE_GLOBAL(flux_rsx_vf(-1:buff_size, &
+        @:ALLOCATE_GLOBAL(flux_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:adv_idx%end))
 
-        @:ALLOCATE_GLOBAL(flux_src_rsx_vf(-1:buff_size, &
+        @:ALLOCATE_GLOBAL(flux_src_rsx_vf_l(-1:buff_size, &
             is2%beg:is2%end, &
             is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -231,11 +231,11 @@ contains
 
             end if
 
-            @:ALLOCATE_GLOBAL(flux_rsy_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:adv_idx%end))
 
-            @:ALLOCATE_GLOBAL(flux_src_rsy_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_src_rsy_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -276,11 +276,11 @@ contains
 
             end if
 
-            @:ALLOCATE_GLOBAL(flux_rsz_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:adv_idx%end))
 
-            @:ALLOCATE_GLOBAL(flux_src_rsz_vf(-1:buff_size, &
+            @:ALLOCATE_GLOBAL(flux_src_rsz_vf_l(-1:buff_size, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, adv_idx%beg:adv_idx%end))
 
@@ -692,7 +692,7 @@ contains
                     do i = 1, advxe
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
-                                flux_rs${XYZ}$_vf(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
+                                flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
                                                                 + pi_coef_${XYZ}$ (0, 0, cbc_loc)* &
                                                                 (F_rs${XYZ}$_vf(1, k, r, i) - &
                                                                  F_rs${XYZ}$_vf(0, k, r, i))
@@ -704,7 +704,7 @@ contains
                     do i = advxb, advxe
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
-                                flux_src_rs${XYZ}$_vf(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + &
+                                flux_src_rs${XYZ}$_vf_l(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + &
                                                                     (F_src_rs${XYZ}$_vf(1, k, r, i) - &
                                                                      F_src_rs${XYZ}$_vf(0, k, r, i)) &
                                                                     *pi_coef_${XYZ}$ (0, 0, cbc_loc)
@@ -725,7 +725,7 @@ contains
                         do j = 0, 1
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
-                                    flux_rs${XYZ}$_vf(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) &
+                                    flux_rs${XYZ}$_vf_l(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) &
                                                                     + pi_coef_${XYZ}$ (j, 0, cbc_loc)* &
                                                                     (F_rs${XYZ}$_vf(3, k, r, i) - &
                                                                      F_rs${XYZ}$_vf(2, k, r, i)) &
@@ -745,7 +745,7 @@ contains
                         do j = 0, 1
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
-                                    flux_src_rs${XYZ}$_vf(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, i) + &
+                                    flux_src_rs${XYZ}$_vf_l(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, i) + &
                                                                         (F_src_rs${XYZ}$_vf(3, k, r, i) - &
                                                                          F_src_rs${XYZ}$_vf(2, k, r, i)) &
                                                                         *pi_coef_${XYZ}$ (j, 0, cbc_loc) + &
@@ -937,21 +937,21 @@ contains
                         end if
                         ! ============================================================
 
-                        ! flux_rs_vf and flux_src_rs_vf at j = -1/2 ==================
+                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2 ==================
                         !$acc loop seq
                         do i = 1, contxe
-                            flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
                                                              + ds(0)*dalpha_rho_dt(i)
                         end do
 
                         !$acc loop seq
                         do i = momxb, momxe
-                            flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
                                                              + ds(0)*(vel(i - contxe)*drho_dt &
                                                                       + rho*dvel_dt(i - contxe))
                         end do
 
-                        flux_rs${XYZ}$_vf(-1, k, r, E_idx) = flux_rs${XYZ}$_vf(0, k, r, E_idx) &
+                        flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
                                                              + ds(0)*(pres*dgamma_dt &
                                                                       + gamma*dpres_dt &
                                                                       + dpi_inf_dt &
@@ -962,17 +962,17 @@ contains
                         if (riemann_solver == 1) then
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf(-1, k, r, i) = 0d0
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0d0
                             end do
 
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_src_rs${XYZ}$_vf(-1, k, r, i) = &
+                                flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = &
                                     1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
                                     *sign(1d0, vel(dir_idx(1))) &
-                                    *(flux_rs${XYZ}$_vf(0, k, r, i) &
+                                    *(flux_rs${XYZ}$_vf_l(0, k, r, i) &
                                       + vel(dir_idx(1)) &
-                                      *flux_src_rs${XYZ}$_vf(0, k, r, i) &
+                                      *flux_src_rs${XYZ}$_vf_l(0, k, r, i) &
                                       + ds(0)*dadv_dt(i - E_idx))
                             end do
 
@@ -980,17 +980,17 @@ contains
 
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) + &
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + &
                                                                  ds(0)*dadv_dt(i - E_idx)
                             end do
 
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_src_rs${XYZ}$_vf(-1, k, r, i) = flux_src_rs${XYZ}$_vf(0, k, r, i)
+                                flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = flux_src_rs${XYZ}$_vf_l(0, k, r, i)
                             end do
 
                         end if
-                        ! END: flux_rs_vf and flux_src_rs_vf at j = -1/2 =============
+                        ! END: flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2 =============
 
                     end do
                 end do
@@ -1083,7 +1083,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_rsx_vf(j, k, r, i) = &
+                            flux_rsx_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1095,7 +1095,7 @@ contains
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
-                        flux_rsx_vf(j, k, r, momxb) = &
+                        flux_rsx_vf_l(j, k, r, momxb) = &
                             flux_vf(momxb)%sf(dj*((m - 1) - 2*j) + j, k, r)
                     end do
                 end do
@@ -1107,7 +1107,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsx_vf(j, k, r, i) = &
+                                flux_src_rsx_vf_l(j, k, r, i) = &
                                     flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)
                             end do
                         end do
@@ -1118,7 +1118,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsx_vf(j, k, r, advxb) = &
+                            flux_src_rsx_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1159,7 +1159,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_rsy_vf(j, k, r, i) = &
+                            flux_rsy_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1171,7 +1171,7 @@ contains
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
-                        flux_rsy_vf(j, k, r, momxb + 1) = &
+                        flux_rsy_vf_l(j, k, r, momxb + 1) = &
                             flux_vf(momxb + 1)%sf(k, dj*((n - 1) - 2*j) + j, r)
                     end do
                 end do
@@ -1183,7 +1183,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsy_vf(j, k, r, i) = &
+                                flux_src_rsy_vf_l(j, k, r, i) = &
                                     flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)
                             end do
                         end do
@@ -1194,7 +1194,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsy_vf(j, k, r, advxb) = &
+                            flux_src_rsy_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1235,7 +1235,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_rsz_vf(j, k, r, i) = &
+                            flux_rsz_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1247,7 +1247,7 @@ contains
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
-                        flux_rsz_vf(j, k, r, momxe) = &
+                        flux_rsz_vf_l(j, k, r, momxe) = &
                             flux_vf(momxe)%sf(r, k, dj*((p - 1) - 2*j) + j)
                     end do
                 end do
@@ -1259,7 +1259,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsz_vf(j, k, r, i) = &
+                                flux_src_rsz_vf_l(j, k, r, i) = &
                                     flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)
                             end do
                         end do
@@ -1270,7 +1270,7 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsz_vf(j, k, r, advxb) = &
+                            flux_src_rsz_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
@@ -1321,7 +1321,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
-                                flux_rsx_vf(j, k, r, i)* &
+                                flux_rsx_vf_l(j, k, r, i)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1332,7 +1332,7 @@ contains
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
                         flux_vf(momxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
-                            flux_rsx_vf(j, k, r, momxb)
+                            flux_rsx_vf_l(j, k, r, momxb)
                     end do
                 end do
             end do
@@ -1344,7 +1344,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
                                 flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
-                                    flux_src_rsx_vf(j, k, r, i)
+                                    flux_src_rsx_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1355,7 +1355,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
-                                flux_src_rsx_vf(j, k, r, advxb)* &
+                                flux_src_rsx_vf_l(j, k, r, advxb)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1372,7 +1372,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
-                                flux_rsy_vf(j, k, r, i)* &
+                                flux_rsy_vf_l(j, k, r, i)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1384,7 +1384,7 @@ contains
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
                         flux_vf(momxb + 1)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
-                            flux_rsy_vf(j, k, r, momxb + 1)
+                            flux_rsy_vf_l(j, k, r, momxb + 1)
                     end do
                 end do
             end do
@@ -1396,7 +1396,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
                                 flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
-                                    flux_src_rsy_vf(j, k, r, i)
+                                    flux_src_rsy_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1407,7 +1407,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
-                                flux_src_rsy_vf(j, k, r, advxb)* &
+                                flux_src_rsy_vf_l(j, k, r, advxb)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1425,7 +1425,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
-                                flux_rsz_vf(j, k, r, i)* &
+                                flux_rsz_vf_l(j, k, r, i)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1437,7 +1437,7 @@ contains
                 do k = is2%beg, is2%end
                     do j = -1, buff_size
                         flux_vf(momxe)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
-                            flux_rsz_vf(j, k, r, momxe)
+                            flux_rsz_vf_l(j, k, r, momxe)
                     end do
                 end do
             end do
@@ -1449,7 +1449,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
                                 flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
-                                    flux_src_rsz_vf(j, k, r, i)
+                                    flux_src_rsz_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1460,7 +1460,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
-                                flux_src_rsz_vf(j, k, r, advxb)* &
+                                flux_src_rsz_vf_l(j, k, r, advxb)* &
                                 sign(1d0, -real(cbc_loc, kind(0d0)))
                         end do
                     end do
@@ -1507,21 +1507,21 @@ contains
         if (weno_order > 1) then
             @:DEALLOCATE_GLOBAL(F_rsx_vf, F_src_rsx_vf)
         end if
-        @:DEALLOCATE_GLOBAL(flux_rsx_vf, flux_src_rsx_vf)
+        @:DEALLOCATE_GLOBAL(flux_rsx_vf_l, flux_src_rsx_vf_l)
 
         if (n > 0) then
             @:DEALLOCATE_GLOBAL(q_prim_rsy_vf)
             if (weno_order > 1) then
                 @:DEALLOCATE_GLOBAL(F_rsy_vf, F_src_rsy_vf)
             end if
-            @:DEALLOCATE_GLOBAL(flux_rsy_vf, flux_src_rsy_vf)
+            @:DEALLOCATE_GLOBAL(flux_rsy_vf_l, flux_src_rsy_vf_l)
         end if
         if (p > 0) then
             @:DEALLOCATE_GLOBAL(q_prim_rsz_vf)
             if (weno_order > 1) then
                 @:DEALLOCATE_GLOBAL(F_rsz_vf, F_src_rsz_vf)
             end if
-            @:DEALLOCATE_GLOBAL(flux_rsz_vf, flux_src_rsz_vf)
+            @:DEALLOCATE_GLOBAL(flux_rsz_vf_l, flux_src_rsz_vf_l)
         end if
 
         ! Deallocating the cell-width distribution in the s-direction
