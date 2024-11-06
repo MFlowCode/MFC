@@ -1076,20 +1076,18 @@ contains
                 p_send => q_cons_buff_send(0)
                 p_recv => q_cons_buff_recv(0)
                 #:if rdma_mpi
-                    !$acc data attach(p_send, p_recv)
-                    !$acc host_data use_device(p_send, p_recv)
+                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
                 #:else
                     !$acc update host(q_cons_buff_send, ib_buff_send)
                 #:endif
 
                 call MPI_SENDRECV( &
-                    p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
-                    p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
+                    q_cons_buff_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
+                    q_cons_buff_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                 #:if rdma_mpi
                     !$acc end host_data
-                    !$acc end data
                     !$acc wait
                 #:else
                     !$acc update device(q_cons_buff_recv)
