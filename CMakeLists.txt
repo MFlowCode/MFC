@@ -482,7 +482,6 @@ function(MFC_SETUP_TARGET)
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}
-			PRIVATE -gpu=cuda${CUDA_VERSION}
                     )
                 endforeach()
 
