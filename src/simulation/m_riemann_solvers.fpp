@@ -314,7 +314,7 @@ contains
         real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R
         real(kind(0d0)), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-        real(kind(0d0)) :: Cp_avg, Cv_avg, gamma_avggg, T_avg, eps, c_sum_Yi_Phi
+        real(kind(0d0)) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
         real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: MW_L, MW_R
@@ -331,20 +331,15 @@ contains
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
         real(kind(0d0)) :: rho_avg
-        real(kind(0d0)), dimension(num_dims) :: vel_avg
         real(kind(0d0)) :: H_avg
         real(kind(0d0)) :: gamma_avg
         real(kind(0d0)) :: c_avg
 
         real(kind(0d0)) :: s_L, s_R, s_M, s_P, s_S
-        real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
         real(kind(0d0)) :: xi_M, xi_P
 
-        real(kind(0d0)) :: nbub_L, nbub_R
         real(kind(0d0)) :: ptilde_L, ptilde_R
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(kind(0d0)) :: blkmod1, blkmod2
-        real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(kind(0d0)) :: alpha_L_sum, alpha_R_sum
 
@@ -374,7 +369,7 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 !$acc parallel loop collapse(3) gang vector default(present)    &
                 !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L,  &
-                !$acc alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
+                !$acc alpha_R, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
                 !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R,     &
                 !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
                 !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
@@ -947,7 +942,6 @@ contains
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
 
         real(kind(0d0)) :: rho_avg
-        real(kind(0d0)), dimension(num_dims) :: vel_avg
         real(kind(0d0)) :: H_avg
         real(kind(0d0)) :: gamma_avg
         real(kind(0d0)) :: c_avg
@@ -961,7 +955,6 @@ contains
         real(kind(0d0)), dimension(nb) :: V0_L, V0_R
         real(kind(0d0)), dimension(nb) :: P0_L, P0_R
         real(kind(0d0)), dimension(nb) :: pbw_L, pbw_R
-        real(kind(0d0)), dimension(nb, nmom) :: moms_L, moms_R
         real(kind(0d0)) :: ptilde_L, ptilde_R
 
         real(kind(0d0)) :: alpha_L_sum, alpha_R_sum, nbub_L_denom, nbub_R_denom
@@ -972,10 +965,8 @@ contains
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
-        real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
-        real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: zcoef, pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
@@ -1360,7 +1351,7 @@ contains
                     end do
                 elseif (model_eqns == 4) then
                     !ME4
-                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, &
+                    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                     !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
