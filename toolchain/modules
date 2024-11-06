@@ -45,6 +45,7 @@ p     GT Phoenix
 p-all python/3.10.10
 p-cpu gcc/12.3.0 openmpi/4.1.5
 p-gpu nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
+p-gpu MFC_CUDA_CC=70,80,89,90 CC=nvc CXX=nvc++ FC=nvfortran
 
 f     OLCF Frontier
 f-all cce/18.0.0 cpe/24.07 rocm/6.1.3 cray-mpich/8.1.28
