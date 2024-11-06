@@ -35,8 +35,7 @@ module m_start_up
 
     use m_checker
 
-    use m_thermochem            !< Procedures used to compute thermodynamic
-                                !! quantities
+    use m_thermochem, only: num_species, species_names
 
     use m_finite_differences
 

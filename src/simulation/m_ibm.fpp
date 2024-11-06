@@ -106,8 +106,6 @@ contains
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
         @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
 
-        print *, "num_gps was ", num_gps
-
         !$acc enter data copyin(ghost_points, inner_points)
 
         call s_find_ghost_points(ghost_points, inner_points)

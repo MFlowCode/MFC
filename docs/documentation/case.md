@@ -536,7 +536,6 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-
 ### 8. Acoustic Source {#acoustic-source}
 
 | Parameter                             | Type    | Description |
@@ -744,7 +743,7 @@ $$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
 
 - `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`).
-This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
+This parameter enables the use of true `pi_\infty` in bubble dynamics models when the `pi_\infty` given in the `case.py` file is an artificial value.
 
 ### 13. Body Forces
 
@@ -760,7 +759,23 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 
 $$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
 
-Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]` direction by convention.
+By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
+
+### 14. Cylindrical Coordinates
+
+When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
+
+- `bc_y%beg = -14`  enables the axis boundary condition
+
+- `bc_z%beg = bc_z%end = -1`  enables periodic boundary conditions in the azimuthal direction
+
+- `z_domain%beg = 0`  sets the azimuthal starting point to 0
+
+- `z_comain%end = 2*math.pi` to set the azimuthal ending point to $2\pi$ (note, requires `import math` in the case file)
+
+When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
+
+- `bc_y%beg = -2` to enable reflective boundary conditions
 
 ## Enumerations
 

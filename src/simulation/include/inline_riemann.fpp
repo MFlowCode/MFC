@@ -31,7 +31,7 @@
     vel_avg_rms = (sqrt(rho_L)*vel_L(1) + sqrt(rho_R)*vel_R(1))**2d0/ &
                   (sqrt(rho_L) + sqrt(rho_R))**2d0
 
-    #:if chemistry
+    if (chemistry) then
         eps = 0.001d0
         call get_species_enthalpies_rt(T_L, h_iL)
         call get_species_enthalpies_rt(T_R, h_iR)
@@ -59,7 +59,7 @@
 
         Phi_avg(:) = (gamma_avg - 1.d0)*(vel_avg_rms/2.0d0 - h_avg_2(:)) + gamma_avg*gas_constant/mol_weights(:)*T_avg
         c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
-    #:endif
+    end if
 
 #:enddef roe_avg
 

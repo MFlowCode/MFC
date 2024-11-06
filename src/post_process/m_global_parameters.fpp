@@ -18,7 +18,7 @@ module m_global_parameters
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
-    use m_thermochem            !< Thermodynamic and chemical properties module
+    use m_thermochem, only: num_species, species_names
 
     ! ==========================================================================
 
