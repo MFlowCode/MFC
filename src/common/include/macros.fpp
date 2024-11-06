@@ -37,7 +37,6 @@
     !$acc& attach(${', '.join(map(lambda x: re.sub('\\(.*\\)','',x), args))}$)
 #else
     allocate (${', '.join(args)}$)
-    !$acc enter data create(${', '.join(args)}$)
 #endif
 
 #:enddef ALLOCATE_GLOBAL
@@ -53,7 +52,6 @@
     deallocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
 #else
     deallocate (${', '.join(args)}$)
-    !$acc exit data delete(${', '.join(args)}$)
 #endif
 
 #:enddef DEALLOCATE_GLOBAL

@@ -201,7 +201,7 @@ module m_rhs
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), gamma_min, pres_inf)
-    !$acc declare link(gamma_min, pres_inf)
+    !!$acc declare link(gamma_min, pres_inf)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
     !$acc declare create(gamma_min, pres_inf)
@@ -209,7 +209,7 @@ module m_rhs
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-    !$acc declare link(Res)
+    !!$acc declare link(Res)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
@@ -217,7 +217,7 @@ module m_rhs
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), nbub)
-    !$acc declare link(nbub)
+    !!$acc declare link(nbub)
 #else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
@@ -656,26 +656,6 @@ contains
             !$acc update device(Res, Re_idx, Re_size)
         end if
 
-        ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution of a given Riemann problem
-        if (riemann_solver == 1) then
-            s_riemann_solver => s_hll_riemann_solver
-        elseif (riemann_solver == 2) then
-            s_riemann_solver => s_hllc_riemann_solver
-        end if
-
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        else if (bubbles) then          ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
@@ -2170,9 +2150,7 @@ contains
 
         end if
 
-#ifndef _CRAYFTN
 !$acc update device(is1, is2, is3, iv)
-#endif
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)
@@ -2371,8 +2349,6 @@ contains
             @:DEALLOCATE_GLOBAL(tau_re_vf)
         end if
 
-        s_riemann_solver => null()
-        s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_rhs_module
 

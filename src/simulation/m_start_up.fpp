@@ -1352,10 +1352,8 @@ contains
         ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
             s_read_data_files => s_read_serial_data_files
-            s_write_data_files => s_write_serial_data_files
         else
             s_read_data_files => s_read_parallel_data_files
-            s_write_data_files => s_write_parallel_data_files
         end if
 
         ! Reading in the user provided initial condition and grid data
@@ -1493,7 +1491,6 @@ contains
     subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
-        s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
         call s_finalize_derived_variables_module()

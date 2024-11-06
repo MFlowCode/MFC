@@ -33,7 +33,7 @@ module m_viscous
     !$acc declare link(Res_viscous)
 #else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
-    !$acc declare create(Re_viscous)
+    !$acc declare create(Res_viscous)
 #endif
 
 contains
