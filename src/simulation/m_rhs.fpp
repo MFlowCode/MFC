@@ -452,7 +452,6 @@ contains
                 @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
                 @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
 
-
                 do l = mom_idx%beg, mom_idx%end
                     @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf( &
                              & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -788,14 +787,14 @@ contains
 
         call nvtxStartRange("Viscous")
         if (viscous) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                 dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                                 qL_prim, &
-                                                 qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                                 dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                                 qR_prim, &
-                                                 q_prim_qp, &
-                                                 dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                                 idwbuff(1), idwbuff(2), idwbuff(3))
+                                        dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                                        qL_prim, &
+                                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                                        dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                                        qR_prim, &
+                                        q_prim_qp, &
+                                        dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                                        idwbuff(1), idwbuff(2), idwbuff(3))
         call nvtxEndRange
 
         call nvtxStartRange("Surface_Tension")
