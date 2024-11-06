@@ -44,30 +44,6 @@ module m_time_steppers
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
-    !! Cell-average conservative variables at each time-stage (TS)
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), q_prim_vf)
-    !! Cell-average primitive variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
-    !! Cell-average RHS variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
-    !! Cell-average primitive variables at consecutive TIMESTEPS
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_pb)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
-
-    integer, private :: num_ts !<
-    !! Number of time stages in the time-stepping scheme
-
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -90,7 +66,6 @@ module m_time_steppers
     !! Number of time stages in the time-stepping scheme
 
     !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#endif
 
 contains
 

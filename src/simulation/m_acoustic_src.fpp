@@ -23,41 +23,6 @@ module m_acoustic_src
     implicit none
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), pulse, support)
-    !$acc declare link(pulse, support)
-
-    @:CRAY_DECLARE_GLOBAL(logical, dimension(:), dipole)
-    !$acc declare link(dipole)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), loc_acoustic)
-    !$acc declare link(loc_acoustic)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
-    !$acc declare link(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), foc_length, aperture)
-    !$acc declare link(foc_length, aperture)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), element_spacing_angle, element_polygon_ratio, rotate_angle)
-    !$acc declare link(element_spacing_angle, element_polygon_ratio, rotate_angle)
-
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), num_elements, element_on)
-    !$acc declare link(num_elements, element_on)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), mass_src, e_src)
-    !$acc declare link(mass_src, e_src)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), mom_src)
-    !$acc declare link(mom_src)
-
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), source_spatials_num_points)
-    !$acc declare link(source_spatials_num_points)
-
-    @:CRAY_DECLARE_GLOBAL(type(source_spatial_type), dimension(:), source_spatials)
-    !$acc declare link(source_spatials)
-
-#else
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 
@@ -92,7 +57,6 @@ module m_acoustic_src
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
     !$acc declare create(source_spatials)
 
-#endif
 
 contains
 

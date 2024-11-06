@@ -28,13 +28,10 @@ module m_qbmm
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
-    !$acc declare link(momrhs)
-#else
+
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
     !$acc declare create(momrhs)
-#endif
+
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
@@ -43,17 +40,11 @@ module m_qbmm
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-!$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
-    !$acc declare link(bubrs, bubmoms)
-#else
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
     !$acc declare create(bubrs, bubmoms)
-#endif
 
 contains
 

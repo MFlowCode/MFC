@@ -39,47 +39,25 @@ module m_cbc
     !! The cell-average primitive variables. They are obtained by reshaping (RS)
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
     !! which the CBC is applied.
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), q_prim_rsz_vf)
-    !$acc declare link(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf)
-#else
+
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), F_rs_vf, F_src_rs_vf)
-    !$acc declare link(F_rs_vf, F_src_rs_vf)
-#else
+
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
-#endif
+
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsx_vf, F_src_rsx_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsy_vf, F_src_rsy_vf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), F_rsz_vf, F_src_rsz_vf)
-    !$acc declare link(F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf)
-#else
+
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsx_vf_l, flux_src_rsx_vf_l)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsy_vf_l, flux_src_rsy_vf_l)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), flux_rsz_vf_l, flux_src_rsz_vf_l)
-    !$acc declare link(flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
-#endif
 
     real(kind(0d0)) :: c           !< Cell averaged speed of sound
     real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
@@ -87,39 +65,26 @@ module m_cbc
 
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
 !$acc declare create(dpres_ds)
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), ds)
-    !$acc declare link(ds)
-#else
+
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
-#endif
+
 
     ! CBC Coefficients =========================================================
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), fd_coef_z)
-    !$acc declare link(fd_coef_x, fd_coef_y, fd_coef_z)
-#else
+
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
-#endif
+
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
     ! Bug with NVHPC when using nullified pointers in a declare create
     !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), pi_coef_z)
-    !$acc declare link(pi_coef_x, pi_coef_y, pi_coef_z)
-#else
+
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
     real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
-#endif
+
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the location of the CBC.
@@ -134,12 +99,11 @@ module m_cbc
     integer :: cbc_dir, cbc_loc
 !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
-#ifndef CRAY_ACC_WAR
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
 !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
 !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
 !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
-#endif
+
 
 contains
 
