@@ -29,6 +29,9 @@ module m_data_output
     use m_helper
 
     use m_delay_file_access
+
+    use m_thermochem, only: species_names
+
     ! ==========================================================================
 
     implicit none

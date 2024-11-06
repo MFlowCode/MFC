@@ -9,7 +9,8 @@
 module m_derived_types
 
     use m_constants  !< Constants
-    use m_thermochem !< Thermodynamic properties
+
+    use m_thermochem, only: num_species
 
     implicit none
 

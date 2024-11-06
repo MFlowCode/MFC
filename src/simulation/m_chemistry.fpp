@@ -11,8 +11,11 @@ module m_chemistry
     use ieee_arithmetic
 
     use m_mpi_proxy
-    use m_thermochem
+    use m_thermochem, only: &
+        num_species, mol_weights, get_net_production_rates
+
     use m_global_parameters
+
     use m_finite_differences
 
     implicit none
@@ -116,8 +119,7 @@ contains
         real(kind(0d0)), dimension(num_species) :: omega
         real(kind(0d0)) :: cp_mix
 
-        #:if chemistry
-
+        if (chemistry) then
             !$acc parallel loop collapse(3) gang vector default(present) &
             !$acc private(Ys, omega)
             do z = idwint(3)%beg, idwint(3)%end
@@ -147,11 +149,11 @@ contains
                 end do
             end do
 
-        #:else
+        else
 
             @:ASSERT(.false., "Chemistry is not enabled")
 
-        #:endif
+        end if
 
     end subroutine s_compute_chemistry_reaction_flux
 
