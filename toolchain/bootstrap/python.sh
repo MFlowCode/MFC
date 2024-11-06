@@ -129,7 +129,7 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         fi
     done
 
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install -e "$(pwd)/toolchain"; then
+    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain"; then
         error "(venv) Installation failed."
 
         log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
