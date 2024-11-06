@@ -128,7 +128,7 @@ contains
         !! @param mom Momentum
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G)
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure
 #else
         !$acc routine seq
@@ -473,7 +473,7 @@ contains
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
         !$acc routine seq
@@ -555,7 +555,7 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
         !$acc routine seq
@@ -1400,8 +1400,8 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
-#ifdef CRAY_ACC_WAR
+    pure subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
         !$acc routine seq

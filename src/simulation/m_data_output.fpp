@@ -275,7 +275,7 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !$acc update host(icfl_sf)
 
         if (any(Re_size > 0)) then

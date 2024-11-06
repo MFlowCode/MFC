@@ -77,7 +77,7 @@
 #:enddef CRAY_DECLARE_GLOBAL_SCALAR
 
 #:def ACC_SETUP_VFs(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
         integer :: macros_setup_vfs_i
 
@@ -100,7 +100,7 @@
 #:enddef
 
 #:def ACC_SETUP_SFs(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
 
         @:LOG({'@:ACC_SETUP_SFs(${', '.join(args)}$)'})
@@ -116,7 +116,7 @@
 #:enddef
 
 #:def ACC_SETUP_source_spatials(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
 
         @:LOG({'@:ACC_SETUP_source_spatials(${', '.join(args)}$)'})
