@@ -136,7 +136,7 @@ module m_cbc
 
 #ifndef CRAY_ACC_WAR
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
-!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
+!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf, &
 !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
 !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
 #endif
