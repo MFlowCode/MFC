@@ -441,8 +441,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'patch_icpp(1)%pres':         1.E+06, 'patch_icpp(1)%alpha_rho(1)': 1000.E+00,
                 'patch_icpp(2)%pres':         1.E+05, 'patch_icpp(2)%alpha_rho(1)': 1000.E+00,
                 'patch_icpp(3)%pres':         5.E+05, 'patch_icpp(3)%alpha_rho(1)': 1000.E+00,
-                'patch_icpp(1)%tau_e(1)':     0.E+00, 'patch_icpp(2)%tau_e(1)':     0.E+00,
-                'patch_icpp(3)%tau_e(1)':     0.E+00, 'fluid_pp(1)%G':              1.E+05,
+                'patch_icpp(1)%tau_e(1)':     0.E-00, 'patch_icpp(2)%tau_e(1)':     0.E-00,
+                'patch_icpp(3)%tau_e(1)':     0.E-00, 'fluid_pp(1)%G':              1.E+05,
+      
             })
 
             if num_fluids == 2:

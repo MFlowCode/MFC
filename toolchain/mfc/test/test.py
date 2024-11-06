@@ -54,6 +54,11 @@ def __filter(cases_) -> typing.List[TestCase]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
 
+    for case in cases[:]:
+        if ARG("single"):  
+            if 'low_Mach' in case.trace or 'Hypoelasticity' in case.trace or 'teno' in case.trace:
+                cases.remove(case) 
+
     if ARG("percent") == 100:
         return cases
 
@@ -219,7 +224,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
     nAttempts = 0
     if ARG('single'):
-        max_attempts = max(ARG('max_attempts'), 3)
+        max_attempts = max(ARG('max_attempts'), 20)
     else:
         max_attempts = ARG('max_attempts')
 

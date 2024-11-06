@@ -3,21 +3,6 @@ name: 'Benchmark'
 on: pull_request
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   self:
     name: Georgia Tech | Phoenix (NVHPC)
     if: github.repository == 'MFlowCode/MFC'
@@ -25,7 +10,7 @@ jobs:
       matrix:
         device: ['cpu', 'gpu']
     runs-on:
-      group:  phoenix
+      group: phoenix
       labels: gt
     timeout-minutes: 1400
     env:
@@ -48,16 +33,39 @@ jobs:
         run: |
           (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
           (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          wait %1 && wait %2
+          wait
+
+          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
+          (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
+          wait
+
+      - name: Check Speedup
+        run: |
+          cd pr
+          . ./mfc.sh load -c p -m ${{ matrix.device }}
+
+          single_time=$(grep "Runtime:" bench-${{ matrix.device }}-single.yaml | awk '{print $2}')
+          double_time=$(grep "Runtime:" bench-${{ matrix.device }}.yaml | awk '{print $2}')
+          speedup=$(echo "$double_time / $single_time" | bc -l)
+
+          echo "Single precision time: $single_time"
+          echo "Double precision time: $double_time"
+          echo "Speedup: $speedup"
+
+          if (( $(echo "$speedup < 1.5" | bc -l) )); then
+            echo "Error: Speedup is less than 1.5x in single precision"
+            exit 1
+          fi
 
       - name: Generate & Post Comment
         run: |
-          (cd pr && . ./mfc.sh load -c p -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
+          cd pr
+          . ./mfc.sh load -c p -m ${{ matrix.device }}
+          ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml bench-${{ matrix.device }}.yaml
 
       - name: Archive Logs
         uses: actions/upload-artifact@v3
-        if:   always()
+        if: always()
         with:
           name: logs-${{ matrix.device }}
           path: |
