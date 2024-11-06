@@ -57,6 +57,10 @@ module m_derived_types
         real(kind(0d0)) :: ve1
         real(kind(0d0)) :: ve2
         real(kind(0d0)) :: ve3
+        real(kind(0d0)) :: u_in, v_in, w_in, u_out, v_out, w_out, pres_in, pres_out
+        real(kind(0d0)), dimension(num_fluids_max) :: alpha_rho_in,  alpha_in
+        logical :: grcbc_in, grcbc_out, grcbc_vel_out
+
     end type int_bounds_info
 
     !> Derived type adding beginning (beg) and end bounds info as attributes

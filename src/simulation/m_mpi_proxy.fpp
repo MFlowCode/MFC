@@ -203,6 +203,9 @@ contains
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
+            & 'bc_x%grcbc_in', 'bc_x%grcbc_out', 'bc_x%grcbc_vel_out',          &
+            & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
+            & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -210,8 +213,14 @@ contains
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
             & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
+            & 'bc_x%u_in','bc_x%v_in','bc_x%w_in','bc_x%u_out','bc_x%v_out','bc_x%w_out', &
+            & 'bc_x%pres_in','bc_x%pres_out', &
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
+            & 'bc_y%u_in','bc_y%v_in','bc_y%w_in','bc_y%u_out','bc_y%v_out','bc_y%w_out', &
+            & 'bc_y%pres_in','bc_y%pres_out', & 
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
+            & 'bc_z%u_in','bc_z%v_in','bc_z%w_in','bc_z%u_out','bc_z%v_out','bc_z%w_out', &
+            & 'bc_z%pres_in','bc_z%pres_out', & 
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 't_stop',  't_save', 'cfl_target']
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -233,6 +242,12 @@ contains
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end do
+
+        do i = 1, num_fluids_max
+            #:for VAR in ['bc_x%alpha_rho_in','bc_x%alpha_in','bc_y%alpha_rho_in','bc_y%alpha_in','bc_z%alpha_rho_in','bc_z%alpha_in']
+                call MPI_BCAST(${VAR}$(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr )
+            #:endfor
+        end do 
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', &

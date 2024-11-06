@@ -134,6 +134,31 @@ module m_cbc
     integer :: cbc_dir, cbc_loc
 !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
+    real(kind(0d0)) :: ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out
+     
+    real(kind(0d0)) :: uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out
+     
+    real(kind(0d0)) :: uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out
+    
+!$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
+!$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
+!$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
+
+
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhox_in,  alphax_in)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhoy_in,  alphay_in)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhoz_in,  alphaz_in)
+!$acc declare link(alpha_rhox_in,  alphax_in, alpha_rhoy_in,  alphay_in, alpha_rhoz_in,  alphaz_in) 
+#else
+    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhox_in,  alphax_in
+    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhoy_in,  alphay_in
+    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhoz_in,  alphaz_in
+!$acc declare create(alpha_rhox_in, alphax_in, alpha_rhoy_in, alphay_in, alpha_rhoz_in, alphaz_in) 
+#endif
+
+
+
 #ifndef CRAY_ACC_WAR
 !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf, flux_src_rsx_vf, &
 !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf, flux_src_rsy_vf, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf, flux_src_rsz_vf,Re, &
@@ -426,6 +451,58 @@ contains
             !$acc update device(bczb, bcze)
         end if
 
+        @:ALLOCATE_GLOBAL(alpha_rhox_in(1:num_fluids), alpha_rhoy_in(1:num_fluids), alpha_rhoz_in(1:num_fluids))
+        @:ALLOCATE_GLOBAL(alphax_in(1:num_fluids), alphay_in(1:num_fluids), alphaz_in(1:num_fluids))
+
+        #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+
+            if(${CBC_DIR}$ == 1) then 
+                u${XYZ}$_in = bc_${XYZ}$%u_in 
+                v${XYZ}$_in = bc_${XYZ}$%v_in 
+                w${XYZ}$_in = bc_${XYZ}$%w_in 
+                u${XYZ}$_out = bc_${XYZ}$%u_out
+                v${XYZ}$_out = bc_${XYZ}$%v_out 
+                w${XYZ}$_out = bc_${XYZ}$%w_out
+                Del${XYZ}$_in = maxval(dx)
+                Del${XYZ}$_out = maxval(dx)
+            else if(${CBC_DIR}$ == 2) then 
+
+                u${XYZ}$_in = bc_${XYZ}$%v_in 
+                v${XYZ}$_in = bc_${XYZ}$%u_in 
+                w${XYZ}$_in = bc_${XYZ}$%w_in 
+                u${XYZ}$_out = bc_${XYZ}$%v_out
+                v${XYZ}$_out = bc_${XYZ}$%u_out 
+                w${XYZ}$_out = bc_${XYZ}$%w_out 
+                if(n > 0) then 
+                    Del${XYZ}$_in = maxval(dy)
+                    Del${XYZ}$_out = maxval(dy)
+                end if
+            else if(${CBC_DIR}$ == 3) then 
+                u${XYZ}$_in = bc_${XYZ}$%w_in 
+                v${XYZ}$_in = bc_${XYZ}$%u_in 
+                w${XYZ}$_in = bc_${XYZ}$%v_in 
+                u${XYZ}$_out = bc_${XYZ}$%w_out
+                v${XYZ}$_out = bc_${XYZ}$%u_out 
+                w${XYZ}$_out = bc_${XYZ}$%v_out 
+                if(p > 0) then 
+                    Del${XYZ}$_in = maxval(dz)
+                    Del${XYZ}$_out = maxval(dz)
+                end if
+            end if               
+
+            pres${XYZ}$_in = bc_${XYZ}$%pres_in
+            pres${XYZ}$_out = bc_${XYZ}$%pres_out
+            do i = 1, num_fluids
+                alpha_rho${XYZ}$_in(i) = bc_${XYZ}$%alpha_rho_in(i)
+                alpha${XYZ}$_in(i) = bc_${XYZ}$%alpha_in(i)
+            end do
+            !$acc update device(u${XYZ}$_in, v${XYZ}$_in, w${XYZ}$_in, u${XYZ}$_out, v${XYZ}$_out, w${XYZ}$_out)
+            !$acc update device(pres${XYZ}$_in, pres${XYZ}$_out, alpha_rho${XYZ}$_in, alpha${XYZ}$_in)
+            !$acc update device(Del${XYZ}_in, Del${XYZ}_out)
+            
+        #:endfor
+
+
     end subroutine s_initialize_cbc_module
 
     !>  Compute CBC coefficients
@@ -655,6 +732,7 @@ contains
         real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
         real(kind(0d0)) :: qv          !< Cell averaged fluid reference energy
         real(kind(0d0)) :: c
+        real(kind(0d0)) :: Ma
 
         real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
 
@@ -861,14 +939,42 @@ contains
                         lambda(2) = vel(dir_idx(1))
                         lambda(3) = vel(dir_idx(1)) + c
 
+                        Ma = vel(dir_idx(1)) / c                                            
+
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
                             call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            
+                            if(bc_${XYZ}$%grcbc_in) then 
+                                !$acc loop seq 
+                                do i = 2, momxb
+                                    L(2) = c**3d0 * Ma * (alpha_rho(i-1) - alpha_rho${XYZ}$_in(i-1)) / Del${XYZ}$_in - c * Ma * (pres - pres${XYZ}$_in) / Del${XYZ}$_in
+                                end do
+                                if(n > 0) then 
+                                    L(momxb + 1) = c * Ma * (vel(dir_idx(2)) - v${XYZ}$_in) / Del${XYZ}$_in
+                                    if(p > 0) then 
+                                        L(momxb + 2) = c * Ma * (vel(dir_idx(3)) - w${XYZ}$_in) / Del${XYZ}$_in
+                                    end if 
+                                end if                                
+                                !$acc loop seq 
+                                do i = E_idx, advxe - 1
+                                    L(i) = c * Ma * (adv(i + 1 - E_idx) - alpha${XYZ}$_in(i + 1 - E_idx)) / Del${XYZ}$_in
+                                end do 
+                                L(advxe) = rho*c**2d0*(1d0 + Ma)*(vel(dir_idx(1)) + u${XYZ}$_in * sign(1, cbc_loc)) / Del${XYZ}$_in + c*(1d0 + Ma)*(pres - pres${XYZ}$_in) / Del${XYZ}$_in
+                            end if      
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+                            
+                            if(bc_${XYZ}$%grcbc_out) then
+                                L(advxe) =  c*(1d0 - Ma)*(pres - pres${XYZ}$_out) / Del${XYZ}$_out 
+                                if(bc_${XYZ}$%grcbc_vel_out) then
+                                    L(advxe) = L(advxe) +  rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + u${XYZ}$_out * sign(1, cbc_loc)) / Del${XYZ}$_out
+                                end if
+                            end if
+
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then

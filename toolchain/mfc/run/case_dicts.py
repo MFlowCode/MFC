@@ -237,15 +237,31 @@ for ib_id in range(1, 10+1):
         SIMULATION[f'patch_ib({ib_id})%{cmp}_centroid'] = ParamType.REAL
         SIMULATION[f'patch_ib({ib_id})%length_{cmp}'] = ParamType.REAL
 
-for cmp in ["x", "y", "z"]:
-    SIMULATION[f'bc_{cmp}%beg'] = ParamType.INT
-    SIMULATION[f'bc_{cmp}%end'] = ParamType.INT
-    SIMULATION[f'bc_{cmp}%vb1'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%vb2'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%vb3'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve1'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
-    SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
+    for cmp in ["x", "y", "z"]:
+        SIMULATION[f'bc_{cmp}%beg'] = ParamType.INT
+        SIMULATION[f'bc_{cmp}%end'] = ParamType.INT
+        SIMULATION[f'bc_{cmp}%vb1'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%vb2'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%vb3'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%ve1'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%u_in'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%v_in'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%w_in'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%u_out'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%v_out'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%w_out'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%pres_in'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%pres_out'] = ParamType.REAL
+        SIMULATION[f'bc_{cmp}%grcbc_in'] = ParamType.LOG
+        SIMULATION[f'bc_{cmp}%grcbc_out'] = ParamType.LOG
+        SIMULATION[f'bc_{cmp}%grcbc_vel_out'] = ParamType.LOG
+
+    for int_id in range(1, 10+1):
+        for cmp in ["x", "y", "z"]:
+            SIMULATION[f"bc_{cmp}%alpha_rho_in({int_id})"] = ParamType.REAL
+            SIMULATION[f"bc_{cmp}%alpha_in({int_id})"] = ParamType.REAL
 
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
@@ -293,6 +309,7 @@ for f_id in range(1,10+1):
         for cmp in ["x", "y", "z"]:
             SIMULATION[f"integral({int_id})%{cmp}min"] = ParamType.REAL
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
+
 
 
 # Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt'

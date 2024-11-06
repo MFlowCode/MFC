@@ -473,6 +473,7 @@ module m_global_parameters
 
     !$acc declare create(pb_ts, mv_ts)
 #endif
+
     ! ======================================================================
 
 contains
@@ -679,6 +680,18 @@ contains
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
         end do
+
+        bc_x%grcbc_in = .false. 
+        bc_x%grcbc_out = .false.
+        bc_x%grcbc_vel_out = .false.
+
+        bc_y%grcbc_in = .false. 
+        bc_y%grcbc_out = .false.
+        bc_y%grcbc_vel_out = .false.
+
+        bc_z%grcbc_in = .false. 
+        bc_z%grcbc_out = .false.
+        bc_z%grcbc_vel_out = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
