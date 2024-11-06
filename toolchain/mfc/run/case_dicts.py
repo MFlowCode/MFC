@@ -312,7 +312,7 @@ for f_id in range(1,10+1):
 
 
 
-# Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt'
+# Removed: 'fourier_modes%beg', 'fourier_modes%end'.
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
 POST_PROCESS.update({
