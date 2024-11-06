@@ -694,7 +694,7 @@ contains
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
         !$acc routine seq
@@ -767,7 +767,7 @@ contains
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
     subroutine s_coeff(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
         !$acc routine seq
@@ -1046,7 +1046,7 @@ contains
     end subroutine s_mom_inv
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_chyqmom
 #else
         !$acc routine seq
@@ -1113,7 +1113,7 @@ contains
     end subroutine s_chyqmom
 
     subroutine s_hyqmom(frho, fup, fmom)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_hyqmom
 #else
         !$acc routine seq
