@@ -75,7 +75,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_capillary():
-        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1,
+                        'sigma':1, 'model_eqns':3, 'surface_tension': 'T'})
         cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
         stack.pop()
 
@@ -157,7 +158,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 1:
                 stack.push("Viscous", {
-                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
+                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0,
+                    'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -175,7 +177,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
-                    'patch_icpp(1)%vel(1)': 1.0})
+                    'patch_icpp(1)%vel(1)': 1.0, 'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -206,7 +208,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11})
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'})
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
         cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -249,7 +252,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'
             })
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
@@ -533,7 +537,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
                     'mixlayer_perturb': 'T', 'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
                     'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,
-                    'fluid_pp(1)%Re(1)': 1.6881644098979287,
+                    'fluid_pp(1)%Re(1)': 1.6881644098979287, 'viscous': 'T',
                     'patch_icpp(1)%x_centroid': 180.0, 'patch_icpp(1)%length_x': 360.0,
                     'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0,
                     'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0,

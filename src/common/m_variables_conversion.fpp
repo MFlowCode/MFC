@@ -1045,7 +1045,7 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (.not. f_is_default(sigma)) then
+                    if (surface_tension) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
                     end if
 
@@ -1219,7 +1219,7 @@ contains
                         end do
                     end if
 
-                    if (.not. f_is_default(sigma)) then
+                    if (surface_tension) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
 

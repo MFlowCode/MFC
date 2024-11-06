@@ -75,6 +75,7 @@ data = {
         'num_patches'       : 2,
         'num_fluids'        : 2,
         'weno_avg'          : 'T',
+        'surface_tension'   : 'T',
     # =======================================
 
     # Database Structure Parameters =========
@@ -91,13 +92,11 @@ data = {
     # Fluid Parameters (Water) ==============
         'fluid_pp(1)%gamma'            : 1.E+00/(2.1E+00-1.E+00),
         'fluid_pp(1)%pi_inf'           : 2.1E+00*1.E+06/(2.1E+00-1.E+00),
-        #'fluid_pp(1)%Re(1)'             : 1.e3,
     # =======================================
 
     # Fluid Parameters (Gas) ================
         'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
         'fluid_pp(2)%pi_inf'           : 0.E+00,
-        #'fluid_pp(2)%Re(1)'             : 1.81e5,
     # =======================================
 
     # Air Patch ==========================
