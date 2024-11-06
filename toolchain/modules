@@ -57,6 +57,7 @@ d-all python/3.11.6
 d-cpu gcc/11.4.0 openmpi
 d-gpu nvhpc/24.1 cuda/12.3.0 openmpi/4.1.5+cuda cmake
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
+d-gpu MFC_CUDA_CC=80,86
 
 c     DoD Carpenter
 c-all python/3.12.1
