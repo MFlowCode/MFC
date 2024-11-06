@@ -961,11 +961,11 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
-        #:if chemistry
+        if (chemistry) then
             call nvtxStartRange("RHS_Chem_Advection")
             call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
             call nvtxEndRange
-        #:endif
+        end if
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -1000,13 +1000,13 @@ contains
             rhs_vf)
         call nvtxEndRange
 
-        #:if chemistry
+        if (chemistry) then
             if (chem_params%reactions) then
                 call nvtxStartRange("RHS_Chem_Reactions")
                 call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
                 call nvtxEndRange
             end if
-        #:endif
+        end if
 
         ! END: Additional pphysics and source terms ============================
 
