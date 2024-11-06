@@ -151,7 +151,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h static" "SHELL:-h keepfiles"
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
-        "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-UCRAY_ACC_WAR"
+        "SHELL: -h list=adm"
     )
 
     add_link_options("SHELL:-hkeepfiles")
