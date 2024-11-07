@@ -365,7 +365,6 @@ contains
         integer :: i, j, k, l, r
 
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'

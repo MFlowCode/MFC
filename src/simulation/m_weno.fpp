@@ -551,7 +551,6 @@ contains
         real(kind(0d0)), dimension(0:weno_num_stencils) :: delta
         real(kind(0d0)), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
         real(kind(0d0)) :: tau
-        real(kind(0d0)), pointer :: beta_p(:)
 
         integer :: i, j, k, l
 

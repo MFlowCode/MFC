@@ -702,7 +702,7 @@ contains
         real(kind(0.d0)), intent(in) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
 
-        integer :: i1, i2, q
+        integer :: i1, i2
 
         coeffs = 0d0
 
@@ -847,7 +847,7 @@ contains
 
         integer :: id1, id2, id3
         integer :: i1, i2
-        integer :: j, k, q, r
+        integer :: j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
 
