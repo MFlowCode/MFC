@@ -65,7 +65,7 @@ P_amp_n = P_amp/stress_char
 #geometry
 amp = 0.5
 interface_amp = amp*lambda_wave
-Namp = 25               #20                                                     # Dont Change
+Namp = 60 #25               #20                                                     # Dont Change
 
 dlengx = 6.*lambda_wave
 dlengy = 1.*lambda_wave/2.
@@ -77,15 +77,15 @@ dx = dlengx/Nx
 dy = dlengy/Ny
 dz = dlengz/Nz
 
-alphal_back = 0.99999
+alphal_back = 1.0 - 1E-8
 alphag_back = 1.0 - alphal_back
 
-alphag_lung = 0.99999
+alphag_lung = 1.0 - 1E-8
 alphal_lung = 1.0 - alphag_lung
 
 
 # time stepping requirements
-time_end = 5.5e-5#1.5E-04
+time_end = 1E-5#5.5e-5#1.5E-04
 time_save = 0.01
 cfl = 0.5                                                                       # Should not change
 
@@ -131,8 +131,8 @@ print(json.dumps({
     ####Change
     'relax'                        : 'T',
     'relax_model'                  : 5,
-    'palpha_eps'                   : 1.0E-5,            #check smaller  -6/-8
-    'ptgalpha_eps'                 : 0.999,
+    'palpha_eps'                   : 1.0E-8,            #check smaller  -6/-8
+    'ptgalpha_eps'                 : 1.0-1E-8,
     ########Change
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
@@ -216,8 +216,8 @@ print(json.dumps({
     'patch_icpp(2)%length_z'       : 2*dlengz,                 
     'patch_icpp(2)%a2'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
-    'patch_icpp(2)%vel(2)'         : 0.0,
-    'patch_icpp(2)%vel(3)'         : 0.0,
+    'patch_icpp(2)%vel(2)'         : 0.E+00,
+    'patch_icpp(2)%vel(3)'         : 0.E+00,
     'patch_icpp(2)%pres'           : patmos_n,
     'patch_icpp(2)%alpha_rho(1)'   : rhol_n*alphal_lung,
     'patch_icpp(2)%alpha_rho(2)'   : rhog_n*alphag_lung,

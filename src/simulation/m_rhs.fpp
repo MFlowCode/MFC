@@ -798,7 +798,7 @@ contains
                 end do
             end do
         end if
-        !print *, "I got here A"
+
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -806,16 +806,16 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-        !print *, "I got here B"
 
         call nvtxStartRange("RHS-MPI")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
-
         call nvtxEndRange
-        !print *, "I got here c"
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+           if (hyperelasticity) then 
+             call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+             call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+           end if
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -947,7 +947,6 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-            !print *, "I got here e"
 
             ! ===============================================================
             ! Additional physics and source terms ===========================
@@ -966,7 +965,6 @@ contains
                                                                q_prim_qp%vf, &
                                                                rhs_vf)
             call nvtxEndRange
-            !print *, "I got here f"
 
             ! RHS additions for viscosity
             call nvtxStartRange("RHS_add_phys")
@@ -1067,8 +1065,6 @@ contains
         #:endif
 
         ! END: Additional pphysics and source terms ============================
-        !print *, "I got here g"
-
         if (run_time_info .or. probe_wrt .or. ib) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
@@ -1095,9 +1091,8 @@ contains
             time_avg = 0d0
         end if
         ! ==================================================================
-        !print *, "I got here h"
-
         call nvtxEndRange
+
     end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
