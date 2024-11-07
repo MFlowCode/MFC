@@ -872,8 +872,6 @@ contains
 
         integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
-        real(kind(0d0)), pointer :: p_send, p_recv
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
@@ -1073,8 +1071,6 @@ contains
         ! Send/Recv
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                p_send => q_cons_buff_send(0)
-                p_recv => q_cons_buff_recv(0)
                 #:if rdma_mpi
                     !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
                 #:else
