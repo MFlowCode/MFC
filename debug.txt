@@ -1,0 +1,2185 @@
+/Users/spencer/Downloads/MFC-spencer/build/staging/d55d7675f9/modules/syscheck/m_thermochem.f90:670:43:
+
+  670 |         real(dp), dimension(1) :: k_falloff
+      |                                           1
+Warning: Unused variable 'k_falloff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:737:16:
+
+  737 |             k = scale(i)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:355:49:
+
+  355 |                            norm, tst1, tst2, c, d
+      |                                                 1
+Warning: Unused variable 'd' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/build/staging/01e791bfe0/modules/pre_process/m_thermochem.f90:670:43:
+
+  670 |         real(dp), dimension(1) :: k_falloff
+      |                                           1
+Warning: Unused variable 'k_falloff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:229:52:
+
+  229 |         real(kind(0d0)) :: f, g, h, fi, fr, scale, c
+      |                                                    1
+Warning: Unused variable 'c' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:226:67:
+
+  226 |                                                        ccfl_max_glb, &
+      |                                                                   1
+Warning: Dummy argument 'ccfl_max_glb' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:222:67:
+
+  222 |                                                        ccfl_max_loc, &
+      |                                                                   1
+Warning: Unused dummy argument 'ccfl_max_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:224:67:
+
+  224 |                                                        icfl_max_glb, &
+      |                                                                   1
+Warning: Dummy argument 'icfl_max_glb' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:220:67:
+
+  220 |     subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
+      |                                                                   1
+Warning: Unused dummy argument 'icfl_max_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:227:65:
+
+  227 |                                                        Rc_min_glb)
+      |                                                                 1
+Warning: Dummy argument 'rc_min_glb' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:223:65:
+
+  223 |                                                        Rc_min_loc, &
+      |                                                                 1
+Warning: Unused dummy argument 'rc_min_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:225:67:
+
+  225 |                                                        vcfl_max_glb, &
+      |                                                                   1
+Warning: Dummy argument 'vcfl_max_glb' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:221:67:
+
+  221 |                                                        vcfl_max_loc, &
+      |                                                                   1
+Warning: Unused dummy argument 'vcfl_max_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:29:
+
+   81 |         integer :: i, j, q, k, l
+      |                             1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:32:
+
+   81 |         integer :: i, j, q, k, l
+      |                                1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:26:
+
+   81 |         integer :: i, j, q, k, l
+      |                          1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:236:13:
+
+  236 |         c1 = imag*omega*peclet
+      |             1
+Warning: Possible change of value in conversion from COMPLEX(8) to COMPLEX(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:239:16:
+
+  239 |         trans = ((c2/c3 - 1.d0)**(-1) - 3.d0/c1)**(-1) ! transfer function
+      |                1
+Warning: Possible change of value in conversion from COMPLEX(8) to COMPLEX(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:397:46:
+
+  397 |         real(kind(0d0)), dimension(1:4) :: tmp
+      |                                              1
+Warning: Unused variable 'tmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:234:40:
+
+  234 |         real(kind(0.d0)) :: f_transcoeff
+      |                                        1
+Warning: Unused variable 'f_transcoeff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_mpi_proxy.fpp:26:32:
+
+   26 |     integer, private :: err_code, ierr !<
+      |                                1
+Warning: Unused PRIVATE module variable 'err_code' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_model.fpp:320:21:
+
+  320 |             normal = model%trs(i)%n
+      |                     1
+Warning: Possible change of value in conversion from REAL(8) to REAL(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_model.fpp:324:20:
+
+  324 |                 v = model%trs(i)%v(j, :)
+      |                    1
+Warning: Possible change of value in conversion from REAL(8) to REAL(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_model.fpp:504:34:
+
+  504 |         real(kind(0d0)) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+      |                                  1
+Warning: Unused variable 'v0v1' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_model.fpp:504:43:
+
+  504 |         real(kind(0d0)) :: v0v1(3), v0v2(3), N(3), P(3), C(3), edge(3), vp(3)
+      |                                           1
+Warning: Unused variable 'v0v2' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_model.fpp:32:23:
+
+   32 |         integer :: i, j, iunit, iostat
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:130:56:
+
+  130 | 
+      |                                                        1
+Warning: Unused PRIVATE module variable 'res' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1266:57:
+
+ 1266 |         real(kind(0d0)), dimension(num_fluids) :: alpha_K
+      |                                                         1
+Warning: Unused variable 'alpha_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1265:61:
+
+ 1265 |         real(kind(0d0)), dimension(num_fluids) :: alpha_rho_K
+      |                                                             1
+Warning: Unused variable 'alpha_rho_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1271:30:
+
+ 1271 |         real(kind(0d0)) :: E_K
+      |                              1
+Warning: Unused variable 'e_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1252:62:
+
+ 1252 |                                                      FK_src_vf, &
+      |                                                              1
+Warning: Unused dummy argument 'fk_src_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1251:58:
+
+ 1251 |                                                      FK_vf, &
+      |                                                          1
+Warning: Unused dummy argument 'fk_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1276:30:
+
+ 1276 |         real(kind(0d0)) :: G_K
+      |                              1
+Warning: Unused variable 'g_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1272:34:
+
+ 1272 |         real(kind(0d0)) :: gamma_K
+      |                                  1
+Warning: Unused variable 'gamma_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1278:20:
+
+ 1278 |         integer :: i, j, k, l !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1278:23:
+
+ 1278 |         integer :: i, j, k, l !< Generic loop iterators
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1278:26:
+
+ 1278 |         integer :: i, j, k, l !< Generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1278:29:
+
+ 1278 |         integer :: i, j, k, l !< Generic loop iterators
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1273:35:
+
+ 1273 |         real(kind(0d0)) :: pi_inf_K
+      |                                   1
+Warning: Unused variable 'pi_inf_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1270:33:
+
+ 1270 |         real(kind(0d0)) :: pres_K
+      |                                 1
+Warning: Unused variable 'pres_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1250:63:
+
+ 1250 |     subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, &
+      |                                                               1
+Warning: Unused dummy argument 'qk_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1274:31:
+
+ 1274 |         real(kind(0d0)) :: qv_K
+      |                               1
+Warning: Unused variable 'qv_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1275:45:
+
+ 1275 |         real(kind(0d0)), dimension(2) :: Re_K
+      |                                             1
+Warning: Unused variable 're_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1267:32:
+
+ 1267 |         real(kind(0d0)) :: rho_K
+      |                                1
+Warning: Unused variable 'rho_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1268:53:
+
+ 1268 |         real(kind(0d0)), dimension(num_dims) :: vel_K
+      |                                                     1
+Warning: Unused variable 'vel_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1269:36:
+
+ 1269 |         real(kind(0d0)) :: vel_K_sum
+      |                                    1
+Warning: Unused variable 'vel_k_sum' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:32:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:35:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                                   1
+Warning: Unused variable 'r3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1094:23:
+
+ 1094 |         integer :: spec
+      |                       1
+Warning: Unused variable 'spec' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:42:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                                          1
+Warning: Unused variable 'vftmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:840:73:
+
+  840 |                                                              gm_alphaK_vf)
+      |                                                                         1
+Warning: Unused dummy argument 'gm_alphak_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:865:37:
+
+  865 |         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
+      |                                     1
+Warning: Unused variable 'nr3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:873:32:
+
+  873 |         real(kind(0.d0)) :: ntmp
+      |                                1
+Warning: Unused variable 'ntmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:871:32:
+
+  871 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:865:53:
+
+  865 |         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
+      |                                                     1
+Warning: Unused variable 'r3tmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:869:38:
+
+  869 |         real(kind(0d0)) :: pres, Yksum, T
+      |                                      1
+Warning: Unused variable 'yksum' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:628:23:
+
+  628 |         integer :: i, j
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:73:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                         1
+Warning: Unused dummy argument 'alpha_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:86:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                      1
+Warning: Unused dummy argument 'alpha_rho_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:556:73:
+
+  556 |                                                                   gamma_K, pi_inf_K, qv_K, &
+      |                                                                         1
+Warning: Unused dummy argument 'gamma_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:572:20:
+
+  572 |         integer :: i, j !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:572:23:
+
+  572 |         integer :: i, j !< Generic loop iterators
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:95:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                               1
+Warning: Unused dummy argument 'k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:98:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                                  1
+Warning: Unused dummy argument 'l' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:556:83:
+
+  556 |                                                                   gamma_K, pi_inf_K, qv_K, &
+      |                                                                                   1
+Warning: Unused dummy argument 'pi_inf_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:556:89:
+
+  556 |                                                                   gamma_K, pi_inf_K, qv_K, &
+      |                                                                                         1
+Warning: Unused dummy argument 'qv_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:101:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                                     1
+Warning: Unused dummy argument 'r' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:92:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                            1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:555:71:
+
+  555 |     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
+      |                                                                       1
+Warning: Unused dummy argument 'rho_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:65:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                 1
+Warning: Unused dummy argument 'alpha_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:494:38:
+
+  494 |         real(kind(0d0)) :: alpha_K_sum
+      |                                      1
+Warning: Unused variable 'alpha_k_sum' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:78:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                              1
+Warning: Unused dummy argument 'alpha_rho_k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:475:64:
+
+  475 |                                                           G_K, G)
+      |                                                                1
+Warning: Unused dummy argument 'g' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:475:61:
+
+  475 |                                                           G_K, G)
+      |                                                             1
+Warning: Dummy argument 'g_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:473:65:
+
+  473 |                                                           gamma_K, pi_inf_K, qv_K, &
+      |                                                                 1
+Warning: Dummy argument 'gamma_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:493:20:
+
+  493 |         integer :: i, j !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:493:23:
+
+  493 |         integer :: i, j !< Generic loop iterators
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:87:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                       1
+Warning: Unused dummy argument 'k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:90:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                          1
+Warning: Unused dummy argument 'l' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:473:75:
+
+  473 |                                                           gamma_K, pi_inf_K, qv_K, &
+      |                                                                           1
+Warning: Dummy argument 'pi_inf_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:473:81:
+
+  473 |                                                           gamma_K, pi_inf_K, qv_K, &
+      |                                                                                 1
+Warning: Dummy argument 'qv_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:93:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                             1
+Warning: Unused dummy argument 'r' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:84:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                    1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:472:63:
+
+  472 |     subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
+      |                                                               1
+Warning: Dummy argument 'rho_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:405:23:
+
+  405 |         integer :: i, j !< Generic loop iterator
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:387:77:
+
+  387 |                                                       gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                             1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:263:98:
+
+  263 |                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                                  1
+Warning: Unused dummy argument 'g' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:263:95:
+
+  263 |                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                               1
+Warning: Dummy argument 'g_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:278:23:
+
+  278 |         integer :: i, q
+      |                       1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:263:90:
+
+  263 |                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                          1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:90:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                          1
+Warning: Unused dummy argument 'g' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:87:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                       1
+Warning: Dummy argument 'g_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:82:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                  1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:176:35:
+
+  176 |                             E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+      |                                   1
+Warning: Unused variable 'e_per_kg' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:176:48:
+
+  176 |                             E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+      |                                                1
+Warning: Unused variable 'pdyn_per_kg' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:159:84:
+
+  159 |             else
+      |                                                                                    1
+Warning: Unused dummy argument 'rhoyks' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:159:93:
+
+  159 |             else
+      |                                                                                             1
+Warning: Dummy argument 't' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:177:57:
+
+  177 |                         end if
+      |                                                         1
+Warning: Unused variable 'y_rs' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:491:33:
+
+  491 |     subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+      |                                 1
+Warning: Unused dummy argument 'wr' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:296:20:
+
+  296 |         integer :: i, j, k, l !<  generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:296:29:
+
+  296 |         integer :: i, j, k, l !<  generic loop iterators
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:235:20:
+
+  235 |         integer :: i, j !<  generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:185:25:
+
+  185 |         integer :: ii, jj
+      |                         1
+Warning: Unused variable 'jj' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:87:29:
+
+   87 |         integer :: i, j, k, l !<  generic loop iterators
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_perturbation.fpp:58:38:
+
+   58 |         real(kind(0d0)) :: alpha_unadv
+      |                                      1
+Warning: Unused variable 'alpha_unadv' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:321:40:
+
+  321 |         real(kind(0d0)) :: epsilon, beta
+      |                                        1
+Warning: Unused variable 'beta' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:321:34:
+
+  321 |         real(kind(0d0)) :: epsilon, beta
+      |                                  1
+Warning: Unused variable 'epsilon' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:319:31:
+
+  319 |         real(kind(0d0)) :: pres   !< pressure
+      |                               1
+Warning: Unused variable 'pres' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:318:67:
+
+  318 |         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+      |                                                                   1
+Warning: Unused variable 'vel' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:320:37:
+
+  320 |         real(kind(0d0)) :: x_centroid, y_centroid
+      |                                     1
+Warning: Unused variable 'x_centroid' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:320:49:
+
+  320 |         real(kind(0d0)) :: x_centroid, y_centroid
+      |                                                 1
+Warning: Unused variable 'y_centroid' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:123:40:
+
+  123 |         real(kind(0d0)) :: epsilon, beta
+      |                                        1
+Warning: Unused variable 'beta' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:123:34:
+
+  123 |         real(kind(0d0)) :: epsilon, beta
+      |                                  1
+Warning: Unused variable 'epsilon' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:121:32:
+
+  121 |         real(kind(0d0)) :: gamma  !< specific heat ratio function
+      |                                1
+Warning: Unused variable 'gamma' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:120:31:
+
+  120 |         real(kind(0d0)) :: pres   !< pressure
+      |                               1
+Warning: Unused variable 'pres' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:118:30:
+
+  118 |         real(kind(0d0)) :: rho    !< density
+      |                              1
+Warning: Unused variable 'rho' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:119:67:
+
+  119 |         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
+      |                                                                   1
+Warning: Unused variable 'vel' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:122:37:
+
+  122 |         real(kind(0d0)) :: x_centroid, y_centroid
+      |                                     1
+Warning: Unused variable 'x_centroid' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_assign_variables.fpp:122:49:
+
+  122 |         real(kind(0d0)) :: x_centroid, y_centroid
+      |                                                 1
+Warning: Unused variable 'y_centroid' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:316:44:
+
+  316 |         integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
+      |                                            1
+Warning: Unused variable 'ig' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:317:54:
+
+  317 |         real(kind(0.0d0)), dimension(num_fluids) :: pk !< individual initial pressures
+      |                                                      1
+Warning: Unused variable 'pk' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:300:71:
+
+  300 |     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+      |                                                                       1
+Warning: Unused dummy argument 'rm' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_data_output.fpp:112:30:
+
+  112 |         real(kind(0d0)) :: nR3
+      |                              1
+Warning: Unused variable 'nr3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_data_output.fpp:113:31:
+
+  113 |         real(kind(0d0)) :: ntmp
+      |                               1
+Warning: Unused variable 'ntmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1982:43:
+
+ 1982 |         type(ic_model_parameters) :: params
+      |                                           1
+Warning: Unused variable 'params' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1564:59:
+
+ 1564 |         real(kind(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !<
+      |                                                           1
+Warning: Unused variable 'pressure_bubble' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1564:73:
+
+ 1564 |         real(kind(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !<
+      |                                                                         1
+Warning: Unused variable 'pressure_inf' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1564:42:
+
+ 1564 |         real(kind(0d0)) :: radius_pressure, pressure_bubble, pressure_inf !<
+      |                                          1
+Warning: Unused variable 'radius_pressure' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1274:28:
+
+ 1274 |         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
+      |                            1
+Warning: Unused variable 'a' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1274:31:
+
+ 1274 |         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
+      |                               1
+Warning: Unused variable 'b' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1274:34:
+
+ 1274 |         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
+      |                                  1
+Warning: Unused variable 'c' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1274:37:
+
+ 1274 |         real(kind(0d0)) :: a, b, c, d !< placeholderrs for the cell boundary values
+      |                                     1
+Warning: Unused variable 'd' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1273:26:
+
+ 1273 |         integer :: i, j, k !< generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1222:33:
+
+ 1222 |         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                 1
+Warning: Unused variable 'a' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1222:36:
+
+ 1222 |         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                    1
+Warning: Unused variable 'b' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1222:39:
+
+ 1222 |         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                       1
+Warning: Unused variable 'c' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1222:42:
+
+ 1222 |         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                          1
+Warning: Unused variable 'd' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1222:30:
+
+ 1222 |         real(kind(0d0)) :: fac, a, b, c, d, pi_inf, gamma, lit_gamma
+      |                              1
+Warning: Unused variable 'fac' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1220:23:
+
+ 1220 |         integer :: i, j, k
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1220:26:
+
+ 1220 |         integer :: i, j, k
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1162:28:
+
+ 1162 |         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+      |                            1
+Warning: Unused variable 'a' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1162:31:
+
+ 1162 |         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+      |                               1
+Warning: Unused variable 'b' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1162:34:
+
+ 1162 |         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                  1
+Warning: Unused variable 'c' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1162:37:
+
+ 1162 |         real(kind(0d0)) :: a, b, c, d, pi_inf, gamma, lit_gamma
+      |                                     1
+Warning: Unused variable 'd' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1160:23:
+
+ 1160 |         integer :: i, j, k
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1160:26:
+
+ 1160 |         integer :: i, j, k
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1082:26:
+
+ 1082 |         integer :: i, j, k !< generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:1017:26:
+
+ 1017 |         integer :: i, j, k !< Generic loop operators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:919:26:
+
+  919 |         integer :: i, j, k !< generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:766:26:
+
+  766 |         integer :: i, j, k !< Generic loop operators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:642:26:
+
+  642 |         integer :: i, j, k
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:462:60:
+
+  462 |     subroutine s_3D_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+      |                                                            1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:469:103:
+
+  469 |         real(kind(0d0)) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+      |                                                                                                       1
+Warning: Unused variable 'ya' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:308:29:
+
+  308 |         integer :: i, j, k, l
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:300:57:
+
+  300 |     subroutine s_airfoil(patch_id, patch_id_fp, q_prim_vf, ib)
+      |                                                         1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:307:81:
+
+  307 |         real(kind(0d0)) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+      |                                                                                 1
+Warning: Unused variable 'ya' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:229:26:
+
+  229 |         integer :: i, j, k !< Generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:104:23:
+
+  104 |         integer :: i, j, k !< Generic loop operators
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_patches.fpp:104:26:
+
+  104 |         integer :: i, j, k !< Generic loop operators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_initial_condition.fpp:121:33:
+
+  121 |         character(len=10) :: iStr
+      |                                 1
+Warning: Unused variable 'istr' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_start_up.fpp:829:100:
+
+  829 |     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+      |                                                                                                    1
+Warning: Unused dummy argument 'file_exists' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_start_up.fpp:829:65:
+
+  829 |     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+      |                                                                 1
+Warning: Unused dummy argument 'proc_time' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_start_up.fpp:829:75:
+
+  829 |     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+      |                                                                           1
+Warning: Unused dummy argument 'time_avg' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/m_start_up.fpp:829:87:
+
+  829 |     subroutine s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
+      |                                                                                       1
+Warning: Unused dummy argument 'time_final' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/pre_process/p_main.f90:19:16:
+
+   19 |     integer :: i
+      |                1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_nvtx.f90:7:30:
+
+    7 |     integer, private :: col(7) = [ &
+      |                              1
+Warning: Unused PRIVATE module variable 'col' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_nvtx.f90:13:43:
+
+   13 |     character(len=256), private :: tempName
+      |                                           1
+Warning: Unused PRIVATE module variable 'tempname' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_nvtx.f90:59:42:
+
+   59 |         type(nvtxEventAttributes) :: event
+      |                                          1
+Warning: Unused variable 'event' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_nvtx.f90:56:38:
+
+   56 |     subroutine nvtxStartRange(name, id)
+      |                                      1
+Warning: Unused dummy argument 'id' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_nvtx.f90:56:34:
+
+   56 |     subroutine nvtxStartRange(name, id)
+      |                                  1
+Warning: Unused dummy argument 'name' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:737:16:
+
+  737 |             k = scale(i)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:355:49:
+
+  355 |                            norm, tst1, tst2, c, d
+      |                                                 1
+Warning: Unused variable 'd' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/build/staging/7e1418ef14/modules/simulation/m_thermochem.f90:670:43:
+
+  670 |         real(dp), dimension(1) :: k_falloff
+      |                                           1
+Warning: Unused variable 'k_falloff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_eigen_solver.f90:229:52:
+
+  229 |         real(kind(0d0)) :: f, g, h, fi, fr, scale, c
+      |                                                    1
+Warning: Unused variable 'c' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:62:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                              1
+Warning: Unused dummy argument 'c' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:109:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                                             1
+Warning: Unused dummy argument 'dadv_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:81:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                 1
+Warning: Unused dummy argument 'dalpha_rho_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:91:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                           1
+Warning: Unused dummy argument 'dpres_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:100:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                                    1
+Warning: Unused dummy argument 'dvel_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:51:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                   1
+Warning: Unused dummy argument 'lambda' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:66:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                  1
+Warning: Unused dummy argument 'mf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:249:59:
+
+  249 |     subroutine s_compute_supersonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                           1
+Warning: Unused dummy argument 'rho' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:102:121:
+
+  102 |     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                                                         1
+Warning: Unused dummy argument 'dadv_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:102:93:
+
+  102 |     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                             1
+Warning: Unused dummy argument 'dalpha_rho_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:102:78:
+
+  102 |     subroutine s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                              1
+Warning: Unused dummy argument 'mf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:30:101:
+
+   30 |     subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                                                     1
+Warning: Unused dummy argument 'dadv_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:30:73:
+
+   30 |     subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                                         1
+Warning: Unused dummy argument 'dalpha_rho_ds' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_cbc.fpp:30:58:
+
+   30 |     subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+      |                                                          1
+Warning: Unused dummy argument 'mf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:226:67:
+
+  226 |                                                        ccfl_max_glb, &
+      |                                                                   1
+Warning: Dummy argument 'ccfl_max_glb' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:222:67:
+
+  222 |                                                        ccfl_max_loc, &
+      |                                                                   1
+Warning: Unused dummy argument 'ccfl_max_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:29:
+
+   81 |         integer :: i, j, q, k, l
+      |                             1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:32:
+
+   81 |         integer :: i, j, q, k, l
+      |                                1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_mpi_common.fpp:81:26:
+
+   81 |         integer :: i, j, q, k, l
+      |                          1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:308:13:
+
+  308 | 
+      |             1
+Warning: Possible change of value in conversion from COMPLEX(8) to COMPLEX(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:311:16:
+
+  311 | 
+      |                1
+Warning: Possible change of value in conversion from COMPLEX(8) to COMPLEX(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:469:46:
+
+  469 |     subroutine s_prohibit_abort(condition, message)
+      |                                              1
+Warning: Unused variable 'tmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_helper.fpp:306:40:
+
+  306 |     !! @return The cross product of the two vectors.
+      |                                        1
+Warning: Unused variable 'f_transcoeff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:142:32:
+
+  142 | 
+      |                                1
+Warning: Unused PRIVATE module variable 'err_code' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:2138:36:
+
+ 2138 |         integer :: pack_offsets(1:3), unpack_offsets(1:3)
+      |                                    1
+Warning: Unused variable 'pack_offsets' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:2128:35:
+
+ 2128 |         integer :: i, j, k, l, r, q !< Generic loop iterators
+      |                                   1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:2138:57:
+
+ 2138 |         integer :: pack_offsets(1:3), unpack_offsets(1:3)
+      |                                                         1
+Warning: Unused variable 'unpack_offsets' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:1282:20:
+
+ 1282 |         integer :: i, j, k, l, r !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:1283:60:
+
+ 1283 |         integer, pointer, dimension(:) :: p_i_send, p_i_recv
+      |                                                            1
+Warning: Unused variable 'p_i_recv' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:1283:50:
+
+ 1283 |         integer, pointer, dimension(:) :: p_i_send, p_i_recv
+      |                                                  1
+Warning: Unused variable 'p_i_send' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:876:60:
+
+  876 |         integer, pointer, dimension(:) :: p_i_send, p_i_recv
+      |                                                            1
+Warning: Unused variable 'p_i_recv' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:876:50:
+
+  876 |         integer, pointer, dimension(:) :: p_i_send, p_i_recv
+      |                                                  1
+Warning: Unused variable 'p_i_send' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:873:36:
+
+  873 |         integer :: pack_offsets(1:3), unpack_offsets(1:3)
+      |                                    1
+Warning: Unused variable 'pack_offsets' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:873:57:
+
+  873 |         integer :: pack_offsets(1:3), unpack_offsets(1:3)
+      |                                                         1
+Warning: Unused variable 'unpack_offsets' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_mpi_proxy.fpp:676:32:
+
+  676 |         integer :: dst_proc(1:3)
+      |                                1
+Warning: Unused variable 'dst_proc' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1087:35:
+
+ 1087 |         real(kind(0d0)) :: dyn_pres
+      |                                   1
+Warning: Unused variable 'dyn_pres' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1097:32:
+
+ 1097 |         real(kind(0d0)) :: e_mix, mix_mol_weight, T
+      |                                1
+Warning: Unused variable 'e_mix' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1090:28:
+
+ 1090 |         real(kind(0d0)) :: G = 0d0
+      |                            1
+Warning: Unused variable 'g' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1084:32:
+
+ 1084 |         real(kind(0d0)) :: gamma
+      |                                1
+Warning: Unused variable 'gamma' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:20:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:23:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:26:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:29:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1097:48:
+
+ 1097 |         real(kind(0d0)) :: e_mix, mix_mol_weight, T
+      |                                                1
+Warning: Unused variable 'mix_mol_weight' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:31:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                               1
+Warning: Unused variable 'nbub' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1085:33:
+
+ 1085 |         real(kind(0d0)) :: pi_inf
+      |                                 1
+Warning: Unused variable 'pi_inf' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1093:32:
+
+ 1093 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1070:70:
+
+ 1070 |                                                              q_cons_vf)
+      |                                                                      1
+Warning: Unused dummy argument 'q_cons_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1069:70:
+
+ 1069 |     subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
+      |                                                                      1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1086:29:
+
+ 1086 |         real(kind(0d0)) :: qv
+      |                             1
+Warning: Unused variable 'qv' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:35:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                                   1
+Warning: Unused variable 'r3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:49:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                                                 1
+Warning: Unused variable 'r3tmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1091:45:
+
+ 1091 |         real(kind(0d0)), dimension(2) :: Re_K
+      |                                             1
+Warning: Unused variable 're_k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1083:30:
+
+ 1083 |         real(kind(0d0)) :: rho
+      |                              1
+Warning: Unused variable 'rho' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1089:46:
+
+ 1089 |         real(kind(0d0)), dimension(nb) :: Rtmp
+      |                                              1
+Warning: Unused variable 'rtmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1094:23:
+
+ 1094 |         integer :: spec
+      |                       1
+Warning: Unused variable 'spec' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1097:51:
+
+ 1097 |         real(kind(0d0)) :: e_mix, mix_mol_weight, T
+      |                                                   1
+Warning: Unused variable 't' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1088:42:
+
+ 1088 |         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
+      |                                          1
+Warning: Unused variable 'vftmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:1096:53:
+
+ 1096 |         real(kind(0d0)), dimension(num_species) :: Ys
+      |                                                     1
+Warning: Unused variable 'ys' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:864:73:
+
+  864 | 
+      |                                                                         1
+Warning: Unused dummy argument 'gm_alphak_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:865:37:
+
+  865 |         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
+      |                                     1
+Warning: Unused variable 'nr3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:873:32:
+
+  873 |         real(kind(0.d0)) :: ntmp
+      |                                1
+Warning: Unused variable 'ntmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:871:32:
+
+  871 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:865:53:
+
+  865 |         real(kind(0d0)) :: vftmp, nR3, nbub_sc, R3tmp
+      |                                                     1
+Warning: Unused variable 'r3tmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:869:38:
+
+  869 |         real(kind(0d0)) :: pres, Yksum, T
+      |                                      1
+Warning: Unused variable 'yksum' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:95:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                               1
+Warning: Unused dummy argument 'k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:98:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                                  1
+Warning: Unused dummy argument 'l' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:557:101:
+
+  557 |                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
+      |                                                                                                     1
+Warning: Unused dummy argument 'r' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:87:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                       1
+Warning: Unused dummy argument 'k' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:90:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                          1
+Warning: Unused dummy argument 'l' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:474:93:
+
+  474 |                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
+      |                                                                                             1
+Warning: Unused dummy argument 'r' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:263:98:
+
+  263 |                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                                  1
+Warning: Unused dummy argument 'g' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:263:95:
+
+  263 |                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                               1
+Warning: Dummy argument 'g_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:90:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                          1
+Warning: Unused dummy argument 'g' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:87:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                       1
+Warning: Dummy argument 'g_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:216:82:
+
+  216 |                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
+      |                                                                                  1
+Warning: Dummy argument 're_k' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:176:35:
+
+  176 |                             E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+      |                                   1
+Warning: Unused variable 'e_per_kg' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:176:48:
+
+  176 |                             E_e = E_e + ((stress/rho)**2d0)/(4d0*G)
+      |                                                1
+Warning: Unused variable 'pdyn_per_kg' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:159:84:
+
+  159 |             else
+      |                                                                                    1
+Warning: Unused dummy argument 'rhoyks' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:159:93:
+
+  159 |             else
+      |                                                                                             1
+Warning: Dummy argument 't' at (1) was declared INTENT(OUT) but was not set [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_variables_conversion.fpp:177:57:
+
+  177 |                         end if
+      |                                                         1
+Warning: Unused variable 'y_rs' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_fftw.fpp:284:29:
+
+  284 |                 call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_fftw.fpp:283:56:
+
+  283 |                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
+      |                                                        1
+Warning: Unused variable 'p_cmplx' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_fftw.fpp:283:73:
+
+  283 |                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
+      |                                                                         1
+Warning: Unused variable 'p_fltr_cmplx' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_fftw.fpp:282:44:
+
+  282 |                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
+      |                                            1
+Warning: Unused variable 'p_real' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:1045:47:
+
+ 1045 |     subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                               1
+Warning: Unused dummy argument 'mv' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:1045:43:
+
+ 1045 |     subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                           1
+Warning: Unused dummy argument 'pb' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:1051:29:
+
+ 1051 |         integer :: j, k, l, q, i
+      |                             1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:903:44:
+
+  903 |     subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                            1
+Warning: Unused dummy argument 'mv' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:903:40:
+
+  903 |     subroutine s_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                        1
+Warning: Unused dummy argument 'pb' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:909:29:
+
+  909 |         integer :: j, k, l, q, i
+      |                             1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:830:47:
+
+  830 |     subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                               1
+Warning: Unused dummy argument 'bc_dir' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:830:55:
+
+  830 |     subroutine s_axis(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                                       1
+Warning: Unused dummy argument 'bc_loc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:217:59:
+
+  217 |     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                                           1
+Warning: Unused dummy argument 'mv' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:217:55:
+
+  217 |     subroutine s_ghost_cell_extrapolation(q_prim_vf, pb, mv, bc_dir, bc_loc)
+      |                                                       1
+Warning: Unused dummy argument 'pb' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:222:29:
+
+  222 |         integer :: j, k, l, q, i
+      |                             1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:35:33:
+
+   35 |         integer :: bc_loc, bc_dir
+      |                                 1
+Warning: Unused variable 'bc_dir' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_boundary_conditions.fpp:35:25:
+
+   35 |         integer :: bc_loc, bc_dir
+      |                         1
+Warning: Unused variable 'bc_loc' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:30:51:
+
+   30 |     real(kind(0d0)) :: length_x, length_y, length_z
+      |                                                   1
+Warning: Unused PRIVATE module variable 'length_z' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:31:29:
+
+   31 |     real(kind(0d0)) :: radius
+      |                             1
+Warning: Unused PRIVATE module variable 'radius' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:33:35:
+
+   33 |     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
+      |                                   1
+Warning: Unused PRIVATE module variable 'x_boundary' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:33:47:
+
+   33 |     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
+      |                                               1
+Warning: Unused PRIVATE module variable 'y_boundary' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:33:59:
+
+   33 |     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
+      |                                                           1
+Warning: Unused PRIVATE module variable 'z_boundary' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:29:57:
+
+   29 |     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
+      |                                                         1
+Warning: Unused PRIVATE module variable 'z_centroid' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:391:39:
+
+  391 |         real(kind(0d0)) :: radius, dist
+      |                                       1
+Warning: Unused variable 'dist' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:394:72:
+
+  394 |         real(kind(0d0)), dimension(3) :: pos_vec, centroid_vec, dist_vec, dist_sides_vec, dist_surface_vec
+      |                                                                        1
+Warning: Unused variable 'dist_vec' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:273:26:
+
+  273 |         integer :: i, j, k !< Loop index variables
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:167:33:
+
+  167 |         real(kind(0d0)) :: radius, dist, dist_surf, dist_side, global_dist
+      |                                 1
+Warning: Unused variable 'radius' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_compute_levelset.fpp:84:33:
+
+   84 |         real(kind(0d0)) :: radius, dist, global_dist
+      |                                 1
+Warning: Unused variable 'radius' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:120:33:
+
+  120 |         real(kind(0d0)) :: cp_mix
+      |                                 1
+Warning: Unused variable 'cp_mix' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:114:35:
+
+  114 |         real(kind(0d0)) :: dyn_pres
+      |                                   1
+Warning: Unused variable 'dyn_pres' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:115:28:
+
+  115 |         real(kind(0d0)) :: E
+      |                            1
+Warning: Unused variable 'e' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:107:20:
+
+  107 |         integer :: i
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:113:20:
+
+  113 |         integer :: o
+      |                    1
+Warning: Unused variable 'o' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:58:35:
+
+   58 |         type(int_bounds_info) :: ix, iy, iz
+      |                                   1
+Warning: Unused variable 'ix' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:58:39:
+
+   58 |         type(int_bounds_info) :: ix, iy, iz
+      |                                       1
+Warning: Unused variable 'iy' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_chemistry.fpp:58:43:
+
+   58 |         type(int_bounds_info) :: ix, iy, iz
+      |                                           1
+Warning: Unused variable 'iz' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_body_forces.fpp:109:61:
+
+  109 |     subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
+      |                                                             1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_sim_helpers.f90:89:37:
+
+   89 |         real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
+      |                                     1
+Warning: Unused variable 'icfl_dt' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_sim_helpers.f90:89:46:
+
+   89 |         real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
+      |                                              1
+Warning: Unused variable 'vcfl_dt' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:184:24:
+
+  184 | 
+      |                        1
+Warning: Unused PRIVATE module variable 'c' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:97:60:
+
+   97 |     ! CBC Coefficients =========================================================
+      |                                                            1
+Warning: Unused PRIVATE module variable 'f_rs_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:97:73:
+
+   97 |     ! CBC Coefficients =========================================================
+      |                                                                         1
+Warning: Unused PRIVATE module variable 'f_src_rs_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:185:39:
+
+  185 |             @:ALLOCATE_GLOBAL(F_src_rsx_vf(0:buff_size, &
+      |                                       1
+Warning: Unused PRIVATE module variable 're' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:1301:32:
+
+ 1301 |                               ix, iy, iz)
+      |                                1
+Warning: Unused dummy argument 'ix' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:1301:36:
+
+ 1301 |                               ix, iy, iz)
+      |                                    1
+Warning: Unused dummy argument 'iy' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:1301:40:
+
+ 1301 |                               ix, iy, iz)
+      |                                        1
+Warning: Unused dummy argument 'iz' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:664:34:
+
+  664 |         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+      |                                  1
+Warning: Unused variable 'blkmod1' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:664:43:
+
+  664 |         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+      |                                           1
+Warning: Unused variable 'blkmod2' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:662:32:
+
+  662 |         integer :: i, j, k, r, q !< Generic loop iterators
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:649:54:
+
+  649 |         real(kind(0d0)), dimension(num_species) :: Y_s
+      |                                                      1
+Warning: Unused variable 'y_s' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_cbc.fpp:321:20:
+
+  321 | 
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:846:40:
+
+  846 |         real(kind(0d0)) :: start, finish
+      |                                        1
+Warning: Unused variable 'finish' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:849:23:
+
+  849 |         integer :: j, k, l, q, r, s !< Loop variables
+      |                       1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:849:26:
+
+  849 |         integer :: j, k, l, q, r, s !< Loop variables
+      |                          1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:844:67:
+
+  844 |         real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
+      |                                                                   1
+Warning: Unused variable 'mom3d_terms' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:832:105:
+
+  832 |     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub_sc)
+      |                                                                                                         1
+Warning: Unused dummy argument 'nbub_sc' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:845:54:
+
+  845 |         real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
+      |                                                      1
+Warning: Unused variable 'r3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:849:35:
+
+  849 |         integer :: j, k, l, q, r, s !< Loop variables
+      |                                   1
+Warning: Unused variable 's' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:846:32:
+
+  846 |         real(kind(0d0)) :: start, finish
+      |                                1
+Warning: Unused variable 'start' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:305:27:
+
+  305 | 
+      |                           1
+Warning: Unused PRIVATE module variable 'test' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:1256:20:
+
+ 1256 |         integer :: i, j
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:1256:23:
+
+ 1256 |         integer :: i, j
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:779:28:
+
+  779 |         integer :: i1, i2, q
+      |                            1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:705:28:
+
+  705 |         integer :: i1, i2, q
+      |                            1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:428:95:
+
+  428 |     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
+      |                                                                                               1
+Warning: Unused dummy argument 'mv' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_qbmm.fpp:428:103:
+
+  428 |     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb, mv, rhs_mv)
+      |                                                                                                       1
+Warning: Unused dummy argument 'rhs_mv' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:977:20:
+
+  977 |         integer :: i, j, k, l, q !< Generic loop iterators
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:970:41:
+
+  970 |                                  norm_dir, weno_dir)
+      |                                         1
+Warning: Unused dummy argument 'norm_dir' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:555:45:
+
+  555 |         real(kind(0d0)), pointer :: beta_p(:)
+      |                                             1
+Warning: Unused variable 'beta_p' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:316:44:
+
+  316 |         integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
+      |                                            1
+Warning: Unused variable 'ig' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:317:54:
+
+  317 |         real(kind(0.0d0)), dimension(num_fluids) :: pk !< individual initial pressures
+      |                                                      1
+Warning: Unused variable 'pk' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/common/m_phase_change.fpp:300:71:
+
+  300 |     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
+      |                                                                       1
+Warning: Unused dummy argument 'rm' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:362:16:
+
+  362 |             i = gp%loc(1)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:363:16:
+
+  363 |             j = gp%loc(2)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:364:16:
+
+  364 |             k = gp%loc(3)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:395:51:
+
+  395 |                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
+      |                                                   1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:403:28:
+
+  403 |                     index = ghost_points(q)%loc(dim)
+      |                            1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:412:55:
+
+  412 |                         ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim) + 1
+      |                                                       1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:414:55:
+
+  414 |                         ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim) - 1
+      |                                                       1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:170:16:
+
+  170 |             j = gp%loc(1)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:171:16:
+
+  171 |             k = gp%loc(2)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:172:16:
+
+  172 |             l = gp%loc(3)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:306:16:
+
+  306 |             j = innerp%loc(1)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:307:16:
+
+  307 |             k = innerp%loc(2)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:308:16:
+
+  308 |             l = innerp%loc(3)
+      |                1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:915:32:
+
+  915 |         real(kind(0.d0)) :: tmp1, tmp2
+      |                                1
+Warning: Unused variable 'tmp1' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:915:38:
+
+  915 |         real(kind(0.d0)) :: tmp1, tmp2
+      |                                      1
+Warning: Unused variable 'tmp2' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:741:46:
+
+  741 |     function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
+      |                                              1
+Warning: Unused dummy argument 'fr0' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:455:40:
+
+  455 |         real(kind(0d0)) :: h0, h1, h_min !< Time step size
+      |                                        1
+Warning: Unused variable 'h_min' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:190:40:
+
+  190 |         real(kind(0d0)) :: start, finish
+      |                                        1
+Warning: Unused variable 'finish' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:197:24:
+
+  197 |         integer :: ndirs  !< Number of coordinate directions
+      |                        1
+Warning: Unused variable 'ndirs' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:194:43:
+
+  194 |         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
+      |                                           1
+Warning: Unused variable 're' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:190:32:
+
+  190 |         real(kind(0d0)) :: start, finish
+      |                                1
+Warning: Unused variable 'start' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:177:67:
+
+  177 |     subroutine s_compute_bubble_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+      |                                                                   1
+Warning: Unused dummy argument 't_step' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:122:20:
+
+  122 |         integer :: i, j, k, l, q
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:122:32:
+
+  122 |         integer :: i, j, k, l, q
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:90:20:
+
+   90 |         @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:90:23:
+
+   90 |         @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:90:26:
+
+   90 |         @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_bubbles.fpp:90:32:
+
+   90 |         @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:323:20:
+
+  323 |                     ! any contributions from outside of the physical domain during
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_weno.fpp:323:23:
+
+  323 |                     ! any contributions from outside of the physical domain during
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:656:23:
+
+  656 |         integer :: i, j, k, l, q !< Iterator variables
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:656:26:
+
+  656 |         integer :: i, j, k, l, q !< Iterator variables
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:656:29:
+
+  656 |         integer :: i, j, k, l, q !< Iterator variables
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:656:32:
+
+  656 |         integer :: i, j, k, l, q !< Iterator variables
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:452:29:
+
+  452 |         integer :: i, j, k, l, q !< Iterator variables
+      |                             1
+Warning: Unused variable 'l' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:452:32:
+
+  452 |         integer :: i, j, k, l, q !< Iterator variables
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:148:41:
+
+  148 |         real(kind(0d0)) :: pres_IP, coeff
+      |                                         1
+Warning: Unused variable 'coeff' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:94:20:
+
+   94 |         integer :: i, j, k
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:94:23:
+
+   94 |         integer :: i, j, k
+      |                       1
+Warning: Unused variable 'j' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_ibm.fpp:94:26:
+
+   94 |         integer :: i, j, k
+      |                          1
+Warning: Unused variable 'k' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:137:31:
+
+  137 |         write (3, '(13X,A)') 'those stability conditions pertinent '// &
+      |                               1
+Warning: Unused PRIVATE module variable 'ccfl_max' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:122:63:
+
+  122 |         ! Opening the run-time information file
+      |                                                               1
+Warning: Unused PRIVATE module variable 'ccfl_sf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1647:20:
+
+ 1647 |         integer :: i !< Generic loop iterator
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1608:20:
+
+ 1608 |         integer :: i !< Generic loop iterator
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1606:35:
+
+ 1606 |         type(int_bounds_info) :: ix, iy, iz
+      |                                   1
+Warning: Unused variable 'ix' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1606:39:
+
+ 1606 |         type(int_bounds_info) :: ix, iy, iz
+      |                                       1
+Warning: Unused variable 'iy' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1606:43:
+
+ 1606 |         type(int_bounds_info) :: ix, iy, iz
+      |                                           1
+Warning: Unused variable 'iz' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1005:34:
+
+ 1005 |             M02 = 0d0
+      |                                  1
+Warning: Unused variable 'blkmod1' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:1005:43:
+
+ 1005 |             M02 = 0d0
+      |                                           1
+Warning: Unused variable 'blkmod2' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:993:30:
+
+  993 |             pi_inf = 0d0
+      |                              1
+Warning: Unused variable 'e_e' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:998:35:
+
+  998 |             nRdot = 0d0; Rdot = 0d0
+      |                                   1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:779:63:
+
+  779 |                 call s_create_directory(trim(file_loc))
+      |                                                               1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:430:30:
+
+  430 | 
+      |                              1
+Warning: Unused variable 'e_e' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:423:33:
+
+  423 | 
+      |                                 1
+Warning: Unused variable 'ii' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:426:31:
+
+  426 |                 open (2, FILE=trim(file_path), &
+      |                               1
+Warning: Unused variable 'nbub' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:426:36:
+
+  426 |                 open (2, FILE=trim(file_path), &
+      |                                    1
+Warning: Unused variable 'nr3' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:425:47:
+
+  425 | 
+      |                                               1
+Warning: Unused variable 'nrtmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:429:43:
+
+  429 |                 write (2) z_cb(-1:p); close (2)
+      |                                           1
+Warning: Unused variable 're' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:428:30:
+
+  428 |                       STATUS='new')
+      |                              1
+Warning: Unused variable 'rho' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:426:43:
+
+  426 |                 open (2, FILE=trim(file_path), &
+      |                                           1
+Warning: Unused variable 'vftmp' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:267:59:
+
+  267 |                     else
+      |                                                           1
+Warning: Unused variable 'alpha_rho' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:285:34:
+
+  285 |         icfl_max_loc = maxval(icfl_sf)
+      |                                  1
+Warning: Unused variable 'blkmod1' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:285:43:
+
+  285 |         icfl_max_loc = maxval(icfl_sf)
+      |                                           1
+Warning: Unused variable 'blkmod2' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:277:28:
+
+  277 | 
+      |                            1
+Warning: Unused variable 'e' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:291:38:
+
+  291 | #else
+      |                                      1
+Warning: Unused variable 'fltr_dtheta' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:288:20:
+
+  288 |             vcfl_max_loc = maxval(vcfl_sf)
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:290:22:
+
+  290 |         end if
+      |                      1
+Warning: Unused variable 'nfq' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:288:32:
+
+  288 |             vcfl_max_loc = maxval(vcfl_sf)
+      |                                1
+Warning: Unused variable 'q' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_data_output.fpp:275:29:
+
+  275 | 
+      |                             1
+Warning: Unused variable 'qv' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_viscous.fpp:1470:20:
+
+ 1470 |         integer :: i
+      |                    1
+Warning: Unused variable 'i' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_surface_tension.fpp:81:55:
+
+   81 |     subroutine s_compute_capilary_source_flux(q_prim_vf, &
+      |                                                       1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:4189:53:
+
+ 4189 |                                          norm_dir, ix, iy, iz)
+      |                                                     1
+Warning: Unused dummy argument 'ix' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:4189:57:
+
+ 4189 |                                          norm_dir, ix, iy, iz)
+      |                                                         1
+Warning: Unused dummy argument 'iy' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:4189:61:
+
+ 4189 |                                          norm_dir, ix, iy, iz)
+      |                                                             1
+Warning: Unused dummy argument 'iz' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3712:57:
+
+ 3712 |                                                        ix, iy, iz)
+      |                                                         1
+Warning: Unused dummy argument 'ix' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3712:61:
+
+ 3712 |                                                        ix, iy, iz)
+      |                                                             1
+Warning: Unused dummy argument 'iy' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3712:65:
+
+ 3712 |                                                        ix, iy, iz)
+      |                                                                 1
+Warning: Unused dummy argument 'iz' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3702:62:
+
+ 3702 |     subroutine s_compute_cartesian_viscous_source_flux(velL_vf, &
+      |                                                              1
+Warning: Unused dummy argument 'vell_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3706:62:
+
+ 3706 |                                                        velR_vf, &
+      |                                                              1
+Warning: Unused dummy argument 'velr_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3185:59:
+
+ 3185 |                                                          ix, iy, iz)
+      |                                                           1
+Warning: Unused dummy argument 'ix' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3185:63:
+
+ 3185 |                                                          ix, iy, iz)
+      |                                                               1
+Warning: Unused dummy argument 'iy' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3185:67:
+
+ 3185 |                                                          ix, iy, iz)
+      |                                                                   1
+Warning: Unused dummy argument 'iz' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3046:20:
+
+ 3046 |         flux_gsrc_vf, &
+      |                    1
+Warning: Unused dummy argument 'flux_gsrc_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3045:15:
+
+ 3045 |         flux_vf, flux_src_vf, &
+      |               1
+Warning: Unused dummy argument 'flux_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3047:20:
+
+ 3047 |         norm_dir, ix, iy, iz)
+      |                    1
+Warning: Unused dummy argument 'ix' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3047:24:
+
+ 3047 |         norm_dir, ix, iy, iz)
+      |                        1
+Warning: Unused dummy argument 'iy' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3047:28:
+
+ 3047 |         norm_dir, ix, iy, iz)
+      |                            1
+Warning: Unused dummy argument 'iz' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:3044:17:
+
+ 3044 |         q_prim_vf, &
+      |                 1
+Warning: Unused dummy argument 'q_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:2665:18:
+
+ 2665 |         qL_prim_vf, &
+      |                  1
+Warning: Unused dummy argument 'ql_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_riemann_solvers.fpp:2669:18:
+
+ 2669 |         qR_prim_vf, &
+      |                  1
+Warning: Unused dummy argument 'qr_prim_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_rhs.fpp:1018:96:
+
+ 1018 |     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
+      |                                                                                                1
+Warning: Unused dummy argument 'flux_src_n_vf' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1274:17:
+
+ 1274 |             nt = mytime/t_save
+      |                 1
+Warning: Possible change of value in conversion from REAL(8) to INTEGER(4) at (1) [-Wconversion]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:112:62:
+
+  112 |     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+      |                                                              1
+Warning: Unused PRIVATE module variable 'grad_x_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:112:73:
+
+  112 |     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+      |                                                                         1
+Warning: Unused PRIVATE module variable 'grad_y_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:112:84:
+
+  112 |     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+      |                                                                                    1
+Warning: Unused PRIVATE module variable 'grad_z_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:112:93:
+
+  112 |     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+      |                                                                                             1
+Warning: Unused PRIVATE module variable 'norm_vf' declared at (1) [-Wunused-value]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1386:23:
+
+ 1386 |         integer :: ierr
+      |                       1
+Warning: Unused variable 'ierr' declared at (1) [-Wunused-variable]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1171:151:
+
+ 1171 |     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                                       1
+Warning: Unused dummy argument 'finish' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1171:155:
+
+ 1171 |     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                                           1
+Warning: Unused dummy argument 'nt' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1171:143:
+
+ 1171 |     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                               1
+Warning: Unused dummy argument 'start' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1171:48:
+
+ 1171 |     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                1
+Warning: Unused dummy argument 't_step' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:129:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                 1
+Warning: Unused dummy argument 'file_exists' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:144:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                                1
+Warning: Unused dummy argument 'finish' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:116:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                    1
+Warning: Unused dummy argument 'io_proc_time' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:76:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                            1
+Warning: Unused dummy argument 'io_time_avg' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:91:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                           1
+Warning: Unused dummy argument 'io_time_final' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:148:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                                    1
+Warning: Unused dummy argument 'nt' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:102:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                      1
+Warning: Unused dummy argument 'proc_time' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:136:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                                                                                                        1
+Warning: Unused dummy argument 'start' at (1) [-Wunused-dummy-argument]
+/Users/spencer/Downloads/MFC-spencer/src/simulation/m_start_up.fpp:1089:63:
+
+ 1089 |     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      |                                                               1
+Warning: Unused dummy argument 'time_final' at (1) [-Wunused-dummy-argument]

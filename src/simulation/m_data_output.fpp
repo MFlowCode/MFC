@@ -232,9 +232,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: E          !< Cell-avg. energy
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
 
@@ -242,17 +240,10 @@ contains
         ! time-step and located on both the local (loc) and the global (glb)
         ! computational domains
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
-
-        integer :: i, j, k, l, q !< Generic loop iterators
-
-        integer :: Nfq
-        real(kind(0d0)) :: fltr_dtheta   !<
-            !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+        integer :: j, k, l, q !< Generic loop iterators
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -962,9 +953,6 @@ contains
         real(kind(0d0)) :: tmp !<
             !! Temporary variable to store quantity for mpi_allreduce
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
-
         integer :: npts !< Number of included integral points
         real(kind(0d0)) :: rad, thickness !< For integral quantities
         logical :: trigger !< For integral quantities
@@ -1605,8 +1593,6 @@ contains
 
         type(int_bounds_info) :: ix, iy, iz
 
-        integer :: i !< Generic loop iterator
-
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
@@ -1643,8 +1629,6 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
-
-        integer :: i !< Generic loop iterator
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE_GLOBAL(icfl_sf)
