@@ -96,6 +96,7 @@ print(json.dumps({
     'bc_x%end'                      : -1,
     'bc_y%beg'                      : -6,
     'bc_y%end'                      : -6,
+    'viscous'                       : 'T',
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================

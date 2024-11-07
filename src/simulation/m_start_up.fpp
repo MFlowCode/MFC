@@ -164,7 +164,8 @@ contains
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
-            cfl_adap_dt, cfl_const_dt, cfl_target
+            cfl_adap_dt, cfl_const_dt, cfl_target, &
+            viscous, surface_tension
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1325,13 +1326,13 @@ contains
             call s_initialize_acoustic_src()
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_initialize_viscous_module()
         end if
 
         call s_initialize_rhs_module()
 
-        if (.not. f_is_default(sigma)) call s_initialize_surface_tension_module()
+        if (surface_tension) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1470,7 +1471,7 @@ contains
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
-        !$acc update device(sigma)
+        !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
 
@@ -1507,11 +1508,11 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_finalize_viscous_module()
         end if
 
-        if (.not. f_is_default(sigma)) call s_finalize_surface_tension_module()
+        if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment
