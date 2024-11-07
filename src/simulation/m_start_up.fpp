@@ -413,8 +413,6 @@ contains
                 end if
 
                 if (patch_ib(i)%c > 0) then
-
-                    print *, "HERE Np", Np
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 

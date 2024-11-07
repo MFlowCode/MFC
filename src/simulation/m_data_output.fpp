@@ -364,8 +364,6 @@ contains
 
         integer :: i, j, k, l, r
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
 
@@ -934,7 +932,7 @@ contains
         real(kind(0d0)) :: G
         real(kind(0d0)) :: dyn_p, Temp
 
-        integer :: i, j, k, l, s, q, d !< Generic loop iterator
+        integer :: i, j, k, l, s, d !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
@@ -954,7 +952,7 @@ contains
             if (t_step_old /= dflt_int) then
                 nondim_time = real(t_step + t_step_old, kind(0d0))*dt
             else
-                nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
+                nondim_time = real(t_step, kind(0d0))*dt
             end if
         end if
 
