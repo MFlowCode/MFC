@@ -139,7 +139,7 @@ contains
 
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
                     'Max ==== VCFL Max ====== Rc Min ======='
             else
@@ -147,7 +147,7 @@ contains
                     '============== ICFL Max ============='
             end if
         else
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
                     'Max ==== VCFL Max ====== Rc Min ======='
             else
@@ -253,7 +253,7 @@ contains
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
 
-                    if (any(Re_size > 0)) then
+                    if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
                     else
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
@@ -269,13 +269,13 @@ contains
 #ifdef _CRAYFTN
         !$acc update host(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc update host(vcfl_sf, Rc_sf)
         end if
 
         icfl_max_loc = maxval(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
         end if
@@ -284,7 +284,7 @@ contains
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
@@ -304,21 +304,21 @@ contains
                                                          Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
-            if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
-            if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
+            if (viscous) vcfl_max_glb = vcfl_max_loc
+            if (viscous) Rc_min_glb = Rc_min_loc
         end if
 
         ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
@@ -335,7 +335,7 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
                     call s_mpi_abort('VCFL is NaN. Exiting ...')
                 elseif (vcfl_max_glb > 1d0) then
@@ -1565,8 +1565,8 @@ contains
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (any(Re_size > 0)) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (any(Re_size > 0)) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1602,7 +1602,7 @@ contains
         @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
@@ -1619,7 +1619,7 @@ contains
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE_GLOBAL(icfl_sf)
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 

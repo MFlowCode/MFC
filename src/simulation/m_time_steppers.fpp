@@ -164,7 +164,7 @@ contains
             end do
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))

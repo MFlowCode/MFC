@@ -333,7 +333,7 @@ contains
 
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (num_fluids == 1) then ! need to consider case with num_fluids >= 2
                 do i = 1, 2
 
@@ -523,7 +523,7 @@ contains
             G_K = max(0d0, G_K)
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
 
             do i = 1, 2
                 Re_K(i) = dflt_real
@@ -589,7 +589,7 @@ contains
             qv_K = qvs(1)
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (num_fluids == 1) then ! need to consider case with num_fluids >= 2
 
                 do i = 1, 2
@@ -654,7 +654,7 @@ contains
 
 #ifdef MFC_SIMULATION
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
@@ -1026,7 +1026,7 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (.not. f_is_default(sigma)) then
+                    if (surface_tension) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
                     end if
 
@@ -1200,7 +1200,7 @@ contains
                         end do
                     end if
 
-                    if (.not. f_is_default(sigma)) then
+                    if (surface_tension) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
 

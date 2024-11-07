@@ -90,7 +90,7 @@ contains
                 end do
             end do
         end do
-        if (Re_size(1) > 0) then    ! Shear stresses
+        if (shear_stress) then    ! Shear stresses
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -156,7 +156,7 @@ contains
                                 pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                             end do
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
@@ -197,7 +197,7 @@ contains
             end do
         end if
 
-        if (Re_size(2) > 0) then    ! Bulk stresses
+        if (bulk_stress) then    ! Bulk stresses
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -263,7 +263,7 @@ contains
                                 pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                             end do
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
@@ -301,7 +301,7 @@ contains
 
         if (p == 0) return
 
-        if (Re_size(1) > 0) then    ! Shear stresses
+        if (shear_stress) then    ! Shear stresses
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -367,7 +367,7 @@ contains
                                 pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                             end do
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
@@ -409,7 +409,7 @@ contains
             end do
         end if
 
-        if (Re_size(2) > 0) then    ! Bulk stresses
+        if (bulk_stress) then    ! Bulk stresses
             !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
@@ -475,7 +475,7 @@ contains
                                 pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                             end do
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
@@ -1018,7 +1018,7 @@ contains
                         is1_viscous, is2_viscous, is3_viscous)
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -1119,7 +1119,7 @@ contains
                         is1_viscous, is2_viscous, is3_viscous)
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
                     !$acc parallel loop collapse(4) gang vector default(present)

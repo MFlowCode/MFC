@@ -132,7 +132,7 @@ contains
             v_size = sys_size
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
@@ -192,7 +192,8 @@ contains
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
+            & 'viscous', 'shear_stress', 'bulk_stress' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -2332,7 +2333,7 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 

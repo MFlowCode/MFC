@@ -62,6 +62,7 @@ print(json.dumps({
     # Set IB to True and add 1 patch
     'ib'                           : 'T',
     'num_ibs'                      : 1,
+    'viscous'                      : 'T',
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
