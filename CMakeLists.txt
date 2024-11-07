@@ -127,7 +127,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
-            -Wall 
+            -Wall
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
@@ -142,7 +142,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-argument-mismatch>
-            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>            
+            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>
         )
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -155,7 +155,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     )
 
     add_link_options("SHELL:-hkeepfiles")
-    
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
@@ -231,7 +231,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	    else()
             message(STATUS "IPO / LTO is NOT available")
         endif()
-    endif() 
+    endif()
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -295,7 +295,7 @@ macro(HANDLE_SOURCES target useCommon)
 
     string(TOUPPER ${target} ${target}_UPPER)
 
-    # Gather: 
+    # Gather:
     # *          src/[<target>,(common)]/*.f90
     # * (if any) <build>/modules/<target>/*.f90
     file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90"
@@ -388,7 +388,7 @@ function(MFC_SETUP_TARGET)
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (NVHPC_USE_TWO_PASS_IPO)
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET}_lib PRIVATE 
+        target_compile_options(${ARGS_TARGET}_lib PRIVATE
 		    $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
