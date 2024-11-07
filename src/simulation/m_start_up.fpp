@@ -98,7 +98,9 @@ module m_start_up
 
         !! @param q_cons_vf  Conservative variables
         subroutine s_read_abstract_data_files(q_cons_vf)
-
+            
+            import :: scalar_field, sys_size, pres_field
+            
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf
