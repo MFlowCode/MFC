@@ -99,10 +99,8 @@ module m_rhs
     !$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
     !> @}
 
-
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !$acc declare create(tau_Re_vf)
-
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
@@ -128,7 +126,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
     !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
     !> @}
-
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
     !$acc declare create(qL_prim, qR_prim)
@@ -598,7 +595,6 @@ contains
             end do
             !$acc update device(Res, Re_idx, Re_size)
         end if
-
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
@@ -2093,7 +2089,7 @@ contains
 
         end if
 
-!$acc update device(is1, is2, is3, iv)
+        !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)
@@ -2291,7 +2287,6 @@ contains
             @:DEALLOCATE(tau_re_vf(e_idx)%sf)
             @:DEALLOCATE_GLOBAL(tau_re_vf)
         end if
-
 
     end subroutine s_finalize_rhs_module
 

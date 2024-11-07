@@ -22,7 +22,6 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
-
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 
@@ -33,7 +32,6 @@ module m_hypoelastic
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
-
 
 contains
 

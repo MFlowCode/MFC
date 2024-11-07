@@ -108,13 +108,13 @@ module m_weno
     !> @}
 
     real(kind(0d0)) :: test
-!$acc declare create(test)
+    !$acc declare create(test)
 
-!$acc declare create( &
-!$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
+    !$acc declare create( &
+    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
+    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
+    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
 
 contains
 

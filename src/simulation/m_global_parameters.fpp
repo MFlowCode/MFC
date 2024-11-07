@@ -380,8 +380,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
-
+    !$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, pi_fac)
 
     type(scalar_field), allocatable, dimension(:) :: mom_sp
     type(scalar_field), allocatable, dimension(:, :, :) :: mom_3d
@@ -432,9 +431,8 @@ module m_global_parameters
 
     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe)
 
-
     real(kind(0d0)), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+!$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #
 
     real(kind(0d0)) :: mytime       !< Current simulation time
@@ -447,7 +445,7 @@ module m_global_parameters
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
     !$acc declare create(pb_ts, mv_ts)
-    
+
     ! ======================================================================
 
 contains

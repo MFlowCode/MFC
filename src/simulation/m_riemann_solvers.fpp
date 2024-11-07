@@ -54,7 +54,6 @@ module m_riemann_solvers
  s_hllc_riemann_solver, &
  s_finalize_riemann_solvers_module
 
-
     !> The cell-boundary values of the fluxes (src - source) that are computed
     !! through the chosen Riemann problem solver, and the direct evaluation of
     !! source terms, by using the left and right states given in qK_prim_rs_vf,
@@ -142,17 +141,17 @@ contains
         !!  @param iz Index bounds in the z-dir
         !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-        dqL_prim_dy_vf, &
-        dqL_prim_dz_vf, &
-        qL_prim_vf, &
-        qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-        dqR_prim_dy_vf, &
-        dqR_prim_dz_vf, &
-        qR_prim_vf, &
-        q_prim_vf, &
-        flux_vf, flux_src_vf, &
-        flux_gsrc_vf, &
-        norm_dir, ix, iy, iz)
+                                dqL_prim_dy_vf, &
+                                dqL_prim_dz_vf, &
+                                qL_prim_vf, &
+                                qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                dqR_prim_dy_vf, &
+                                dqR_prim_dz_vf, &
+                                qR_prim_vf, &
+                                q_prim_vf, &
+                                flux_vf, flux_src_vf, &
+                                flux_gsrc_vf, &
+                                norm_dir, ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -162,8 +161,8 @@ contains
         type(scalar_field), &
             allocatable, dimension(:), &
             intent(INOUT) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
-                            dqL_prim_dy_vf, dqR_prim_dy_vf, &
-                            dqL_prim_dz_vf, dqR_prim_dz_vf
+                             dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                             dqL_prim_dz_vf, dqR_prim_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -175,30 +174,30 @@ contains
 
         if (riemann_solver == 1) then
             call s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-            dqL_prim_dy_vf, &
-            dqL_prim_dz_vf, &
-            qL_prim_vf, &
-            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-            dqR_prim_dy_vf, &
-            dqR_prim_dz_vf, &
-            qR_prim_vf, &
-            q_prim_vf, &
-            flux_vf, flux_src_vf, &
-            flux_gsrc_vf, &
-            norm_dir, ix, iy, iz)
+                                      dqL_prim_dy_vf, &
+                                      dqL_prim_dz_vf, &
+                                      qL_prim_vf, &
+                                      qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                      dqR_prim_dy_vf, &
+                                      dqR_prim_dz_vf, &
+                                      qR_prim_vf, &
+                                      q_prim_vf, &
+                                      flux_vf, flux_src_vf, &
+                                      flux_gsrc_vf, &
+                                      norm_dir, ix, iy, iz)
         elseif (riemann_solver == 2) then
             call s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-            dqL_prim_dy_vf, &
-            dqL_prim_dz_vf, &
-            qL_prim_vf, &
-            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-            dqR_prim_dy_vf, &
-            dqR_prim_dz_vf, &
-            qR_prim_vf, &
-            q_prim_vf, &
-            flux_vf, flux_src_vf, &
-            flux_gsrc_vf, &
-            norm_dir, ix, iy, iz)
+                                       dqL_prim_dy_vf, &
+                                       dqL_prim_dz_vf, &
+                                       qL_prim_vf, &
+                                       qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                       dqR_prim_dy_vf, &
+                                       dqR_prim_dz_vf, &
+                                       qR_prim_vf, &
+                                       q_prim_vf, &
+                                       flux_vf, flux_src_vf, &
+                                       flux_gsrc_vf, &
+                                       norm_dir, ix, iy, iz)
         end if
 
     end subroutine s_riemann_solver
@@ -209,24 +208,23 @@ contains
         !!      1) s_compute_cartesian_viscous_source_flux
         !!      2) s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, & ! -------------
-        dvelL_dx_vf, &
-        dvelL_dy_vf, &
-        dvelL_dz_vf, &
-        velR_vf, &
-        dvelR_dx_vf, &
-        dvelR_dy_vf, &
-        dvelR_dz_vf, &
-        flux_src_vf, &
-        norm_dir, &
-        ix, iy, iz)
-
+                                             dvelL_dx_vf, &
+                                             dvelL_dy_vf, &
+                                             dvelL_dz_vf, &
+                                             velR_vf, &
+                                             dvelR_dx_vf, &
+                                             dvelR_dy_vf, &
+                                             dvelR_dz_vf, &
+                                             flux_src_vf, &
+                                             norm_dir, &
+                                             ix, iy, iz)
 
         type(scalar_field), &
             dimension(num_dims), &
             intent(IN) :: velL_vf, velR_vf, &
-                dvelL_dx_vf, dvelR_dx_vf, &
-                dvelL_dy_vf, dvelR_dy_vf, &
-                dvelL_dz_vf, dvelR_dz_vf
+                          dvelL_dx_vf, dvelR_dx_vf, &
+                          dvelL_dy_vf, dvelR_dy_vf, &
+                          dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -238,28 +236,28 @@ contains
 
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, & ! -------------
-                dvelL_dx_vf, &
-                dvelL_dy_vf, &
-                dvelL_dz_vf, &
-                velR_vf, &
-                dvelR_dx_vf, &
-                dvelR_dy_vf, &
-                dvelR_dz_vf, &
-                flux_src_vf, &
-                norm_dir, &
-                ix, iy, iz)
+                                                           dvelL_dx_vf, &
+                                                           dvelL_dy_vf, &
+                                                           dvelL_dz_vf, &
+                                                           velR_vf, &
+                                                           dvelR_dx_vf, &
+                                                           dvelR_dy_vf, &
+                                                           dvelR_dz_vf, &
+                                                           flux_src_vf, &
+                                                           norm_dir, &
+                                                           ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(velL_vf, & ! -------------
-                dvelL_dx_vf, &
-                dvelL_dy_vf, &
-                dvelL_dz_vf, &
-                velR_vf, &
-                dvelR_dx_vf, &
-                dvelR_dy_vf, &
-                dvelR_dz_vf, &
-                flux_src_vf, &
-                norm_dir, &
-                ix, iy, iz)
+                                                         dvelL_dx_vf, &
+                                                         dvelL_dy_vf, &
+                                                         dvelL_dz_vf, &
+                                                         velR_vf, &
+                                                         dvelR_dx_vf, &
+                                                         dvelR_dy_vf, &
+                                                         dvelR_dz_vf, &
+                                                         flux_src_vf, &
+                                                         norm_dir, &
+                                                         ix, iy, iz)
         end if
     end subroutine s_compute_viscous_source_flux
 
@@ -2534,7 +2532,6 @@ contains
 
         !$acc enter data copyin(is1, is2, is3, isx, isy, isz)
 
-
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
@@ -4334,7 +4331,6 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_riemann_solvers_module
-
 
         if (Re_size(1) > 0) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)

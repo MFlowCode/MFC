@@ -28,7 +28,6 @@ module m_qbmm
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
-
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
     !$acc declare create(momrhs)
 

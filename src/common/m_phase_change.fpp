@@ -53,7 +53,7 @@ module m_phase_change
 
 contains
 
-    !> This subroutine should dispatch to the correct relaxation solver based 
+    !> This subroutine should dispatch to the correct relaxation solver based
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
     subroutine s_relaxation_solver(q_cons_vf)
@@ -587,7 +587,7 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param TJac Transpose of the Jacobian Matrix
     subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
-        
+
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
 #else

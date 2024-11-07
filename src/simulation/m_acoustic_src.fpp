@@ -57,7 +57,6 @@ module m_acoustic_src
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
     !$acc declare create(source_spatials)
 
-
 contains
 
     !> This subroutine initializes the acoustic source module

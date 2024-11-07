@@ -37,8 +37,7 @@ module m_ibm
  s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
-!$acc declare create(ib_markers)
-
+    !$acc declare create(ib_markers)
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
     real(kind(0d0)), dimension(:, :, :, :), allocatable :: levelset
@@ -50,7 +49,6 @@ module m_ibm
     !! Matrix of normal vector to IB
 
     !$acc declare create(levelset, levelset_norm, ghost_points, inner_points)
-
 
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points

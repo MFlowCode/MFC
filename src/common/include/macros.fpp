@@ -35,7 +35,6 @@
 
 #:enddef DEALLOCATE_GLOBAL
 
-
 #:def ACC_SETUP_VFs(*args)
 #ifdef _CRAYFTN
     block

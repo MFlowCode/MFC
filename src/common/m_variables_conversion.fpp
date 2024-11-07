@@ -55,7 +55,6 @@ module m_variables_conversion
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
-
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
@@ -83,7 +82,7 @@ contains
         !!  @param pi_inf Liquid stiffness function
         !!  @param qv Fluid reference energy
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
-        rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                              rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: i, j, k
@@ -91,20 +90,20 @@ contains
         real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
         real(kind(0d0)), optional, intent(out) :: G_K
         real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
-        
+
         if (model_eqns == 1) then        ! Gamma/pi_inf model
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
-            rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         else if (bubbles) then
             call s_convert_species_to_mixture_variables_bubbles(q_vf, i, j, k, &
-            rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                                rho, gamma, pi_inf, qv, Re_K, G_K, G)
         else
             ! Volume fraction model
             call s_convert_species_to_mixture_variables(q_vf, i, j, k, &
-            rho, gamma, pi_inf, qv, Re_K, G_K, G)
+                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
         end if
-    
+
     end subroutine s_convert_to_mixture_variables
 
     !>  This procedure conditionally calculates the appropriate pressure
@@ -1372,7 +1371,6 @@ contains
             @:DEALLOCATE(bubrs)
         end if
 #endif
-
 
     end subroutine s_finalize_variables_conversion_module
 

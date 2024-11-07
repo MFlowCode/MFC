@@ -44,12 +44,10 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 
-
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
-
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
@@ -64,10 +62,9 @@ module m_cbc
     !$acc declare create(c, Re)
 
     real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-!$acc declare create(dpres_ds)
+    !$acc declare create(dpres_ds)
 
     real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
-
 
     ! CBC Coefficients =========================================================
 
@@ -97,13 +94,12 @@ module m_cbc
     integer :: dj
     integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
-!$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
+    !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
-!$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
-!$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
-!$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
-!$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
-
+    !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
+    !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
+    !$acc                 ds,fd_coef_x,fd_coef_y,fd_coef_z,      &
+    !$acc                 pi_coef_x,pi_coef_y,pi_coef_z)
 
 contains
 
@@ -657,9 +653,9 @@ contains
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) &
-                                                                + pi_coef_${XYZ}$ (0, 0, cbc_loc)* &
-                                                                (F_rs${XYZ}$_vf(1, k, r, i) - &
-                                                                 F_rs${XYZ}$_vf(0, k, r, i))
+                                                                  + pi_coef_${XYZ}$ (0, 0, cbc_loc)* &
+                                                                  (F_rs${XYZ}$_vf(1, k, r, i) - &
+                                                                   F_rs${XYZ}$_vf(0, k, r, i))
                             end do
                         end do
                     end do
@@ -669,9 +665,9 @@ contains
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_src_rs${XYZ}$_vf_l(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + &
-                                                                    (F_src_rs${XYZ}$_vf(1, k, r, i) - &
-                                                                     F_src_rs${XYZ}$_vf(0, k, r, i)) &
-                                                                    *pi_coef_${XYZ}$ (0, 0, cbc_loc)
+                                                                      (F_src_rs${XYZ}$_vf(1, k, r, i) - &
+                                                                       F_src_rs${XYZ}$_vf(0, k, r, i)) &
+                                                                      *pi_coef_${XYZ}$ (0, 0, cbc_loc)
                             end do
                         end do
                     end do
@@ -690,15 +686,15 @@ contains
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
                                     flux_rs${XYZ}$_vf_l(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) &
-                                                                    + pi_coef_${XYZ}$ (j, 0, cbc_loc)* &
-                                                                    (F_rs${XYZ}$_vf(3, k, r, i) - &
-                                                                     F_rs${XYZ}$_vf(2, k, r, i)) &
-                                                                    + pi_coef_${XYZ}$ (j, 1, cbc_loc)* &
-                                                                    (F_rs${XYZ}$_vf(2, k, r, i) - &
-                                                                     F_rs${XYZ}$_vf(1, k, r, i)) &
-                                                                    + pi_coef_${XYZ}$ (j, 2, cbc_loc)* &
-                                                                    (F_rs${XYZ}$_vf(1, k, r, i) - &
-                                                                     F_rs${XYZ}$_vf(0, k, r, i))
+                                                                      + pi_coef_${XYZ}$ (j, 0, cbc_loc)* &
+                                                                      (F_rs${XYZ}$_vf(3, k, r, i) - &
+                                                                       F_rs${XYZ}$_vf(2, k, r, i)) &
+                                                                      + pi_coef_${XYZ}$ (j, 1, cbc_loc)* &
+                                                                      (F_rs${XYZ}$_vf(2, k, r, i) - &
+                                                                       F_rs${XYZ}$_vf(1, k, r, i)) &
+                                                                      + pi_coef_${XYZ}$ (j, 2, cbc_loc)* &
+                                                                      (F_rs${XYZ}$_vf(1, k, r, i) - &
+                                                                       F_rs${XYZ}$_vf(0, k, r, i))
                                 end do
                             end do
                         end do
@@ -710,15 +706,15 @@ contains
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
                                     flux_src_rs${XYZ}$_vf_l(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, i) + &
-                                                                        (F_src_rs${XYZ}$_vf(3, k, r, i) - &
-                                                                         F_src_rs${XYZ}$_vf(2, k, r, i)) &
-                                                                        *pi_coef_${XYZ}$ (j, 0, cbc_loc) + &
-                                                                        (F_src_rs${XYZ}$_vf(2, k, r, i) - &
-                                                                         F_src_rs${XYZ}$_vf(1, k, r, i)) &
-                                                                        *pi_coef_${XYZ}$ (j, 1, cbc_loc) + &
-                                                                        (F_src_rs${XYZ}$_vf(1, k, r, i) - &
-                                                                         F_src_rs${XYZ}$_vf(0, k, r, i)) &
-                                                                        *pi_coef_${XYZ}$ (j, 2, cbc_loc)
+                                                                          (F_src_rs${XYZ}$_vf(3, k, r, i) - &
+                                                                           F_src_rs${XYZ}$_vf(2, k, r, i)) &
+                                                                          *pi_coef_${XYZ}$ (j, 0, cbc_loc) + &
+                                                                          (F_src_rs${XYZ}$_vf(2, k, r, i) - &
+                                                                           F_src_rs${XYZ}$_vf(1, k, r, i)) &
+                                                                          *pi_coef_${XYZ}$ (j, 1, cbc_loc) + &
+                                                                          (F_src_rs${XYZ}$_vf(1, k, r, i) - &
+                                                                           F_src_rs${XYZ}$_vf(0, k, r, i)) &
+                                                                          *pi_coef_${XYZ}$ (j, 2, cbc_loc)
                                 end do
                             end do
                         end do
@@ -905,23 +901,23 @@ contains
                         !$acc loop seq
                         do i = 1, contxe
                             flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
-                                                             + ds(0)*dalpha_rho_dt(i)
+                                                               + ds(0)*dalpha_rho_dt(i)
                         end do
 
                         !$acc loop seq
                         do i = momxb, momxe
                             flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
-                                                             + ds(0)*(vel(i - contxe)*drho_dt &
-                                                                      + rho*dvel_dt(i - contxe))
+                                                               + ds(0)*(vel(i - contxe)*drho_dt &
+                                                                        + rho*dvel_dt(i - contxe))
                         end do
 
                         flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
-                                                             + ds(0)*(pres*dgamma_dt &
-                                                                      + gamma*dpres_dt &
-                                                                      + dpi_inf_dt &
-                                                                      + dqv_dt &
-                                                                      + rho*vel_dv_dt_sum &
-                                                                      + 5d-1*drho_dt*vel_K_sum)
+                                                               + ds(0)*(pres*dgamma_dt &
+                                                                        + gamma*dpres_dt &
+                                                                        + dpi_inf_dt &
+                                                                        + dqv_dt &
+                                                                        + rho*vel_dv_dt_sum &
+                                                                        + 5d-1*drho_dt*vel_K_sum)
 
                         if (riemann_solver == 1) then
                             !$acc loop seq
@@ -945,7 +941,7 @@ contains
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + &
-                                                                 ds(0)*dadv_dt(i - E_idx)
+                                                                   ds(0)*dadv_dt(i - E_idx)
                             end do
 
                             !$acc loop seq
