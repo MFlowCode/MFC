@@ -48,7 +48,6 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
@@ -76,8 +75,6 @@ contains
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
     subroutine s_write_data_files(q_cons_vf, q_prim_vf, t_step)
-
-        import :: scalar_field, sys_size, pres_field
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -1625,7 +1622,6 @@ contains
         if (any(Re_size > 0)) then
             @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
-
 
     end subroutine s_finalize_data_output_module
 

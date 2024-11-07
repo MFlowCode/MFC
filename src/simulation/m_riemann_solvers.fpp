@@ -154,8 +154,6 @@ contains
         flux_gsrc_vf, &
         norm_dir, ix, iy, iz)
 
-        import :: scalar_field, int_bounds_info, sys_size, startx, starty, startz
-
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
 

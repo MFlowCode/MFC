@@ -57,7 +57,6 @@ contains
         !!      some parameter. It replaces the procedure pointer, which CCE
         !!      is breaking on.
     subroutine s_relaxation_solver(q_cons_vf)
-        import :: scalar_field, sys_size
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         ! This is empty because in current master the procedure pointer
         ! was never assigned
