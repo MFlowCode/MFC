@@ -1070,7 +1070,6 @@ contains
 
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
-            buff_size = buff_size + fd_number
         end if
 
         ! Configuring Coordinate Direction Indexes =========================
