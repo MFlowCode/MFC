@@ -275,7 +275,14 @@ contains
                 @:PROHIBIT(weno_order == 1 .and. (.not. weno_avg) .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
                     "weno_order = 1 without weno_avg does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")
             end do
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(1)) .and. .not. viscous, &
+                "Re(1) is specified, but viscous is not set to true")
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(2)) .and. .not. viscous, &
+                "Re(2) is specified, but viscous is not set to true")
+            @:PROHIBIT(f_is_default(fluid_pp(i)%Re(1)) .and. viscous, &
+                "Re(1) is not specified, but viscous is set to true")
         end do
+
     end subroutine s_check_inputs_stiffened_eos_viscosity
 
     !> Checks constraints on body forces parameters (bf_x[y,z], etc.)

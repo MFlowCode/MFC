@@ -163,6 +163,9 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     logical :: cu_tensor
+    logical :: viscous       !< Viscous effects
+    logical :: shear_stress  !< Shear stresses
+    logical :: bulk_stress   !< Bulk stresses
 
     !$acc declare create(chemistry)
 
@@ -183,7 +186,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, low_Mach, viscous, shear_stress, bulk_stress)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -459,7 +462,8 @@ module m_global_parameters
     !> @name Surface tension parameters
     !> @{
     real(kind(0d0)) :: sigma
-    !$acc declare create(sigma)
+    logical :: surface_tension
+    !$acc declare create(sigma, surface_tension)
     !> @}
 
     integer :: momxb, momxe
@@ -562,6 +566,9 @@ contains
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
+        viscous = .false.
+        shear_stress = .false.
+        bulk_stress = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -650,6 +657,7 @@ contains
 
         ! Surface tension
         sigma = dflt_real
+        surface_tension = .false.
 
         ! Cuda aware MPI
         cu_tensor = .false.
@@ -888,7 +896,7 @@ contains
                     sys_size = stress_idx%end
                 end if
 
-                if (.not. f_is_default(sigma)) then
+                if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
@@ -906,7 +914,7 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
 
-                if (.not. f_is_default(sigma)) then
+                if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
@@ -973,11 +981,14 @@ contains
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
             end do
 
-            !$acc update device(Re_size)
+            if (Re_size(1) > 0d0) shear_stress = .true.
+            if (Re_size(2) > 0d0) bulk_stress = .true.
+
+            !$acc update device(Re_size, viscous, shear_stress, bulk_stress)
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 @:ALLOCATE_GLOBAL(Re_idx(1:2, 1:maxval(Re_size)))
 
@@ -1049,7 +1060,7 @@ contains
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (any(Re_size > 0)) then
+        if (viscous) then
             buff_size = 2*weno_polyn + 2
 !        else if (hypoelasticity) then !TODO: check if necessary
 !            buff_size = 2*weno_polyn + 2
@@ -1193,7 +1204,7 @@ contains
         ! Deallocating the variables bookkeeping the indexes of any viscous
         ! fluids and any pairs of fluids whose interfaces supported effects
         ! of surface tension
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_idx)
         end if
 

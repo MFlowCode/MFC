@@ -228,6 +228,7 @@ module m_global_parameters
     !> @name Surface Tension Modeling
     !> @{
     real(kind(0d0)) :: sigma
+    logical :: surface_tension
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -400,6 +401,7 @@ contains
         Re_inv = dflt_real
         Web = dflt_real
         poly_sigma = dflt_real
+        surface_tension = .false.
 
         adv_n = .false.
 
@@ -615,7 +617,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -639,7 +641,7 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
