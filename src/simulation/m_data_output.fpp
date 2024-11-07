@@ -224,7 +224,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
         real(kind(0d0)) :: rho        !< Cell-avg. density
         real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
@@ -235,22 +234,14 @@ contains
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-
-        ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
-        ! time-step and located on both the local (loc) and the global (glb)
-        ! computational domains
-
-        integer :: j, k, l, q !< Generic loop iterators
+        integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re)
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-
-                    ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
 
                     if (any(Re_size > 0)) then
@@ -371,14 +362,12 @@ contains
 
         character(LEN=15) :: FMT
 
-        integer :: i, j, k, l, ii, r!< Generic loop iterators
+        integer :: i, j, k, l, r
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
-        real(kind(0d0)) :: E_e                          !< Temp. elastic energy contribution
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -941,7 +930,6 @@ contains
         real(kind(0d0)) :: int_pres
         real(kind(0d0)) :: max_pres
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
         real(kind(0d0)) :: G
         real(kind(0d0)) :: dyn_p, Temp
@@ -1590,8 +1578,6 @@ contains
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_data_output_module
-
-        type(int_bounds_info) :: ix, iy, iz
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
