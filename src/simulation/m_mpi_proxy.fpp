@@ -143,7 +143,7 @@ contains
             v_size = sys_size
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
@@ -196,8 +196,8 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',                   &
-            & 'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat',                &
+        #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
+            &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -206,9 +206,20 @@ contains
             & 'bc_x%grcbc_in', 'bc_x%grcbc_out', 'bc_x%grcbc_vel_out',          &
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
+            & 'viscous', 'shear_stress', 'bulk_stress' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
+
+        if (chemistry) then
+            #:for VAR in [ 'diffusion', 'reactions' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'gamma_method' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
@@ -233,6 +244,7 @@ contains
             call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(nb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(num_fluids, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(wenoz_q, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endif
 
         do i = 1, num_fluids_max
@@ -2347,7 +2359,7 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 

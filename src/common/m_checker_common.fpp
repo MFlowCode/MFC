@@ -194,7 +194,7 @@ contains
     !> Checks constraints regarding WENO order.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_weno
-        @:PROHIBIT(all(weno_order /= (/1, 3, 5/)), "weno_order must be 1, 3, or 5")
+        @:PROHIBIT(all(weno_order /= (/1, 3, 5, 7/)), "weno_order must be 1, 3, 5, or 7")
         @:PROHIBIT(m + 1 < weno_order, "m must be at least weno_order - 1")
         @:PROHIBIT(n > 0 .and. n + 1 < weno_order, "n must be at least weno_order - 1")
         @:PROHIBIT(p > 0 .and. p + 1 < weno_order, "p must be at least weno_order - 1")
@@ -290,11 +290,18 @@ contains
     !> Checks constraints on the surface tension parameters.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_surface_tension
-        @:PROHIBIT(.not. f_is_default(sigma) .and. sigma < 0d0, &
+        @:PROHIBIT(surface_tension .and. sigma < 0d0, &
             "sigma must be greater than or equal to zero")
 
-        @:PROHIBIT(.not. f_is_default(sigma) .and. model_eqns /= 3, &
+        @:PROHIBIT(surface_tension .and. sigma == dflt_real, &
+            "sigma must be set if surface_tension is enabled")
+
+        @:PROHIBIT(.not. f_is_default(sigma) .and. .not. surface_tension, &
+            "sigma is set but surface_tension is not enabled")
+
+        @:PROHIBIT(surface_tension .and. model_eqns /= 3, &
             "The surface tension model requires model_eqns=3")
+
     end subroutine s_check_inputs_surface_tension
 
     !> Checks constraints on the inputs for moving boundaries.

@@ -1,7 +1,5 @@
 @echo off
 
-if "%1" == "docker" goto label_docker
-
 goto label_windows
 
 :label_windows
@@ -33,11 +31,11 @@ if %errorlevel% neq 0 (
 	exit /b 1
 )
 
-fc /b "%cd%\build\requirements.txt" "%cd%\toolchain\requirements.txt" 2> NUL
+fc /b "%cd%\build\pyproject.toml" "%cd%\toolchain\pyproject.toml" 2> NUL
 if %errorlevel% neq 0 (
-    pip3 install -r toolchain/requirements.txt
+    pip3 install -e toolchain
 
-    copy "%cd%\toolchain\requirements.txt" "%cd%\build" 2> NUL
+    copy "%cd%\toolchain\pyproject.toml" "%cd%\build" 2> NUL
 )
 
 python "%cd%\toolchain\main.py" %*
@@ -54,38 +52,3 @@ if %main_py_err% neq 0 (
 exit /b %main_py_err%
 
 :label_windows_after
-
-
-:label_docker
-where docker >nul 2>nul
-if %errorlevel% neq 0 (
-	echo.
-	echo ^[mfc.bat^] You must have Docker installed.
-	echo           Please install Docker and try again.
-	exit /b 1
-)
-
-
-echo ^[mfc.bat^] Fetching image...
-docker pull henryleberre/mfc
-if %errorlevel% neq 0 (
-	echo.
-	echo ^[mfc.bat^] Docker: Failed to fetch image.
-	echo           Pleasure ensure docker is running.
-	exit /b 1
-)
-
-echo ^[mfc.bat^] Starting container...
-docker run --interactive --tty --rm ^
-		   --mount type=bind,source="%cd%",target=/home/me/MFC ^
-		   henryleberre/mfc
-
-if %errorlevel% neq 0 (
-	echo.
-	echo          Docker: Fatal container runtime error.
-	exit /b 1
-)
-
-
-exit /b 0
-:label_docker_after

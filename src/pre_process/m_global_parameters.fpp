@@ -2,6 +2,8 @@
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
+#:include 'case.fpp'
+
 !> @brief This module contains all of the parameters characterizing the
 !!              computational domain, simulation algorithm, initial condition
 !!              and the stiffened equation of state.
@@ -15,6 +17,9 @@ module m_global_parameters
     use m_derived_types         ! Definitions of the derived types
 
     use m_helper_basic          ! Functions to compare floating point numbers
+
+    use m_thermochem, only: num_species
+
     ! ==========================================================================
 
     implicit none
@@ -85,6 +90,7 @@ module m_global_parameters
     integer :: sys_size              !< Number of unknowns in the system of equations
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
+    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -99,6 +105,17 @@ module m_global_parameters
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
     integer :: c_idx                               !< Index of the color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer :: T_idx                               !< Index of temperature eqn.
+
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwint(1:3)
+
+    ! Cell Indices for the entire (local) domain. In simulation and post_process,
+    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwbuff(1:3)
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
@@ -211,6 +228,7 @@ module m_global_parameters
     !> @name Surface Tension Modeling
     !> @{
     real(kind(0d0)) :: sigma
+    logical :: surface_tension
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -221,6 +239,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
+    integer :: chemxb, chemxe
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -359,6 +378,10 @@ contains
             patch_icpp(i)%m0 = dflt_real
 
             patch_icpp(i)%hcid = dflt_int
+
+            if (chemistry) then
+                patch_icpp(i)%Y(:) = 0d0
+            end if
         end do
 
         ! Tait EOS
@@ -378,6 +401,7 @@ contains
         Re_inv = dflt_real
         Web = dflt_real
         poly_sigma = dflt_real
+        surface_tension = .false.
 
         adv_n = .false.
 
@@ -593,7 +617,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -617,7 +641,7 @@ contains
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -681,6 +705,15 @@ contains
             end if
         end if
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            T_idx = sys_size + 1
+            sys_size = T_idx
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -693,7 +726,15 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
 
+        ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        ! There is no buffer region in pre_process.
+        idwbuff(1) = idwint(1); idwbuff(2) = idwint(2); idwbuff(3) = idwint(3)
         ! ==================================================================
 
 #ifdef MFC_MPI

@@ -8,7 +8,9 @@
 !!              types used in the pre-process code.
 module m_derived_types
 
-    use m_constants !< Constants
+    use m_constants  !< Constants
+
+    use m_thermochem, only: num_species
 
     implicit none
 
@@ -196,6 +198,7 @@ module m_derived_types
         !! id for hard coded initial condition
 
         real(kind(0d0)) :: cf_val !! color function value
+        real(kind(0d0)) :: Y(1:num_species)
 
     end type ic_patch_parameters
 
@@ -303,5 +306,23 @@ module m_derived_types
         integer, dimension(3) :: DB
 
     end type ghost_point
+
+    !> Species parameters
+    type species_parameters
+        character(LEN=name_len) :: name !< Name of species
+    end type species_parameters
+
+    !> Chemistry parameters
+    type chemistry_parameters
+        character(LEN=name_len) :: cantera_file !< Path to Cantera file
+
+        logical :: diffusion
+        logical :: reactions
+
+        !> Method of determining gamma.
+        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+        integer :: gamma_method
+    end type chemistry_parameters
 
 end module m_derived_types

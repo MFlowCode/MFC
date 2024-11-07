@@ -48,23 +48,18 @@ jobs:
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
-        run: |
-          brew install wget make python make cmake coreutils gcc@14
-          echo "CC=gcc-14"      >> $GITHUB_ENV
-          echo "CXX=g++-14"     >> $GITHUB_ENV
+        run:  |
+          brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
           echo "FC=gfortran-14" >> $GITHUB_ENV
-          
-      - name: (MacOS) Build OpenMPI
-        if:   matrix.os == 'macos' && matrix.mpi == 'mpi'
-        run: |
-          brew install mpich
+          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false
         run: |
            sudo apt update -y
-           sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-     
+           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev
+
       - name: Setup Ubuntu (Intel)
         if:   matrix.os == 'ubuntu' && matrix.intel == true
         run: |
@@ -83,33 +78,21 @@ jobs:
           echo "OMPI_FC=$(which ifort)"     >> $GITHUB_ENV
           echo "OMPI_CXX=$(which icpc)"     >> $GITHUB_ENV
           echo "OMPI_MPICC=$(which icc)"    >> $GITHUB_ENV
-          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
-          echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/"    >> $GITHUB_ENV
+          echo "MPI_HOME=/opt/intel/oneapi/mpi/2021.7.1/"   >> $GITHUB_ENV
+          echo "I_MPI_ROOT=/opt/intel/oneapi/mpi/2021.7.1/" >> $GITHUB_ENV
 
       - name: Build
         run:  |
-          if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
+          if [ '${{ matrix.intel }}' == 'true' ]; then . /opt/intel/oneapi/setvars.sh; fi
           /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
 
       - name: Test
         run:  |
-          if [ '${{ matrix.intel }}' == 'true' ]; then source /opt/intel/oneapi/setvars.sh; fi
+          if [ '${{ matrix.intel }}' == 'true' ]; then . /opt/intel/oneapi/setvars.sh; fi
           /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
-
-  docker:
-    name: Github | Docker
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
-    runs-on: ubuntu-latest
-    steps:
-    - name: Clone
-      uses: actions/checkout@v4
-
-    - name: Test
-      run:  sudo ./mfc.sh docker ./mfc.sh test --max-attempts 3 -j $(nproc) -a
 
   self:
     name: Self Hosted
@@ -156,4 +139,3 @@ jobs:
         with:
           name: logs
           path: test-${{ matrix.device }}.out
-

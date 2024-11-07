@@ -40,6 +40,9 @@ class MFCTarget:
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
 
+        if case.params.get('chemistry', 'F') == 'T':
+            m.update(case.get_cantera_solution().name.encode())
+
         return m.hexdigest()[:10]
 
     # Get path to directory that will store the build files
@@ -57,15 +60,8 @@ class MFCTarget:
         ])
 
     def get_install_dirpath(self, case: input.MFCInputFile) -> str:
-        # The install directory is located:
-        # Regular:    <root>/build/install/<slug>
-        # Dependency: <root>/build/install/dependencies (shared)
-        return os.sep.join([
-            os.getcwd(),
-            "build",
-            "install",
-            'dependencies' if self.isDependency else self.get_slug(case),
-        ])
+        # The install directory is located <root>/build/install/<slug>
+        return os.sep.join([os.getcwd(), "build", "install", self.get_slug(case)])
 
     def get_install_binpath(self, case: input.MFCInputFile) -> str:
         # <root>/install/<slug>/bin/<target>
@@ -103,9 +99,9 @@ class MFCTarget:
         cmake_dirpath   = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath(case)
 
-        install_prefixes = ';'.join([install_dirpath, get_dependency_install_dirpath(case)])
-
-        mod_dirs = ';'.join(['build/install/dependencies/include/hipfort/amdgcn'])
+        install_prefixes = ';'.join([
+            t.get_install_dirpath(case) for t in self.requires.compute()
+        ])
 
         flags: list = self.flags.copy() + [
             # Disable CMake warnings intended for developers (us).
@@ -130,12 +126,12 @@ class MFCTarget:
             # First directory that FIND_LIBRARY searches.
             # See: https://cmake.org/cmake/help/latest/command/find_library.html.
             f"-DCMAKE_FIND_ROOT_PATH={install_prefixes}",
+            # First directory that FIND_PACKAGE searches.
+            # See: https://cmake.org/cmake/help/latest/variable/CMAKE_FIND_PACKAGE_REDIRECTS_DIR.html.
+            f"-DCMAKE_FIND_PACKAGE_REDIRECTS_DIR={install_prefixes}",
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            # Fortran .mod include directories. Currently used for the HIPFORT
-            # dependency that has this missing from its config files.
-            f"-DCMAKE_Fortran_MODULE_DIRECTORY={mod_dirs}",
         ]
 
         if ARG("verbose"):
@@ -189,7 +185,7 @@ SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  Fa
 HIPFORT       = MFCTarget('hipfort',       ['-DMFC_HIPFORT=ON'],       True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 PRE_PROCESS   = MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], []), 0)
 SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], [HIPFORT]), 1)
-POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, SILO], [], []), 2)
+POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, HDF5, SILO], [], []), 2)
 SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [HIPFORT]), -1)
 DOCUMENTATION = MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []), -1)
 
@@ -213,16 +209,6 @@ def get_target(target: typing.Union[str, MFCTarget]) -> MFCTarget:
 
 def get_targets(targets: typing.List[typing.Union[str, MFCTarget]]) -> typing.List[MFCTarget]:
     return [ get_target(t) for t in targets ]
-
-
-def get_dependency_install_dirpath(case: input.MFCInputFile) -> str:
-    # Since dependencies share the same install directory, we can just return
-    # the install directory of the first dependency we find.
-    for target in TARGETS:
-        if target.isDependency:
-            return target.get_install_dirpath(case)
-
-    raise MFCException("No dependency target found.")
 
 
 def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFile, history: typing.Set[str] = None):
@@ -270,6 +256,8 @@ def __generate_header(step_name: str, targets: typing.List):
 def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[str] = None):
     if history is None:
         history = set()
+    if isinstance(targets, (MFCTarget, str)):
+        targets = [ targets ]
     if targets is None:
         targets = ARG("targets")
 

@@ -30,6 +30,7 @@ contains
         call s_check_inputs_grid_stretching
         call s_check_inputs_qbmm_and_polydisperse
         call s_check_inputs_perturb_density
+        call s_check_inputs_chemistry
         call s_check_inputs_misc
 
     end subroutine s_check_inputs
@@ -115,6 +116,7 @@ contains
 
         ! Common checks for all directions (stretch_x, stretch_y, and stretch_z)
         #:for X in ['x', 'y', 'z']
+            @:PROHIBIT(stretch_${X}$ .and. weno_order == 7, "weno_order = 7 does not support stretched grids")
             @:PROHIBIT(stretch_${X}$ .and. old_grid, "old_grid and stretch_${X}$ are incompatible")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(a_${X}$), "a_${X}$ must be set with stretch_${X}$ enabled")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(${X}$_a), "${X}$_a must be set with stretch_${X}$ enabled")
@@ -169,6 +171,14 @@ contains
                 "fluid_rho("//trim(iStr)//") must be set if perturb_sph = T")
         end do
     end subroutine s_check_inputs_perturb_density
+
+    subroutine s_check_inputs_chemistry
+
+        if (chemistry) then
+            @:ASSERT(num_species > 0)
+        end if
+
+    end subroutine s_check_inputs_chemistry
 
     !> Checks miscellaneous constraints
         !! (mixlayer_vel_profile and mixlayer_perturb)
