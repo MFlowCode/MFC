@@ -196,10 +196,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})
-    	# Need to find CUDA to get the version to specify for login node builds
-     	find_package(CUDA)
         string(REGEX MATCHALL "[0-9]+" MFC_CUDA_CC $ENV{MFC_CUDA_CC})
-        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for compute capability ${MFC_CUDA_CC} and CUDA version ${CUDA_VERSION}.")
+        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for compute capability(ies) ${MFC_CUDA_CC}.")
     endif()
 endif()
 
