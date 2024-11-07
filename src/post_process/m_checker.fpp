@@ -115,7 +115,7 @@ contains
 
     !> Checks constraints on surface tension parameters (cf_wrt and sigma)
     subroutine s_check_inputs_surface_tension
-        @:PROHIBIT(cf_wrt .and. f_is_default(sigma), &
+        @:PROHIBIT(cf_wrt .and. .not. surface_tension, &
             "cf_wrt can only be enabled if the surface coefficient is set")
     end subroutine s_check_inputs_surface_tension
 

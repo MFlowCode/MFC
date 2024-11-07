@@ -76,6 +76,7 @@ data = {
         'bc_z%end'          : -3,
         'num_patches'       : 1,
         'num_fluids'        : 2,
+        'viscous'           : 'T',
     # =======================================
 
     # Database Structure Parameters =========
