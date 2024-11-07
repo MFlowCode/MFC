@@ -13,12 +13,13 @@
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     allocate (${', '.join(args)}$)
-
+    !$acc enter data create(${', '.join(args)}$)
 #:enddef ALLOCATE
 
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     deallocate (${', '.join(args)}$)
+    !$acc exit data delete(${', '.join(args)}$)
 #:enddef DEALLOCATE
 
 #:def ALLOCATE_GLOBAL(*args)
