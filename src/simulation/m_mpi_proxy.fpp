@@ -228,10 +228,10 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out', &
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
             & 'bc_y%u_in','bc_y%v_in','bc_y%w_in','bc_y%u_out','bc_y%v_out','bc_y%w_out', &
-            & 'bc_y%pres_in','bc_y%pres_out', & 
+            & 'bc_y%pres_in','bc_y%pres_out', &
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_z%u_in','bc_z%v_in','bc_z%w_in','bc_z%u_out','bc_z%v_out','bc_z%w_out', &
-            & 'bc_z%pres_in','bc_z%pres_out', & 
+            & 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 't_stop',  't_save', 'cfl_target']
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
@@ -257,9 +257,9 @@ contains
 
         do i = 1, num_fluids_max
             #:for VAR in ['bc_x%alpha_rho_in','bc_x%alpha_in','bc_y%alpha_rho_in','bc_y%alpha_in','bc_z%alpha_rho_in','bc_z%alpha_in']
-                call MPI_BCAST(${VAR}$(i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr )
+                call MPI_BCAST(${VAR}$ (i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-        end do 
+        end do
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', &

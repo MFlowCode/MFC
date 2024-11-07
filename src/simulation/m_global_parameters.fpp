@@ -719,15 +719,15 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
-        bc_x%grcbc_in = .false. 
+        bc_x%grcbc_in = .false.
         bc_x%grcbc_out = .false.
         bc_x%grcbc_vel_out = .false.
 
-        bc_y%grcbc_in = .false. 
+        bc_y%grcbc_in = .false.
         bc_y%grcbc_out = .false.
         bc_y%grcbc_vel_out = .false.
 
-        bc_z%grcbc_in = .false. 
+        bc_z%grcbc_in = .false.
         bc_z%grcbc_out = .false.
         bc_z%grcbc_vel_out = .false.
 
