@@ -145,9 +145,9 @@ module m_cbc
 !$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
 
 #ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhox_in,  alphax_in)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhoy_in,  alphay_in)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), alpha_rhoz_in,  alphaz_in)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), alpha_rhox_in,  alphax_in)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), alpha_rhoy_in,  alphay_in)
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), alpha_rhoz_in,  alphaz_in)
     !$acc declare link(alpha_rhox_in,  alphax_in, alpha_rhoy_in,  alphay_in, alpha_rhoz_in,  alphaz_in)
 #else
     real(kind(0d0)), allocatable, dimension(:) :: alpha_rhox_in, alphax_in
@@ -495,7 +495,7 @@ contains
             end do
             !$acc update device(u${XYZ}$_in, v${XYZ}$_in, w${XYZ}$_in, u${XYZ}$_out, v${XYZ}$_out, w${XYZ}$_out)
             !$acc update device(pres${XYZ}$_in, pres${XYZ}$_out, alpha_rho${XYZ}$_in, alpha${XYZ}$_in)
-            !$acc update device(Del${XYZ}_in, Del${XYZ}_out)
+            !$acc update device(Del${XYZ}$_in, Del${XYZ}$_out)
 
         #:endfor
 
