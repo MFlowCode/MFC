@@ -1057,6 +1057,11 @@ contains
             buff_size = weno_polyn + 2
         end if
 
+        if (probe_wrt) then
+            fd_number = max(1, fd_order/2)
+            buff_size = buff_size + fd_number
+        end if
+
         ! Configuring Coordinate Direction Indexes =========================
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
@@ -1077,11 +1082,6 @@ contains
                 & idwbuff(1)%beg:idwbuff(1)%end, &
                 & idwbuff(2)%beg:idwbuff(2)%end, &
                 & idwbuff(3)%beg:idwbuff(3)%end))
-        end if
-
-        if (probe_wrt) then
-            fd_number = max(1, fd_order/2)
-            buff_size = buff_size + fd_number
         end if
 
         startx = -buff_size
