@@ -94,28 +94,28 @@ module m_start_up
  s_perform_time_step, s_save_data, &
  s_save_performance_metrics
 
-    abstract interface ! ===================================================
-
-        !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf)
-
-            import :: scalar_field, sys_size, pres_field
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_cons_vf
-
-        end subroutine s_read_abstract_data_files
-
-    end interface ! ========================================================
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-
-    procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
     real(kind(0d0)) :: dt_init
 
 contains
+
+   !> Read data files. Dispatch subroutine that replaces procedure pointer.
+        !! @param q_cons_vf Conservative variables
+    subroutine s_read_data_files(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: q_cons_vf
+
+        if (.not. parallel_io) then
+            call s_read_serial_data_files(q_cons_vf)
+        else
+            call s_read_parallel_data_files(q_cons_vf)
+        end if
+
+    end subroutine s_read_data_files
 
     !>  The purpose of this procedure is to first verify that an
         !!      input file has been made available by the user. Provided
@@ -1345,15 +1345,6 @@ contains
         call acc_present_dump()
 #endif
 
-        ! Associate pointers for serial or parallel I/O
-        if (parallel_io .neqv. .true.) then
-            s_read_data_files => s_read_serial_data_files
-            s_write_data_files => s_write_serial_data_files
-        else
-            s_read_data_files => s_read_parallel_data_files
-            s_write_data_files => s_write_parallel_data_files
-        end if
-
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
 
@@ -1487,9 +1478,6 @@ contains
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
-        ! Disassociate pointers for serial and parallel I/O
-        s_read_data_files => null()
-        s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
         call s_finalize_derived_variables_module()

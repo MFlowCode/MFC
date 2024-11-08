@@ -26,15 +26,10 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
-!$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
+    !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res_viscous)
-    !$acc declare link(Res_viscous)
-#else
     real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
-    !$acc declare create(Re_viscous)
-#endif
+    !$acc declare create(Res_viscous)
 
 contains
 
