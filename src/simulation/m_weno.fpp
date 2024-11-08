@@ -972,7 +972,7 @@ contains
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
-        integer :: j, k, l, q 
+        integer :: j, k, l, q
 
         ! Determining the number of cell-average variables which will be
         ! WENO-reconstructed and mapping their indical bounds in the x-,
