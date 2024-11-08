@@ -75,27 +75,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_grcbc(dimInfo):
-        if len(dimInfo[0]) == 1: 
-            stack.push('', {'patch_icpp(1)%vel(1)':1.0, 'patch_icpp(2)%vel(1)':1.0, 'patch_icpp(3)%vel(1)':1.0, 
+        if len(dimInfo[0]) == 1:
+            stack.push('', {'patch_icpp(1)%vel(1)':1.0, 'patch_icpp(2)%vel(1)':1.0, 'patch_icpp(3)%vel(1)':1.0,
                             'bc_x%beg':-7, 'bc_x%end':-8, 'bc_x%grcbc_in':'T', 'bc_x%grcbc_out':'T', 'bc_x%grcbc_vel_out':'T',
                             'bc_x%u_in':1.0, 'bc_x%v_in':0.0, 'bc_x%w_in':0.0, 'bc_x%u_out':1.0, 'bc_x%v_out':0.0, 'bc_x%w_out':0.0,
                             'bc_x%pres_in':1.0, 'bc_x%pres_out':1.0, 'bc_x%alpha_in(1)':1.0, 'bc_x%alpha_rho_in(1)':1.0})
             cases.append(define_case_d(stack, [f"grcbc"],{}))
             stack.pop()
         elif len(dimInfo[0]) == 2:
-            stack.push('', {'patch_icpp(1)%vel(2)':1.0, 'patch_icpp(2)%vel(2)':1.0, 'patch_icpp(3)%vel(2)':1.0, 
+            stack.push('', {'patch_icpp(1)%vel(2)':1.0, 'patch_icpp(2)%vel(2)':1.0, 'patch_icpp(3)%vel(2)':1.0,
                             'bc_y%beg':-7, 'bc_y%end':-8, 'bc_y%grcbc_in':'T', 'bc_y%grcbc_out':'T', 'bc_y%grcbc_vel_out':'T',
                             'bc_y%u_in':0.0, 'bc_y%v_in':1.0, 'bc_y%w_in':0.0, 'bc_y%u_out':0.0, 'bc_y%v_out':1.0, 'bc_y%w_out':0.0,
                             'bc_y%pres_in':1.0, 'bc_y%pres_out':1.0, 'bc_y%alpha_in(1)':1.0, 'bc_y%alpha_rho_in(1)':1.0})
             cases.append(define_case_d(stack, [f"grcbc"],{}))
             stack.pop()
         elif len(dimInfo[0]) == 3:
-            stack.push('', {'patch_icpp(1)%vel(3)':1.0, 'patch_icpp(2)%vel(3)':1.0, 'patch_icpp(3)%vel(3)':1.0, 
+            stack.push('', {'patch_icpp(1)%vel(3)':1.0, 'patch_icpp(2)%vel(3)':1.0, 'patch_icpp(3)%vel(3)':1.0,
                             'bc_z%beg':-7, 'bc_z%end':-8, 'bc_z%grcbc_in':'T', 'bc_z%grcbc_out':'T', 'bc_z%grcbc_vel_out':'T',
                             'bc_z%u_in':0.0, 'bc_z%v_in':0.0, 'bc_z%w_in':1.0, 'bc_z%u_out':0.0, 'bc_z%v_out':0.0, 'bc_z%w_out':1.0,
                             'bc_z%pres_in':1.0, 'bc_z%pres_out':1.0, 'bc_z%alpha_in(1)':1.0, 'bc_z%alpha_rho_in(1)':1.0})
             cases.append(define_case_d(stack, [f"grcbc"],{}))
-            stack.pop()                   
+            stack.pop()
 
     def alter_capillary():
         stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1,
