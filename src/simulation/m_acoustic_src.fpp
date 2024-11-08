@@ -173,6 +173,8 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: source_temporal
+        real(kind(0d0)), dimension(1:100) :: f_BB, period_BB, sl_BB, bwid_BB, ffre_BB, phi_rn
+        real(kind(0d0)) :: sum_BB
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
@@ -207,6 +209,20 @@ contains
             gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
             num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
+
+            call random_number(phi_rn(1:100))
+            call s_mpi_send_random_number(phi_rn)
+            sum_BB = 0d0
+    
+            !$acc loop
+            do k = 1, 100
+                f_BB(k) = 500d0 + k*100d0 ! Discrete frequency specturm center
+                period_BB(k) = 1d0/f_BB(k)
+                sl_BB(k) = 20d0*mag(ai) + k*mag(ai)/10 ! Spectral level at each frequency
+                bwid_BB(k) = 100d0 ! Bandwidth
+                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*bwid_BB(k)))*cos((sim_time)*2.d0*pi/period_BB(k) + 2d0*pi*phi_rn(k))
+                sum_BB = sum_BB + ffre_BB(k)
+            end do
 
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
             do i = 1, num_points
@@ -257,7 +273,7 @@ contains
                 if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
                 ! Update momentum source term
-                call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
                 mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
                 if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
@@ -294,7 +310,7 @@ contains
                     mass_src_diff = mom_src_diff/c
                 else ! Spherical or cylindrical support
                     ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
-                    call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal)
+                    call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
                     mass_src_diff = source_temporal*source_spatials(ai)%val(i)
                 end if
                 mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
@@ -334,10 +350,10 @@ contains
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
-    subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source)
+    subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
         !$acc routine seq
         integer, intent(in) :: ai, term_index
-        real(kind(0d0)), intent(in) :: sim_time, c
+        real(kind(0d0)), intent(in) :: sim_time, c, sum_BB
         real(kind(0d0)), intent(in) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)), intent(out) :: source
 
@@ -387,6 +403,10 @@ contains
             if (abs(sine_wave) < 1d-2) then
                 source = mag(ai)*sine_wave*1d2
             end if
+            
+        elseif (pulse(ai) == 4) then
+                ! TO DO: delay broadband acoustic source
+                source = sum_BB
 
         end if
     end subroutine s_source_temporal

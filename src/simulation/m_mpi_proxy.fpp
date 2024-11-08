@@ -2333,6 +2333,13 @@ contains
 
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
+    subroutine s_mpi_send_random_number(phi_rn)
+        real(kind(0d0)), dimension(1:100) :: phi_rn
+#ifdef MFC_MPI
+        call MPI_BCAST(phi_rn, size(phi_rn), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+#endif
+    end subroutine s_mpi_send_random_number
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module
 
