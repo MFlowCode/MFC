@@ -32,13 +32,14 @@ Note:
 | AMD MI250X                |                           | GPU           | 1 _GCD_*     | 1.1              | CCE 16.0.1           | OLCF Frontier  |
 | AMD EPYC 9965             | Turin, Zen5c              | CPU           | 192 cores    | 1.2              | AOCC 5.0.0           | AMD Volcano    |
 | AMD MI100                 |                           | GPU           | 1 GPU        | 1.4              | CCE 16.0.1           | Cray internal system |
+| AMD EPYC 9755             | Turin, Zen5               | CPU           | 128 cores    | 1.4              | AOCC 5.0.0           | AMD Volcano    |
 | Intel Xeon 6980P          | Granite Rapids            | CPU           | 128 cores    | 1.4              | Intel 2024.2         | Intel Endeavour   |
 | NVIDIA L40S               | FP32-only GPU             | GPU           | 1 GPU        | 1.7              | NVHPC 24.5           | GT ICE  |
 | AMD EPYC 9654             | Genoa, Zen4               | CPU           | 96 cores     | 1.7              | Intel 2021.9         | DOD Carpenter    |
 | Intel Xeon 6960P          | Granite Rapids            | CPU           | 72 cores     | 1.7              | Intel 2024.2         | Intel AI Cloud   |
 | NVIDIA P100               |                           | GPU           | 1 GPU        | 2.4              | NVHPC 23.5           | GT CSE Internal  |
 | Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud   |
-| Intel Xeon 6900E          | Sierra Forest Advanced, 2.8GHz Boost, 384 MiB L3    | CPU           | 192 cores     | 2.6       | Intel 2024.2         | Intel AI Cloud   |
+| Intel Xeon 6900E          | Sierra Forest Adv., 2.8GHz Boost, 384 MiB L3    | CPU           | 192 cores     | 2.6       | Intel 2024.2         | Intel AI Cloud   |
 | AMD EPYC 9534             | Genoa, Zen4               | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
 | Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
