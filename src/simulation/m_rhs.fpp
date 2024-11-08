@@ -699,30 +699,9 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        real(kind(0d0)) :: t_start, t_finish
-        real(kind(0d0)) :: gp_sum
-
-        real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
-        real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
-
-        real(kind(0d0)) :: tmp1, tmp2, tmp3, tmp4, &
-                           c_gas, c_liquid, &
-                           Cpbw, Cpinf, Cpinf_dot, &
-                           myH, myHdot, rddot, alf_gas
-
-        real(kind(0d0)) :: n_tait, B_tait, angle, angle_z
-
-        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: nbub
-        integer :: ndirs
-
-        real(kind(0d0)) :: sound
-        real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: s2, const_sos, s1
-
-        integer :: i, c, j, k, l, q, ii, id !< Generic loop iterators
-        integer :: term_index
+        real(kind(0d0)) :: t_start, t_finish
+        integer :: i, j, k, l, id !< Generic loop iterators
 
         call nvtxStartRange("Compute_RHS")
 
@@ -1593,7 +1572,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: flux_src_n
         type(scalar_field), dimension(sys_size), intent(in) :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
 
-        integer :: i, j, k, l, q
+        integer :: i, j, k, l
 
         if (idir == 1) then ! x-direction
 
@@ -2089,7 +2068,6 @@ contains
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
-        integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
@@ -2213,7 +2191,7 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_rhs_module
 
-        integer :: i, j, k, l !< Generic loop iterators
+        integer :: i, j, l
 
         do j = cont_idx%beg, cont_idx%end
             !$acc exit data detach(q_prim_qp%vf(j)%sf)

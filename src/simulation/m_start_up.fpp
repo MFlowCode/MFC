@@ -216,9 +216,6 @@ contains
         ! Logical used to check the existence of the current directory file
         logical :: file_exist
 
-        ! Generic loop iterators
-        integer :: i, j
-
         ! Logistics ========================================================
         file_path = trim(case_dir)//'/.'
 
@@ -417,8 +414,6 @@ contains
                 end if
 
                 if (patch_ib(i)%c > 0) then
-
-                    print *, "HERE Np", Np
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 
@@ -1100,7 +1095,7 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        integer :: i, j, k, l
+        integer :: i
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
