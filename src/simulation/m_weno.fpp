@@ -44,12 +44,8 @@ module m_weno
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
-    !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
-#else
+
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
-#endif
     !> @}
 
     ! WENO Coefficients ========================================================
@@ -60,17 +56,7 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), poly_coef_cbR_z)
-    !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
-    !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
-#else
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
@@ -78,7 +64,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-#endif
 
     !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
     !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
@@ -89,16 +74,7 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbL_z)
 
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), d_cbR_z)
-    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z)
-#else
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -106,9 +82,8 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
-#endif
-!    real(wp), pointer, dimension(:, :) :: d_L => null()
-!    real(wp), pointer, dimension(:, :) :: d_R => null()
+!    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
+!    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -116,17 +91,11 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), beta_coef_z)
-    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z)
-#else
+
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
-#endif
-!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
+!    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients ===================================================
@@ -142,16 +111,15 @@ module m_weno
     !
     !> @}
 
-    real(wp) :: test
-!$acc declare create(test)
 
-#ifndef CRAY_ACC_WAR
-!$acc declare create( &
-!$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
-#endif
+    real(wp) :: test
+    !$acc declare create(test)
+
+    !$acc declare create( &
+    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
+    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
+    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
 
 contains
 

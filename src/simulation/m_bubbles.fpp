@@ -21,27 +21,12 @@ module m_bubbles
 
     implicit none
 
-    real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
-    real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
-    real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
-!$acc declare create(chi_vw, k_mw, rho_mw)
 
-#ifdef CRAY_ACC_WAR
-    !> @name Bubble dynamic source terms
-    !> @{
+    real(kind(0._wp)) :: chi_vw  !< Bubble wall properties (Ando 2010)
+    real(kind(0._wp)) :: k_mw    !< Bubble wall properties (Ando 2010)
+    real(kind(0._wp)) :: rho_mw  !< Bubble wall properties (Ando 2010)
+    !$acc declare create(chi_vw, k_mw, rho_mw)
 
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), bub_adv_src)
-    !$acc declare link(bub_adv_src)
-
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), bub_r_src, bub_v_src, bub_p_src, bub_m_src)
-    !$acc declare link(bub_r_src, bub_v_src, bub_p_src, bub_m_src)
-
-    type(scalar_field) :: divu !< matrix for div(u)
-    !$acc declare create(divu)
-
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
-    !$acc declare link(rs, vs, ms, ps)
-#else
     real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
     real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
@@ -51,7 +36,6 @@ module m_bubbles
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
     !$acc declare create(rs, vs, ms, ps)
-#endif
 
 contains
 

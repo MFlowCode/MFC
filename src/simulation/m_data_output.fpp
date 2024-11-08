@@ -48,41 +48,12 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-    abstract interface ! ===================================================
 
-        !> Write data files
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf Primitive variables
-        !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
-
-            import :: scalar_field, sys_size, pres_field
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(in) :: q_cons_vf
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_prim_vf
-
-            integer, intent(in) :: t_step
-
-        end subroutine s_write_abstract_data_files
-    end interface ! ========================================================
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), icfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), vcfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), ccfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), Rc_sf)
-    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
-#else
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
-#endif
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
@@ -98,9 +69,30 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
-
 contains
+
+    !> Write data files. Dispatch subroutine that replaces procedure pointer.
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
+        !! @param t_step Current time step
+    subroutine s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(in) :: q_cons_vf
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: q_prim_vf
+
+        integer, intent(in) :: t_step
+
+        if (.not. parallel_io) then
+            call s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+        else
+            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
+        end if
+    end subroutine s_write_data_files
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
@@ -258,7 +250,7 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !$acc update host(icfl_sf)
 
         if (viscous) then
@@ -1590,26 +1582,6 @@ contains
             Rc_min = 1e3_wp
         end if
 
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        elseif (bubbles) then           ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
-
-        if (parallel_io .neqv. .true.) then
-            s_write_data_files => s_write_serial_data_files
-        else
-            s_write_data_files => s_write_parallel_data_files
-        end if
-
     end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
@@ -1620,11 +1592,6 @@ contains
         if (viscous) then
             @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
-
-        ! Disassociating the pointer to the procedure that was utilized to
-        ! to convert mixture or species variables to the mixture variables
-        s_convert_to_mixture_variables => null()
-        s_write_data_files => null()
 
     end subroutine s_finalize_data_output_module
 

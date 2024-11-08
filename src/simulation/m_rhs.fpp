@@ -84,39 +84,23 @@ module m_rhs
     !! of the divergence theorem on the integral-average cell-boundary values
     !! of the primitive variables, located in qK_prim_n, where K = L or R.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
-    !$acc declare link(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
-#else
     type(vector_field), allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
     !$acc declare create(dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp)
-#endif
+    !> @}
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average first-order spatial derivatives of the primitive variables. The
     !! cell-average of the first-order spatial derivatives may be found in the
     !! variables dq_prim_ds_qp, where s = x, y or z.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-    !$acc declare link(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-    !$acc declare link(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-#else
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
     !$acc declare create(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
     !$acc declare create(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
-#endif
     !> @}
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), tau_Re_vf)
-    !$acc declare link(tau_Re_vf)
-#else
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     !$acc declare create(tau_Re_vf)
-#endif
 
     type(vector_field) :: gm_alpha_qp  !<
     !! The gradient magnitude of the volume fractions at cell-interior Gaussian
@@ -128,41 +112,23 @@ module m_rhs
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
     !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaL_n)
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), gm_alphaR_n)
-    !$acc declare link(gm_alphaL_n, gm_alphaR_n)
-#else
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
     !$acc declare create(gm_alphaL_n, gm_alphaR_n)
-#endif
     !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
     !! source). These are computed by applying the chosen Riemann problem solver
     !! .on the left and right cell-boundary values of the primitive variables
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_n)
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_src_n)
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), flux_gsrc_n)
-    !$acc declare link(flux_n, flux_src_n, flux_gsrc_n)
-#else
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
     !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
-#endif
     !> @}
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), qL_prim, qR_prim)
-    !$acc declare link(qL_prim, qR_prim)
-#else
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
     !$acc declare create(qL_prim, qR_prim)
-#endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
     !$acc declare create(iv)
@@ -179,49 +145,27 @@ module m_rhs
     !> @{
     type(scalar_field) :: alf_sum
     !> @}
-!$acc declare create(alf_sum)
+    !$acc declare create(alf_sum)
 
-#ifdef CRAY_ACC_WAR
 
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
-    !$acc declare link(blkmod1, blkmod2, alpha1, alpha2, Kterm)
-    !$acc declare link(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
-    !$acc declare link(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
-
-#else
     real(wp), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(wp), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(wp), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
     !$acc declare create(blkmod1, blkmod2, alpha1, alpha2, Kterm)
     !$acc declare create(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
     !$acc declare create(dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf)
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:), gamma_min, pres_inf)
-    !$acc declare link(gamma_min, pres_inf)
-#else
+
     real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
     !$acc declare create(gamma_min, pres_inf)
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :), Res)
-    !$acc declare link(Res)
-#else
+
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), nbub)
-    !$acc declare link(nbub)
-#else
+
     real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
-#endif
 
 contains
 
@@ -647,27 +591,6 @@ contains
                 end do
             end do
             !$acc update device(Res, Re_idx, Re_size)
-        end if
-
-        ! Associating procedural pointer to the subroutine that will be
-        ! utilized to calculate the solution of a given Riemann problem
-        if (riemann_solver == 1) then
-            s_riemann_solver => s_hll_riemann_solver
-        elseif (riemann_solver == 2) then
-            s_riemann_solver => s_hllc_riemann_solver
-        end if
-
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        else if (bubbles) then          ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -2144,9 +2067,7 @@ contains
 
         end if
 
-#ifndef _CRAYFTN
-!$acc update device(is1, is2, is3, iv)
-#endif
+        !$acc update device(is1, is2, is3, iv)
 
         if (recon_dir == 1) then
             !$acc parallel loop collapse(4) default(present)
@@ -2341,9 +2262,6 @@ contains
             @:DEALLOCATE(tau_re_vf(e_idx)%sf)
             @:DEALLOCATE_GLOBAL(tau_re_vf)
         end if
-
-        s_riemann_solver => null()
-        s_convert_to_mixture_variables => null()
 
     end subroutine s_finalize_rhs_module
 

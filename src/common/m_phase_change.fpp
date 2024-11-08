@@ -34,21 +34,6 @@ module m_phase_change
               s_infinite_relaxation_k, &
               s_finalize_relaxation_solver_module
 
-    !> @name Abstract interface for creating function pointers
-    !> @{
-    abstract interface
-
-        !> @name Abstract subroutine for the infinite relaxation solver
-        !> @{
-        subroutine s_abstract_relaxation_solver(q_cons_vf)
-            import :: scalar_field, sys_size
-            type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        end subroutine
-        !> @}
-
-    end interface
-    !> @}
-
     !> @name Parameters for the first order transition phase change
     !> @{
     integer, parameter :: max_iter = 1e8_wp        !< max # of iterations
@@ -66,9 +51,17 @@ module m_phase_change
 
     !$acc declare create(max_iter,pCr,TCr,mixM,lp,vp,A,B,C,D)
 
-    procedure(s_abstract_relaxation_solver), pointer :: s_relaxation_solver => null()
-
 contains
+
+    !> This subroutine should dispatch to the correct relaxation solver based
+        !!      some parameter. It replaces the procedure pointer, which CCE
+        !!      is breaking on.
+    subroutine s_relaxation_solver(q_cons_vf)
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        ! This is empty because in current master the procedure pointer
+        ! was never assigned
+        @:ASSERT(.false., "s_relaxation_solver called but it currently does nothing")
+    end subroutine s_relaxation_solver
 
     !>  The purpose of this subroutine is to initialize the phase change module
         !!      by setting the parameters needed for phase change and
@@ -298,8 +291,9 @@ contains
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, rM, q_cons_vf, rhoe, TS)
-#ifdef CRAY_ACC_WAR
-        !DIR$ INLINEALWAYS s_compute_speed_of_sound
+
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_infinite_pt_relaxation_k
 #else
         !$acc routine seq
 #endif
@@ -403,7 +397,7 @@ contains
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_infinite_ptg_relaxation_k
 #else
         !$acc routine seq
@@ -527,7 +521,8 @@ contains
         !!  @param k generic loop iterator for y direction
         !!  @param l generic loop iterator for z direction
     subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
-#ifdef CRAY_ACC_WAR
+
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_correct_partial_densities
 #else
         !$acc routine seq
@@ -590,7 +585,7 @@ contains
         !!  @param TJac Transpose of the Jacobian Matrix
     subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_jacobian_matrix
 #else
         !$acc routine seq
@@ -697,7 +692,7 @@ contains
         !!  @param R2D (2D) residue array
     subroutine s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pTg_residue
 #else
         !$acc routine seq
@@ -747,8 +742,9 @@ contains
         !!  @param TSat Saturation Temperature
         !!  @param TSIn equilibrium Temperature
     subroutine s_TSat(pSat, TSat, TSIn)
-#ifdef CRAY_ACC_WAR
-        !DIR$ INLINEALWAYS s_compute_speed_of_sound
+
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_TSat
 #else
         !$acc routine seq
 #endif

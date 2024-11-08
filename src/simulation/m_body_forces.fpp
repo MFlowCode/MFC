@@ -24,13 +24,9 @@ module m_body_forces
               s_initialize_body_forces_module, &
               s_finalize_body_forces_module
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :), rhoM)
-    !$acc declare link(rhoM)
-#else
+
     real(wp), allocatable, dimension(:, :, :) :: rhoM
     !$acc declare create(rhoM)
-#endif
 
 contains
 

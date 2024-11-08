@@ -154,11 +154,11 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
-        "SHELL:-h nomessage=296:878:1391:1069"
+        "SHELL:-M 296,878,1391,1069,5025"
         "SHELL:-h static" "SHELL:-h keepfiles"
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
-        "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
+        "SHELL: -h list=adm"
     )
 
     add_link_options("SHELL:-hkeepfiles")

@@ -37,16 +37,8 @@ module m_ibm
  s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
-!$acc declare create(ib_markers)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :), levelset)
-    @:CRAY_DECLARE_GLOBAL(real(wp), dimension(:, :, :, :, :), levelset_norm)
-    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), ghost_points)
-    @:CRAY_DECLARE_GLOBAL(type(ghost_point), dimension(:), inner_points)
-
-    !$acc declare link(levelset, levelset_norm, ghost_points, inner_points)
-#else
+    !$acc declare create(ib_markers)
 
     !! Marker for solid cells. 0 if liquid, the patch id of its IB if solid
     real(wp), dimension(:, :, :, :), allocatable :: levelset
@@ -58,7 +50,6 @@ module m_ibm
     !! Matrix of normal vector to IB
 
     !$acc declare create(levelset, levelset_norm, ghost_points, inner_points)
-#endif
 
     integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
