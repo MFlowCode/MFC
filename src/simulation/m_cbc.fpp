@@ -53,6 +53,12 @@ module m_cbc
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
 
+    !! There is a CCE bug that is causing some subset of these variables to interfere
+    !! with variables of the same name in m_riemann_solvers.fpp, and giving this versions
+    !! unique "_l" names works around the bug. Other private module allocatable arrays
+    !! in `acc declare create` clauses don't have this problem, so we still need to
+    !! isolate this bug.
+
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l

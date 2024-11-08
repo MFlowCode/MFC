@@ -86,7 +86,7 @@ contains
 
         integer, intent(in) :: t_step
 
-        if (parallel_io .neqv. .true.) then
+        if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
         else
             call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
