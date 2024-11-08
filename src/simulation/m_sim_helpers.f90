@@ -31,7 +31,7 @@ contains
         !! @param k y index
         !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_enthalpy
 #else
         !$acc routine seq

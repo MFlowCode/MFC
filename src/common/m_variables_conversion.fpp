@@ -49,57 +49,17 @@ module m_variables_conversion
 #endif
               s_finalize_variables_conversion_module
 
-    !> Abstract interface to two subroutines designed for the transfer/conversion
-    !! of the mixture/species variables to the mixture variables
-
-    abstract interface ! =======================================================
-
-        !> Structure of the s_convert_mixture_to_mixture_variables
-        !!      and s_convert_species_to_mixture_variables subroutines
-        !!  @param q_vf Conservative or primitive variables
-        !!  @param i First-coordinate cell index
-        !!  @param j First-coordinate cell index
-        !!  @param k First-coordinate cell index
-        !!  @param rho Density
-        !!  @param gamma Specific heat ratio function
-        !!  @param pi_inf Liquid stiffness function
-        !!  @param qv Fluid reference energy
-        subroutine s_convert_xxxxx_to_mixture_variables(q_vf, i, j, k, &
-                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
-
-            ! Importing the derived type scalar_field from m_derived_types.f90
-            ! and global variable sys_size, from m_global_variables.f90, as
-            ! the abstract interface does not inherently have access to them
-            import :: scalar_field, sys_size, num_fluids
-
-            type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-            integer, intent(in) :: i, j, k
-            real(kind(0d0)), intent(out), target :: rho, gamma, pi_inf, qv
-            real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
-            real(kind(0d0)), optional, intent(out) :: G_K
-            real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
-
-        end subroutine s_convert_xxxxx_to_mixture_variables
-
-    end interface ! ============================================================
-
     !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(kind(0d0)), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
 #endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
-    @:CRAY_DECLARE_GLOBAL(integer,         dimension(:), bubrs)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), Res)
-    !$acc declare link(bubrs, Gs, Res)
-#else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     integer, allocatable, dimension(:) :: bubrs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(bubrs, Gs, Res)
-#endif
+
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
@@ -108,12 +68,43 @@ module m_variables_conversion
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: qv_sf !< Scalar liquid energy reference function
 
-    procedure(s_convert_xxxxx_to_mixture_variables), &
-        pointer :: s_convert_to_mixture_variables => null() !<
-    !! Pointer referencing the subroutine s_convert_mixture_to_mixture_variables
-    !! or s_convert_species_to_mixture_variables, based on model equations choice
-
 contains
+
+    !> Dispatch to the s_convert_mixture_to_mixture_variables
+        !!      and s_convert_species_to_mixture_variables subroutines.
+        !!      Replaces a procedure pointer.
+        !!  @param q_vf Conservative or primitive variables
+        !!  @param i First-coordinate cell index
+        !!  @param j First-coordinate cell index
+        !!  @param k First-coordinate cell index
+        !!  @param rho Density
+        !!  @param gamma Specific heat ratio function
+        !!  @param pi_inf Liquid stiffness function
+        !!  @param qv Fluid reference energy
+    subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
+                                              rho, gamma, pi_inf, qv, Re_K, G_K, G)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        integer, intent(in) :: i, j, k
+        real(kind(0d0)), intent(out), target :: rho, gamma, pi_inf, qv
+        real(kind(0d0)), optional, dimension(2), intent(out) :: Re_K
+        real(kind(0d0)), optional, intent(out) :: G_K
+        real(kind(0d0)), optional, dimension(num_fluids), intent(in) :: G
+
+        if (model_eqns == 1) then        ! Gamma/pi_inf model
+            call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
+                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
+
+        else if (bubbles) then
+            call s_convert_species_to_mixture_variables_bubbles(q_vf, i, j, k, &
+                                                                rho, gamma, pi_inf, qv, Re_K, G_K, G)
+        else
+            ! Volume fraction model
+            call s_convert_species_to_mixture_variables(q_vf, i, j, k, &
+                                                        rho, gamma, pi_inf, qv, Re_K, G_K, G)
+        end if
+
+    end subroutine s_convert_to_mixture_variables
 
     !>  This procedure conditionally calculates the appropriate pressure
         !! @param energy Energy
@@ -128,7 +119,7 @@ contains
         !! @param mom Momentum
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G)
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_pressure
 #else
         !$acc routine seq
@@ -473,7 +464,7 @@ contains
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, k, l, r, &
                                                           G_K, G)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_acc
 #else
         !$acc routine seq
@@ -555,7 +546,7 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
                                                                   alpha_K, alpha_rho_K, Re_K, k, l, r)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_convert_species_to_mixture_variables_bubbles_acc
 #else
         !$acc routine seq
@@ -748,18 +739,6 @@ contains
         end if
 #endif
 
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-
-        else if (bubbles) then
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else
-            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
     end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
@@ -1393,15 +1372,11 @@ contains
         end if
 #endif
 
-        ! Nullifying the procedure pointer to the subroutine transferring/
-        ! computing the mixture/species variables to the mixture variables
-        s_convert_to_mixture_variables => null()
-
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
-#ifdef CRAY_ACC_WAR
+    pure subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_speed_of_sound
 #else
         !$acc routine seq

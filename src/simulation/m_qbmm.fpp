@@ -28,13 +28,9 @@ module m_qbmm
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
-    !$acc declare link(momrhs)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
     !$acc declare create(momrhs)
-#endif
+
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
@@ -43,17 +39,11 @@ module m_qbmm
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-!$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
-    !$acc declare link(bubrs, bubmoms)
-#else
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
     !$acc declare create(bubrs, bubmoms)
-#endif
 
 contains
 
@@ -694,7 +684,7 @@ contains
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
         !$acc routine seq
@@ -767,7 +757,7 @@ contains
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
     subroutine s_coeff(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
         !$acc routine seq
@@ -1045,7 +1035,7 @@ contains
     end subroutine s_mom_inv
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_chyqmom
 #else
         !$acc routine seq
@@ -1112,7 +1102,7 @@ contains
     end subroutine s_chyqmom
 
     subroutine s_hyqmom(frho, fup, fmom)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_hyqmom
 #else
         !$acc routine seq
