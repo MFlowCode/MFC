@@ -113,7 +113,7 @@ contains
         logical :: dir_check
 
         ! Generic loop iterator
-        integer :: i
+        integer :: i, k ,l
 
         ! Allocating the generic storage for the flow variable(s) that are
         ! going to be written to the formatted database file(s). Note once
