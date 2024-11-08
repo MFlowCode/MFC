@@ -275,7 +275,9 @@ module m_global_parameters
 
     !> @name surface tension coefficient
     !> @{
+
     real(wp) :: sigma
+    logical :: surface_tension
     !> #}
 
     !> @name Index variables used for m_variables_conversion
@@ -398,6 +400,7 @@ contains
         poly_sigma = dflt_real
         sigR = dflt_real
         sigma = dflt_real
+        surface_tension = .false.
         adv_n = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
@@ -535,7 +538,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -560,7 +563,7 @@ contains
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if

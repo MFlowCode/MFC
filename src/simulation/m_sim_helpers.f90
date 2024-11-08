@@ -86,7 +86,7 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
         real(wp), dimension(num_dims) :: vel
-        real(wp) :: c, icfl_dt, vcfl_dt, rho
+        real(wp) :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p) :: icfl_sf
         real(wp), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
         real(wp) :: fltr_dtheta   !<
@@ -118,7 +118,7 @@ contains
                                           dz(l)/(abs(vel(3)) + c))
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 if (grid_geometry == 3) then
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
@@ -145,7 +145,7 @@ contains
             icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                       dy(k)/(abs(vel(2)) + c))
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
 
@@ -159,7 +159,7 @@ contains
             !1D
             icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
 
@@ -213,7 +213,7 @@ contains
                                          dz(l)/(abs(vel(3)) + c))
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 if (grid_geometry == 3) then
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
                               /minval(1/(rho*Re_l))
@@ -228,7 +228,7 @@ contains
             icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
                                      dy(k)/(abs(vel(2)) + c))
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             end if
 
@@ -236,7 +236,8 @@ contains
             !1D
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
-            if (any(Re_size > 0)) then
+
+            if (viscous) then
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
             end if
 

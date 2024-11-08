@@ -148,7 +148,7 @@ contains
 
         ! Generating table header for the stability criteria to be outputted
         if (cfl_dt) then
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
                     'Max ==== VCFL Max ====== Rc Min ======='
             else
@@ -156,7 +156,7 @@ contains
                     '============== ICFL Max ============='
             end if
         else
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
                     'Max ==== VCFL Max ====== Rc Min ======='
             else
@@ -224,7 +224,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(wp), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
         real(wp) :: rho        !< Cell-avg. density
         real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
@@ -232,37 +231,21 @@ contains
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(wp) :: qv         !< Cell-avg. fluid reference energy
         real(wp) :: c          !< Cell-avg. sound speed
-        real(wp) :: E          !< Cell-avg. energy
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-
-        ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
-        ! time-step and located on both the local (loc) and the global (glb)
-        ! computational domains
-
-        real(wp) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
-
-        integer :: i, j, k, l, q !< Generic loop iterators
-
-        integer :: Nfq
-        real(wp) :: fltr_dtheta   !<
-            !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+        integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
-                    ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
-                    if (any(Re_size > 0)) then
+                    if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
                     else
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
@@ -278,13 +261,13 @@ contains
 #ifdef CRAY_ACC_WAR
         !$acc update host(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc update host(vcfl_sf, Rc_sf)
         end if
 
         icfl_max_loc = maxval(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
         end if
@@ -293,7 +276,7 @@ contains
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
@@ -313,21 +296,21 @@ contains
                                                          Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
-            if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
-            if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
+            if (viscous) vcfl_max_glb = vcfl_max_loc
+            if (viscous) Rc_min_glb = Rc_min_loc
         end if
 
         ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
                     t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
@@ -344,7 +327,7 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 if (vcfl_max_glb /= vcfl_max_glb) then
                     call s_mpi_abort('VCFL is NaN. Exiting ...')
                 elseif (vcfl_max_glb > 1._wp) then
@@ -380,14 +363,9 @@ contains
 
         character(LEN=15) :: FMT
 
-        integer :: i, j, k, l, ii, r!< Generic loop iterators
+        integer :: i, j, k, l, r
 
-        real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(wp) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(wp) :: rho                          !< Temporary density
-        real(wp), dimension(2) :: Re !< Temporary Reynolds number
-        real(wp) :: E_e                          !< Temp. elastic energy contribution
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -951,20 +929,16 @@ contains
         real(wp) :: int_pres
         real(wp) :: max_pres
         real(wp), dimension(2) :: Re
-        real(wp) :: E_e
         real(wp), dimension(6) :: tau_e
         real(wp) :: G
         real(wp) :: dyn_p, Temp
 
-        integer :: i, j, k, l, s, q, d !< Generic loop iterator
+        integer :: i, j, k, l, s, d !< Generic loop iterator
 
         real(wp) :: nondim_time !< Non-dimensional time
 
         real(wp) :: tmp !<
             !! Temporary variable to store quantity for mpi_allreduce
-
-        real(wp) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
 
         integer :: npts !< Number of included integral points
         real(wp) :: rad, thickness !< For integral quantities
@@ -979,7 +953,7 @@ contains
             if (t_step_old /= dflt_int) then
                 nondim_time = real(t_step + t_step_old, wp)*dt
             else
-                nondim_time = real(t_step, wp)*dt !*1.e-5_wp/10.0761131451_wp
+                nondim_time = real(t_step, wp)*dt
             end if
         end if
 
@@ -1575,8 +1549,8 @@ contains
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (any(Re_size > 0)) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (any(Re_size > 0)) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1604,15 +1578,11 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_data_output_module
 
-        type(int_bounds_info) :: ix, iy, iz
-
-        integer :: i !< Generic loop iterator
-
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0._wp
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
@@ -1645,11 +1615,9 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
 
-        integer :: i !< Generic loop iterator
-
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE_GLOBAL(icfl_sf)
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 

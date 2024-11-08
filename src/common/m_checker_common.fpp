@@ -290,11 +290,19 @@ contains
     !> Checks constraints on the surface tension parameters.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_surface_tension
-        @:PROHIBIT(.not. f_is_default(sigma) .and. sigma < 0._wp, &
+
+        @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
 
-        @:PROHIBIT(.not. f_is_default(sigma) .and. model_eqns /= 3, &
+        @:PROHIBIT(surface_tension .and. sigma == dflt_real, &
+            "sigma must be set if surface_tension is enabled")
+
+        @:PROHIBIT(.not. f_is_default(sigma) .and. .not. surface_tension, &
+            "sigma is set but surface_tension is not enabled")
+
+        @:PROHIBIT(surface_tension .and. model_eqns /= 3, &
             "The surface tension model requires model_eqns=3")
+
     end subroutine s_check_inputs_surface_tension
 
     !> Checks constraints on the inputs for moving boundaries.

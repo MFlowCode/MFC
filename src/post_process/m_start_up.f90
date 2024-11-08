@@ -82,7 +82,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target
+            cfl_target, surface_tension
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'

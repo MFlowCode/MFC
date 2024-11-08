@@ -663,7 +663,7 @@ contains
             end do
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
                                            (1._wp - eta)*patch_icpp(smooth_patch_id)%cf_val
         end if

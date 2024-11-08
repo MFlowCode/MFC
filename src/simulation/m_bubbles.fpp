@@ -57,7 +57,7 @@ contains
 
     subroutine s_initialize_bubbles_module
 
-        integer :: i, j, k, l, q
+        integer :: l
 
         @:ALLOCATE_GLOBAL(rs(1:nb))
         @:ALLOCATE_GLOBAL(vs(1:nb))
@@ -119,7 +119,7 @@ contains
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        integer :: i, j, k, l, q
+        integer :: j, k, l
 
         if (idir == 1) then
 
@@ -183,18 +183,12 @@ contains
         real(wp) :: rddot
         real(wp) :: pb, mv, vflux, pbdot
         real(wp) :: n_tait, B_tait
-
         real(wp), dimension(nb) :: Rtmp, Vtmp
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
-        real(wp) :: start, finish
-
         real(wp) :: nbub !< Bubble number density
-
-        real(wp), dimension(2) :: Re !< Reynolds number
-
+        
         integer :: i, j, k, l, q, ii !< Loop variables
-        integer :: ndirs  !< Number of coordinate directions
 
         real(wp) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(wp) :: t_new !< Updated time step size
@@ -452,7 +446,7 @@ contains
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(out) :: h
 
-        real(wp) :: h0, h1, h_min !< Time step size
+        real(wp) :: h0, h1 !< Time step size
         real(wp) :: d0, d1, d2 !< norms
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
@@ -910,10 +904,10 @@ contains
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
 
-        real(wp) :: T_bar
-        real(wp) :: grad_T
-        real(wp) :: tmp1, tmp2
-        real(wp) :: f_bpres_dot
+
+        real(kind(0._wp)) :: T_bar
+        real(kind(0._wp)) :: grad_T
+        real(kind(0._wp)) :: f_bpres_dot
 
         if (thermal == 3) then
             T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &

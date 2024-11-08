@@ -189,7 +189,7 @@ contains
             end do
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
@@ -301,15 +301,9 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
-        integer :: i, j, k, l, q!< Generic loop iterator
-        real(wp) :: nR3bar
-        real(wp) :: e_mix
-
-        real(wp) :: T
-        real(wp), dimension(num_species) :: Ys
+        integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -417,7 +411,6 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(wp) :: start, finish
-        real(wp) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -599,9 +592,8 @@ contains
         real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(wp) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
+
         real(wp) :: start, finish
-        real(wp) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
@@ -862,7 +854,7 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
+
         real(wp) :: start, finish
 
         call cpu_time(start)
@@ -896,8 +888,6 @@ contains
 
         type(vector_field) :: gm_alpha_qp
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_prim_vf, &
@@ -923,9 +913,9 @@ contains
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
+
         real(wp) :: dt_local
-        
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l !< Generic loop iterators
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &

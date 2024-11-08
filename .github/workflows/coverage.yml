@@ -31,8 +31,7 @@ jobs:
         run: |
             sudo apt update -y
             sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-            
-      
+
       - name: Build
         run: /bin/bash mfc.sh build -j $(nproc) --gcov
 
@@ -42,7 +41,6 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
         env:

@@ -55,12 +55,10 @@ contains
 
         type(vector_field), dimension(:), intent(IN) :: flux_n
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(int_bounds_info) :: ix, iy, iz
-
         integer :: x, y, z
         integer :: eqn
 
-        real(kind(0d0)) :: flux_x, flux_y, flux_z
+        real(wp) :: flux_x, flux_y, flux_z
 
         #:for num_dims in range(1, 4)
             if (num_dims == ${num_dims}$) then
@@ -78,20 +76,20 @@ contains
                                     flux_y = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
                                               flux_n(2)%vf(eqn)%sf(x, y, z))/dy(y)
                                 #:else
-                                    flux_y = 0d0
+                                    flux_y = 0._wp
                                 #:endif
 
                                 #:if num_dims == 3
                                     flux_z = (flux_n(3)%vf(eqn)%sf(x, y, z - 1) - &
                                               flux_n(3)%vf(eqn)%sf(x, y, z))/dz(z)
                                 #:else
-                                    flux_z = 0d0
+                                    flux_z = 0._wp
                                 #:endif
 
                                 rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
                             end do
 
-                            rhs_vf(T_idx)%sf(x, y, z) = 0d0
+                            rhs_vf(T_idx)%sf(x, y, z) = 0._wp
                         end do
                     end do
                 end do
@@ -103,22 +101,13 @@ contains
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_prim_qp)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_qp, q_prim_qp
-
-        integer :: i
-
         integer :: x, y, z
         integer :: eqn
 
         real(wp) :: T
-        integer :: o
-        real(wp) :: dyn_pres
-        real(wp) :: E
-
-
         real(wp) :: rho, omega_m
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
-        real(wp) :: cp_mix
 
         if (chemistry) then
             !$acc parallel loop collapse(3) gang vector default(present) &

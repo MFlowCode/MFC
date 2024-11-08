@@ -160,7 +160,6 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_weno_module
 
-        integer :: i, j
         if (weno_order == 1) return
 
         ! Allocating/Computing WENO Coefficients in x-direction ============
@@ -554,7 +553,6 @@ contains
         real(wp), dimension(0:weno_num_stencils) :: delta
         real(wp), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
         real(wp) :: tau
-        real(wp), pointer :: beta_p(:)
 
         integer :: i, j, k, l
 
@@ -981,7 +979,7 @@ contains
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l, q
 
         ! Determining the number of cell-average variables which will be
         ! WENO-reconstructed and mapping their indical bounds in the x-,
@@ -1259,8 +1257,6 @@ contains
 
     !>  Module deallocation and/or disassociation procedures
     subroutine s_finalize_weno_module()
-
-        integer :: i, j
 
         if (weno_order == 1) return
 

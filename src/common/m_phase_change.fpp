@@ -312,9 +312,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(kind(0.0_wp)), intent(in) :: rhoe
         real(kind(0.0_wp)), intent(out) :: TS
-
-        integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
-        real(kind(0.0_wp)), dimension(num_fluids) :: pk !< individual initial pressures
         real(kind(0.0_wp)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
 
         integer :: i, ns !< generic loop iterators
