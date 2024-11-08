@@ -137,9 +137,9 @@ module m_cbc
     real(kind(0d0)) :: ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out
     real(kind(0d0)) :: uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out
     real(kind(0d0)) :: uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out
-    !$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
-    !$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
-    !$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
+!$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
+!$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
+!$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), alpha_rhox_in,  alphax_in)
