@@ -39,18 +39,10 @@ jobs:
         run: /bin/bash mfc.sh test -a -j $(nproc)
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.6.0
+        uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: false
-          name: mfc-coverage
           verbose: true
-
-coverage:
-  status:
-    project:
-      default:
-        target: 1%
-        threshold: 1%
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
