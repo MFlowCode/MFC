@@ -805,7 +805,7 @@ contains
                         end do
 
 
-                        E = gamma*pres + pi_inf + 5e-1*rho*vel_K_sum
+                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed

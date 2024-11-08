@@ -1110,7 +1110,7 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1e-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            if (dt < 1e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if

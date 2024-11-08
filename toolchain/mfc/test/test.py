@@ -233,7 +233,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         try:
             _handle_case(case, devices)
             nPASS += 1
-        except Exception as exc:
+        except MFCException as exc:
             if nAttempts < max_attempts:
                 continue
             nFAIL += 1

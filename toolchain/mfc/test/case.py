@@ -216,11 +216,19 @@ print(json.dumps({{**case, **mods}}))
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
+    def to_input_file(self) -> input.MFCInputFile:
+        return input.MFCInputFile(
+            os.path.basename(self.get_filepath()),
+            self.get_dirpath(),
+            self.get_parameters())
+
 
     def compute_tolerance(self) -> float:
         single = ARG("single")
         if self.params.get("hypoelasticity", 'F') == 'T':
             tol = 1e-7
+        elif self.params.get("weno_order") == 7:
+            tol = 1e-9
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             tol = 1e-10
         elif self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
