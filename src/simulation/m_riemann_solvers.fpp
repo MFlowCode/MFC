@@ -18,9 +18,9 @@
 !!                  2) Harten-Lax-van Leer-Contact (HLLC)
 !!                  3) Exact
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
-#:include 'inline_conversions.fpp'
 
 module m_riemann_solvers
 
@@ -36,6 +36,14 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension      !< To get the capilary fluxes
+
+    use m_chemistry
+
+    use m_thermochem, only: &
+        gas_constant, get_mixture_molecular_weight, &
+        get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
+        get_species_specific_heats_r, get_species_enthalpies_rt, &
+        get_mixture_specific_heat_cp_mass
     ! ==========================================================================
 
     implicit none
@@ -264,9 +272,7 @@ module m_riemann_solvers
 
 contains
 
-    @:s_compute_speed_of_sound()
-
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
                                     qL_prim_vf, &
@@ -305,7 +311,17 @@ contains
         real(kind(0d0)) :: E_L, E_R
         real(kind(0d0)) :: H_L, H_R
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R
+        real(kind(0d0)), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+        real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+        real(kind(0d0)) :: Cp_avg, Cv_avg, gamma_avggg, T_avg, eps, c_sum_Yi_Phi
+        real(kind(0d0)) :: T_L, T_R
         real(kind(0d0)) :: Y_L, Y_R
+        real(kind(0d0)) :: MW_L, MW_R
+        real(kind(0d0)) :: R_gas_L, R_gas_R
+        real(kind(0d0)) :: Cp_L, Cp_R
+        real(kind(0d0)) :: Cv_L, Cv_R
+        real(kind(0d0)) :: Gamm_L, Gamm_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
         real(kind(0d0)) :: qv_L, qv_R
@@ -356,8 +372,12 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
-                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S)
+                !$acc parallel loop collapse(3) gang vector default(present)    &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L,  &
+                !$acc alpha_R, vel_avg, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, &
+                !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R,     &
+                !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
+                !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -436,7 +456,7 @@ contains
                                 qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                             end do
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_L(i) = dflt_real
@@ -469,11 +489,61 @@ contains
                                 end do
                             end if
 
-                            E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
-                            E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                            if (chemistry) then
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                end do
 
-                            H_L = (E_L + pres_L)/rho_L
-                            H_R = (E_R + pres_R)/rho_R
+                                call get_mixture_molecular_weight(Ys_L, MW_L)
+                                call get_mixture_molecular_weight(Ys_R, MW_R)
+
+                                Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+
+                                R_gas_L = gas_constant/MW_L
+                                R_gas_R = gas_constant/MW_R
+
+                                T_L = pres_L/rho_L/R_gas_L
+                                T_R = pres_R/rho_R/R_gas_R
+
+                                call get_species_specific_heats_r(T_L, Cp_iL)
+                                call get_species_specific_heats_r(T_R, Cp_iR)
+
+                                if (chem_params%gamma_method == 1) then
+                                    ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                    Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
+                                    Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
+
+                                    gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
+                                    gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
+                                else if (chem_params%gamma_method == 2) then
+                                    ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                    call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                    call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                    call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                    call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+
+                                    Gamm_L = Cp_L/Cv_L
+                                    gamma_L = 1.0d0/(Gamm_L - 1.0d0)
+                                    Gamm_R = Cp_R/Cv_R
+                                    gamma_R = 1.0d0/(Gamm_R - 1.0d0)
+                                end if
+
+                                call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                call get_mixture_energy_mass(T_R, Ys_R, E_R)
+
+                                E_L = rho_L*E_L + 5d-1*rho_L*vel_L_rms
+                                E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
+                                H_L = (E_L + pres_L)/rho_L
+                                H_R = (E_R + pres_R)/rho_R
+                            else
+                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                H_L = (E_L + pres_L)/rho_L
+                                H_R = (E_R + pres_R)/rho_R
+                            end if
 
                             if (hypoelasticity) then
                                 !$acc loop seq
@@ -509,18 +579,18 @@ contains
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                          vel_L_rms, c_L)
+                                                          vel_L_rms, 0d0, c_L)
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                          vel_R_rms, c_R)
+                                                          vel_R_rms, 0d0, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                             ! variables are placeholders to call the subroutine.
 
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                          vel_avg_rms, c_avg)
+                                                          vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
-                            if (any(Re_size > 0)) then
+                            if (viscous) then
                                 !$acc loop seq
                                 do i = 1, 2
                                     Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
@@ -736,6 +806,20 @@ contains
                                     flux_rs${XYZ}$_vf(j, k, l, contxe) = 0d0
                                 end if
                             end if
+
+                            if (chemistry) then
+                                !$acc loop seq
+                                do i = chemxb, chemxe
+                                    Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
+                                                                     + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
+                                                                    /(s_M - s_P)
+                                    flux_src_rs${XYZ}$_vf(j, k, l, i) = 0d0
+                                end do
+                            end if
                         end do
                     end do
                 end do
@@ -743,7 +827,7 @@ contains
 
         #:endfor
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (weno_Re_flux) then
 
                 call s_compute_viscous_source_flux( &
@@ -846,6 +930,15 @@ contains
         real(kind(0d0)) :: E_L, E_R
         real(kind(0d0)) :: H_L, H_R
         real(kind(0d0)), dimension(num_fluids) :: alpha_L, alpha_R
+        real(kind(0d0)), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
+        real(kind(0d0)), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+        real(kind(0d0)) :: Cp_avg, Cv_avg, T_avg, c_sum_Yi_Phi, eps
+        real(kind(0d0)) :: T_L, T_R
+        real(kind(0d0)) :: MW_L, MW_R
+        real(kind(0d0)) :: R_gas_L, R_gas_R
+        real(kind(0d0)) :: Cp_L, Cp_R
+        real(kind(0d0)) :: Cv_L, Cv_R
+        real(kind(0d0)) :: Gamm_L, Gamm_R
         real(kind(0d0)) :: Y_L, Y_R
         real(kind(0d0)) :: gamma_L, gamma_R
         real(kind(0d0)) :: pi_inf_L, pi_inf_R
@@ -878,10 +971,12 @@ contains
         real(kind(0d0)) :: R3V2Lbar, R3V2Rbar
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: zcoef, pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -913,8 +1008,10 @@ contains
                 if (model_eqns == 3) then
                     !ME3
 
-                    !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+                    !$acc parallel loop collapse(3) gang vector default(present) &
+                    !$acc private(vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, &
+                    !$acc s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, &
+                    !$acc Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)
 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -988,7 +1085,7 @@ contains
                                     alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, advxb + i - 1)
                                 end do
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_L(i) = dflt_real
@@ -1031,18 +1128,18 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
@@ -1108,7 +1205,7 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
-                                    if (.not. f_is_default(sigma)) then
+                                    if (surface_tension) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
@@ -1142,7 +1239,7 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
 
-                                    if (.not. f_is_default(sigma)) then
+                                    if (surface_tension) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
                                     end if
@@ -1183,7 +1280,7 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
-                                    if (.not. f_is_default(sigma)) then
+                                    if (surface_tension) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
@@ -1226,7 +1323,7 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
-                                    if (.not. f_is_default(sigma)) then
+                                    if (surface_tension) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
                                     end if
@@ -1330,16 +1427,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -1510,10 +1607,10 @@ contains
                             end do
                         end do
                     end do
-
+                    !$acc end parallel loop
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R)
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1594,7 +1691,7 @@ contains
                                     qv_R = qvs(1)
                                 end if
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     if (num_fluids == 1) then ! Need to consider case with num_fluids >= 2
                                         !$acc loop seq
                                         do i = 1, 2
@@ -1746,22 +1843,26 @@ contains
                                 end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, 0d0, c_avg)
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                     end do
+                                end if
+
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
                                 end if
 
                                 if (wave_speeds == 1) then
@@ -1810,6 +1911,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0d0
+                                end if
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1843,8 +1950,8 @@ contains
                                                        s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
                                                                   (1d0 - dir_flg(dir_idx(i)))* &
                                                                   vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
-                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -1858,7 +1965,8 @@ contains
                                     + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                        (s_R - vel_R(dir_idx(1))))) - E_R))
+                                                        (s_R - vel_R(dir_idx(1))))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
 
@@ -1882,7 +1990,7 @@ contains
                                                 dir_flg(dir_idx(i))* &
                                                 s_P*(xi_R - 1d0))
 
-                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(idxi)%sf(j,k,l) = 0d0
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
@@ -1968,7 +2076,9 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef,   &
+                    !$acc vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR,          &
+                    !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2047,7 +2157,7 @@ contains
                                     qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                 end do
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_L(i) = dflt_real
@@ -2080,32 +2190,88 @@ contains
                                     end do
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+                                if (chemistry) then
+                                    c_sum_Yi_Phi = 0.0d0
+                                    !$acc loop seq
+                                    do i = chemxb, chemxe
+                                        Ys_L(i - chemxb + 1) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        Ys_R(i - chemxb + 1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    end do
 
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+                                    call get_mixture_molecular_weight(Ys_L, MW_L)
+                                    call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                    Xs_L(:) = Ys_L(:)*MW_L/mol_weights(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/mol_weights(:)
+
+                                    R_gas_L = gas_constant/MW_L
+                                    R_gas_R = gas_constant/MW_R
+
+                                    T_L = pres_L/rho_L/R_gas_L
+                                    T_R = pres_R/rho_R/R_gas_R
+
+                                    call get_species_specific_heats_r(T_L, Cp_iL)
+                                    call get_species_specific_heats_r(T_R, Cp_iR)
+
+                                    if (chem_params%gamma_method == 1) then
+                                        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                        Gamma_iL = Cp_iL/(Cp_iL - 1.0d0)
+                                        Gamma_iR = Cp_iR/(Cp_iR - 1.0d0)
+
+                                        gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0d0))
+                                        gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0d0))
+                                    else if (chem_params%gamma_method == 2) then
+                                        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                        call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                        call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                        call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
+                                        call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
+
+                                        Gamm_L = Cp_L/Cv_L
+                                        gamma_L = 1.0d0/(Gamm_L - 1.0d0)
+                                        Gamm_R = Cp_R/Cv_R
+                                        gamma_R = 1.0d0/(Gamm_R - 1.0d0)
+                                    end if
+
+                                    call get_mixture_energy_mass(T_L, Ys_L, E_L)
+                                    call get_mixture_energy_mass(T_R, Ys_R, E_R)
+
+                                    E_L = rho_L*E_L + 5d-1*rho_L*vel_L_rms
+                                    E_R = rho_R*E_R + 5d-1*rho_R*vel_R_rms
+                                    H_L = (E_L + pres_L)/rho_L
+                                    H_R = (E_R + pres_R)/rho_R
+                                else
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms + qv_L
+
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms + qv_R
+
+                                    H_L = (E_L + pres_L)/rho_L
+                                    H_R = (E_R + pres_R)/rho_R
+                                end if
 
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, c_L)
+                                                              vel_L_rms, 0d0, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, c_R)
+                                                              vel_R_rms, 0d0, c_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_avg)
+                                                              vel_avg_rms, c_sum_Yi_Phi, c_avg)
 
-                                if (any(Re_size > 0)) then
+                                if (viscous) then
                                     !$acc loop seq
                                     do i = 1, 2
                                         Re_avg_rs${XYZ}$_vf(j, k, l, i) = 2d0/(1d0/Re_L(i) + 1d0/Re_R(i))
                                     end do
+                                end if
+
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
                                 end if
 
                                 if (wave_speeds == 1) then
@@ -2155,6 +2321,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0d0
+                                end if
+
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2181,8 +2353,8 @@ contains
                                                        s_P*(xi_R*(dir_flg(idxi)*s_S + &
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R))
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
+                                                dir_flg(idxi)*(pres_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -2195,7 +2367,8 @@ contains
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(idx1)))) - E_R))
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
                                 !$acc loop seq
@@ -2223,6 +2396,18 @@ contains
                                 end do
 
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
+
+                                if (chemistry) then
+                                    !$acc loop seq
+                                    do i = chemxb, chemxe
+                                        Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*rho_L*Y_L*(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                                                        + xi_P*rho_R*Y_R*(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = 0.0d0
+                                    end do
+                                end if
 
                                 ! Geometrical source flux for cylindrical coordinates
 
@@ -2278,12 +2463,13 @@ contains
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
                 end if
             end if
         #:endfor
         ! Computing HLLC flux and source flux for Euler system of equations
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (weno_Re_flux) then
                 call s_compute_viscous_source_flux( &
                     qL_prim_vf(momxb:momxe), &
@@ -2309,7 +2495,7 @@ contains
             end if
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             call s_compute_capilary_source_flux( &
                 q_prim_vf, &
                 vel_src_rsx_vf, &
@@ -2342,11 +2528,11 @@ contains
         end do
         !$acc update device(Gs)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
@@ -2392,7 +2578,7 @@ contains
             @:ALLOCATE_GLOBAL(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(Re_avg_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -2420,7 +2606,7 @@ contains
             @:ALLOCATE_GLOBAL(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(Re_avg_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -2448,7 +2634,7 @@ contains
             @:ALLOCATE_GLOBAL(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(Re_avg_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -2547,7 +2733,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do l = isz%beg, isz%end
@@ -2602,7 +2788,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
@@ -2661,7 +2847,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
@@ -2711,7 +2897,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
 
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
@@ -2764,7 +2950,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
@@ -2808,7 +2994,7 @@ contains
                     end do
                 end do
 
-                if (any(Re_size > 0)) then
+                if (viscous) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do i = momxb, momxe
                         do k = isy%beg, isy%end
@@ -2883,7 +3069,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
+            if (viscous .or. (surface_tension)) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2916,7 +3102,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
+            if (viscous .or. (surface_tension)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2947,7 +3133,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0) .or. (.not. f_is_default(sigma))) then
+            if (viscous .or. (surface_tension)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
@@ -3038,7 +3224,7 @@ contains
 
         ! Viscous Stresses in z-direction ==================================
         if (norm_dir == 1) then
-            if (Re_size(1) > 0) then ! Shear stresses
+            if (shear_stress) then ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3064,7 +3250,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then ! Bulk stresses
+            if (bulk_stress) then ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3092,7 +3278,7 @@ contains
 
             if (n == 0) return
 
-            if (Re_size(1) > 0) then ! Shear stresses
+            if (shear_stress) then ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3134,7 +3320,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then ! Bulk stresses
+            if (bulk_stress) then ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3166,7 +3352,7 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then ! Shear stresses
+            if (shear_stress) then ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3207,7 +3393,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then ! Bulk stresses
+            if (bulk_stress) then ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( avg_vel, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3237,7 +3423,7 @@ contains
             ! Viscous Stresses in r-direction ==================================
         elseif (norm_dir == 2) then
 
-            if (Re_size(1) > 0) then ! Shear stresses
+            if (shear_stress) then ! Shear stresses
 
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
@@ -3287,7 +3473,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3322,7 +3508,7 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3367,7 +3553,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel,  dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3397,7 +3583,7 @@ contains
             ! Viscous Stresses in theta-direction ==================================
         else
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3462,7 +3648,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(avg_vel, dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3562,7 +3748,7 @@ contains
         ! Viscous Stresses in x-direction ==================================
         if (norm_dir == 1) then
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3588,7 +3774,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3616,7 +3802,7 @@ contains
 
             if (n == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3657,7 +3843,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3685,7 +3871,7 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3725,7 +3911,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3755,7 +3941,7 @@ contains
             ! Viscous Stresses in y-direction ==================================
         elseif (norm_dir == 2) then
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3800,7 +3986,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3831,7 +4017,7 @@ contains
 
             if (p == 0) return
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private(  dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3872,7 +4058,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3902,7 +4088,7 @@ contains
             ! Viscous Stresses in z-direction ==================================
         else
 
-            if (Re_size(1) > 0) then              ! Shear stresses
+            if (shear_stress) then              ! Shear stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -3959,7 +4145,7 @@ contains
                 end do
             end if
 
-            if (Re_size(2) > 0) then              ! Bulk stresses
+            if (bulk_stress) then              ! Bulk stresses
                 !$acc parallel loop collapse(3) gang vector default(present) private( dvel_avg_dx, dvel_avg_dy, dvel_avg_dz, tau_Re)
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -4185,7 +4371,7 @@ contains
         ! to convert mixture or species variables to the mixture variables
         ! s_convert_to_mixture_variables => null()
 
-        if (Re_size(1) > 0) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsx_vf)
@@ -4198,7 +4384,7 @@ contains
 
         if (n == 0) return
 
-        if (Re_size(1) > 0) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsy_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsy_vf)
@@ -4211,7 +4397,7 @@ contains
 
         if (p == 0) return
 
-        if (Re_size(1) > 0) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(Re_avg_rsz_vf)
         end if
         @:DEALLOCATE_GLOBAL(vel_src_rsz_vf)

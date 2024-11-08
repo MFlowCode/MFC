@@ -24,8 +24,11 @@
 
 Welcome to the home of MFC!
 MFC simulates compressible multi-component and multi-phase flows, [amongst other things](#what-else-can-this-thing-do). 
+MFC is written in Fortran and uses metaprogramming to keep the code short (about 20K lines).
+
+MFC is used on the latest leadership-class supercomputers.
 It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Summit and Frontier.
-MFC is written in Fortran and makes use of metaprogramming to keep the code short (about 20K lines).
+MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
   
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
@@ -53,20 +56,21 @@ Another example is the high-Mach flow over an airfoil, shown below.
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get started using MFC!
 It's rather straightforward.
 We'll give a brief intro. here for MacOS.
-Using [brew](https://brew.sh), install MFC's modest set of dependencies:
+Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
-brew install wget python cmake gcc@13 mpich
+brew install coreutils python cmake fftw hdf5 gcc boost open-mpi
 ```
 You're now ready to build and test MFC!
 Put it to a convenient directory via
 ```shell
-git clone https://github.com/MFlowCode/MFC.git
+git clone https://github.com/MFlowCode/MFC
 cd MFC
 ```
-and be sure MFC knows what compilers to use by appending and sourcing your `~/.profile` file via this command
+and be sure MFC knows where to find Boost by appending to your dotfiles and sourcing them again
 ```shell
-echo -e "export CC=gcc-13 \nexport CXX=g++-13 \nexport FC=gfortran-13" >> ~/.profile
-source ~/.profile
+echo -e "export BOOST_INCLUDE='$(brew --prefix --installed boost)/include'" | tee -a ~/.bash_profile ~/.zshrc
+. ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
+! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
 ```
 then you can build MFC and run the test suite!
 ```shell
@@ -79,15 +83,15 @@ You can learn more about MFC's capabilities [via its documentation](https://mflo
 
 The shock-droplet interaction case above was run via
 ```shell
-./mfc.sh run ./examples/3d_shockdroplet/case.py -n 8
+./mfc.sh run -n $(nproc) ./examples/3d_shockdroplet/case.py 
 ```
-where `8` is the number of cores the example will run on.
-You can visualize the output data, located in `examples/3d_shockdroplet/silo_hdf5`, via Paraview, Visit, or your other favorite software.
+where `$(nproc)` is the number of cores the example will run on (and the number of physical cores on your CPU device).
+You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
 
-## Is this really exascale
+## Is this _really_ exascale?
 
 [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
-The weak scaling of MFC on this machine is below, showing near-ideal utilization. 
+The weak scaling of MFC on this machine shows near-ideal utilization. 
 
 <p align="center">
     <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
@@ -128,7 +132,7 @@ They are organized below. Just click the drop-downs!
 
 * Shock and interface capturing schemes
 	* First-order upwinding
- 	* WENO reconstructions of order 3 and 5
+ 	* WENO reconstructions of order 3, 5, and 7
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of high density ratios
@@ -155,7 +159,7 @@ They are organized below. Just click the drop-downs!
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
 	* \>100 Regression tests with each PR.
- 		* Performed with GNU, Intel, and NVIDIA compilers on NVIDIA and AMD GPUs.
+ 		* Performed with GNU (GCC), Intel, Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
 * Continuous Deployment (CD) of [website](https://mflowcode.github.io) and [API documentation](https://mflowcode.github.io/documentation/index.html)
@@ -198,7 +202,7 @@ If you use MFC, consider citing it as:
 
 ## License
  
-Copyright 2021-2024 Spencer Bryngelson and Tim Colonius.
+Copyright 2021 Spencer Bryngelson and Tim Colonius.
 MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 ## Acknowledgements
@@ -207,6 +211,7 @@ Multiple federal sponsors have supported MFC development, including the US Depar
 
 MFC computations have used many supercomputing systems. A partial list is below
   * OLCF Frontier and Summit, and testbed systems Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson)
+  * LLNL Lassen and El Capitan testbed system, Tioga
   * PSC Bridges(1/2), NCSA Delta, SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI (allocations TG-CTS120005 (PI Colonius) and TG-PHY210084 (PI Bryngelson))
   * DOD systems Onyx, Carpenter, and Nautilus via the DOD HPCMP program
   * Sandia National Labs systems Doom and Attaway and testbed systems Weaver and Vortex

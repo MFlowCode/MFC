@@ -98,6 +98,8 @@ contains
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
+        !$acc update host(ib_markers%sf)
+
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps, num_inner_gps)
@@ -448,6 +450,8 @@ contains
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
         integer :: i, j, k, l, q !< Iterator variables
+
+        num_gps = 0
 
         do i = 0, m
             do j = 0, n

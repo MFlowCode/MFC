@@ -31,10 +31,10 @@
 #ifdef CRAY_ACC_WAR
     allocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
     #:for arg in args
-        ${re.sub('\(.*\)','',arg)}$ => ${ 'p_' + re.sub('\(.*\)','',arg.strip()) }$
+        ${re.sub('\\(.*\\)','',arg)}$ => ${ 'p_' + re.sub('\\(.*\\)','',arg.strip()) }$
     #:endfor
-    !$acc enter data create(${', '.join(('p_' + re.sub('\(.*\)','',arg.strip()) for arg in args))}$) &
-    !$acc& attach(${', '.join(map(lambda x: re.sub('\(.*\)','',x), args))}$)
+    !$acc enter data create(${', '.join(('p_' + re.sub('\\(.*\\)','',arg.strip()) for arg in args))}$) &
+    !$acc& attach(${', '.join(map(lambda x: re.sub('\\(.*\\)','',x), args))}$)
 #else
     allocate (${', '.join(args)}$)
     !$acc enter data create(${', '.join(args)}$)
@@ -115,5 +115,44 @@
 #endif
 #:enddef
 
+#:def ACC_SETUP_source_spatials(*args)
+#ifdef CRAY_ACC_WAR
+    block
+
+        @:LOG({'@:ACC_SETUP_source_spatials(${', '.join(args)}$)'})
+
+        #:for arg in args
+            !$acc enter data copyin(${arg}$)
+            if (allocated(${arg}$%coord)) then
+                !$acc enter data create(${arg}$%coord)
+            end if
+            if (allocated(${arg}$%val)) then
+                !$acc enter data create(${arg}$%val)
+            end if
+            if (allocated(${arg}$%angle)) then
+                !$acc enter data create(${arg}$%angle)
+            end if
+            if (allocated(${arg}$%xyz_to_r_ratios)) then
+                !$acc enter data create(${arg}$%xyz_to_r_ratios)
+            end if
+        #:endfor
+    end block
+#endif
+#:enddef
+
+#:def PROHIBIT(condition, message = None)
+    if (${condition}$) then
+        call s_prohibit_abort("${condition}$", ${message or '""'}$)
+    end if
+#:enddef
+
 #define t_vec3   real(kind(0d0)), dimension(1:3)
 #define t_mat4x4 real(kind(0d0)), dimension(1:4,1:4)
+
+#:def ASSERT(predicate, message = None)
+    if (.not. (${predicate}$)) then
+        call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: "// &
+                         "Assertion failed: ${predicate}$. " &
+                         //${message or '"No error description."'}$)
+    end if
+#:enddef

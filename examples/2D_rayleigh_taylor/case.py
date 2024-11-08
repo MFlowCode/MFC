@@ -51,7 +51,6 @@ data = {
     # Simulation Algorithm ==================
         'model_eqns'        : 3,
         'alt_soundspeed'    : 'F',
-        'adv_alphan'        : 'T',
         'mixture_err'       : 'T',
         'mpp_lim'           : 'T',
         'time_stepper'      : 3,
@@ -70,6 +69,7 @@ data = {
         'bc_y%end'          : -16,
         'num_patches'       : 1,
         'num_fluids'        : 2,
+        'viscous'           : 'T',
     # =======================================
 
     # Database Structure Parameters =========

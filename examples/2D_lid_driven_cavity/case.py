@@ -27,7 +27,6 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
@@ -45,6 +44,7 @@ print(json.dumps({
     'bc_y%beg'                     : -16,
     'bc_y%end'                     : -16,
     'bc_y%ve1'                     : 0.5,
+    'viscous'                      : 'T',
     # ==========================================================
 
     # Formatted Database Files Structure Parameters ============

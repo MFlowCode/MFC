@@ -969,9 +969,6 @@ contains
 
                         @:analytical()
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = &
@@ -991,7 +988,8 @@ contains
                     y_boundary%end >= y_cc(j)) &
                     then
 
-                    patch_id_fp(i, j, 0) = patch_id
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
 
                 end if
 

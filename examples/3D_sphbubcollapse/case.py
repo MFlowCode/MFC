@@ -45,7 +45,7 @@ print(json.dumps({
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
-    # Only two patches are necesssary, the background liquid and the
+    # Only two patches are necessary, the background liquid and the
     # gas bubble
     'num_patches'                  : 2,
     # Use the 6 equation model
@@ -54,9 +54,6 @@ print(json.dumps({
     'alt_soundspeed'               : 'F',
     # Two fluids: water and air
     'num_fluids'                   : 2,
-    # Advect both volume fractions
-    'adv_alphan'                   : 'T',
-    # Ensure the volume fractions sum to unity at the end of each
     # time step
     'mpp_lim'                      : 'T',
     # Correct errors when computing speed of sound

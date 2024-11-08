@@ -3,7 +3,6 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -26,6 +25,8 @@ module m_data_output
     use m_compile_specific
 
     use m_helper
+
+    use m_sim_helpers
 
     use m_delay_file_access
 
@@ -101,8 +102,6 @@ module m_data_output
 
 contains
 
-    @:s_compute_speed_of_sound()
-
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
         !!      basic header information relevant to current simulation.
@@ -120,51 +119,50 @@ contains
         character(LEN=8) :: file_date !<
             !! Creation date of the run-time information file
 
-        logical :: file_exist !<
-            !! Logical used to check existence of run-time information file
-
         ! Opening the run-time information file
         file_path = trim(case_dir)//'/'//trim(file_name)
 
-        inquire (FILE=trim(file_path), EXIST=file_exist)
-
-        open (1, FILE=trim(file_path), &
+        open (3, FILE=trim(file_path), &
               FORM='formatted', &
-              POSITION='append', &
-              STATUS='unknown')
+              STATUS='replace')
 
-        ! Generating file header for a new run-time information file
-        if (file_exist .neqv. .true.) then
+        write (3, '(A)') 'Description: Stability information at '// &
+            'each time-step of the simulation. This'
+        write (3, '(13X,A)') 'data is composed of the inviscid '// &
+            'Courant–Friedrichs–Lewy (ICFL)'
+        write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
+            'the capillary CFL (CCFL)'
+        write (3, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
+            'number. Please note that only'
+        write (3, '(13X,A)') 'those stability conditions pertinent '// &
+            'to the physics included in'
+        write (3, '(13X,A)') 'the current computation are displayed.'
 
-            write (1, '(A)') 'Description: Stability information at '// &
-                'each time-step of the simulation. This'
-            write (1, '(13X,A)') 'data is composed of the inviscid '// &
-                'Courant–Friedrichs–Lewy (ICFL)'
-            write (1, '(13X,A)') 'number, the viscous CFL (VCFL) number, '// &
-                'the capillary CFL (CCFL)'
-            write (1, '(13X,A)') 'number and the cell Reynolds (Rc) '// &
-                'number. Please note that only'
-            write (1, '(13X,A)') 'those stability conditions pertinent '// &
-                'to the physics included in'
-            write (1, '(13X,A)') 'the current computation are displayed.'
+        call date_and_time(DATE=file_date)
 
-            call date_and_time(DATE=file_date)
+        write (3, '(A)') 'Date: '//file_date(5:6)//'/'// &
+            file_date(7:8)//'/'// &
+            file_date(3:4)
 
-            write (1, '(A)') 'Date: '//file_date(5:6)//'/'// &
-                file_date(7:8)//'/'// &
-                file_date(3:4)
-
-        end if
-
-        write (1, '(A)') ''; write (1, '(A)') ''
+        write (3, '(A)') ''; write (3, '(A)') ''
 
         ! Generating table header for the stability criteria to be outputted
-        if (any(Re_size > 0)) then
-            write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
-                'Max ==== VCFL Max ====== Rc Min ======='
+        if (cfl_dt) then
+            if (viscous) then
+                write (1, '(A)') '==== Time-steps ====== dt ===== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== dt ===== Time '// &
+                    '============== ICFL Max ============='
+            end if
         else
-            write (1, '(A)') '=========== Time-steps ============== Time '// &
-                '============== ICFL Max ============='
+            if (viscous) then
+                write (1, '(A)') '==== Time-steps ====== Time ======= ICFL '// &
+                    'Max ==== VCFL Max ====== Rc Min ======='
+            else
+                write (1, '(A)') '=========== Time-steps ============== Time '// &
+                    '============== ICFL Max ============='
+            end if
         end if
 
     end subroutine s_open_run_time_information_file
@@ -177,6 +175,7 @@ contains
             !! Relative path to the probe data file in the case directory
 
         integer :: i !< Generic loop iterator
+        logical :: file_exist
 
         do i = 1, num_probes
             ! Generating the relative path to the data file
@@ -185,23 +184,18 @@ contains
 
             ! Creating the formatted data file and setting up its
             ! structure
-            open (i + 30, FILE=trim(file_path), &
-                  FORM='formatted', &
-                  STATUS='unknown')
-            ! POSITION = 'append', &
-            !WRITE(i+30,'(A,I0,A)') 'Probe ',i, ' located at:'
-            !WRITE(i+30,'(A,F10.6)') 'x = ',probe(i)%x
-            !WRITE(i+30,'(A,F10.6)') 'y = ',probe(i)%y
-            !WRITE(i+30,'(A,F10.6)') 'z = ',probe(i)%z
-            !WRITE(i+30, *)
-            !WRITE(i+30,'(A)') '=== Non-Dimensional Time ' // &
-            !                '=== Density ' // &
-            !                '=== Velocity ' // &
-            !                '=== Pressure ' // &
-            !                '=== Gamma ' // &
-            !                '=== Stiffness ' // &
-            !                '=== Sound Speed ' // &
-            !                '=== Acceleration ==='
+            inquire (file=trim(file_path), exist=file_exist)
+
+            if (file_exist) then
+                open (i + 30, FILE=trim(file_path), &
+                      FORM='formatted', &
+                      STATUS='old', &
+                      POSITION='append')
+            else
+                open (i + 30, FILE=trim(file_path), &
+                      FORM='formatted', &
+                      STATUS='unknown')
+            end if
         end do
 
         if (integral_wrt) then
@@ -263,107 +257,15 @@ contains
             do k = 0, n
                 do j = 0, m
 
-                    do i = 1, num_fluids
-                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-                    end do
-
-                    if (bubbles) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
-                    else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
-                    end if
-
-                    do i = 1, num_dims
-                        vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
-                    end do
-
-                    vel_sum = 0d0
-                    do i = 1, num_dims
-                        vel_sum = vel_sum + vel(i)**2d0
-                    end do
-
-                    pres = q_prim_vf(E_idx)%sf(j, k, l)
-
-                    E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
-
-                    H = (E + pres)/rho
+                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
 
-                    if (grid_geometry == 3) then
-                        if (k == 0) then
-                            fltr_dtheta = 2d0*pi*y_cb(0)/3d0
-                        elseif (k <= fourier_rings) then
-                            Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                            fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
-                        else
-                            fltr_dtheta = y_cb(k - 1)*dz(l)
-                        end if
-                    end if
-
-                    if (p > 0) then
-                        !3D
-                        if (grid_geometry == 3) then
-                            icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      fltr_dtheta/(abs(vel(3)) + c))
-                        else
-                            icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                      dy(k)/(abs(vel(2)) + c), &
-                                                      dz(l)/(abs(vel(3)) + c))
-                        end if
-
-                        if (any(Re_size > 0)) then
-
-                            if (grid_geometry == 3) then
-                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
-                                                   /min(dx(j), dy(k), fltr_dtheta)**2d0
-
-                                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                     dy(k)*(abs(vel(2)) + c), &
-                                                     fltr_dtheta*(abs(vel(3)) + c)) &
-                                                 /maxval(1d0/Re)
-                            else
-                                vcfl_sf(j, k, l) = maxval(dt/Re/rho) &
-                                                   /min(dx(j), dy(k), dz(l))**2d0
-
-                                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                     dy(k)*(abs(vel(2)) + c), &
-                                                     dz(l)*(abs(vel(3)) + c)) &
-                                                 /maxval(1d0/Re)
-                            end if
-
-                        end if
-
-                    elseif (n > 0) then
-                        !2D
-                        icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
-                                                  dy(k)/(abs(vel(2)) + c))
-
-                        if (any(Re_size > 0)) then
-
-                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/min(dx(j), dy(k))**2d0
-
-                            Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                                 dy(k)*(abs(vel(2)) + c)) &
-                                             /maxval(1d0/Re)
-
-                        end if
-
+                    if (viscous) then
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
                     else
-                        !1D
-                        icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
-
-                        if (any(Re_size > 0)) then
-
-                            vcfl_sf(j, k, l) = maxval(dt/Re/rho)/dx(j)**2d0
-
-                            Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re)
-
-                        end if
-
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
                     end if
 
                 end do
@@ -376,13 +278,13 @@ contains
 #ifdef CRAY_ACC_WAR
         !$acc update host(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc update host(vcfl_sf, Rc_sf)
         end if
 
         icfl_max_loc = maxval(icfl_sf)
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
         end if
@@ -391,7 +293,7 @@ contains
         icfl_max_loc = maxval(icfl_sf)
         !$acc end kernels
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             !$acc kernels
             vcfl_max_loc = maxval(vcfl_sf)
             Rc_min_loc = minval(Rc_sf)
@@ -411,28 +313,28 @@ contains
                                                          Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
-            if (any(Re_size > 0)) vcfl_max_glb = vcfl_max_loc
-            if (any(Re_size > 0)) Rc_min_glb = Rc_min_loc
+            if (viscous) vcfl_max_glb = vcfl_max_loc
+            if (viscous) Rc_min_glb = Rc_min_loc
         end if
 
         ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
         ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
-            if (any(Re_size > 0)) then
-                write (1, '(6X,I8,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
-                    t_step, t_step*dt, icfl_max_glb, &
+            if (viscous) then
+                write (1, '(6X,I8,F10.6,6X,6X,F10.6,6X,F9.6,6X,F9.6,6X,F10.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb, &
                     vcfl_max_glb, &
                     Rc_min_glb
             else
-                write (1, '(13X,I8,14X,F10.6,13X,F9.6)') &
-                    t_step, t_step*dt, icfl_max_glb
+                write (1, '(13X,I8,14X,F10.6,14X,F10.6,13X,F9.6)') &
+                    t_step, dt, t_step*dt, icfl_max_glb
             end if
 
             if (icfl_max_glb /= icfl_max_glb) then
@@ -442,11 +344,13 @@ contains
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting ...')
             end if
 
-            if (vcfl_max_glb /= vcfl_max_glb) then
-                call s_mpi_abort('VCFL is NaN. Exiting ...')
-            elseif (vcfl_max_glb > 1d0) then
-                print *, 'vcfl', vcfl_max_glb
-                call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+            if (viscous) then
+                if (vcfl_max_glb /= vcfl_max_glb) then
+                    call s_mpi_abort('VCFL is NaN. Exiting ...')
+                elseif (vcfl_max_glb > 1d0) then
+                    print *, 'vcfl', vcfl_max_glb
+                    call s_mpi_abort('VCFL is greater than 1.0. Exiting ...')
+                end if
             end if
         end if
 
@@ -489,7 +393,7 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
 
         ! Creating or overwriting the current time-step directory
-        write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all/p', &
+        write (t_step_dir, '(a,i0,a,i0)') trim(case_dir)//'/p_all/p', &
             proc_rank, '/', t_step
 
         file_path = trim(t_step_dir)//'/.'
@@ -599,7 +503,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
@@ -618,10 +522,8 @@ contains
 
                     open (2, FILE=trim(file_path))
                     do j = 0, m
-                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                            .or. &
-                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                            ) then
+                        ! todo: revisit change here
+                        if (((i >= adv_idx%beg) .and. (i <= adv_idx%end))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else
                             write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
@@ -727,6 +629,8 @@ contains
                             if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                 .or. &
                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                .or. &
+                                ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
@@ -808,6 +712,8 @@ contains
                                 if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                     .or. &
                                     ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                    .or. &
+                                    ((i >= chemxb) .and. (i <= chemxe)) &
                                     ) then
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
@@ -937,7 +843,6 @@ contains
                 call s_initialize_mpi_data(q_cons_vf)
             end if
 
-            ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step, '.dat'
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -1003,8 +908,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        call MPI_FILE_CLOSE(ifile, ierr)
-
 #endif
 
     end subroutine s_write_parallel_data_files
@@ -1050,9 +953,9 @@ contains
         real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
         real(kind(0d0)) :: G
-        real(kind(0d0)) :: dyn_p
+        real(kind(0d0)) :: dyn_p, Temp
 
-        integer :: i, j, k, l, s, q !< Generic loop iterator
+        integer :: i, j, k, l, s, q, d !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
@@ -1065,6 +968,8 @@ contains
         integer :: npts !< Number of included integral points
         real(kind(0d0)) :: rad, thickness !< For integral quantities
         logical :: trigger !< For integral quantities
+
+        real(kind(0d0)) :: rhoYks(1:num_species)
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
@@ -1117,6 +1022,12 @@ contains
                     k = 0
                     l = 0
 
+                    if (chemistry) then
+                        do d = 1, num_species
+                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k, l)
+                        end do
+                    end if
+
                     ! Computing/Sharing necessary state variables
                     if (hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
@@ -1136,14 +1047,14 @@ contains
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, pres, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, pres)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp)
                     end if
 
                     if (model_eqns == 4) then
@@ -1201,11 +1112,17 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                  ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
             elseif (p == 0) then ! 2D simulation
+                if (chemistry) then
+                    do d = 1, num_species
+                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
+                    end do
+                end if
+
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         do s = -1, m
@@ -1236,13 +1153,17 @@ contains
                             call s_compute_pressure( &
                                 q_cons_vf(1)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                dyn_p, pi_inf, gamma, rho, qv, pres, &
+                                dyn_p, pi_inf, gamma, rho, qv, &
+                                rhoYks, &
+                                pres, &
+                                Temp, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                                    dyn_p, pi_inf, gamma, rho, qv, pres)
+                                                    dyn_p, pi_inf, gamma, rho, qv, &
+                                                    rhoYks, pres, Temp)
                         end if
 
                         if (model_eqns == 4) then
@@ -1277,7 +1198,7 @@ contains
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                      ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
 
                         accel = accel_mag(j - 2, k - 2, l)
                     end if
@@ -1315,22 +1236,30 @@ contains
 
                             dyn_p = 0.5d0*rho*dot_product(vel, vel)
 
+                            if (chemistry) then
+                                do d = 1, num_species
+                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l - 2)
+                                end do
+                            end if
+
                             if (hypoelasticity) then
                                 call s_compute_pressure( &
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
-                                    dyn_p, pi_inf, gamma, rho, qv, pres, &
+                                    dyn_p, pi_inf, gamma, rho, qv, &
+                                    rhoYks, pres, Temp, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
-                                                        dyn_p, pi_inf, gamma, rho, qv, pres)
+                                                        dyn_p, pi_inf, gamma, rho, qv, &
+                                                        rhoYks, pres, Temp)
                             end if
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, c)
+                                                          ((gamma + 1d0)*pres + pi_inf)/rho, alpha, 0d0, 0d0, c)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1639,23 +1568,22 @@ contains
     subroutine s_close_run_time_information_file
 
         real(kind(0d0)) :: run_time !< Run-time of the simulation
-
         ! Writing the footer of and closing the run-time information file
-        write (1, '(A)') '----------------------------------------'// &
+        write (3, '(A)') '----------------------------------------'// &
             '----------------------------------------'
-        write (1, '(A)') ''
+        write (3, '(A)') ''
 
-        write (1, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (any(Re_size > 0)) write (1, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (any(Re_size > 0)) write (1, '(A,F10.6)') 'Rc Min: ', Rc_min
+        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
-        write (1, '(A)') ''
-        write (1, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
-        write (1, '(A)') '========================================'// &
+        write (3, '(A)') ''
+        write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
+        write (3, '(A)') '========================================'// &
             '========================================'
-        close (1)
+        close (3)
 
     end subroutine s_close_run_time_information_file
 
@@ -1683,7 +1611,7 @@ contains
         @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
 
@@ -1720,7 +1648,7 @@ contains
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE_GLOBAL(icfl_sf)
-        if (any(Re_size > 0)) then
+        if (viscous) then
             @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
         end if
 

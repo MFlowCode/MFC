@@ -20,8 +20,7 @@ module m_helper
     implicit none
 
     private; 
-    public :: s_compute_finite_difference_coefficients, &
-              s_comp_n_from_prim, &
+    public :: s_comp_n_from_prim, &
               s_comp_n_from_cons, &
               s_initialize_nonpoly, &
               s_simpson, &
@@ -36,75 +35,10 @@ module m_helper
               f_create_bbox, &
               s_print_2D_array, &
               f_xor, &
-              f_logical_to_int
+              f_logical_to_int, &
+              s_prohibit_abort
 
 contains
-
-    !>  The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, buff_size, &
-                                                        fd_number_in, fd_order_in, offset_s)
-
-        integer, intent(in) :: q
-        real(kind(0d0)), allocatable, dimension(:, :), intent(inout) :: fd_coeff_s
-        integer, intent(in) :: buff_size, fd_number_in, fd_order_in
-        type(int_bounds_info), optional, intent(in) :: offset_s
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        integer :: lB, lE !< loop bounds
-        integer :: i !< Generic loop iterator
-
-        if (present(offset_s)) then
-            lB = -offset_s%beg
-            lE = q + offset_s%end
-        else
-            lB = 0
-            lE = q
-        end if
-
-        if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order_in == 1) then
-            do i = lB, lE
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order_in == 2) then
-            do i = lB, lE
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = lB, lE
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
-
-    end subroutine s_compute_finite_difference_coefficients
 
     !> Computes the bubble number density n from the primitive variables
         !! @param vftmp is the void fraction
@@ -531,5 +465,21 @@ contains
             int = 0
         end if
     end function f_logical_to_int
+
+    subroutine s_prohibit_abort(condition, message)
+        character(len=*), intent(in) :: condition, message
+
+        print *, ""
+        print *, "===================================================================================================="
+        print *, "                                          CASE FILE ERROR                                           "
+        print *, "----------------------------------------------------------------------------------------------------"
+        print *, "Prohibited condition: ", trim(condition)
+        if (len_trim(message) > 0) then
+            print *, "Note: ", trim(message)
+        end if
+        print *, "===================================================================================================="
+        print *, ""
+        call s_mpi_abort
+    end subroutine s_prohibit_abort
 
 end module m_helper

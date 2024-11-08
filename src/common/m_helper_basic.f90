@@ -14,7 +14,8 @@ module m_helper_basic
     private; 
     public :: f_approx_equal, &
               f_is_default, &
-              f_all_default
+              f_all_default, &
+              f_is_integer
 
 contains
 
@@ -24,6 +25,7 @@ contains
     !! @param tol_input Relative error (default = 1d-6).
     !! @return Result of the comparison.
     logical function f_approx_equal(a, b, tol_input) result(res)
+        !$acc routine seq
         ! Reference: https://floating-point-gui.de/errors/comparison/
 
         real(kind(0d0)), intent(in) :: a, b
@@ -67,5 +69,14 @@ contains
 
         res = all(res_array)
     end function f_all_default
+
+    !> Checks if a real(kind(0d0)) variable is an integer.
+    !! @param var Variable to check.
+    logical function f_is_integer(var) result(res)
+        !$acc routine seq
+        real(kind(0d0)), intent(in) :: var
+
+        res = f_approx_equal(var, real(nint(var), kind(0d0)))
+    end function f_is_integer
 
 end module m_helper_basic

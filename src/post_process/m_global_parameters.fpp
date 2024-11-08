@@ -2,6 +2,8 @@
 !! @file m_global_parameters.f90
 !! @brief Contains module m_global_parameters
 
+#:include 'case.fpp'
+
 !> @brief This module contains all of the parameters characterizing the
 !!      computational domain, simulation algorithm, stiffened equation of
 !!      state and finally, the formatted database file(s) structure.
@@ -15,6 +17,9 @@ module m_global_parameters
     use m_derived_types         !< Definitions of the derived types
 
     use m_helper_basic          !< Functions to compare floating point numbers
+
+    use m_thermochem, only: num_species, species_names
+
     ! ==========================================================================
 
     implicit none
@@ -76,6 +81,16 @@ module m_global_parameters
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
 
+    !> @name IO options for adaptive time-stepping
+    !> @{
+    logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
+    real(kind(0d0)) :: t_save
+    real(kind(0d0)) :: t_stop
+    real(kind(0d0)) :: cfl_target
+    integer :: n_save
+    integer :: n_start
+    !> @}
+
     ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data
     ! of the defragmented computational domain. They are only used in 1D. For
     ! serial simulations, they are equal to m, x_cb and x_cc, respectively.
@@ -88,14 +103,16 @@ module m_global_parameters
     integer :: num_fluids      !< Number of different fluids present in the flow
     logical :: relax           !< phase change
     integer :: relax_model     !< Phase change relaxation model
-    logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
+    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
+
+    integer :: avg_state       !< Average state evaluation method
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
@@ -111,7 +128,18 @@ module m_global_parameters
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
     integer :: c_idx                               !< Index of color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer :: T_idx                               !< Index of temperature eqn.
     !> @}
+
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwint(1:3)
+
+    ! Cell Indices for the entire (local) domain. In simulation, this includes
+    ! the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwbuff(1:3)
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
@@ -195,6 +223,8 @@ module m_global_parameters
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
+    logical :: chem_wrt_Y(1:num_species)
+    logical :: chem_wrt_T
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -240,12 +270,12 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     real(kind(0d0)) :: sigR
     integer :: nmom
-
     !> @}
 
     !> @name surface tension coefficient
     !> @{
     real(kind(0d0)) :: sigma
+    logical :: surface_tension
     !> #}
 
     !> @name Index variables used for m_variables_conversion
@@ -256,6 +286,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
+    integer :: chemxb, chemxe
     !> @}
 
 contains
@@ -279,10 +310,17 @@ contains
         t_step_stop = dflt_int
         t_step_save = dflt_int
 
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
+        cfl_dt = .false.
+        cfl_target = dflt_real
+        t_save = dflt_real
+        n_start = dflt_int
+        t_stop = dflt_real
+
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
-        adv_alphan = .false.
         weno_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
@@ -320,6 +358,8 @@ contains
         rho_wrt = .false.
         mom_wrt = .false.
         vel_wrt = .false.
+        chem_wrt_Y = .false.
+        chem_wrt_T = .false.
         flux_lim = dflt_int
         flux_wrt = .false.
         parallel_io = .false.
@@ -343,6 +383,7 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
+        avg_state = dflt_int
 
         ! Tait EOS
         rhoref = dflt_real
@@ -357,6 +398,7 @@ contains
         poly_sigma = dflt_real
         sigR = dflt_real
         sigma = dflt_real
+        surface_tension = .false.
         adv_n = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
@@ -494,7 +536,7 @@ contains
                 sys_size = stress_idx%end
             end if
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -514,13 +556,12 @@ contains
             E_idx = mom_idx%end + 1
             adv_idx%beg = E_idx + 1
             adv_idx%end = E_idx + num_fluids
-            if (adv_alphan .neqv. .true.) adv_idx%end = adv_idx%end - 1
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
-            if (.not. f_is_default(sigma)) then
+            if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
             end if
@@ -581,6 +622,19 @@ contains
             end if
         end if
 
+        if (chemistry) then
+            species_idx%beg = sys_size + 1
+            species_idx%end = sys_size + num_species
+            sys_size = species_idx%end
+
+            T_idx = sys_size + 1
+            sys_size = T_idx
+        else
+            species_idx%beg = 1
+            species_idx%end = 1
+            T_idx = 1
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -593,7 +647,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
-        ! ==================================================================
+        chemxb = species_idx%beg
+        chemxe = species_idx%end
 
 #ifdef MFC_MPI
         allocate (MPI_IO_DATA%view(1:sys_size))
@@ -641,6 +696,19 @@ contains
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if
+
+        ! Configuring Coordinate Direction Indexes =========================
+        idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
+        idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
+
+        idwbuff(1)%beg = -buff_size
+        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
+        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
+
+        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
+        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
+        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
+        ! ==================================================================
 
         ! Allocating single precision grid variables if needed
         if (precision == 1) then

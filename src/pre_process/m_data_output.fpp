@@ -2,8 +2,6 @@
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
-#:include 'inline_conversions.fpp'
-
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder
 !!              associated with the rank of the local processor, which is a sub-
@@ -31,6 +29,9 @@ module m_data_output
     use m_helper
 
     use m_delay_file_access
+
+    use m_thermochem, only: species_names
+
     ! ==========================================================================
 
     implicit none
@@ -99,17 +100,19 @@ contains
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
 
-        integer :: i, j, k, l, r !< Generic loop iterator
+        integer :: i, j, k, l, r, c !< Generic loop iterator
         integer :: t_step
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(kind(0d0)) :: pres, Temp                         !< Temporary pressure
 
         real(kind(0d0)) :: nR3
         real(kind(0d0)) :: ntmp
+
+        real(kind(0d0)) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
         t_step = 0
 
@@ -232,6 +235,8 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
+        if (cfl_dt) t_step = n_start
+
         !1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2) then
@@ -240,14 +245,27 @@ contains
 
                     open (2, FILE=trim(file_loc))
                     do j = 0, m
+
+                        if (chemistry) then
+                            do c = 1, num_species
+                                rhoYks(c) = q_cons_vf(chemxb + c - 1)%sf(j, 0, 0)
+                            end do
+                        end if
+
                         call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
 
                         lit_gamma = 1d0/gamma + 1d0
 
-                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                            .or. &
-                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                            ) then
+                        if ((i >= chemxb) .and. (i <= chemxe)) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
+                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                                 .or. &
+                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                 .or. &
+                                 ((i >= chemxb) .and. (i <= chemxe)) &
+                                 .or. &
+                                 ((i == T_idx)) &
+                                 ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
@@ -258,7 +276,7 @@ contains
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, qv, pres)
+                                pi_inf, gamma, rho, qv, rhoYks, pres, Temp)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
@@ -367,6 +385,12 @@ contains
                     end do
                 end do
             end if
+        end if
+
+        if (precision == 1) then
+            FMT = "(4F30.7)"
+        else
+            FMT = "(4F40.14)"
         end if
 
         ! 3D
@@ -517,7 +541,11 @@ contains
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A,i7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(restart_dir)//'/lustre_0'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -577,7 +605,11 @@ contains
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -721,9 +753,12 @@ contains
     subroutine s_initialize_data_output_module
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
+        character(len=15) :: temp
+        character(LEN=1), dimension(3) :: coord = (/'x', 'y', 'z'/)
 
         ! Generic logical used to check the existence of directories
         logical :: dir_check
+        integer :: i
 
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
@@ -767,15 +802,45 @@ contains
 
         end if
 
-        open (1, FILE='equations.dat', STATUS='unknown')
+        open (1, FILE='indices.dat', STATUS='unknown')
 
-        write (1, '(A)') "Equations: "
-        if (momxb /= 0) write (1, '(A,I3,I3)') " * Momentum:          ", momxb, momxe
-        if (advxb /= 0) write (1, '(A,I3,I3)') " * Advection:         ", advxb, advxe
-        if (contxb /= 0) write (1, '(A,I3,I3)') " * Continuity:        ", contxb, contxe
-        if (bubxb /= 0) write (1, '(A,I3,I3)') " * Bubbles:           ", bubxb, bubxe
-        if (strxb /= 0) write (1, '(A,I3,I3)') " * Stress:            ", strxb, strxe
-        if (intxb /= 0) write (1, '(A,I3,I3)') " * Internal Energies: ", intxb, intxe
+        write (1, '(A)') "Warning: The creation of file is currently experimental."
+        write (1, '(A)') "This file may contain errors and not support all features."
+
+        write (1, '(A3,A20,A20)') "#", "Conservative", "Primitive"
+        write (1, '(A)') "-------------------------------------------"
+        do i = contxb, contxe
+            write (temp, '(I0)') i - contxb + 1
+            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"} \rho_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"} \rho"
+        end do
+        do i = momxb, momxe
+            write (1, '(I3,A20,A20)') i, "\rho u_"//coord(i - momxb + 1), "u_"//coord(i - momxb + 1)
+        end do
+        do i = E_idx, E_idx
+            write (1, '(I3,A20,A20)') i, "\rho U", "p"
+        end do
+        do i = advxb, advxe
+            write (temp, '(I0)') i - contxb + 1
+            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"}"
+        end do
+        if (chemistry) then
+            do i = 1, num_species
+                write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
+            end do
+
+            write (1, '(I3,A20,A20)') T_idx, "T", "T"
+        end if
+
+        write (1, '(A)') ""
+        if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
+        if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
+        if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
+        if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
+        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles"
+        if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
+        if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
+        if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
+        if (T_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') T_idx, T_idx, " Temperature"
 
         close (1)
 

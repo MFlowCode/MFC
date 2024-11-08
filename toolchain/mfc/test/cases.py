@@ -1,7 +1,7 @@
 import typing, itertools
 
 from mfc   import common
-from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
+from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -75,18 +75,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_capillary():
-        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1,
+                        'sigma':1, 'model_eqns':3, 'surface_tension': 'T'})
         cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
         stack.pop()
 
-    def alter_weno():
-        for weno_order in [3, 5]:
+    def alter_weno(dimInfo):
+        for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
                 if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
-                if mp_weno == 'T' and weno_order == 3:
+                if mp_weno == 'T' and weno_order != 5:
                     continue
                 if teno == 'T' and weno_order == 3:
                     continue
@@ -96,6 +97,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if "teno" in data:
                     data["teno_CT"] = 1e-6
+                if "wenoz" in data and weno_order == 7:
+                    data["wenoz_q"] = 3.0
+
+                if weno_order == 7:
+                    data = {**data, 'weno_eps': 1e-6} # increase damping for stability
+
+                    if "z" in dimInfo[0]:
+                        data = {**data, 'm': 35, 'n': 35, 'p': 35}
 
                 cases.append(define_case_d(stack, trace, data))
 
@@ -120,6 +129,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_low_Mach_correction():
+        stack.push('', {'riemann_solver': 2, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
+
+        for low_Mach in [1, 2]:
+            stack.push(f"low_Mach={low_Mach}", {'low_Mach': low_Mach})
+            cases.append(define_case_d(stack, '', {}))
+            stack.pop()
+
+        stack.pop()
+
     def alter_num_fluids(dimInfo):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
@@ -134,11 +153,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 })
 
             alter_riemann_solvers(num_fluids)
+            alter_low_Mach_correction()
             alter_ib(dimInfo)
 
             if num_fluids == 1:
                 stack.push("Viscous", {
-                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
+                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0,
+                    'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -156,7 +177,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
-                    'patch_icpp(1)%vel(1)': 1.0})
+                    'patch_icpp(1)%vel(1)': 1.0, 'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -187,7 +208,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11})
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'})
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
         cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -223,9 +245,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
 
+        stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.08, 't_save': 0.1, 'n_start': 0, 't_stop': 0.1})
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'
             })
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
@@ -264,26 +292,76 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_monopole(dimInfo):
-        stack.push("Monopole", {"Monopole": 'T'})
+    def alter_acoustic_src(dimInfo):
+        stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1, 'dt': 1e-3, 't_step_stop': 50, 't_step_save': 50})
+
+        transducer_params = {'acoustic(1)%loc(1)': 0.2, 'acoustic(1)%foc_length': 0.4, 'acoustic(1)%aperture': 0.6}
 
         if len(dimInfo[0]) == 1:
-            cases.append(define_case_d(stack, 'Delay', {'Mono(1)%support': 1, 'Mono(1)%delay': 0.1}))
+            for pulse_type in ['Sine', 'Square']:
+                stack.push(pulse_type, {'acoustic(1)%pulse': 1 if pulse_type == 'Sine' else 3})
+                cases.append(define_case_d(stack, 'Frequency', {'acoustic(1)%frequency': 50}))
+                cases.append(define_case_d(stack, 'Wavelength', {'acoustic(1)%wavelength': 0.02}))
+                cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.02, 'acoustic(1)%wavelength': 0.02}))
+                cases.append(define_case_d(stack, 'Number of Pulses', {'acoustic(1)%npulse': 2, 'acoustic(1)%wavelength': 0.01}))
+                stack.pop()
 
-        if len(dimInfo[0]) == 2:
-            stack.push('', {'Mono(1)%loc(2)': 0.5})
-            cases.append(define_case_d(stack, 'support=1', {'Mono(1)%support': 1}))
-            cases.append(define_case_d(stack, 'support=2', {'Mono(1)%support': 2}))
-            cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
-            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
-            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+            stack.push('Gaussian', {'acoustic(1)%pulse': 2, 'acoustic(1)%delay': 0.02})
+            cases.append(define_case_d(stack, 'Sigma Time', {'acoustic(1)%gauss_sigma_time': 0.01}))
+            cases.append(define_case_d(stack, 'Sigma Dist', {'acoustic(1)%gauss_sigma_dist': 0.01}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%gauss_sigma_dist': 0.01, 'acoustic(1)%dipole': 'T'}))
             stack.pop()
 
-        if len(dimInfo[0]) == 3:
-            stack.push('', {'Mono(1)%loc(2)': 0.5, 'Mono(1)%loc(3)': 0.5})
-            cases.append(define_case_d(stack, 'support=3', {'Mono(1)%support': 3}))
-            cases.append(define_case_d(stack, 'support=4', {'Mono(1)%support': 4}))
-            cases.append(define_case_d(stack, 'support=5', {'Mono(1)%support': 5}))
+        elif len(dimInfo[0]) == 2:
+            stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%wavelength': 0.02})
+
+            stack.push('Planar', {})
+            stack.push('support=2', {'acoustic(1)%support': 2})
+            cases.append(define_case_d(stack, '', {}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%dipole': 'T'}))
+            stack.pop()
+            stack.pop()
+
+            stack.push('Transducer', transducer_params)
+            for support in [5, 6]:
+                stack.push(f'support={support}', {'acoustic(1)%support': support, 'cyl_coord': 'T' if support == 6 else 'F', 'bc_y%beg': -2 if support == 6 else -3})
+                cases.append(define_case_d(stack, 'Sine', {}))
+                cases.append(define_case_d(stack, 'Gaussian', {'acoustic(1)%pulse': 2, 'acoustic(1)%delay': 0.02, 'acoustic(1)%gauss_sigma_dist': 0.01}))
+                cases.append(define_case_d(stack, 'Delay', {'acoustic(1)%delay': 0.02}))
+                stack.pop()
+            stack.pop()
+
+            stack.push('Transducer Array', {**transducer_params, 'acoustic(1)%num_elements': 4, 'acoustic(1)%element_spacing_angle': 0.05, 'acoustic(1)%element_on': 0})
+            stack.push('support=9', {'acoustic(1)%support': 9})
+            cases.append(define_case_d(stack, 'All Elements', {}))
+            cases.append(define_case_d(stack, 'One element', {'acoustic(1)%element_on': 1}))
+            stack.pop()
+            cases.append(define_case_d(stack, 'support=10', {'acoustic(1)%support': 10, 'cyl_coord': 'T', 'bc_y%beg': -2}))
+            stack.pop()
+
+            stack.pop()
+
+        elif len(dimInfo[0]) == 3:
+            stack.push('', {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%loc(3)': 0.5, 'acoustic(1)%wavelength': 0.02})
+
+            stack.push('Planar', {})
+            stack.push('support=3', {'acoustic(1)%support': 3, 'acoustic(1)%height': 0.25})
+            cases.append(define_case_d(stack, '', {}))
+            cases.append(define_case_d(stack, 'Dipole', {'acoustic(1)%dipole': 'T'}))
+            stack.pop()
+            stack.pop()
+
+            stack.push('Transducer', transducer_params)
+            cases.append(define_case_d(stack, 'support=7', {'acoustic(1)%support': 7}))
+            stack.pop()
+
+            stack.push('Transducer Array', {**transducer_params, 'acoustic(1)%num_elements': 6, 'acoustic(1)%element_polygon_ratio': 0.7})
+            stack.push('support=11', {'acoustic(1)%support': 11})
+            cases.append(define_case_d(stack, 'All Elements', {}))
+            cases.append(define_case_d(stack, 'One element', {'acoustic(1)%element_on': 1}))
+            stack.pop()
+            stack.pop()
+
             stack.pop()
 
         stack.pop()
@@ -301,16 +379,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)':
                 4e-02, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
                 'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
-                'patch_icpp(3)%pres': 1.0, 'Mono(1)%support': 1
+                'patch_icpp(3)%pres': 1.0, 'acoustic(1)%support': 1, 'acoustic(1)%wavelength': 0.25
             })
 
-            stack.push("Monopole", {"Monopole": 'T'})
+            stack.push('', {"acoustic_source": 'T'})
 
             if len(dimInfo[0]) >= 2:
-                stack.push("", {'Mono(1)%loc(2)': 0.5, 'Mono(1)%support': 1})
+                stack.push("", {'acoustic(1)%loc(2)': 0.5, 'acoustic(1)%support': 2})
 
             if len(dimInfo[0]) >= 3:
-                stack.push("", {'Mono(1)%loc(3)': 0.5, 'Mono(1)%support': 3})
+                stack.push("", {'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10})
 
             for polytropic in ['T', 'F']:
                 stack.push("Polytropic" if polytropic == 'T' else '', {'polytropic' : polytropic})
@@ -337,6 +415,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, 'artificial_Ma', {'pi_fac': 0.1}))
 
             stack.pop()
+
+            cases.append(define_case_d(stack, 'low_Mach=1', {'low_Mach': 1}))
+            cases.append(define_case_d(stack, 'low_Mach=2', {'low_Mach': 2}))
 
             stack.push("QBMM", {'qbmm': 'T'})
             cases.append(define_case_d(stack, '', {}))
@@ -433,6 +514,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, '', {}))
 
+        stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.08, 't_save': 0.025, 'n_start': 0, 't_stop': 0.025})
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
         stack.pop()
 
         if ndims >= 2:
@@ -441,6 +527,58 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
+    def alter_instability_wave(dimInfo):
+        if len(dimInfo[0]) > 1:
+            for bubbles in ['F', 'T']:
+                stack.push('mixlayer_perturb', {
+                    'm': 24, 'n': 35, 'num_patches': 1, 'num_fluids': 1,
+                    'x_domain%beg': 0.0, 'x_domain%end': 360.0, 'y_domain%beg': -180.0, 'y_domain%end': 180.0,
+                    'bc_x%beg': -3, 'bc_x%end': -3, 'bc_y%beg': -6, 'bc_y%end': -6,
+                    'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
+                    'mixlayer_perturb': 'T', 'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
+                    'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,
+                    'fluid_pp(1)%Re(1)': 1.6881644098979287, 'viscous': 'T',
+                    'patch_icpp(1)%x_centroid': 180.0, 'patch_icpp(1)%length_x': 360.0,
+                    'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0,
+                    'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0,
+                    'patch_icpp(2)%geometry': -100, 'patch_icpp(2)%x_centroid': -1e6, 'patch_icpp(2)%length_x': -1e6,
+                    'patch_icpp(2)%y_centroid': -1e6, 'patch_icpp(2)%length_y': -1e6, 'patch_icpp(2)%vel(1)': -1e6,
+                    'patch_icpp(2)%vel(2)': -1e6, 'patch_icpp(2)%r0': -1e6, 'patch_icpp(2)%v0': -1e6,
+                    'patch_icpp(3)%geometry': -100, 'patch_icpp(3)%x_centroid': -1e6, 'patch_icpp(3)%length_x': -1e6,
+                    'patch_icpp(3)%y_centroid': -1e6, 'patch_icpp(3)%length_y': -1e6, 'patch_icpp(3)%vel(1)': -1e6,
+                    'patch_icpp(3)%vel(2)': -1e6, 'patch_icpp(3)%r0': -1e6, 'patch_icpp(3)%v0': -1e6
+                })
+
+                if bubbles == 'F':
+                    stack.push('',{'bubbles': 'F',
+                        'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
+                        'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6
+                        })
+                elif bubbles == 'T':
+                    stack.push('bubbles',{'bubbles': 'T',
+                        'patch_icpp(1)%alpha_rho(1)': 0.99999, 'patch_icpp(1)%alpha(1)': 0.00001,
+                        'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0,
+                        'Ca': 0.7160271976687712, 'Web': 5.660481099656358, 'Re_inv': 0.0069829599021229965,
+                        'adv_n': 'T', 'polytropic': 'T', 'thermal': 1, 'polydisperse': 'F', 'nb': 1, 'qbmm': 'F'
+                        })
+
+                if len(dimInfo[0]) == 2:
+                    stack.push('', {'p': 0, 'patch_icpp(1)%geometry': 3,
+                        'patch_icpp(1)%vel(3)': -1e6, 'patch_icpp(2)%vel(3)': -1e6, 'patch_icpp(3)%vel(3)': -1e6
+                    })
+
+                if len(dimInfo[0]) == 3:
+                    stack.push('', {'p': 24, 'patch_icpp(1)%geometry': 9,
+                        'z_domain%beg': 0.0, 'z_domain%end': 360.0, 'bc_z%beg': -3, 'bc_z%end': -3,
+                        'patch_icpp(1)%z_centroid': 180.0, 'patch_icpp(1)%length_z': 360.0, 'patch_icpp(1)%vel(3)': 0.0,
+                        'patch_icpp(2)%z_centroid': -1e6, 'patch_icpp(2)%length_z': -1e6, 'patch_icpp(2)%vel(3)': -1e6,
+                        'patch_icpp(3)%z_centroid': -1e6, 'patch_icpp(3)%length_z': -1e6, 'patch_icpp(3)%vel(3)': -1e6
+                    })
+
+                cases.append(define_case_d(stack, '', {}))
+                stack.pop()
+                stack.pop()
+                stack.pop()
 
     def alter_phasechange(dimInfo):
         ndims = len(dimInfo[0])
@@ -514,7 +652,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
             stack.push("Viscosity -> Bubbles",
-                {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
+                       {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T', "viscous": 'T'})
 
             stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
@@ -550,14 +688,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('bubble_model=3', {'bubble_model': 3})
             cases.append(define_case_d(stack, '', {}))
 
-            for _ in range(5):
+            stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01, 'm': 24})
+            cases.append(define_case_d(stack, '', {}))
+
+            stack.pop()
+
+            stack.push('cfl_const_dt=T', {'cfl_const_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01, 'm': 24})
+            cases.append(define_case_d(stack, '', {}))
+
+            for _ in range(6):
                 stack.pop()
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
-            alter_weno()
+            alter_weno(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -567,16 +713,42 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
-            alter_monopole(dimInfo)
+            alter_acoustic_src(dimInfo)
             alter_bubbles(dimInfo)
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
             alter_body_forces(dimInfo)
+            alter_instability_wave(dimInfo)
             stack.pop()
             stack.pop()
 
+    def chemistry_cases():
+        common_mods = {
+            't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(1, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> Chemistry -> Perfect Reactor',
+                'examples/nD_perfect_reactor/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+
+        for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
+            cases.append(define_case_f(
+                f'1D -> Chemistry -> Inert Shocktube -> Riemann Solver {riemann_solver} -> Gamma Method {gamma_method}',
+                'examples/1D_inert_shocktube/case.py',
+                mods={
+                    **common_mods,
+                    'riemann_solver': riemann_solver,
+                    'chem_params%gamma_method': gamma_method
+                },
+                override_tol=1
+            ))
+
     foreach_dimension()
+    chemistry_cases()
 
     # Sanity Check 1
     if stack.size() != 0:

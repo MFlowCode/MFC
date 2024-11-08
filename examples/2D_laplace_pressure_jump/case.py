@@ -43,20 +43,14 @@ data = {
         't_step_start'      : 0,
         't_step_stop'       : 100000,
         't_step_save'       : 1000,
-        #'t_step_stop'       : 100,
-        #'t_step_save'       : 100,
     # =======================================
 
     # Simulation Algorithm ==================
         'model_eqns'        : 3,
         'alt_soundspeed'    : 'F',
-        'adv_alphan'        : 'T',
         'mixture_err'       : 'T',
         'mpp_lim'           : 'F',
         'time_stepper'      : 3,
-        #'recon_type'        : 1,
-        #'muscl_order'       : 2,
-        #'muscl_lim'         : 2,
         'weno_order'        : 5,
         'avg_state'         : 2,
         'weno_eps'          : 1e-16,
@@ -73,6 +67,7 @@ data = {
         'num_patches'       : 2,
         'num_fluids'        : 2,
         'weno_avg'          : 'T',
+        'surface_tension'   : 'T',
     # =======================================
 
     # Database Structure Parameters =========
@@ -85,21 +80,15 @@ data = {
     # =======================================
 
         'sigma'             : 8,
-        #'flux_lim'          : 2,
-        #'flux_wrt(1)'       : 'T',
-        #'flux_wrt(2)'       : 'T',
-        #'cf_grad_wrt'       : 'T',
 
     # Fluid Parameters (Water) ==============
         'fluid_pp(1)%gamma'            : 1.E+00/(2.1E+00-1.E+00),
         'fluid_pp(1)%pi_inf'           : 2.1E+00*1.E+06/(2.1E+00-1.E+00),
-        #'fluid_pp(1)%Re(1)'             : 1.e3,
     # =======================================
 
     # Fluid Parameters (Gas) ================
         'fluid_pp(2)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
         'fluid_pp(2)%pi_inf'           : 0.E+00,
-        #'fluid_pp(2)%Re(1)'             : 1.81e5,
     # =======================================
 
     # Air Patch ==========================

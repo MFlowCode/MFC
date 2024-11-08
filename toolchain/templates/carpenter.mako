@@ -24,12 +24,11 @@
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
-cd "${MFC_ROOTDIR}"
+cd "${MFC_ROOT_DIR}"
 . ./mfc.sh load -c c -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo
 
-    
 % for target in targets:
     ${helpers.run_prologue(target)}
 
@@ -40,7 +39,7 @@ echo
             mpirun -np ${nodes*tasks_per_node}            \
                    "${target.get_install_binpath(case)}")
     % endif
-
+            
     ${helpers.run_epilogue(target)}
 
     echo

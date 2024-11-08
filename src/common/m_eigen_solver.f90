@@ -15,45 +15,25 @@ module m_eigen_solver
 
 contains
 
+    !>  This subroutine calls the recommended sequence of subroutines from the
+        !!              eigensystem subroutine package (eispack) to find the
+        !!              eigenvalues and eigenvectors (if desired) of a complex
+        !!              general matrix.
+        !! @param nm the row dimension of the two-dimensional array parameters
+        !! @param nl the order of the matrix a=(ar,ai)
+        !! @param ar the real part of the complex general matrix
+        !! @param ai the imaginary part of the complex general matrix
+        !! @param wr the real part of the eigenvalues
+        !! @param wi the imaginary part of the eigenvalues
+        !! @param zr the real part of the eigenvectors
+        !! @param zi the imaginary part of the eigenvectors
+        !! @param fv1 temporary storage array
+        !! @param fv2 temporary storage array
+        !! @param fv3 temporary storage array
+        !! @param ierr an error completion code
     subroutine cg(nm, nl, ar, ai, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
-!     this subroutine calls the recommended sequence of
-!     subroutines from the eigensystem subroutine package (eispack)
-!     to find the eigenvalues and eigenvectors (if desired)
-!     of a complex general matrix.
-!
-!     on input
-!
-!        nm  must be set to the row dimension of the two-dimensional
-!        array parameters as declared in the calling program
-!        dimension statement.
-!
-!        nl  is the order of the matrix  a=(ar,ai).
-!
-!        ar  and  ai  contain the real and imaginary parts,
-!        respectively, of the complex general matrix.
-!
-!     on output
-!
-!        wr  and  wi  contain the real and imaginary parts,
-!        respectively, of the eigenvalues.
-!
-!        zr  and  zi  contain the real and imaginary parts,
-!        respectively, of the eigenvectors.
-!
-!        ierr  is an integer output variable set equal to an error
-!           completion code described in the documentation for comqr
-!           and comqr2.  the normal completion code is zero.
-!
-!        fv1, fv2, and  fv3  are temporary storage arrays.
-!
-!     questions and comments should be directed to burton s. garbow,
-!     mathematics and computer science div, argonne national laboratory
-!
-!     this version dated august 1983.
-!
-!     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl
-        real(kind(0d0)), dimension(nm:nl), intent(inout) :: ar, ai
+        real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
         real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
         real(kind(0d0)), dimension(nm, nl), intent(out) :: zr, zi
         real(kind(0d0)), dimension(nl), intent(out) :: fv1, fv2, fv3
@@ -74,63 +54,27 @@ contains
 50      return
     end subroutine cg
 
+    !>  This subroutine is a translation of the algol procedure cbalance,
+        !!              which is a complex version of balance, num. math. 13,
+        !!              293-304(1969) by parlett and reinsch. handbook for auto.
+        !!              comp., vol.ii-linear algebra, 315-326(1971).
+        !!              This subroutine balances a complex matrix and isolates
+        !!              eigenvalues whenever possible.
+        !! @param nm the row dimension of the two-dimensional array parameters
+        !! @param nl the order of the matrix
+        !! @param ar the real part of the complex matrix to be balanced
+        !! @param ai the imaginary part of the complex matrix to be balanced
+        !! @param low one of two integers such that ar(i,j) and ai(i,j)
+        !!            are equal to zero if
+        !!            (1) i is greater than j and
+        !!            (2) j=1,...,low-1 or i=igh+1,...,nl.
+        !! @param igh one of two integers such that ar(i,j) and ai(i,j)
+        !!            are equal to zero if
+        !!            (1) i is greater than j and
+        !!            (2) j=1,...,low-1 or i=igh+1,...,nl.
+        !! @param scale the information determining the permutations and scaling
+        !!              factors used.
     subroutine cbal(nm, nl, ar, ai, low, igh, scale)
-!     this subroutine is a translation of the algol procedure
-!     cbalance, which is a complex version of balance,
-!     num. math. 13, 293-304(1969) by parlett and reinsch.
-!     handbook for auto. comp., vol.ii-linear algebra, 315-326(1971).
-!
-!     this subroutine balances a complex matrix and isolates
-!     eigenvalues whenever possible.
-!
-!     on input
-!
-!        nm must be set to the row dimension of two-dimensional
-!          array parameters as declared in the calling program
-!          dimension statement.
-!
-!        nl is the order of the matrix.
-!
-!        ar and ai contain the real and imaginary parts,
-!          respectively, of the complex matrix to be balanced.
-!
-!     on output
-!
-!        ar and ai contain the real and imaginary parts,
-!          respectively, of the balanced matrix.
-!
-!        low and igh are two integers such that ar(i,j) and ai(i,j)
-!          are equal to zero if
-!           (1) i is greater than j and
-!           (2) j=1,...,low-1 or i=igh+1,...,nl.
-!
-!        scale contains information determining the
-!           permutations and scaling factors used.
-!
-!     suppose that the principal submatrix in rows low through igh
-!     has been balanced, that p(j) denotes the index interchanged
-!     with j during the permutation step, and that the elements
-!     of the diagonal matrix used are denoted by d(i,j).  then
-!        scale(j) = p(j),    for j = 1,...,low-1
-!                 = d(j,j)       j = low,...,igh
-!                 = p(j)         j = igh+1,...,nl.
-!     the order in which the interchanges are made is nl to igh+1,
-!     then 1 to low-1.
-!
-!     note that 1 is returned for igh if igh is zero formally.
-!
-!     the algol procedure exc contained in cbalance appears in
-!     cbal  in line.  (note that the algol roles of identifiers
-!     k,l have been reversed.)
-!
-!     arithmetic is real throughout.
-!
-!     questions and comments should be directed to burton s. garbow,
-!     mathematics and computer science div, argonne national laboratory
-!
-!     this version dated august 1983.
-!
-!     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl
         real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
         integer, intent(out) :: low, igh
@@ -259,51 +203,24 @@ contains
         return
     end subroutine cbal
 
+    !>  This subroutine is a translation of a complex analogue of the algol
+        !!              procedure orthes, num. math. 12, 349-368(1968) by martin
+        !!              and wilkinson. handbook for auto. comp., vol.ii-linear
+        !!              algebra, 339-358(1971). Given a complex general matrix,
+        !!              this subroutine reduces a submatrix situated in rows and
+        !!              columns low through igh to upper hessenberg form by
+        !!              unitary similarity transformations.
+        !! @param nm the row dimension of the two-dimensional array parameters
+        !! @param nl the order of the matrix
+        !! @param ar the real part of the complex matrix
+        !! @param ai the imaginary part of the complex matrix
+        !! @param low an integer determined by the balancing subroutine cbal.
+        !!            if  cbal  has not been used, set low=1.
+        !! @param igh an integer determined by the balancing subroutine cbal.
+        !!            if  cbal  has not been used, set igh=nl.
+        !! @param ortr further information about the transformations
+        !! @param orti further information about the transformations
     subroutine corth(nm, nl, low, igh, ar, ai, ortr, orti)
-!     this subroutine is a translation of a complex analogue of
-!     the algol procedure orthes, num. math. 12, 349-368(1968)
-!     by martin and wilkinson.
-!     handbook for auto. comp., vol.ii-linear algebra, 339-358(1971).
-!
-!     given a complex general matrix, this subroutine
-!     reduces a submatrix situated in rows and columns
-!     low through igh to upper hessenberg form by
-!     unitary similarity transformations.
-!
-!     on input
-!
-!        nm must be set to the row dimension of two-dimensional
-!          array parameters as declared in the calling program
-!          dimension statement.
-!
-!        nl is the order of the matrix.
-!
-!        low and igh are integers determined by the balancing
-!          subroutine  cbal.  if  cbal  has not been used,
-!          set low=1, igh=nl.
-!
-!        ar and ai contain the real and imaginary parts,
-!          respectively, of the complex input matrix.
-!
-!     on output
-!
-!        ar and ai contain the real and imaginary parts,
-!          respectively, of the hessenberg matrix.  information
-!          about the unitary transformations used in the reduction
-!          is stored in the remaining triangles under the
-!          hessenberg matrix.
-!
-!        ortr and orti contain further information about the
-!          transformations.  only elements low through igh are used.
-!
-!     calls pythag for  dsqrt(a*a + b*b) .
-!
-!     questions and comments should be directed to burton s. garbow,
-!     mathematics and computer science div, argonne national laboratory
-!
-!     this version dated august 1983.
-!
-!     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl, low, igh
         real(kind(0d0)), dimension(nm, nl), intent(inout) :: ar, ai
         real(kind(0d0)), dimension(igh), intent(out) :: ortr, orti
@@ -397,79 +314,35 @@ contains
 200     return
     end subroutine corth
 
+    !>  This subroutine is a translation of a unitary analogue of the algol
+        !!              procedure  comlr2, num. math. 16, 181-204(1970) by
+        !!              peters and wilkinson. handbook for auto. comp.,
+        !!              vol.ii-linear algebra, 372-395(1971). The unitary
+        !!              analogue substitutes the qr algorithm of francis (comp.
+        !!              jour. 4, 332-345(1962)) for the lr algorithm.
+        !!              This subroutine finds the eigenvalues and eigenvectors
+        !!              of a complex upper hessenberg matrix by the qr method.
+        !!              The eigenvectors of a complex general matrix can
+        !!              also be found if  corth  has been used to reduce this
+        !!              general matrix to hessenberg form.
+        !! @param nm the row dimension of the two-dimensional array parameters
+        !! @param nl the order of the matrix
+        !! @param low an integer determined by the balancing subroutine cbal.
+        !!            if  cbal  has not been used, set low=1.
+        !! @param igh an integer determined by the balancing subroutine cbal.
+        !!            if  cbal  has not been used, set igh=nl.
+        !! @param ortr information about the unitary transformations used in the
+        !!             reduction by  corth
+        !! @param orti information about the unitary transformations used in the
+        !!             reduction by  corth
+        !! @param hr the real part of the complex upper hessenberg matrix.
+        !! @param hi the imaginary part of the complex upper hessenberg matrix.
+        !! @param wr the real part of the eigenvalues
+        !! @param wi the imaginary part of the eigenvalues
+        !! @param zr the real part of the eigenvectors
+        !! @param zi the imaginary part of the eigenvectors
+        !! @param ierr an error completion code
     subroutine comqr2(nm, nl, low, igh, ortr, orti, hr, hi, wr, wi, zr, zi, ierr)
-!  MESHED overflow control WITH vectors of isolated roots (10/19/89 BSG)
-!  MESHED overflow control WITH triangular multiply (10/30/89 BSG)
-!
-!     this subroutine is a translation of a unitary analogue of the
-!     algol procedure  comlr2, num. math. 16, 181-204(1970) by peters
-!     and wilkinson.
-!     handbook for auto. comp., vol.ii-linear algebra, 372-395(1971).
-!     the unitary analogue substitutes the qr algorithm of francis
-!     (comp. jour. 4, 332-345(1962)) for the lr algorithm.
-!
-!     this subroutine finds the eigenvalues and eigenvectors
-!     of a complex upper hessenberg matrix by the qr
-!     method.  the eigenvectors of a complex general matrix
-!     can also be found if  corth  has been used to reduce
-!     this general matrix to hessenberg form.
-!
-!     on input
-!
-!        nm must be set to the row dimension of two-dimensional
-!          array parameters as declared in the calling program
-!          dimension statement.
-!
-!        nl is the order of the matrix.
-!
-!        low and igh are integers determined by the balancing
-!          subroutine  cbal.  if  cbal  has not been used,
-!          set low=1, igh=nl.
-!
-!        ortr and orti contain information about the unitary trans-
-!          formations used in the reduction by  corth, if performed.
-!          only elements low through igh are used.  if the eigenvectors
-!          of the hessenberg matrix are desired, set ortr(j) and
-!          orti(j) to 0.0d0 for these elements.
-!
-!        hr and hi contain the real and imaginary parts,
-!          respectively, of the complex upper hessenberg matrix.
-!          their lower triangles below the subdiagonal contain further
-!          information about the transformations which were used in the
-!          reduction by  corth, if performed.  if the eigenvectors of
-!          the hessenberg matrix are desired, these elements may be
-!          arbitrary.
-!
-!     on output
-!
-!        ortr, orti, and the upper hessenberg portions of hr and hi
-!          have been destroyed.
-!
-!        wr and wi contain the real and imaginary parts,
-!          respectively, of the eigenvalues.  if an error
-!          exit is made, the eigenvalues should be correct
-!          for indices ierr+1,...,nl.
-!
-!        zr and zi contain the real and imaginary parts,
-!          respectively, of the eigenvectors.  the eigenvectors
-!          are unnormalized.  if an error exit is made, none of
-!          the eigenvectors has been found.
-!
-!        ierr is set to
-!          zero       for normal return,
-!          j          if the limit of 30*nl iterations is exhausted
-!                     while the j-th eigenvalue is being sought.
-!
-!     calls cdiv for complex division.
-!     calls csroot for complex square root.
-!     calls pythag for  dsqrt(a*a + b*b) .
-!
-!     questions and comments should be directed to burton s. garbow,
-!     mathematics and computer science div, argonne national laboratory
-!
-!     this version dated october 1989.
-!
-!     ------------------------------------------------------------------
         integer, intent(in) :: nm, nl, low, igh
         real(kind(0d0)), dimension(nm, nl), intent(inout) :: hr, hi
         real(kind(0d0)), dimension(nl), intent(out) :: wr, wi
@@ -478,7 +351,7 @@ contains
         integer, intent(out) :: ierr
 
         integer :: i, j, k, l, ml, en, ii, jj, ll, nn, ip1, itn, its, lp1, enm1, iend
-        real(kind(0d0)) :: si, sr, ti, tr, xi, xr, yi, yr, zzi, zzr, &
+        real(kind(0d0)) :: si, sr, ti, tr, xi, xr, xxi, xxr, yi, yr, zzi, zzr, &
                            norm, tst1, tst2, c, d
 !
         ierr = 0
@@ -560,7 +433,6 @@ contains
                 zr(j, i) = yr*zr(j, i) - yi*zi(j, i)
                 zi(j, i) = si
 165         end do
-
 170     end do
 !     .......... store roots isolated by cbal ..........
 180     do 200 i = 1, nl
@@ -602,9 +474,9 @@ contains
         if (yr*zzr + yi*zzi >= 0.0d0) go to 310
         zzr = -zzr
         zzi = -zzi
-310     call cdiv(xr, xi, yr + zzr, yi + zzi, xr, xi)
-        sr = sr - xr
-        si = si - xi
+310     call cdiv(xr, xi, yr + zzr, yi + zzi, xxr, xxi)
+        sr = sr - xxr
+        si = si - xxi
         go to 340
 !     .......... form exceptional shift ..........
 320     sr = dabs(hr(en, enm1)) + dabs(hr(enm1, en - 2))
@@ -692,7 +564,6 @@ contains
                 zr(i, j) = xr*zzr + xi*zzi - hi(j, j - 1)*yr
                 zi(i, j) = xr*zzi - xi*zzr - hi(j, j - 1)*yi
 590         end do
-
 600     end do
 !
         if (dabs(si) == 0d0) go to 240
@@ -814,48 +685,27 @@ contains
 1001    return
     end subroutine comqr2
 
+    !>  This subroutine is a translation of the algol procedure cbabk2, which is
+        !!              a complex version of balbak, num. math. 13,
+        !!              293-304(1969) by parlett and reinsch. handbook for auto.
+        !!              comp., vol.ii-linear algebra, 315-326(1971).
+        !!              This subroutine forms the eigenvectors of a complex
+        !!              general matrix by back transforming those of the
+        !!              correspondingbalanced matrix determined by cbal.
+        !! @param nm the row dimension of the two-dimensional array parameters
+        !! @param nl the order of the matrix
+        !! @param ar the real part of the complex matrix to be balanced
+        !! @param ai the imaginary part of the complex matrix to be balanced
+        !! @param low an integer determined by the balancing subroutine cbal
+        !! @param igh an integer determined by the balancing subroutine cbal
+        !! @param scale the information determining the permutations and scaling
+        !!              factors used.
+        !! @param ml the number of eigenvectors to be back transformed
+        !! @param zr the real part of the eigenvectors to be back transformed in
+        !!           their first ml columns
+        !! @param zi the imaginary part of the eigenvectors to be back
+        !!           transformed in their first ml columns
     subroutine cbabk2(nm, nl, low, igh, scale, ml, zr, zi)
-!     this subroutine is a translation of the algol procedure
-!     cbabk2, which is a complex version of balbak,
-!     num. math. 13, 293-304(1969) by parlett and reinsch.
-!     handbook for auto. comp., vol.ii-linear algebra, 315-326(1971).
-!
-!     this subroutine forms the eigenvectors of a complex general
-!     matrix by back transforming those of the corresponding
-!     balanced matrix determined by  cbal.
-!
-!     on input
-!
-!        nm must be set to the row dimension of two-dimensional
-!          array parameters as declared in the calling program
-!          dimension statement.
-!
-!        nl is the order of the matrix.
-!
-!        low and igh are integers determined by  cbal.
-!
-!        scale contains information determining the permutations
-!          and scaling factors used by  cbal.
-!
-!        ml is the number of eigenvectors to be back transformed.
-!
-!        zr and zi contain the real and imaginary parts,
-!          respectively, of the eigenvectors to be
-!          back transformed in their first ml columns.
-!
-!     on output
-!
-!        zr and zi contain the real and imaginary parts,
-!          respectively, of the transformed eigenvectors
-!          in their first ml columns.
-!
-!     questions and comments should be directed to burton s. garbow,
-!     mathematics and computer science div, argonne national laboratory
-!
-!     this version dated august 1983.
-!
-!     ------------------------------------------------------------------
-!
         integer, intent(in) :: nm, nl, low, igh
         double precision, intent(in) :: scale(nl)
         integer, intent(in) :: ml
@@ -924,16 +774,22 @@ contains
     subroutine cdiv(ar, ai, br, bi, cr, ci)
         real(kind(0d0)), intent(in) :: ar, ai, br, bi
         real(kind(0d0)), intent(out) :: cr, ci
+        real(kind(0d0)) :: s, ars, ais, brs, bis
 !
 !     complex division, (cr,ci) = (ar,ai)/(br,bi)
 !
-        real(kind(0d0)) :: s, ars, ais, brs, bis
+        ! (ar + i*ai) * (br - i*bi) /(br**2 + bi**2)
+        ! ((ar*br + i*ai*br) + (-i*ar*bi + ai*bi)) /(br**2 + bi**2)
+        ! (ar*br + ai*bi + i*(ai*br - ar*bi)) /(br**2 + bi**2)
+        ! cr = (ar*br + ai*bi) / (br**2d0 + bi**2d0)
+        ! ci = (ai*br - ar*bi) / (br**2d0 + bi**2d0)
+
         s = dabs(br) + dabs(bi)
         ars = ar/s
         ais = ai/s
         brs = br/s
         bis = bi/s
-        s = brs**2 + bis**2
+        s = brs**2d0 + bis**2d0
         cr = (ars*brs + ais*bis)/s
         ci = (ais*brs - ars*bis)/s
         return
@@ -955,7 +811,7 @@ contains
         s = r/t
         u = 1.0d0 + 2.0d0*s
         p = u*p
-        r = (s/u)**2*r
+        r = (s/u)**2d0*r
         go to 10
 20      c = p
         return

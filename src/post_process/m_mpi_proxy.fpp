@@ -158,17 +158,18 @@ contains
             & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model' ]
+            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
+            & 'n_start' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'cyl_coord', 'adv_alphan', 'mpp_lim', 'mixture_err',    &
+        #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                  &
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
             & 'E_wrt', 'pres_wrt', 'gamma_wrt',                                &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
-            & 'adv_n', 'ib' ]
+            & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -189,7 +190,7 @@ contains
         end do
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'sigma' ]
+            & 'Re_inv', 'sigma', 't_save', 't_stop' ]
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

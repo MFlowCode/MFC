@@ -19,7 +19,6 @@
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
 
 #:include 'macros.fpp'
-#:include 'inline_conversions.fpp'
 
 module m_cbc
 
@@ -143,8 +142,6 @@ module m_cbc
 #endif
 
 contains
-
-    @:s_compute_speed_of_sound()
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -649,6 +646,7 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
         real(kind(0d0)), dimension(sys_size) :: L
         real(kind(0d0)), dimension(3) :: lambda
+        real(kind(0d0)), dimension(num_species) :: Y_s
 
         real(kind(0d0)) :: rho         !< Cell averaged density
         real(kind(0d0)) :: pres        !< Cell averaged pressure
@@ -716,7 +714,7 @@ contains
                     ! ==================================================================
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2 =============
-                elseif (weno_order == 5) then
+                else
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -806,11 +804,10 @@ contains
                         end do
 
                         E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
-
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0d0, c)
                         ! ============================================================
 
                         ! First-Order Spatial Derivatives of Primitive Variables =====

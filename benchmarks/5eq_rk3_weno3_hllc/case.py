@@ -14,11 +14,13 @@ parser = argparse.ArgumentParser(
     description="This MFC case was created for the purposes of benchmarking MFC.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("--gbpp", type=int, metavar="MEM", default=16,
+                    help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
 
 ARGS = vars(parser.parse_args())
-DICT = json.loads(ARGS["dict"])
+DICT = ARGS["mfc"]
 
 size = 1 if DICT["gpu"] else 0
 
@@ -176,7 +178,7 @@ tend = Nt * dt
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
-    'run_time_info'                : 'T',
+    'run_time_info'                : 'F',
     # ==========================================================
 
     # Computational Domain Parameters ==========================
@@ -193,7 +195,7 @@ print(json.dumps({
     'dt'                           : dt,
     't_step_start'                 : 0,
     't_step_stop'                  : int(60*(95*size + 5)),
-    't_step_save'                  : int(12*(95*size + 5)),
+    't_step_save'                  : int(60*(95*size + 5)),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -201,7 +203,6 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,

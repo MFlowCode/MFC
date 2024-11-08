@@ -127,12 +127,12 @@ contains
             t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
             stretch_x, stretch_y, stretch_z, a_x, a_y, &
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
-            model_eqns, num_fluids, &
-            adv_alphan, mpp_lim, &
+            model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, patch_icpp, fluid_pp, &
-            precision, parallel_io, vel_profile, instability_wave, pi_fac, &
-            perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
+            hypoelasticity, patch_icpp, fluid_pp, precision, parallel_io, &
+            mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_domain, &
+            mixlayer_perturb, &
+            pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
             cyl_coord, loops_x, loops_y, loops_z, &
             rhoref, pref, bubbles, R0ref, nb, &
@@ -141,7 +141,8 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n
+            sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
+            n_start_old, surface_tension
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -167,6 +168,9 @@ contains
             p_glb = p
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if
@@ -666,7 +670,11 @@ contains
         integer :: i
 
         ! Open the file to read
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
+        if (cfl_adap_dt) then
+            write (file_loc, '(I0,A)') n_start, '.dat'
+        else
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+        end if
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -778,6 +786,7 @@ contains
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
         call s_initialize_initial_condition_module()
+        call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
         if (relax) call s_initialize_phasechange_module()
 

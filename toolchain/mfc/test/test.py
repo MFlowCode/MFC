@@ -1,4 +1,4 @@
-import os, math, typing, shutil, time
+import os, typing, shutil, time, itertools
 from random import sample
 
 import rich, rich.table
@@ -9,7 +9,6 @@ from ..state   import ARG
 from .case     import TestCase
 from .cases    import list_cases
 from ..        import sched
-from ..run.input import MFCInputFile
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
@@ -18,6 +17,8 @@ from ..packer import packer
 
 
 nFAIL = 0
+nPASS = 0
+nSKIP = 0
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -39,16 +40,12 @@ def __filter(cases_) -> typing.List[TestCase]:
         raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
     if len(ARG("only")) > 0:
-        for i, case in enumerate(cases[:]):
+        for case in cases[:]:
             case: TestCase
 
-            doKeep = False
-            for o in ARG("only"):
-                if str(o) == case.get_uuid():
-                    doKeep = True
-                    break
-
-            if not doKeep:
+            checkCase = case.trace.split(" -> ")
+            checkCase.append(case.get_uuid())
+            if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
 
     for case in cases[:]:
@@ -63,22 +60,22 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL
+    global nFAIL, nPASS, nSKIP
 
-    cases = [ _.to_case() for _ in list_cases() ]
+    cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
-        dir_uuids = set(os.listdir(common.MFC_TESTDIR))
+        dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
         new_uuids = { case.get_uuid() for case in cases }
 
         for old_uuid in dir_uuids - new_uuids:
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
-            common.delete_directory(f"{common.MFC_TESTDIR}/{old_uuid}")
+            common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
         return
 
-    cases = __filter(cases)
+    cases = [ _.to_case() for _ in __filter(cases) ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -93,13 +90,16 @@ def test():
 
         return
 
+    # Some cases require a specific build of MFC for features like Chemistry,
+    # Analytically defined patches, and --case-optimization. Here, we build all
+    # the unique versions of MFC we need to run cases.
     codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
-    if not ARG("case_optimization"):
-        build(codes)
-
-    for case in cases:
-        if case.rebuild:
-            build(codes, MFCInputFile(os.path.basename(case.get_dirpath()), case.get_dirpath(), case.params))
+    unique_builds = set()
+    for case, code in itertools.product(cases, codes):
+        slug = code.get_slug(case.to_input_file())
+        if slug not in unique_builds:
+            build(code, case.to_input_file())
+            unique_builds.add(slug)
 
     cons.print()
 
@@ -126,12 +126,9 @@ def test():
         ARG("jobs"), ARG("gpus"))
 
     cons.print()
-    if nFAIL == 0:
-        cons.print("Tested Simulation [bold green]✓[/bold green]")
-    else:
-        raise MFCException(f"Testing: Encountered [bold red]{nFAIL}[/bold red] failure(s).")
-
     cons.unindent()
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+    exit(nFAIL)
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
@@ -187,16 +184,13 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
-        for t_step in [ i*case["t_step_save"] for i in range(0, math.floor(case["t_step_stop"] / case["t_step_save"]) + 1) ]:
-            silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', f'{t_step}.silo')
-            if not os.path.exists(silo_filepath):
-                silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p_all', 'p0', f'{t_step}.silo')
+        for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
+            silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
+            h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
 
-            h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
-
-            if ARG("sys_hdf5"):
+            if not os.path.exists(h5dump or ""):
                 if not does_command_exist("h5dump"):
-                    raise MFCException("--sys-hdf5 was specified and h5dump couldn't be found.")
+                    raise MFCException("h5dump couldn't be found.")
 
                 h5dump = shutil.which("h5dump")
 
@@ -220,8 +214,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement
-    global nFAIL
+    # pylint: disable=global-statement, global-variable-not-assigned
+    global nFAIL, nPASS, nSKIP
 
     nAttempts = 0
 
@@ -230,18 +224,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
         try:
             _handle_case(case, devices)
+            nPASS += 1
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
-
             nFAIL += 1
-
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-
-            if ARG("relentless"):
-                cons.print(f"{exc}")
-            else:
-                raise exc
+            cons.print(f"{exc}")
 
         return

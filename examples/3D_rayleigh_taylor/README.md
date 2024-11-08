@@ -6,4 +6,4 @@
 
 ## Centerline Velocities
 
-![Linear Theory Comparison](linear_theory.jpg)
+![Linear Theory Comparison](linear_theory.png)

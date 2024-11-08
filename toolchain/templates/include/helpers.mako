@@ -1,19 +1,18 @@
+<%! import os %>
+
 <%def name="template_prologue()">
-#>
-#> The MFC prologue prints a summary of the running job and starts a timer.
-#>
+% if os.name != 'nt':
+    #>
+    #> The MFC prologue prints a summary of the running job and starts a timer.
+    #>
 
-<%!
-import os
-%>\
+    . "${MFC_ROOT_DIR}/toolchain/util.sh"
 
-. "${MFC_ROOTDIR}/toolchain/util.sh"
-
-TABLE_FORMAT_LINE="| * %-14s $MAGENTA%-35s$COLOR_RESET * %-14s $MAGENTA%-35s$COLOR_RESET |\\n"
-TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
-TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
-TABLE_TITLE_FORMAT="| %-105s |\\n"
-TABLE_CONTENT=$(cat <<-END
+    TABLE_FORMAT_LINE="| * %-14s $MAGENTA%-35s$COLOR_RESET * %-14s $MAGENTA%-35s$COLOR_RESET |\\n"
+    TABLE_HEADER="+-----------------------------------------------------------------------------------------------------------+ \\n"
+    TABLE_FOOTER="+-----------------------------------------------------------------------------------------------------------+ \\n"
+    TABLE_TITLE_FORMAT="| %-105s |\\n"
+    TABLE_CONTENT=$(cat <<-END
 $(printf "$TABLE_FORMAT_LINE" "Start-time"   "$(date +%T)"                    "Start-date" "$(date +%T)")
 $(printf "$TABLE_FORMAT_LINE" "Partition"    "${partition or 'N/A'}"          "Walltime"   "${walltime}")
 $(printf "$TABLE_FORMAT_LINE" "Account"      "${account   or 'N/A'}"          "Nodes"      "${nodes}")
@@ -23,73 +22,102 @@ $(printf "$TABLE_FORMAT_LINE" "Queue System" "${qsystem.name}"                "E
 END
 )
 
-printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "MFC case # ${name} @ ${input}:"
-printf "$TABLE_HEADER"
-printf "$TABLE_CONTENT\\n"
-printf "$TABLE_FOOTER\\n"
+    printf "$TABLE_HEADER"
+    printf "$TABLE_TITLE_FORMAT" "MFC case # ${name} @ ${input}:"
+    printf "$TABLE_HEADER"
+    printf "$TABLE_CONTENT\\n"
+    printf "$TABLE_FOOTER\\n"
 
-% for key, value in env.items():
-    export ${key}='${value}'
-% endfor
+    % for key, value in env.items():
+        export ${key}='${value}'
+    % endfor
 
-t_start=$(date +%s)
+    t_start=$(date +%s)
+% else:
+    echo MFC case # ${name} @ ${input}:
+    echo.
+    echo Start Date: %DATE%
+    echo Start Time: %TIME%
+    echo Job Name:   ${name}
+    echo Wall Time:  ${walltime}
+    echo Nodes:      ${nodes}
+    echo.
+% endif
 </%def>
 
 <%def name="template_epilogue()">
-#>
-#> The MFC epilogue stops the timer and prints the execution summary. It also
-#> performs some cleanup and housekeeping tasks before exiting.
-#>
+% if os.name != 'nt':
+    #>
+    #> The MFC epilogue stops the timer and prints the execution summary. It also
+    #> performs some cleanup and housekeeping tasks before exiting.
+    #>
 
-code=$?
+    code=$?
 
-t_stop="$(date +%s)"
+    t_stop="$(date +%s)"
 
-printf "$TABLE_HEADER"
-printf "$TABLE_TITLE_FORMAT" "Finished ${name}:"
-printf "$TABLE_FORMAT_LINE"  "Total-time:" "$(expr $t_stop - $t_start)s" "Exit Code:" "$code"
-printf "$TABLE_FORMAT_LINE"  "End-time:"   "$(date +%T)"                 "End-date:"  "$(date +%T)"
-printf "$TABLE_FOOTER"
+    printf "$TABLE_HEADER"
+    printf "$TABLE_TITLE_FORMAT" "Finished ${name}:"
+    printf "$TABLE_FORMAT_LINE"  "Total-time:" "$(expr $t_stop - $t_start)s" "Exit Code:" "$code"
+    printf "$TABLE_FORMAT_LINE"  "End-time:"   "$(date +%T)"                 "End-date:"  "$(date +%T)"
+    printf "$TABLE_FOOTER"
 
-exit $code
+    exit $code
+% endif
 </%def>
 
 <%def name="run_prologue(target)">
-ok ":) Running$MAGENTA ${target.name}$COLOR_RESET:\n"
+% if os.name != 'nt':
+    ok ":) Running$MAGENTA ${target.name}$COLOR_RESET:\n"
 
-if [ '${target.name}' == 'simulation' ]; then
-    export CRAY_ACC_MODULE='${target.get_staging_dirpath(case)}/simulation-wg256.lld.exe'
-fi
+    cd '${os.path.dirname(input)}'
 
-cd "${os.path.dirname(input)}"
+    t_${target.name}_start=$(python3 -c 'import time; print(time.time())')
+% else:
+    echo ^:) Running ${target.name}.
+    echo.
 
-t_${target.name}_start=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    cd "${os.path.dirname(input)}"
+% endif
 </%def>
 
 <%def name="run_epilogue(target)">
-code=$?
+% if os.name != 'nt':
+    code=$?
 
-t_${target.name}_stop=$(perl -MTime::HiRes=time -e 'printf "%.9f\n", time')
+    t_${target.name}_stop=$(python3 -c 'import time; print(time.time())')
 
-if [ $code -ne 0 ]; then
-    echo
-    error ":( $MAGENTA${target.get_install_binpath(case)}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
-    echo
-    exit 1
-fi
+    if [ $code -ne 0 ]; then
+        echo
+        error ":( $MAGENTA${target.get_install_binpath(case)}$COLOR_RESET failed with exit code $MAGENTA$code$COLOR_RESET."
+        echo
+        exit 1
+    fi
 
-unset CRAY_ACC_MODULE
+    % if output_summary:
 
-% if output_summary:
+        cd '${MFC_ROOT_DIR}'
 
-cd "${MFC_ROOTDIR}"
-
-cat >>"${output_summary}" <<EOL
-${target.name}: $(echo "$t_${target.name}_stop - $t_${target.name}_start" | bc -l)
+        cat >>'${output_summary}' <<EOL
+${target.name}:
+    exec:  $(echo "$t_${target.name}_stop - $t_${target.name}_start" | bc -l)
+% if target == SIMULATION:
+    grind: $(cat '${os.path.join(os.path.dirname(input), 'time_data.dat')}' | tail -n 1 | awk '{print $NF}')
+% endif
 EOL
 
-cd - > /dev/null
+        cd - > /dev/null
 
+    % endif
+% else:
+    set code=%errorlevel%
+
+    if %code% neq 0 (
+        echo.
+        echo ^:( ${target.get_install_binpath(case)} failed with exit code %code%.
+        echo.
+
+        exit /b %code%
+    )
 % endif
 </%def>

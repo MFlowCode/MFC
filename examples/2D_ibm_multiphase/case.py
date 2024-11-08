@@ -35,8 +35,6 @@ print(json.dumps({
     'model_eqns'                   : 3,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    # Advect both volume fractions
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     # Correct errors when computing speed of sound
     'mixture_err'                  : 'T',
@@ -102,10 +100,7 @@ print(json.dumps({
     # Specify 2 fluids
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),  # 2.50(Not 1.40)
     'fluid_pp(1)%pi_inf'           : 0,
-    # 'fluid_pp(1)%Re(1)'            : 2500000,
-    # 'fluid_pp(1)%Re(2)'            : 1.0e+6,
     'fluid_pp(2)%gamma'            : 1.E+00/(gam_b-1.E+00),  # 2.50(Not 1.40)
     'fluid_pp(2)%pi_inf'           : 0,
-    # 'fluid_pp(2)%Re(1)'            : 2500000,
     # ==========================================================================
 }))
