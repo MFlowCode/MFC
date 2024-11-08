@@ -213,7 +213,7 @@ contains
             call random_number(phi_rn(1:100))
             call s_mpi_send_random_number(phi_rn)
             sum_BB = 0d0
-    
+
             !$acc loop
             do k = 1, 100
                 f_BB(k) = 500d0 + k*100d0 ! Discrete frequency specturm center
@@ -403,10 +403,10 @@ contains
             if (abs(sine_wave) < 1d-2) then
                 source = mag(ai)*sine_wave*1d2
             end if
-            
+
         elseif (pulse(ai) == 4) then
-                ! TO DO: delay broadband acoustic source
-                source = sum_BB
+            ! TO DO: delay broadband acoustic source
+            source = sum_BB
 
         end if
     end subroutine s_source_temporal
