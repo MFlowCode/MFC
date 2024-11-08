@@ -57,7 +57,7 @@ contains
 
     subroutine s_initialize_bubbles_module
 
-        integer :: i, j, k, l, q
+        integer :: l
 
         @:ALLOCATE_GLOBAL(rs(1:nb))
         @:ALLOCATE_GLOBAL(vs(1:nb))
@@ -119,7 +119,7 @@ contains
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        integer :: i, j, k, l, q
+        integer :: j, k, l
 
         if (idir == 1) then
 
@@ -183,18 +183,11 @@ contains
         real(kind(0d0)) :: rddot
         real(kind(0d0)) :: pb, mv, vflux, pbdot
         real(kind(0d0)) :: n_tait, B_tait
-
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
-        real(kind(0d0)) :: start, finish
-
         real(kind(0d0)) :: nbub !< Bubble number density
-
-        real(kind(0d0)), dimension(2) :: Re !< Reynolds number
-
         integer :: i, j, k, l, q, ii !< Loop variables
-        integer :: ndirs  !< Number of coordinate directions
 
         real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
@@ -452,7 +445,7 @@ contains
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(kind(0d0)), intent(out) :: h
 
-        real(kind(0d0)) :: h0, h1, h_min !< Time step size
+        real(kind(0d0)) :: h0, h1 !< Time step size
         real(kind(0d0)) :: d0, d1, d2 !< norms
         real(kind(0d0)), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
@@ -912,7 +905,6 @@ contains
 
         real(kind(0.d0)) :: T_bar
         real(kind(0.d0)) :: grad_T
-        real(kind(0.d0)) :: tmp1, tmp2
         real(kind(0.d0)) :: f_bpres_dot
 
         if (thermal == 3) then

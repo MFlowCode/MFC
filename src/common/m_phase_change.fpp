@@ -313,8 +313,6 @@ contains
         real(kind(0.0d0)), intent(in) :: rhoe
         real(kind(0.0d0)), intent(out) :: TS
 
-        integer, dimension(num_fluids) :: ig !< flags to toggle the inclusion of fluids for the pT-equilibrium
-        real(kind(0.0d0)), dimension(num_fluids) :: pk !< individual initial pressures
         real(kind(0.0d0)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
 
         integer :: i, ns !< generic loop iterators

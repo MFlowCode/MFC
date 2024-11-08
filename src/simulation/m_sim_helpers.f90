@@ -86,7 +86,7 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
         real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
+        real(kind(0d0)) :: c, rho
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: icfl_sf
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
         real(kind(0d0)) :: fltr_dtheta   !<

@@ -871,10 +871,8 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
@@ -2136,7 +2134,6 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
 

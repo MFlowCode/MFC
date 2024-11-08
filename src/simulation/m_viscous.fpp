@@ -1467,8 +1467,6 @@ contains
 
     subroutine s_finalize_viscous_module()
 
-        integer :: i
-
         @:DEALLOCATE_GLOBAL(Res_viscous)
 
     end subroutine s_finalize_viscous_module
