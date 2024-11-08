@@ -1,10 +1,43 @@
-This file was created on 2024-11-07 15:00:45.316140.
+This file was created on 2024-11-07 21:58:59.818713.
 
 mfc.sh:
 
     Invocation: test -o EBBA071B --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        510b67deac383866508fab07c18a59aaa3a3f2e3 on GRCBC (dirty)
+    Git:        c032ee99bded37e5080db99957641210ccfb3f60 on GRCBC (dirty)
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.23.2 on lawn-128-61-77-225.lawn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/anand/test/anandrdbz/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 pre_process:
 
@@ -17,6 +50,39 @@ pre_process:
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/anand/test/anandrdbz/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.23.2 on lawn-128-61-77-225.lawn.gatech.edu
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -52,39 +118,6 @@ syscheck:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/anand/test/anandrdbz/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.23.2 on lawn-128-61-77-225.lawn.gatech.edu
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v13.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

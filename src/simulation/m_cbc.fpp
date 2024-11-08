@@ -135,14 +135,11 @@ module m_cbc
     !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
     real(kind(0d0)) :: ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out
-
     real(kind(0d0)) :: uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out
-
     real(kind(0d0)) :: uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out
-
-!$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
-!$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
-!$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
+    !$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
+    !$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
+    !$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), alpha_rhox_in,  alphax_in)
@@ -452,7 +449,6 @@ contains
         @:ALLOCATE_GLOBAL(alphax_in(1:num_fluids), alphay_in(1:num_fluids), alphaz_in(1:num_fluids))
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-
             if (${CBC_DIR}$ == 1) then
                 u${XYZ}$_in = bc_${XYZ}$%u_in
                 v${XYZ}$_in = bc_${XYZ}$%v_in
@@ -463,7 +459,6 @@ contains
                 Del${XYZ}$_in = maxval(dx)
                 Del${XYZ}$_out = maxval(dx)
             else if (${CBC_DIR}$ == 2) then
-
                 u${XYZ}$_in = bc_${XYZ}$%v_in
                 v${XYZ}$_in = bc_${XYZ}$%u_in
                 w${XYZ}$_in = bc_${XYZ}$%w_in
@@ -486,7 +481,6 @@ contains
                     Del${XYZ}$_out = maxval(dz)
                 end if
             end if
-
             pres${XYZ}$_in = bc_${XYZ}$%pres_in
             pres${XYZ}$_out = bc_${XYZ}$%pres_out
             do i = 1, num_fluids
@@ -496,7 +490,6 @@ contains
             !$acc update device(u${XYZ}$_in, v${XYZ}$_in, w${XYZ}$_in, u${XYZ}$_out, v${XYZ}$_out, w${XYZ}$_out)
             !$acc update device(pres${XYZ}$_in, pres${XYZ}$_out, alpha_rho${XYZ}$_in, alpha${XYZ}$_in)
             !$acc update device(Del${XYZ}$_in, Del${XYZ}$_out)
-
         #:endfor
 
     end subroutine s_initialize_cbc_module
@@ -943,7 +936,6 @@ contains
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-
                             !Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
@@ -964,7 +956,6 @@ contains
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-
                             !Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1d0 - Ma)*(pres - pres${XYZ}$_out)/Del${XYZ}$_out
@@ -974,7 +965,6 @@ contains
                                     L(advxe) = L(advxe) + rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + u${XYZ}$_out*sign(1, cbc_loc))/Del${XYZ}$_out
                                 end if
                             end if
-
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -10) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -10)) then
