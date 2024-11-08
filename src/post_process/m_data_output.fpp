@@ -112,8 +112,7 @@ contains
         ! Generic logical used to test the existence of a particular folder
         logical :: dir_check
 
-        ! Generic loop iterator
-        integer :: i, k ,l
+        integer :: i
 
         ! Allocating the generic storage for the flow variable(s) that are
         ! going to be written to the formatted database file(s). Note once
