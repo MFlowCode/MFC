@@ -134,8 +134,8 @@ jobs:
         run:  cat test-${{ matrix.device }}.out
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if:   always()
         with:
-          name: logs
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
           path: test-${{ matrix.device }}.out
