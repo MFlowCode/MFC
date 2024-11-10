@@ -21,7 +21,6 @@ module m_bubbles
 
     implicit none
 
-
     real(kind(0._wp)) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(kind(0._wp)) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(kind(0._wp)) :: rho_mw  !< Bubble wall properties (Ando 2010)
@@ -171,7 +170,7 @@ contains
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: nbub !< Bubble number density
-        
+
         integer :: i, j, k, l, q, ii !< Loop variables
 
         real(wp) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
@@ -887,7 +886,6 @@ contains
         real(wp), intent(in) :: fpb
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
-
 
         real(kind(0._wp)) :: T_bar
         real(kind(0._wp)) :: grad_T

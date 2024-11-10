@@ -236,7 +236,6 @@ contains
             !1D
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
-
             if (viscous) then
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
             end if

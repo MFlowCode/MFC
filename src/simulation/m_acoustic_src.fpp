@@ -23,7 +23,6 @@ module m_acoustic_src
     implicit none
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
-
     integer, allocatable, dimension(:) :: pulse, support
     !$acc declare create(pulse, support)
 

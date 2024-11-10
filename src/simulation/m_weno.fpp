@@ -44,7 +44,6 @@ module m_weno
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
 
-
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
 
@@ -110,7 +109,6 @@ module m_weno
     !$acc declare create(is1_weno, is2_weno, is3_weno)
     !
     !> @}
-
 
     real(wp) :: test
     !$acc declare create(test)
@@ -482,7 +480,6 @@ contains
                     end if
                 end if
 
-
             end if
         #:endfor
 
@@ -511,7 +508,6 @@ contains
         integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
-
 
         real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(wp), dimension(0:weno_num_stencils) :: poly
@@ -925,7 +921,6 @@ contains
         end if
 
     end subroutine s_weno
-
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

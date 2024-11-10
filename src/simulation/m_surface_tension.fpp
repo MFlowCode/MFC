@@ -34,7 +34,6 @@ module m_surface_tension
     !> @)
     !$acc declare create(c_divs)
 
-
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z

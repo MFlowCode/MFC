@@ -350,7 +350,6 @@ module m_global_parameters
         integer :: nb       !< Number of eq. bubble sizes
     #:endif
 
-
     real(wp) :: R0ref    !< Reference bubble size
     real(wp) :: Ca       !< Cavitation number
     real(wp) :: Web      !< Weber number
@@ -369,7 +368,6 @@ module m_global_parameters
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
-
 
     real(wp), allocatable, dimension(:, :, :) :: ptil  !< Pressure modification
     !$acc declare create(ptil)
@@ -441,7 +439,6 @@ module m_global_parameters
     integer :: chemxb, chemxe
 
     !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe,  chemxb, chemxe)
-
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     !$acc declare create(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)

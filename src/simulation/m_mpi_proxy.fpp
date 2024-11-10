@@ -32,7 +32,6 @@ module m_mpi_proxy
 
     implicit none
 
-
     real(wp), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the

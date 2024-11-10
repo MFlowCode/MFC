@@ -222,25 +222,28 @@ print(json.dumps({{**case, **mods}}))
             self.get_dirpath(),
             self.get_parameters())
 
-
     def compute_tolerance(self) -> float:
+        if self.override_tol:
+            return self.override_tol
+
+        tolerance = 1e-12  # Default
         single = ARG("single")
+
         if self.params.get("hypoelasticity", 'F') == 'T':
-            tol = 1e-7
-        elif self.params.get("weno_order") == 7:
-            tol = 1e-9
+            tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
-            tol = 1e-10
-        elif self.params.get("low_Mach", 'F') == 1 or self.params.get("low_Mach", 'F') == 2:
-            tol = 1e-10
+            tolerance = 1e-10
+        elif self.params.get("low_Mach", 'F') in [1, 2]:
+            tolerance = 1e-10
         elif self.params.get("acoustic_source", 'F') == 'T':
-            if "acoustic(1)%pulse" in self.params and self.params["acoustic(1)%pulse"] == 3: # Square wave
+            if self.params.get("acoustic(1)%pulse") == 3:  # Square wave
                 return 1e-1 if single else 1e-5
-            tol = 3e-12
-        else: 
-            tol = 3e-12
-        tol = tol * 1e8 if single else tol
-        return tol
+            tolerance = 3e-12
+        elif self.params.get("weno_order") == 7:
+            tolerance = 1e-9
+
+        return 1e8 * tolerance if single else tolerance
+
 
 
 @dataclasses.dataclass

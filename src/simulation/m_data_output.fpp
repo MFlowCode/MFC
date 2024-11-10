@@ -48,7 +48,6 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion

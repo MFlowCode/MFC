@@ -64,14 +64,20 @@ contains
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*weno_order, &
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(weno_order /= 1 .and. f_is_default(weno_eps), &
-            "weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6_wp")
-        @:PROHIBIT(weno_eps <= 0._wp, "weno_eps must be positive. A typical value of weno_eps is 1e-6_wp")
-        @:PROHIBIT(teno .and. f_is_default(teno_CT), "teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6_wp")
-        @:PROHIBIT(teno .and. teno_CT <= 0._wp, "teno_CT must be positive. A typical value of teno_CT is 1e-6_wp")
+            "weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6")
+
+        @:PROHIBIT(weno_eps <= 0._wp, "weno_eps must be positive. A typical value of weno_eps is 1e-6")
+        @:PROHIBIT(wenoz .and. weno_order == real(7, wp) .and. f_is_default(real(wenoz_q, wp)), &
+            "wenoz is used at 7th order, but wenoz_q is not set. It should be either 2, 3, or 4")
+        @:PROHIBIT(wenoz .and. weno_order == real(7, wp) .and. .not. (f_approx_equal(real(wenoz_q, wp), real(2, wp)) .or. &
+            f_approx_equal(real(wenoz_q, wp), real(3, wp)) .or. f_approx_equal(real(wenoz_q, wp), real(4, wp))), &
+            "wenoz_q must be either 2, 3, or 4")
+        @:PROHIBIT(teno .and. f_is_default(teno_CT), "teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6")
+        @:PROHIBIT(teno .and. teno_CT <= 0._wp, "teno_CT must be positive. A typical value of teno_CT is 1e-6")
         @:PROHIBIT(count([mapped_weno, wenoz, teno]) >= 2, "Only one of mapped_weno, wenoz, or teno can be set to true")
         @:PROHIBIT(weno_order == 1 .and. mapped_weno)
         @:PROHIBIT(weno_order == 1 .and. wenoz)
-        @:PROHIBIT(weno_order /= 5 .and. teno)
+        @:PROHIBIT((weno_order == 1 .or. weno_order == 3) .and. teno)
         @:PROHIBIT(weno_order /= 5 .and. mp_weno)
         @:PROHIBIT(model_eqns == 1 .and. weno_avg)
     end subroutine s_check_inputs_weno

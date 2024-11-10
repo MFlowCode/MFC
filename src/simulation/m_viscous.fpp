@@ -28,7 +28,6 @@ module m_viscous
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
     !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
 
-
     real(wp), allocatable, dimension(:, :) :: Res_viscous
     !$acc declare create(Res_viscous)
 
@@ -1361,7 +1360,6 @@ contains
         end if
 
         !$acc parallel loop collapse(2) gang vector default(present)
-
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
@@ -1374,7 +1372,6 @@ contains
         end do
         if (n > 0) then
             !$acc parallel loop collapse(2) gang vector default(present)
-
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
@@ -1387,7 +1384,6 @@ contains
             end do
             if (p > 0) then
                 !$acc parallel loop collapse(2) gang vector default(present)
-
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
@@ -1403,7 +1399,6 @@ contains
 
         if (bc_x%beg <= -3) then
             !$acc parallel loop collapse(2) gang vector default(present)
-
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
@@ -1413,7 +1408,6 @@ contains
         end if
         if (bc_x%end <= -3) then
             !$acc parallel loop collapse(2) gang vector default(present)
-
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
@@ -1424,7 +1418,6 @@ contains
         if (n > 0) then
             if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
                 !$acc parallel loop collapse(2) gang vector default(present)
-
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
@@ -1434,7 +1427,6 @@ contains
             end if
             if (bc_y%end <= -3) then
                 !$acc parallel loop collapse(2) gang vector default(present)
-
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &

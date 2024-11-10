@@ -22,7 +22,6 @@ module m_hypoelastic
     private; public :: s_initialize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
-
     real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 

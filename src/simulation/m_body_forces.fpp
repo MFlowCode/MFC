@@ -24,7 +24,6 @@ module m_body_forces
               s_initialize_body_forces_module, &
               s_finalize_body_forces_module
 
-
     real(wp), allocatable, dimension(:, :, :) :: rhoM
     !$acc declare create(rhoM)
 

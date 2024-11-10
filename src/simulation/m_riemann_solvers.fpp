@@ -104,10 +104,8 @@ module m_riemann_solvers
 
     !$acc declare create(is1, is2, is3, isx, isy, isz)
 
-
     real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
-
 
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
@@ -298,7 +296,6 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(wp) :: rho_L, rho_R
         real(wp), dimension(num_dims) :: vel_L, vel_R
@@ -337,7 +334,6 @@ contains
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
-
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
@@ -479,7 +475,6 @@ contains
                                     Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                 end do
                             end if
-
 
                             if (chemistry) then
                                 !$acc loop seq
@@ -914,7 +909,6 @@ contains
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
 
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(wp) :: rho_L, rho_R
@@ -2179,7 +2173,6 @@ contains
                                         Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                     end do
                                 end if
-
 
                                 if (chemistry) then
                                     c_sum_Yi_Phi = 0.0_wp

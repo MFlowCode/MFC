@@ -44,7 +44,6 @@ module m_time_steppers
 
     implicit none
 
-
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -829,7 +828,6 @@ contains
 
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
-
 
         real(wp) :: start, finish
 

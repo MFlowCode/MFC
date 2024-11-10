@@ -20,6 +20,7 @@ nFAIL = 0
 nPASS = 0
 nSKIP = 0
 
+# pylint: disable=too-many-branches, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
 
@@ -233,7 +234,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         try:
             _handle_case(case, devices)
             nPASS += 1
-        except MFCException as exc:
+        except Exception as exc:
             if nAttempts < max_attempts:
                 continue
             nFAIL += 1
