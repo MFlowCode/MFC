@@ -28,27 +28,17 @@ module m_surface_tension
  s_get_capilary, &
  s_finalize_surface_tension_module
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), c_divs)
-    !$acc declare link(c_divs)
-#else
     !> @name color function gradient components and magnitude
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
     !$acc declare create(c_divs)
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:,:), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
-    !$acc declare link(gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
-#else
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
-#endif
 
     type(int_bounds_info) :: is1, is2, is3, iv
     !$acc declare create(is1, is2, is3, iv)

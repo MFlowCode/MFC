@@ -49,19 +49,12 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(MFC_OpenACC)
-!$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
+    !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
-    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
-    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
-    !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-#else
     real(kind(0d0)), allocatable, target :: data_real_gpu(:)
     complex(kind(0d0)), allocatable, target :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable, target :: data_fltr_cmplx_gpu(:)
-    !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-#endif
+!$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
