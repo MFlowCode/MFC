@@ -754,7 +754,7 @@ contains
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
                                    'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
                                     MPI_DOUBLE_PRECISION, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -774,7 +774,7 @@ contains
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
                                    'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
                                     MPI_DOUBLE_PRECISION, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
