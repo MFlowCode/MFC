@@ -85,7 +85,7 @@ contains
 
         integer :: i, j, k
 
-        !$acc update device(ib_markers%sf, levelset%sf, levelset_norm%sf)
+        !$acc update device(ib_markers%sf)
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
