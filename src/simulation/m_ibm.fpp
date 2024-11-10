@@ -85,14 +85,14 @@ contains
 
         integer :: i, j, k
 
-        !$acc update device(ib_markers%sf)
+        !$acc update device(ib_markers%sf, levelset%sf, levelset_norm%sf)
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
         call s_find_num_ghost_points()
 
-        !$acc update device(num_inner_gps)
+        !$acc update device(num_gps, num_inner_gps)
         @:ALLOCATE_GLOBAL(ghost_points(num_gps))
         @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
 
