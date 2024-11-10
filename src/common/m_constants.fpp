@@ -23,7 +23,14 @@ module m_constants
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
-    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
+    real(kind(0d0)), parameter :: acoustic_spatial_support_width = 20d0 !< Spatial support width of acoustic source, used in s_source_spatial
     real(kind(0d0)), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
+
+    !< Broadband acoustic source constant (reference: Tam et al. JSV 2004 )
+    integer, parameter :: num_broadband_freq = 100 !< The number of sine wave frequencies in broadband acoustic source.
+    real(kind(0d0)), parameter :: broadband_freq_lowest = 500d0 !< The lower sine wave frequency bound in broadband acoustic source.
+    real(kind(0d0)), parameter :: broadband_bandwidth = 100d0 !< The bandwidth of the discretized sine wave frequencies.
+    real(kind(0d0)), parameter :: broadband_spectral_level_constant = 20d0 !< The constant to scale the spectral level at the lower frequency bound
+    real(kind(0d0)), parameter :: broadband_spectral_level_growth_rate = 10d0 !< The spectral level constant to correct the magnitude at each frqeuency to ensure the source is overall broadband
 
 end module m_constants

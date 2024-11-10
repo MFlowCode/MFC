@@ -545,7 +545,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source |
 | `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false -> monopole) |
 | `acoustic(i)%%loc(j)`                 | Real    | $j$-th coordinate of the point that defines the acoustic source location |
-| `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square [4] Broadband  |
 | `acoustic(i)%%npulse`                 | Real    | Number of pulse cycles |
 | `acoustic(i)%%mag`                    | Real    | Pulse magnitude	|
 | `acoustic(i)%%frequency`              | Real    | Sine/Square - Frequency of the acoustic wave  (exclusive) |
@@ -576,7 +576,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc). 
 
-- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, and `3` correspond to sinusoidal wave, Gaussian wave, and square wave, respectively.
+- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively.
 
 - `%%npulse` specifies the number of cycles of the acoustic wave generated. Only applies to `%%pulse = 1 and 3` (sine and square waves), and must be an integer for non-planar waves.
 

@@ -136,7 +136,7 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: source_temporal
-        real(kind(0d0)), dimension(1:100) :: f_BB, period_BB, sl_BB, bwid_BB, ffre_BB, phi_rn
+        real(kind(0d0)), dimension(1:num_broadband_freq) :: period_BB, sl_BB, ffre_BB, phi_rn ! broadband source variables
         real(kind(0d0)) :: sum_BB
 
         integer :: i, j, k, l, q !< generic loop variables
@@ -178,13 +178,11 @@ contains
             sum_BB = 0d0
 
             !$acc loop
-            do k = 1, 100
-                f_BB(k) = 500d0 + k*100d0 ! Discrete frequency specturm center
-                period_BB(k) = 1d0/f_BB(k)
-                sl_BB(k) = 20d0*mag(ai) + k*mag(ai)/10 ! Spectral level at each frequency
-                bwid_BB(k) = 100d0 ! Bandwidth
-                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*bwid_BB(k)))*cos((sim_time)*2.d0*pi/period_BB(k) + 2d0*pi*phi_rn(k))
-                sum_BB = sum_BB + ffre_BB(k)
+            do k = 1, num_broadband_freq
+                period_BB(k) = 1d0/(broadband_freq_lowest + k*broadband_bandwidth) ! Acoustic period of the wave at each discrete frequency
+                sl_BB(k) = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate ! Spectral level at each frequency
+                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*broadband_bandwidth))*cos((sim_time)*2.d0*pi/period_BB(k) + 2d0*pi*phi_rn(k)) ! Source term corresponding to each frequencies
+                sum_BB = sum_BB + ffre_BB(k) ! Total source term for the broadband wave
             end do
 
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
@@ -367,10 +365,8 @@ contains
                 source = mag(ai)*sine_wave*1d2
             end if
 
-        elseif (pulse(ai) == 4) then
-            ! TO DO: delay broadband acoustic source
+        elseif (pulse(ai) == 4) then ! Broadband wave
             source = sum_BB
-
         end if
     end subroutine s_source_temporal
 

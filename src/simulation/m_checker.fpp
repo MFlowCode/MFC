@@ -164,8 +164,8 @@ contains
                 "acoustic("//trim(jStr)//")%mag must be specified")
             @:PROHIBIT(acoustic(j)%pulse == dflt_int, &
                 "acoustic("//trim(jStr)//")%pulse must be specified")
-            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3/)), &
-                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, or 3 is allowed")
+            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3, 4/)), &
+                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, 3 or 4 is allowed")
 
             @:PROHIBIT(any(acoustic(j)%pulse == (/1, 3/)) .and. &
                 (f_is_default(acoustic(j)%frequency) .eqv. f_is_default(acoustic(j)%wavelength)), &
