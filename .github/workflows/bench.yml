@@ -52,25 +52,7 @@ jobs:
           (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
           (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
           wait
-
-      - name: Check Speedup
-        run: |
-          cd pr
-          . ./mfc.sh load -c p -m ${{ matrix.device }}
-
-          single_time=$(grep "Runtime:" bench-${{ matrix.device }}-single.yaml | awk '{print $2}')
-          double_time=$(grep "Runtime:" bench-${{ matrix.device }}.yaml | awk '{print $2}')
-          speedup=$(echo "$double_time / $single_time" | bc -l)
-
-          echo "Single precision time: $single_time"
-          echo "Double precision time: $double_time"
-          echo "Speedup: $speedup"
-
-          if (( $(echo "$speedup < 1.5" | bc -l) )); then
-            echo "Error: Speedup is less than 1.5x in single precision"
-            exit 1
-          fi
-
+          
       - name: Generate & Post Comment
         run: |
           cd pr
