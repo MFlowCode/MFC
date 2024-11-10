@@ -72,7 +72,6 @@ contains
 
         @:ACC_SETUP_SFs(ib_markers)
         @:ACC_SETUP_SFs(levelset)
-        @:ACC_SETUP_SFs(levelset_norm)
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
 
         !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
