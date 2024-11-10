@@ -32,12 +32,12 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone - PR
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: pr
 
       - name: Clone - Master
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: MFlowCode/MFC
           ref: master
@@ -78,8 +78,8 @@ jobs:
           ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml bench-${{ matrix.device }}.yaml
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v3
-        if: always()
+        uses: actions/upload-artifact@v4
+        if:   always()
         with:
           name: logs-${{ matrix.device }}
           path: |

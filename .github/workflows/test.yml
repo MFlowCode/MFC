@@ -115,7 +115,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build & Test
         if:   matrix.lbl == 'gt'
@@ -134,8 +134,8 @@ jobs:
         run:  cat test-${{ matrix.device }}.out
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if:   always()
         with:
-          name: logs
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
           path: test-${{ matrix.device }}.out
