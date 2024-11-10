@@ -26,7 +26,7 @@ module m_constants
     real(kind(0d0)), parameter :: acoustic_spatial_support_width = 20d0 !< Spatial support width of acoustic source, used in s_source_spatial
     real(kind(0d0)), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
 
-    !< Broadband acoustic source constant (reference: Tam et al. JSV 2004 )
+    !< Broadband acoustic source constant (reference: Tam et al. JSV 2005)
     integer, parameter :: num_broadband_freq = 100 !< The number of sine wave frequencies in broadband acoustic source.
     real(kind(0d0)), parameter :: broadband_freq_lowest = 500d0 !< The lower sine wave frequency bound in broadband acoustic source.
     real(kind(0d0)), parameter :: broadband_bandwidth = 100d0 !< The bandwidth of the discretized sine wave frequencies.
