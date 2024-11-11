@@ -66,7 +66,7 @@ contains
 
         #:endif
 
-        @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE(momrhs(1:3, 0:2, 0:2, 1:nterms, 1:nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
