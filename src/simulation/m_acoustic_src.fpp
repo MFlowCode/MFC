@@ -181,7 +181,7 @@ contains
             call s_mpi_send_random_number(phi_rn)
             sum_BB = 0d0
 
-            !$acc loop seq
+            !$acc loop reduction(+:sum_BB)
             do k = 1, num_broadband_freq
                 ! Acoustic period of the wave at each discrete frequency
                 period_BB(k) = 1d0/(broadband_freq_lowest + k*broadband_bandwidth)
