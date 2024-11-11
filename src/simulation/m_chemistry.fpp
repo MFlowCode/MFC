@@ -55,8 +55,6 @@ contains
 
         type(vector_field), dimension(:), intent(IN) :: flux_n
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        type(int_bounds_info) :: ix, iy, iz
-
         integer :: x, y, z
         integer :: eqn
 
@@ -103,21 +101,12 @@ contains
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_prim_qp)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_qp, q_prim_qp
-
-        integer :: i
-
         integer :: x, y, z
         integer :: eqn
-
         real(kind(0d0)) :: T
-        integer :: o
-        real(kind(0d0)) :: dyn_pres
-        real(kind(0d0)) :: E
-
         real(kind(0d0)) :: rho, omega_m
         real(kind(0d0)), dimension(num_species) :: Ys
         real(kind(0d0)), dimension(num_species) :: omega
-        real(kind(0d0)) :: cp_mix
 
         if (chemistry) then
             !$acc parallel loop collapse(3) gang vector default(present) &

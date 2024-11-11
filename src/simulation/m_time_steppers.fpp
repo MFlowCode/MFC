@@ -44,30 +44,6 @@ module m_time_steppers
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
-    !! Cell-average conservative variables at each time-stage (TS)
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), q_prim_vf)
-    !! Cell-average primitive variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
-    !! Cell-average RHS variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
-    !! Cell-average primitive variables at consecutive TIMESTEPS
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_pb)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
-
-    integer, private :: num_ts !<
-    !! Number of time stages in the time-stepping scheme
-
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -90,7 +66,6 @@ module m_time_steppers
     !! Number of time stages in the time-stepping scheme
 
     !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#endif
 
 contains
 
@@ -301,15 +276,9 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: nR3bar
-        real(kind(0d0)) :: e_mix
-
-        real(kind(0d0)) :: T
-        real(kind(0d0)), dimension(num_species) :: Ys
+        integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-
         call nvtxStartRange("Time_Step")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -417,7 +386,6 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
@@ -599,9 +567,7 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
@@ -862,7 +828,6 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         call cpu_time(start)
@@ -896,8 +861,6 @@ contains
 
         type(vector_field) :: gm_alpha_qp
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_prim_vf, &
@@ -924,7 +887,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
         real(kind(0d0)) :: dt_local
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l !< Generic loop iterators
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &

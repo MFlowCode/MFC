@@ -32,17 +32,6 @@ module m_mpi_proxy
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_recv)
-    !$acc declare link(q_cons_buff_recv, q_cons_buff_send)
-    !$acc declare link(ib_buff_send, ib_buff_recv)
-    !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
-#else
     real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
@@ -76,7 +65,7 @@ module m_mpi_proxy
     !$acc declare create(q_cons_buff_send, q_cons_buff_recv)
     !$acc declare create( ib_buff_send, ib_buff_recv)
     !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-#endif
+
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
@@ -886,10 +875,8 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
@@ -2151,7 +2138,6 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
 
