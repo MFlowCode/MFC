@@ -33,7 +33,6 @@ else
     exit 1
 fi
 
-# Check for the --single flag
 single_flag=""
 if [ "$3" == "--single" ]; then
     single_flag="--single"
@@ -41,7 +40,6 @@ fi
 
 job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
-# **Add this block to adjust job_slug if --single is used**
 if [ "$single_flag" == "--single" ]; then
     job_slug="${job_slug}-single"
 fi

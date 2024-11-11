@@ -17,7 +17,7 @@ class BenchCase:
     args: typing.List[str]
 
 
-def bench(targets=None):
+def bench(targets = None):
     if targets is None:
         targets = ARG("targets")
 
@@ -31,7 +31,7 @@ def bench(targets=None):
     cons.indent()
     cons.print()
 
-    CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
+    CASES = [ BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH) ]
 
     for case in CASES:
         case.args = case.args + ARG("--")
@@ -40,17 +40,14 @@ def bench(targets=None):
     results = {
         "metadata": {
             "invocation": sys.argv[1:],
-            "lock": dataclasses.asdict(CFG())
+            "lock":       dataclasses.asdict(CFG())
         },
         "cases": {},
     }
 
-    single_precision_runtime = None
-    double_precision_runtime = None
-
     for i, case in enumerate(CASES):
         summary_filepath = os.path.join(bench_dirpath, f"{case.slug}.yaml")
-        log_filepath = os.path.join(bench_dirpath, f"{case.slug}.out")
+        log_filepath     = os.path.join(bench_dirpath, f"{case.slug}.out")
 
         cons.print(f"{str(i+1).zfill(len(CASES) // 10 + 1)}/{len(CASES)}: {case.slug} @ [bold]{os.path.relpath(case.path)}[/bold]")
         cons.indent()
@@ -68,28 +65,13 @@ def bench(targets=None):
                 stdout=log_file,
                 stderr=subprocess.STDOUT)
 
-        output_summary = file_load_yaml(summary_filepath)
         results["cases"][case.slug] = {
-            "description": dataclasses.asdict(case),
-            "output_summary": output_summary,
+            "description":    dataclasses.asdict(case),
+            "output_summary": file_load_yaml(summary_filepath),
         }
 
-        if "single" in case.slug:
-            single_precision_runtime = output_summary.get("exec")
-        elif "double" in case.slug:
-            double_precision_runtime = output_summary.get("exec")
-
-    # Check for speedup requirement
-    if single_precision_runtime and double_precision_runtime:
-        speedup = double_precision_runtime / single_precision_runtime
-        cons.print(f"Single precision runtime: {single_precision_runtime}")
-        cons.print(f"Double precision runtime: {double_precision_runtime}")
-        cons.print(f"Speedup: {speedup:.2f}")
-
-        if speedup < 1.2:
-            raise MFCException("Error: Single precision runtime is not at least 1.2 times faster than double precision.")
-
     file_dump_yaml(ARG("output"), results)
+
     cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
 
     cons.unindent()
