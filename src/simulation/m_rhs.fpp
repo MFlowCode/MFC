@@ -903,17 +903,19 @@ contains
         call nvtxEndRange
 
         ! Add bubles source term
-        call nvtxStartRange("RHS-BUBBLES-SRC")
-        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source( &
-            q_cons_qp%vf(1:sys_size), &
-            q_prim_qp%vf(1:sys_size), &
-            t_step, &
-            rhs_vf)
-        call nvtxEndRange
+        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) then
+            call nvtxStartRange("RHS-BUBBLES-SRC")
+            call s_compute_bubble_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                t_step, &
+                rhs_vf)
+            call nvtxEndRange
+        end if
 
         if (chemistry) then
             if (chem_params%reactions) then
-                call nvtxStartRange("RHS_Chem_Reactions")
+                call nvtxStartRange("RHS-CHEM-REACTIONS")
                 call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
                 call nvtxEndRange
             end if
