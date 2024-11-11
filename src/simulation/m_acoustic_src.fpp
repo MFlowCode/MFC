@@ -136,8 +136,11 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: source_temporal
-        real(kind(0d0)), dimension(1:num_broadband_freq) :: period_BB, sl_BB, ffre_BB, phi_rn ! broadband source variables
-        real(kind(0d0)) :: sum_BB
+        real(kind(0d0)), dimension(1:num_broadband_freq) :: period_BB !< period of each sine wave in broadband source
+        real(kind(0d0)), dimension(1:num_broadband_freq) :: sl_BB !< spectral level at each frequency
+        real(kind(0d0)), dimension(1:num_broadband_freq) :: ffre_BB !< source term corresponding to each frequency
+        real(kind(0d0)), dimension(1:num_broadband_freq) :: phi_rn !< random phase shift for each frequency
+        real(kind(0d0)) :: sum_BB !< total source term for the broadband wave
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
@@ -173,16 +176,21 @@ contains
 
             num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
 
-            call random_number(phi_rn(1:100))
+            call random_number(phi_rn(1:num_broadband_freq))
+            ! Ensure all the ranks have the same random phase shift
             call s_mpi_send_random_number(phi_rn)
             sum_BB = 0d0
 
-            !$acc loop
+            !$acc loop seq
             do k = 1, num_broadband_freq
-                period_BB(k) = 1d0/(broadband_freq_lowest + k*broadband_bandwidth) ! Acoustic period of the wave at each discrete frequency
-                sl_BB(k) = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate ! Spectral level at each frequency
-                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*broadband_bandwidth))*cos((sim_time)*2.d0*pi/period_BB(k) + 2d0*pi*phi_rn(k)) ! Source term corresponding to each frequencies
-                sum_BB = sum_BB + ffre_BB(k) ! Total source term for the broadband wave
+                ! Acoustic period of the wave at each discrete frequency
+                period_BB(k) = 1d0/(broadband_freq_lowest + k*broadband_bandwidth)
+                ! Spectral level at each frequency
+                sl_BB(k) = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate
+                ! Source term corresponding to each frequencies
+                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*broadband_bandwidth))*cos((sim_time)*2d0*pi/period_BB(k) + 2d0*pi*phi_rn(k))
+                ! Sum up the source term of each frequency to obtain the total source term for broadband wave
+                sum_BB = sum_BB + ffre_BB(k)
             end do
 
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
