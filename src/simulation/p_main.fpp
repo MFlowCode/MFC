@@ -63,7 +63,7 @@ program p_main
         finaltime = t_step_stop*dt
     end if
 
-    call nvtxStartRange("Simulation")
+    call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop =======================================================
     do
 

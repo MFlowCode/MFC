@@ -16,8 +16,6 @@ module m_mpi_common
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
-
-    use m_nvtx
     ! ==========================================================================
 
     implicit none
@@ -241,7 +239,6 @@ contains
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
 
-        call nvtxStartRange("TSTEP-RUNTIME-INFO-REDUCE-CRIT")
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, &
@@ -256,7 +253,6 @@ contains
                             MPI_DOUBLE_PRECISION, MPI_MIN, 0, &
                             MPI_COMM_WORLD, ierr)
         end if
-        call nvtxEndRange
 
 #else
 
