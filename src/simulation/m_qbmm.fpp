@@ -66,7 +66,7 @@ contains
 
         #:endif
 
-        @:ALLOCATE_GLOBAL(momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE(momrhs(3, 0:2, 0:2, nterms, nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
@@ -398,8 +398,8 @@ contains
 
         !$acc update device(momrhs)
 
-        @:ALLOCATE_GLOBAL(bubrs(1:nb))
-        @:ALLOCATE_GLOBAL(bubmoms(1:nb, 1:nmom))
+        @:ALLOCATE(bubrs(1:nb))
+        @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)

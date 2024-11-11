@@ -72,8 +72,8 @@ contains
         @:ACC_SETUP_SFs(ib_markers)
 
         ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(levelset(0:m, 0:n, 0:p, num_ibs))
-        @:ALLOCATE_GLOBAL(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
+        @:ALLOCATE(levelset(0:m, 0:n, 0:p, num_ibs))
+        @:ALLOCATE(levelset_norm(0:m, 0:n, 0:p, num_ibs, 3))
 
         !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
 
@@ -93,8 +93,8 @@ contains
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps, num_inner_gps)
-        @:ALLOCATE_GLOBAL(ghost_points(num_gps))
-        @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
+        @:ALLOCATE(ghost_points(num_gps))
+        @:ALLOCATE(inner_points(num_inner_gps))
 
         !$acc enter data copyin(ghost_points, inner_points)
 
@@ -925,8 +925,8 @@ contains
     subroutine s_finalize_ibm_module
 
         @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE_GLOBAL(levelset)
-        @:DEALLOCATE_GLOBAL(levelset_norm)
+        @:DEALLOCATE(levelset)
+        @:DEALLOCATE(levelset_norm)
     end subroutine s_finalize_ibm_module
 
 end module m_ibm
