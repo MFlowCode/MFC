@@ -175,6 +175,12 @@ contains
                 (f_is_default(acoustic(j)%gauss_sigma_time) .eqv. f_is_default(acoustic(j)%gauss_sigma_dist)), &
                 "One and only one of acoustic("//trim(jStr)//")%gauss_sigma_time "// &
                 "or acoustic("//trim(jStr)//")%gauss_sigma_dist must be specified for pulse = 2")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. acoustic(j)%bb_num_freq == dflt_int, &
+                "The number of broadband frequencies acoustic("//trim(jStr)//")%bb_num_freq must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_bandwidth), &
+                "The broadband wave band width acoustic("//trim(jStr)//")%bb_bandwidth must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_lowest_freq), &
+                "The broadband wave lower frequency bound acoustic("//trim(jStr)//")%bb_lowest_freq must be specified for pulse = 4")
 
             @:PROHIBIT(f_is_default(acoustic(j)%npulse), &
                 "acoustic("//trim(jStr)//")%npulse must be specified")

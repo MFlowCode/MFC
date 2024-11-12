@@ -563,6 +563,9 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
 | `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
 | `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
+| `acoustic(i)%%bb_num_freq`            | integer | Number of frequencies in broadband wave |
+| `acoustic(i)%%bb_bandwidth`           | Real    | The bandwidth of each frequency in the broadband wave |
+| `acoustic(i)%%bb_lowest_freq`         | Real    | The lower frequency bound of the broadband wave |
 
 Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
 
@@ -607,6 +610,12 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 - `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcircle diameter and `%%num_elements` as the number of sides of the polygon. The ratio is used to specify the aperture size of each transducer element in the array as a ratio of the total aperture. 
 
 - `%%rotate_angle` specifies the rotation angle of the 3D circular transducer array along the x-axis (principal axis). It is optional and defaults to 0.
+
+- `%%bb_num_freq` specifies the number discretized frequencies in the broadband acoustic wave. If `%%bb_num_freq` is 1, the acoustic wave will be a discrete tone (i.e. single frequency sine wave).
+
+- `%%bb_bandwidth` specifies the bandwidth of the discretized frequencies.
+
+- `%%bb_lowest_freq` specifies the lower frequency bound of the broadband acoustic wave. The upper frequency bound will be calculated as `%%bb_lowest_freq + %%bb_num_freq * %%bb_bandwidth`. The wave is no longer broadband below the lower bound and above the upper bound.
 
 ### 9. Ensemble-Averaged Bubble Model
 

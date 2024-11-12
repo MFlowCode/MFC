@@ -17,8 +17,8 @@ print(json.dumps({
 'p'                            : 0,
 'dt'                           : 5e-7,
 't_step_start'                 : 0,
-'t_step_stop'                  : 50000,
-'t_step_save'                  : 500,
+'t_step_stop'                  : 1000,
+'t_step_save'                  : 10,
 # ==========================================================================
 
 # Simulation Algorithm Parameters ==========================================
@@ -80,11 +80,14 @@ print(json.dumps({
 'acoustic(1)%length'           : 0.1,
 'acoustic(1)%pulse'            : 4,
 'acoustic(1)%npulse'           : 1000000,
-'acoustic(1)%mag'              : 10.,
+'acoustic(1)%mag'              : 1000.,
+'acoustic(1)%bb_num_freq'      : 100,
+'acoustic(1)%bb_lowest_freq'   : 500.,
+'acoustic(1)%bb_bandwidth'     : 500.,
 # ==========================================================================
 
 # Fluids Physical Parameters ===============================================
-'fluid_pp(1)%gamma'            : 1.E+00/(4.4E+00-1.E+00),
+'fluid_pp(1)%gamma'            : 1.E+00/(1.4E+00-1.E+00),
 'fluid_pp(1)%pi_inf'           : 0,
 # ==========================================================================
 }))

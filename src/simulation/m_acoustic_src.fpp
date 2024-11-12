@@ -41,8 +41,11 @@ module m_acoustic_src
     real(kind(0d0)), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
     !$acc declare create(element_spacing_angle, element_polygon_ratio, rotate_angle)
 
-    integer, allocatable, dimension(:) :: num_elements, element_on
-    !$acc declare create(num_elements, element_on)
+    real(kind(0d0)), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
+    !$acc declare create(bb_bandwidth, bb_lowest_freq)
+
+    integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
+    !$acc declare create(num_elements, element_on, bb_num_freq)
 
     !> @name Acoustic source terms
     !> @{
@@ -63,7 +66,7 @@ contains
     subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
 
-        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source))
+        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
         do i = 1, num_source
             do j = 1, 3
                 loc_acoustic(j, i) = acoustic(i)%loc(j)
@@ -85,6 +88,10 @@ contains
             element_spacing_angle(i) = acoustic(i)%element_spacing_angle
             element_polygon_ratio(i) = acoustic(i)%element_polygon_ratio
             num_elements(i) = acoustic(i)%num_elements
+            bb_num_freq(i) = acoustic(i)%bb_num_freq
+            bb_bandwidth(i) = acoustic(i)%bb_bandwidth
+            bb_lowest_freq(i) = acoustic(i)%bb_lowest_freq
+
             if (acoustic(i)%element_on == dflt_int) then
                 element_on(i) = 0
             else
@@ -101,7 +108,7 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on)
+        !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq)
 
         @:ALLOCATE_GLOBAL(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
@@ -136,11 +143,11 @@ contains
         real(kind(0d0)) :: frequency_local, gauss_sigma_time_local
         real(kind(0d0)) :: mass_src_diff, mom_src_diff
         real(kind(0d0)) :: source_temporal
-        real(kind(0d0)), dimension(1:num_broadband_freq) :: period_BB !< period of each sine wave in broadband source
-        real(kind(0d0)), dimension(1:num_broadband_freq) :: sl_BB !< spectral level at each frequency
-        real(kind(0d0)), dimension(1:num_broadband_freq) :: ffre_BB !< source term corresponding to each frequency
-        real(kind(0d0)), dimension(1:num_broadband_freq) :: phi_rn !< random phase shift for each frequency
+        real(kind(0d0)) :: period_BB !< period of each sine wave in broadband source
+        real(kind(0d0)) :: sl_BB !< spectral level at each frequency
+        real(kind(0d0)) :: ffre_BB !< source term corresponding to each frequency
         real(kind(0d0)) :: sum_BB !< total source term for the broadband wave
+        real(kind(0d0)), allocatable, dimension(:) :: phi_rn !< random phase shift for each frequency
 
         integer :: i, j, k, l, q !< generic loop variables
         integer :: ai !< acoustic source index
@@ -176,22 +183,32 @@ contains
 
             num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
 
-            call random_number(phi_rn(1:num_broadband_freq))
-            ! Ensure all the ranks have the same random phase shift
-            call s_mpi_send_random_number(phi_rn)
+            ! Calculate the broadband source
+            period_BB = 0d0
+            sl_BB = 0d0
+            ffre_BB = 0d0
             sum_BB = 0d0
 
+            ! Allocate buffers for random phase shift
+            allocate (phi_rn(1:bb_num_freq(ai)))
+
+            call random_number(phi_rn(1:bb_num_freq(ai)))
+            ! Ensure all the ranks have the same random phase shift
+            call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
+
             !$acc loop reduction(+:sum_BB)
-            do k = 1, num_broadband_freq
+            do k = 1, bb_num_freq(ai)
                 ! Acoustic period of the wave at each discrete frequency
-                period_BB(k) = 1d0/(broadband_freq_lowest + k*broadband_bandwidth)
+                period_BB = 1d0/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
                 ! Spectral level at each frequency
-                sl_BB(k) = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate
+                sl_BB = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate
                 ! Source term corresponding to each frequencies
-                ffre_BB(k) = dsqrt((2d0*sl_BB(k)*broadband_bandwidth))*cos((sim_time)*2d0*pi/period_BB(k) + 2d0*pi*phi_rn(k))
+                ffre_BB = dsqrt((2d0*sl_BB*bb_bandwidth(ai)))*cos((sim_time)*2d0*pi/period_BB + 2d0*pi*phi_rn(k))
                 ! Sum up the source term of each frequency to obtain the total source term for broadband wave
-                sum_BB = sum_BB + ffre_BB(k)
+                sum_BB = sum_BB + ffre_BB
             end do
+
+            deallocate (phi_rn)
 
             !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
             do i = 1, num_points
