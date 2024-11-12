@@ -869,7 +869,7 @@ contains
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)
         @:DEALLOCATE(levelset_norm%sf)
-        
+
     end subroutine s_finalize_ibm_module
 
 end module m_ibm
