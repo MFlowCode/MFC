@@ -16,11 +16,13 @@ parser = argparse.ArgumentParser(
     description="This MFC case was created for the purposes of benchmarking MFC.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
-parser.add_argument("gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("--gbpp", type=int, metavar="MEM", default=16,
+                    help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
 
 ARGS = vars(parser.parse_args())
-DICT = json.loads(ARGS["dict"])
+DICT = ARGS["mfc"]
 
 size = 1 if DICT["gpu"] else 0
 
@@ -80,7 +82,7 @@ n0      = vf0/(math.pi*4.E+00/3.E+00)
 cact    = 1475.
 t0      = x0/c0
 
-nbubbles = 1 
+nbubbles = 1
 myr0     = R0ref
 
 cfl     = 0.01
@@ -96,7 +98,7 @@ print(json.dumps({
     # Logistics ================================================
     'run_time_info'                : 'F',
     # ==========================================================
-    
+
     # Computational Domain Parameters ==========================
     'x_domain%beg'                 : -10.E-03/x0,
     'x_domain%end'                 :  10.E-03/x0,
@@ -125,7 +127,7 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
@@ -139,15 +141,16 @@ print(json.dumps({
     'bc_y%end'                     : -3,
     'bc_z%beg'                     : -3,
     'bc_z%end'                     : -3,
+    'viscous'                      : 'T',
     # ==========================================================
-    
+
     # Formatted Database Files Structure Parameters ============
     'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
-    # ==========================================================                                                   
-    
+    # ==========================================================
+
     # Patch 1 _ Background =====================================
     'patch_icpp(1)%geometry'       : 9,
     'patch_icpp(1)%x_centroid'     : 0.,
@@ -165,7 +168,7 @@ print(json.dumps({
     'patch_icpp(1)%r0'             : 1.,
     'patch_icpp(1)%v0'             : 0.0E+00,
     # ==========================================================
-    
+
     # Patch 2 Screen ===========================================
     'patch_icpp(2)%geometry'       : 9,
     'patch_icpp(2)%x_centroid'     : 0.,
@@ -184,7 +187,7 @@ print(json.dumps({
     'patch_icpp(2)%r0'             : 1.,
     'patch_icpp(2)%v0'             : 0.0E+00,
     # ==========================================================
-    
+
     # Fluids Physical Parameters ===============================
     # Surrounding liquid
     'fluid_pp(1)%gamma'            : 1.E+00/(n_tait-1.E+00),
@@ -206,12 +209,12 @@ print(json.dumps({
     'fluid_pp(2)%mu_v'             : mu_n,
     'fluid_pp(2)%k_v'              : k_n,
     # ==========================================================
-    
+
     # Non-polytropic gas compression model AND/OR Tait EOS =====
     'pref'                         : p0,
     'rhoref'                       : rho0,
     # ==========================================================
-    
+
     # Bubbles ==================================================
     'bubbles'                      : 'T',
     'bubble_model'                 : 3,
@@ -225,7 +228,7 @@ print(json.dumps({
     'Web'                          : We,
     'Re_inv'                       : Re_inv,
     # ==========================================================
-    
+
     # Acoustic source ==========================================
     'acoustic_source'              : 'T',
     'num_source'                   : 1,

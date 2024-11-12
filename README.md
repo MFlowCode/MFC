@@ -68,7 +68,7 @@ cd MFC
 ```
 and be sure MFC knows where to find Boost by appending to your dotfiles and sourcing them again
 ```shell
-echo -e 'export BOOST_INCLUDE=/opt/homebrew/' | tee -a ~/.bash_profile ~/.zshrc
+echo -e "export BOOST_INCLUDE='$(brew --prefix --installed boost)/include'" | tee -a ~/.bash_profile ~/.zshrc
 . ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
 ! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
 ```
@@ -132,7 +132,7 @@ They are organized below. Just click the drop-downs!
 
 * Shock and interface capturing schemes
 	* First-order upwinding
- 	* WENO reconstructions of order 3 and 5
+ 	* WENO reconstructions of order 3, 5, and 7
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of high density ratios

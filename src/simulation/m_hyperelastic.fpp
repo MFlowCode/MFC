@@ -52,19 +52,12 @@ module m_hyperelastic
     type(vector_field) :: btensor !<
 !$acc declare create(btensor)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), allocatable, dimension(:, :), fd_coeff_x, fd_coeff_y, fd_coeff_z)
-    !$acc declare link(fd_coeff_x,fd_coeff_y,fd_coeff_z)
-
-#else
-
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_x
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_z
     !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
-#endif
 
 contains
 

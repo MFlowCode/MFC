@@ -7,12 +7,13 @@ parser = argparse.ArgumentParser(
     description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT")
-parser.add_argument("-s", "--scaling",       type=str, metavar="SCALING", choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
-parser.add_argument("-m", "--memory",        type=int, metavar="MEMORY",  help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.")
-parser.add_argument("-f", "--fidelity",      type=str, metavar="FIDELITY", choices=["ideal", "exact"], default="ideal")
-parser.add_argument("--rdma_mpi",            type=str, metavar="FIDELITY", choices=["T", "F"], default="F")
-parser.add_argument("--n-steps",             type=int, metavar="N", default=None)
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-s", "--scaling",  type=str, metavar="SCALING", choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
+parser.add_argument("-m", "--memory",   type=int, metavar="MEMORY",  help="Weak scaling: memory per rank in GB. Strong scaling: global memory in GB. Used to determine cell count.")
+parser.add_argument("-f", "--fidelity", type=str, metavar="FIDELITY", choices=["ideal", "exact"], default="ideal")
+parser.add_argument("--rdma_mpi",       type=str, metavar="FIDELITY", choices=["T", "F"], default="F")
+parser.add_argument("--n-steps",        type=int, metavar="N", default=None)
 
 args = parser.parse_args()
 
@@ -20,12 +21,10 @@ if args.scaling is None:
     parser.print_help()
     sys.exit(1)
 
-DICT = json.loads(args.dict)
-
 # \approx The number of cells per GB of memory. The exact value is not important.
 cpg    = 8000000 / 16.0
 # Number of ranks.
-nranks = DICT["nodes"] * DICT["tasks_per_node"]
+nranks = args.mfc["nodes"] * args.mfc["tasks_per_node"]
 
 def nxyz_from_ncells(ncells: float) -> typing.Tuple[int, int, int]:
     s = math.floor((ncells / 2.0) ** (1/3))
@@ -185,7 +184,7 @@ SF = min( SF, Nt )
 # total simulation time - s. Note that tend >= tendA
 tend = Nt * dt
 
-# Configuring case dictionary
+# Configuring case args.mfcionary
 print(json.dumps({
     # Logistics ================================================
     'run_time_info'                : 'T',

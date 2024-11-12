@@ -192,7 +192,6 @@ print(json.dumps({
     'fluid_pp(1)%M_v'               : M_v,
     'fluid_pp(1)%mu_v'              : mu_v,
     'fluid_pp(1)%k_v'               : k_v,
-    #'fluid_pp(1)%Re(1)' 	    : 80000,
 
     # Last fluid_pp is always reserved for bubble gas state ===
     # if applicable  ==========================================
