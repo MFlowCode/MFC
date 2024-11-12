@@ -212,7 +212,7 @@ contains
 
                 if (bubbles) then
                     if (num_fluids > 2) then
-                        !$acc loop reduction(+:myRho,B_tait,small_gamma)
+                        !$acc loop seq
                         do q = 1, num_fluids - 1
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
@@ -226,7 +226,7 @@ contains
                 end if
 
                 if ((.not. bubbles) .or. (mpp_lim .and. (num_fluids > 2))) then
-                    !$acc loop reduction(+:myRho,B_tait,small_gamma)
+                    !$acc loop seq
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
                         B_tait = B_tait + myalpha(q)*pi_infs(q)
