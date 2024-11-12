@@ -686,17 +686,16 @@ contains
         if (viscous) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                        dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                        qL_prim, &
-                                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                        dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                        qR_prim, &
-                                        q_prim_qp, &
-                                        dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                        idwbuff(1), idwbuff(2), idwbuff(3))
+                               dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                               qL_prim, &
+                               qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                               dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                               qR_prim, &
+                               q_prim_qp, &
+                               dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                               idwbuff(1), idwbuff(2), idwbuff(3))
             call nvtxEndRange
         end if
-
 
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
@@ -846,14 +845,14 @@ contains
             if (qbmm) then
                 call nvtxStartRange("RHS-QBMM")
                 call s_compute_qbmm_rhs(id, &
-                                              q_cons_qp%vf, &
-                                              q_prim_qp%vf, &
-                                              rhs_vf, &
-                                              flux_n(id)%vf, &
-                                              pb, &
-                                              rhs_pb, &
-                                              mv, &
-                                              rhs_mv)
+                                        q_cons_qp%vf, &
+                                        q_prim_qp%vf, &
+                                        rhs_vf, &
+                                        flux_n(id)%vf, &
+                                        pb, &
+                                        rhs_pb, &
+                                        mv, &
+                                        rhs_mv)
                 call nvtxEndRange
             end if
             ! END: Additional physics and source terms =========================
@@ -907,9 +906,9 @@ contains
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
             call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                                              q_prim_qp%vf(1:sys_size), &
-                                                              t_step, &
-                                                              rhs_vf)
+                                             q_prim_qp%vf(1:sys_size), &
+                                             t_step, &
+                                             rhs_vf)
             call nvtxEndRange
         end if
 
