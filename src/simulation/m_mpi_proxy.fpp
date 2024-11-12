@@ -27,6 +27,8 @@ module m_mpi_proxy
 
     use m_mpi_common
 
+    use m_nvtx
+
     use ieee_arithmetic
     ! ==========================================================================
 
@@ -865,6 +867,7 @@ contains
 
 #ifdef MFC_MPI
 
+        call nvtxStartRange("RHS-COMM-PACKBUF")
         !$acc update device(v_size)
 
         if (qbmm .and. .not. polytropic) then
@@ -1057,6 +1060,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange ! Packbuf
 
         ! Send/Recv
         #:for rdma_mpi in [False, True]
@@ -1066,26 +1070,34 @@ contains
                 #:if rdma_mpi
                     !$acc data attach(p_send, p_recv)
                     !$acc host_data use_device(p_send, p_recv)
+                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
                     !$acc update host(q_cons_buff_send, ib_buff_send)
+                    call nvtxEndRange
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
 
                 call MPI_SENDRECV( &
                     p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
                     p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
                     !$acc end host_data
                     !$acc end data
                     !$acc wait
                 #:else
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
                     !$acc update device(q_cons_buff_recv)
+                    call nvtxEndRange
                 #:endif
             end if
         #:endfor
 
         ! Unpack Received Buffer
+        call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
@@ -1254,6 +1266,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange
 
 #endif
 

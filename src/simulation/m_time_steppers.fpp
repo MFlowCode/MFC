@@ -279,7 +279,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -353,7 +353,6 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
         call nvtxEndRange
 
@@ -370,8 +369,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
         end if
-
-        call nvtxEndRange
 
         ! ==================================================================
 
@@ -391,7 +388,7 @@ contains
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -457,9 +454,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -532,9 +527,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -573,7 +566,7 @@ contains
 
         if (.not. adap_dt) then
             call cpu_time(start)
-            call nvtxStartRange("Time_Step")
+            call nvtxStartRange("TIMESTEP")
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -640,9 +633,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -715,9 +706,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -789,9 +778,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -832,7 +819,7 @@ contains
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
@@ -935,6 +922,7 @@ contains
 
         integer :: i, j, k, l
 
+        call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -948,6 +936,8 @@ contains
                 end do
             end do
         end do
+
+        call nvtxEndRange
 
     end subroutine s_apply_bodyforces
 

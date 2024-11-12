@@ -38,12 +38,11 @@ module m_compute_levelset
 
 contains
 
-    !>  Initialize IBM module
     subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        integer, intent(IN) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid
@@ -62,11 +61,11 @@ contains
                 dist_vec(2) = y_cc(j) - y_centroid
                 dist_vec(3) = 0
                 dist = dsqrt(sum(dist_vec**2))
-                levelset(i, j, 0, ib_patch_id) = dist - radius
+                levelset%sf(i, j, 0, ib_patch_id) = dist - radius
                 if (dist == 0) then
-                    levelset_norm(i, j, 0, ib_patch_id, :) = 0
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
                 else
-                    levelset_norm(i, j, 0, ib_patch_id, :) = &
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
                         dist_vec(:)/dist
                 end if
 
@@ -77,9 +76,9 @@ contains
 
     subroutine s_compute_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        integer, intent(IN) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist, global_dist
         integer :: global_id
@@ -145,11 +144,11 @@ contains
                     dist = global_dist
                 end if
 
-                levelset(i, j, 0, ib_patch_id) = dist
+                levelset%sf(i, j, 0, ib_patch_id) = dist
                 if (dist == 0) then
-                    levelset_norm(i, j, 0, ib_patch_id, :) = 0
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
                 else
-                    levelset_norm(i, j, 0, ib_patch_id, :) = &
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
                         dist_vec(:)/dist
                 end if
 
@@ -160,9 +159,9 @@ contains
 
     subroutine s_compute_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        integer, intent(IN) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist, dist_surf, dist_side, global_dist
         integer :: global_id
@@ -237,18 +236,18 @@ contains
                     dist_side = min(abs(z_cc(l) - z_min), abs(z_max - z_cc(l)))
 
                     if (dist_side < dist_surf) then
-                        levelset(i, j, l, ib_patch_id) = dist_side
+                        levelset%sf(i, j, l, ib_patch_id) = dist_side
                         if (dist_side == abs(z_cc(l) - z_min)) then
-                            levelset_norm(i, j, l, ib_patch_id, :) = (/0, 0, -1/)
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, -1/)
                         else
-                            levelset_norm(i, j, l, ib_patch_id, :) = (/0, 0, 1/)
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, 1/)
                         end if
                     else
-                        levelset(i, j, l, ib_patch_id) = dist_surf
+                        levelset%sf(i, j, l, ib_patch_id) = dist_surf
                         if (dist == 0) then
-                            levelset_norm(i, j, l, ib_patch_id, :) = 0
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = 0
                         else
-                            levelset_norm(i, j, l, ib_patch_id, :) = &
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = &
                                 dist_vec(:)/dist_surf
                         end if
                     end if
@@ -262,10 +261,10 @@ contains
     !>  Initialize IBM module
     subroutine s_compute_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
 
+        integer :: ib_patch_id
         real(kind(0d0)) :: top_right(2), bottom_left(2)
         real(kind(0d0)) :: x, y, min_dist
         real(kind(0d0)) :: side_dists(4)
@@ -303,37 +302,37 @@ contains
                     end if
 
                     if (min_dist == abs(side_dists(1))) then
-                        levelset(i, j, 0, ib_patch_id) = side_dists(1)
+                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
                         if (side_dists(1) == 0) then
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = 0d0
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
                         else
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = side_dists(1)/ &
-                                                                     abs(side_dists(1))
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(1)/ &
+                                                                        abs(side_dists(1))
                         end if
 
                     else if (min_dist == abs(side_dists(2))) then
-                        levelset(i, j, 0, ib_patch_id) = side_dists(2)
+                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(2)
                         if (side_dists(2) == 0) then
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = 0d0
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
                         else
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = side_dists(2)/ &
-                                                                     abs(side_dists(2))
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(2)/ &
+                                                                        abs(side_dists(2))
                         end if
 
                     else if (min_dist == abs(side_dists(3))) then
                         if (side_dists(3) == 0) then
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = 0d0
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
                         else
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = side_dists(3)/ &
-                                                                     abs(side_dists(3))
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(3)/ &
+                                                                        abs(side_dists(3))
                         end if
 
                     else if (min_dist == abs(side_dists(4))) then
                         if (side_dists(4) == 0) then
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = 0d0
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
                         else
-                            levelset_norm(i, j, 0, ib_patch_id, 1) = side_dists(4)/ &
-                                                                     abs(side_dists(4))
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(4)/ &
+                                                                        abs(side_dists(4))
                         end if
 
                     end if
@@ -347,9 +346,9 @@ contains
 
     subroutine s_compute_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        integer, intent(IN) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
@@ -369,11 +368,11 @@ contains
                     dist_vec(2) = y_cc(j) - y_centroid
                     dist_vec(3) = z_cc(k) - z_centroid
                     dist = dsqrt(sum(dist_vec**2))
-                    levelset(i, j, k, ib_patch_id) = dist - radius
+                    levelset%sf(i, j, k, ib_patch_id) = dist - radius
                     if (dist == 0) then
-                        levelset_norm(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
                     else
-                        levelset_norm(i, j, k, ib_patch_id, :) = &
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
                             dist_vec(:)/dist
                     end if
                 end do
@@ -384,9 +383,9 @@ contains
 
     subroutine s_compute_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs), intent(inout) :: levelset
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p, num_ibs, 3), intent(inout) :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+        integer, intent(IN) :: ib_patch_id
 
         real(kind(0d0)) :: radius, dist
         real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
@@ -434,20 +433,20 @@ contains
                                    - radius
 
                     if (dist_side < abs(dist_surface)) then
-                        levelset(i, j, k, ib_patch_id) = -dist_side
+                        levelset%sf(i, j, k, ib_patch_id) = -dist_side
                         if (dist_side == abs(side_pos - boundary%beg)) then
-                            levelset_norm(i, j, k, ib_patch_id, :) = -dist_sides_vec
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = -dist_sides_vec
                         else
-                            levelset_norm(i, j, k, ib_patch_id, :) = dist_sides_vec
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_sides_vec
                         end if
                     else
-                        levelset(i, j, k, ib_patch_id) = dist_surface
+                        levelset%sf(i, j, k, ib_patch_id) = dist_surface
 
-                        levelset_norm(i, j, k, ib_patch_id, :) = &
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
                             (pos_vec - centroid_vec)*dist_surface_vec
-                        levelset_norm(i, j, k, ib_patch_id, :) = &
-                            levelset_norm(i, j, k, ib_patch_id, :)/ &
-                            norm2(levelset_norm(i, j, k, ib_patch_id, :))
+                        levelset_norm%sf(i, j, k, ib_patch_id, :) = &
+                            levelset_norm%sf(i, j, k, ib_patch_id, :)/ &
+                            norm2(levelset_norm%sf(i, j, k, ib_patch_id, :))
                     end if
                 end do
             end do
