@@ -200,6 +200,8 @@ module m_global_parameters
     type(mpi_io_var), public :: MPI_IO_DATA
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
+    type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
+    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
     !> @name MPI info for parallel IO with Lustre file systems
     !> @{

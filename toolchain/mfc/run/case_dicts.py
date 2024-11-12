@@ -335,6 +335,7 @@ POST_PROCESS.update({
     'qm_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
     'ib': ParamType.LOG,
+    'num_ibs': ParamType.INT,
     'cfl_target': ParamType.REAL,
     't_save': ParamType.REAL,
     't_stop': ParamType.REAL,
