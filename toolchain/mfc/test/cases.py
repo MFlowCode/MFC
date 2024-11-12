@@ -1,7 +1,7 @@
 import typing, itertools
 
 from mfc   import common
-from .case import define_case_d, CaseGeneratorStack, TestCaseBuilder
+from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
 
 def get_bc_mods(bc: int, dimInfo):
     params = {}
@@ -75,18 +75,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
     def alter_capillary():
-        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1, 'sigma':1, 'model_eqns':3})
+        stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1,
+                        'sigma':1, 'model_eqns':3, 'surface_tension': 'T'})
         cases.append(define_case_d(stack, [f"capillary=T","model_eqns=3"],{}))
         stack.pop()
 
-    def alter_weno():
-        for weno_order in [3, 5]:
+    def alter_weno(dimInfo):
+        for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {'weno_order': weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product('FT', repeat=4):
 
                 if sum(var == 'T' for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
-                if mp_weno == 'T' and weno_order == 3:
+                if mp_weno == 'T' and weno_order != 5:
                     continue
                 if teno == 'T' and weno_order == 3:
                     continue
@@ -96,6 +97,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if "teno" in data:
                     data["teno_CT"] = 1e-6
+                if "wenoz" in data and weno_order == 7:
+                    data["wenoz_q"] = 3.0
+
+                if weno_order == 7:
+                    data = {**data, 'weno_eps': 1e-6} # increase damping for stability
+
+                    if "z" in dimInfo[0]:
+                        data = {**data, 'm': 35, 'n': 35, 'p': 35}
 
                 cases.append(define_case_d(stack, trace, data))
 
@@ -149,7 +158,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 1:
                 stack.push("Viscous", {
-                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0})
+                    'fluid_pp(1)%Re(1)' : 0.0001, 'dt' : 1e-11, 'patch_icpp(1)%vel(1)': 1.0,
+                    'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -167,7 +177,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.push("Viscous", {
                     'fluid_pp(1)%Re(1)' : 0.001, 'fluid_pp(1)%Re(2)' : 0.001,
                     'fluid_pp(2)%Re(1)' : 0.001, 'fluid_pp(2)%Re(2)' : 0.001, 'dt' : 1e-11,
-                    'patch_icpp(1)%vel(1)': 1.0})
+                    'patch_icpp(1)%vel(1)': 1.0, 'viscous': 'T'})
 
                 alter_ib(dimInfo, six_eqn_model=True)
 
@@ -198,7 +208,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11})
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'})
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
         cases.append(define_case_d(stack, "weno_Re_flux", {'weno_Re_flux': 'T'}))
@@ -234,9 +245,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
 
+        stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.08, 't_save': 0.1, 'n_start': 0, 't_stop': 0.1})
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
-            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11
+            'fluid_pp(2)%Re(1)' : 0.0001, 'fluid_pp(2)%Re(2)' : 0.0001, 'dt' : 1e-11,
+            'viscous': 'T'
             })
 
         cases.append(define_case_d(stack, "",             {'weno_Re_flux': 'F'}))
@@ -497,6 +514,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, '', {}))
 
+        stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.08, 't_save': 0.025, 'n_start': 0, 't_stop': 0.025})
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
         stack.pop()
 
         if ndims >= 2:
@@ -515,7 +537,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'mixlayer_vel_profile': 'T', 'mixlayer_domain': 1.475, 'mixlayer_vel_coef': 0.6,
                     'mixlayer_perturb': 'T', 'weno_Re_flux': 'T', 'weno_avg': 'T', 'mapped_weno': 'T',
                     'fluid_pp(1)%gamma': 0.16393442623, 'fluid_pp(1)%pi_inf': 22.312399959394575,
-                    'fluid_pp(1)%Re(1)': 1.6881644098979287,
+                    'fluid_pp(1)%Re(1)': 1.6881644098979287, 'viscous': 'T',
                     'patch_icpp(1)%x_centroid': 180.0, 'patch_icpp(1)%length_x': 360.0,
                     'patch_icpp(1)%y_centroid': 0.0, 'patch_icpp(1)%length_y': 360.0,
                     'patch_icpp(1)%vel(1)': 1.1966855884162177, 'patch_icpp(1)%vel(2)': 0.0, 'patch_icpp(1)%pres': 1.0,
@@ -630,7 +652,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
             stack.push("Viscosity -> Bubbles",
-                {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T'})
+                       {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T', "viscous": 'T'})
 
             stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
@@ -666,14 +688,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push('bubble_model=3', {'bubble_model': 3})
             cases.append(define_case_d(stack, '', {}))
 
-            for _ in range(5):
+            stack.push('cfl_adap_dt=T', {'cfl_adap_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01, 'm': 24})
+            cases.append(define_case_d(stack, '', {}))
+
+            stack.pop()
+
+            stack.push('cfl_const_dt=T', {'cfl_const_dt': 'T', 'cfl_target': 0.8, 't_save': 0.01, 'n_start': 0, 't_stop': 0.01, 'm': 24})
+            cases.append(define_case_d(stack, '', {}))
+
+            for _ in range(6):
                 stack.pop()
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
-            alter_weno()
+            alter_weno(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -693,7 +723,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
             stack.pop()
 
+    def chemistry_cases():
+        common_mods = {
+            't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(1, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> Chemistry -> Perfect Reactor',
+                'examples/nD_perfect_reactor/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+
+        for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
+            cases.append(define_case_f(
+                f'1D -> Chemistry -> Inert Shocktube -> Riemann Solver {riemann_solver} -> Gamma Method {gamma_method}',
+                'examples/1D_inert_shocktube/case.py',
+                mods={
+                    **common_mods,
+                    'riemann_solver': riemann_solver,
+                    'chem_params%gamma_method': gamma_method
+                },
+                override_tol=1
+            ))
+
     foreach_dimension()
+    chemistry_cases()
 
     # Sanity Check 1
     if stack.size() != 0:

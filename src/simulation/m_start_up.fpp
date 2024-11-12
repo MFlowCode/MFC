@@ -38,6 +38,8 @@ module m_start_up
 
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
+    use m_chemistry            !< Chemistry module
+
     use m_data_output          !< Run-time info & solution data output procedures
 
     use m_time_steppers        !< Time-stepping algorithms
@@ -92,26 +94,28 @@ module m_start_up
  s_perform_time_step, s_save_data, &
  s_save_performance_metrics
 
-    abstract interface ! ===================================================
-
-        !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf)
-
-            import :: scalar_field, sys_size, pres_field
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_cons_vf
-
-        end subroutine s_read_abstract_data_files
-
-    end interface ! ========================================================
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
 
-    procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
+    real(kind(0d0)) :: dt_init
 
 contains
+
+   !> Read data files. Dispatch subroutine that replaces procedure pointer.
+        !! @param q_cons_vf Conservative variables
+    subroutine s_read_data_files(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: q_cons_vf
+
+        if (.not. parallel_io) then
+            call s_read_serial_data_files(q_cons_vf)
+        else
+            call s_read_parallel_data_files(q_cons_vf)
+        end if
+
+    end subroutine s_read_data_files
 
     !>  The purpose of this procedure is to first verify that an
         !!      input file has been made available by the user. Provided
@@ -126,8 +130,6 @@ contains
 
         integer :: iostatus
             !! Integer to check iostat of file read
-
-        CHARACTER(len=511) :: CRAY_ACC_MODULE
 
         character(len=1000) :: line
 
@@ -147,9 +149,9 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles, bubble_model, &
-            R0ref, &
+            R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -161,7 +163,9 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z
+            g_x, g_y, g_z, n_start, t_save, t_stop, &
+            cfl_adap_dt, cfl_const_dt, cfl_target, &
+            viscous, surface_tension
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -193,19 +197,11 @@ contains
             n_glb = n
             p_glb = p
 
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
-
-#ifdef _CRAYFTN
-#ifdef MFC_OpenACC
-        call get_environment_variable("CRAY_ACC_MODULE", CRAY_ACC_MODULE)
-
-        if (CRAY_ACC_MODULE == "") then
-            call s_mpi_abort("CRAY_ACC_MODULE is not set. Exiting...")
-        end if
-#endif
-#endif
 
     end subroutine s_read_input_file
 
@@ -219,9 +215,6 @@ contains
 
         ! Logical used to check the existence of the current directory file
         logical :: file_exist
-
-        ! Generic loop iterators
-        integer :: i, j
 
         ! Logistics ========================================================
         file_path = trim(case_dir)//'/.'
@@ -261,8 +254,13 @@ contains
 
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
-        write (t_step_dir, '(A,I0,A,I0)') &
-            trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        if (cfl_dt) then
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
+        else
+            write (t_step_dir, '(A,I0,A,I0)') &
+                trim(case_dir)//'/p_all/p', proc_rank, '/', t_step_start
+        end if
 
         file_path = trim(t_step_dir)//'/.'
         call my_inquire(file_path, file_exist)
@@ -401,23 +399,51 @@ contains
         ! Read IBM Data ====================================================
 
         if (ib) then
+            ! Read IB markers
+            write (file_path, '(A,I0,A)') &
+                trim(t_step_dir)//'/ib.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            ! Read Levelset
+            write (file_path, '(A)') &
+                trim(t_step_dir)//'/levelset.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
+                ! print*, 'check', STL_levelset(106, 50, 0, 1)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            ! Read Levelset Norm
+            write (file_path, '(A)') &
+                trim(t_step_dir)//'/levelset_norm.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
             do i = 1, num_ibs
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/ib.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-
                 if (patch_ib(i)%c > 0) then
-
-                    print *, "HERE Np", Np
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 
@@ -559,9 +585,13 @@ contains
         end if
 
         if (file_per_process) then
-            call s_int_to_str(t_step_start, t_step_start_string)
-            ! Open the file to read conservative variables
-            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                call s_int_to_str(n_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                call s_int_to_str(t_step_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -571,7 +601,8 @@ contains
                 ! Initialize MPI data I/O
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                        levelset, levelset_norm)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
@@ -620,7 +651,7 @@ contains
                 call MPI_FILE_CLOSE(ifile, ierr)
 
                 if (ib) then
-
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -640,6 +671,46 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
                     end if
 
+                    ! Read Levelset
+                    write (file_loc, '(A)') 'levelset.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset Norm
+                    write (file_loc, '(A)') 'levelset_norm.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
                 end if
 
             else
@@ -648,7 +719,11 @@ contains
         else
 
             ! Open the file to read conservative variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -658,7 +733,8 @@ contains
                 ! Initialize MPI data I/O
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                        levelset, levelset_norm)
                 else
 
                     call s_initialize_mpi_data(q_cons_vf)
@@ -725,6 +801,7 @@ contains
 
                 if (ib) then
 
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -739,6 +816,46 @@ contains
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                            MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset
+                    write (file_loc, '(A)') 'levelset.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset Norm
+                    write (file_loc, '(A)') 'levelset_norm.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -1042,9 +1159,11 @@ contains
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: pres
+        real(kind(0d0)) :: pres, T
 
-        integer :: i, j, k, l
+        integer :: i, j, k, l, c
+
+        real(kind(0d0)), dimension(num_species) :: rhoYks
 
         do j = 0, m
             do k = 0, n
@@ -1058,8 +1177,14 @@ contains
                                    /max(rho, sgm_eps)
                     end do
 
+                    if (chemistry) then
+                        do c = 1, num_species
+                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                        end do
+                    end if
+
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1083,16 +1208,44 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        integer :: i, j, k, l
+        integer :: i
 
-        if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-            print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
-                int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                t_step - t_step_start + 1, &
-                t_step_stop - t_step_start + 1, &
-                t_step
+        if (cfl_dt) then
+            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
+
+            if (cfl_adap_dt) call s_compute_dt()
+
+            if (t_step == 0) dt_init = dt
+
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+                print*, "Delta t = ", dt
+                call s_mpi_abort("Delta t has become too small")
+            end if
         end if
-        mytime = mytime + dt
+
+        if (cfl_dt) then
+            if ((mytime + dt) >= t_stop) dt = t_stop - mytime
+        else
+            if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+        end if
+
+        if (cfl_dt) then
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%] Time "ES16.6" dt = "ES16.6" @ Time Step = "I8"")', &
+                    int(ceiling(100d0*(mytime/t_stop))), &
+                    mytime, &
+                    dt, &
+                    t_step
+            end if
+        else
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+                print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
+                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    t_step - t_step_start + 1, &
+                    t_step_stop - t_step_start + 1, &
+                t_step
+            end if
+        end if
 
         if (probe_wrt) then
             do i = 1, sys_size
@@ -1106,6 +1259,8 @@ contains
         print *, 'Computed derived vars'
 #endif
 
+        mytime = mytime + dt
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
@@ -1116,9 +1271,11 @@ contains
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
+
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+
         ! Time-stepping loop controls
-        if ((mytime + dt) >= finaltime) dt = finaltime - mytime
+
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
@@ -1189,41 +1346,52 @@ contains
         integer, intent(inout) :: t_step
         real(kind(0d0)), intent(inout) :: start, finish, io_time_avg
         integer, intent(inout) :: nt
-        
+
         integer :: i, j, k, l
 
-        if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
+        integer :: save_count
 
-            call cpu_time(start)
-            !  call nvtxStartRange("I/O")
-            do i = 1, sys_size
-                !$acc update host(q_cons_ts(1)%vf(i)%sf)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                                error stop "NaN(s) in timestep output."
-                            end if
-                        end do
+        call cpu_time(start)
+        !  call nvtxStartRange("I/O")
+        do i = 1, sys_size
+            !$acc update host(q_cons_ts(1)%vf(i)%sf)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                            error stop "NaN(s) in timestep output."
+                        end if
                     end do
                 end do
             end do
+        end do
 
-            if (qbmm .and. .not. polytropic) then
-                !$acc update host(pb_ts(1)%sf)
-                !$acc update host(mv_ts(1)%sf)
-            end if
+        if (qbmm .and. .not. polytropic) then
+            !$acc update host(pb_ts(1)%sf)
+            !$acc update host(mv_ts(1)%sf)
+        end if
 
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
-            !  call nvtxEndRange
-            call cpu_time(finish)
+        if (cfl_dt) then
+            save_count = int(mytime/t_save)
+        else
+            save_count = t_step
+        end if
+
+        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+
+        !  call nvtxEndRange
+        call cpu_time(finish)
+        if (cfl_dt) then
+            nt = mytime/t_save
+        else
             nt = int((t_step - t_step_start)/(t_step_save))
-            if (nt == 1) then
-                io_time_avg = abs(finish - start)
-            else
-                io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
-            end if
+        end if
+
+        if (nt == 1) then
+            io_time_avg = abs(finish - start)
+        else
+            io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
         end if
 
     end subroutine s_save_data
@@ -1266,13 +1434,13 @@ contains
             call s_initialize_acoustic_src()
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_initialize_viscous_module()
         end if
 
         call s_initialize_rhs_module()
 
-        if (.not. f_is_default(sigma)) call s_initialize_surface_tension_module()
+        if (surface_tension) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1280,6 +1448,8 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
+        if (chemistry) call s_initialize_chemistry_module()
+
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
@@ -1287,15 +1457,6 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
-
-        ! Associate pointers for serial or parallel I/O
-        if (parallel_io .neqv. .true.) then
-            s_read_data_files => s_read_serial_data_files
-            s_write_data_files => s_write_serial_data_files
-        else
-            s_read_data_files => s_read_parallel_data_files
-            s_write_data_files => s_write_parallel_data_files
-        end if
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
@@ -1409,7 +1570,7 @@ contains
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
-        !$acc update device(sigma)
+        !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
 
@@ -1430,9 +1591,6 @@ contains
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
-        ! Disassociate pointers for serial and parallel I/O
-        s_read_data_files => null()
-        s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
         call s_finalize_derived_variables_module()
@@ -1446,11 +1604,11 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_finalize_viscous_module()
         end if
 
-        if (.not. f_is_default(sigma)) call s_finalize_surface_tension_module()
+        if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment

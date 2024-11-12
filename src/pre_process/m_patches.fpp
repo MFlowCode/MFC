@@ -988,7 +988,8 @@ contains
                     y_boundary%end >= y_cc(j)) &
                     then
 
-                    patch_id_fp(i, j, 0) = patch_id
+                    ! Updating the patch identities bookkeeping variable
+                    if (1d0 - eta < 1d-16) patch_id_fp(i, j, 0) = patch_id
 
                 end if
 

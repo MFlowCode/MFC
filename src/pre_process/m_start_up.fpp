@@ -141,7 +141,8 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n
+            sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
+            n_start_old, surface_tension
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -167,6 +168,9 @@ contains
             p_glb = p
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
+
+            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if
@@ -666,7 +670,11 @@ contains
         integer :: i
 
         ! Open the file to read
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
+        if (cfl_adap_dt) then
+            write (file_loc, '(I0,A)') n_start, '.dat'
+        else
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+        end if
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -675,7 +683,7 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -851,7 +859,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, ib_markers)
+        call s_write_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition

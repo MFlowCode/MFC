@@ -29,6 +29,9 @@ module m_data_output
     use m_helper
 
     use m_delay_file_access
+
+    use m_thermochem, only: species_names
+
     ! ==========================================================================
 
     implicit none
@@ -45,9 +48,12 @@ module m_data_output
         !>  Interface for the conservative data
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
-            import :: scalar_field, integer_field, sys_size, m, n, p, pres_field
+            import :: scalar_field, integer_field, sys_size, m, n, p, &
+                pres_field, levelset_field, levelset_norm_field
 
             ! Conservative variables
             type(scalar_field), &
@@ -57,6 +63,14 @@ module m_data_output
             ! IB markers
             type(integer_field), &
                 intent(in) :: ib_markers
+
+            ! Levelset
+            type(levelset_field), &
+                intent(IN) :: levelset
+
+            ! Levelset Norm
+            type(levelset_norm_field), &
+                intent(IN) :: levelset_norm
 
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
@@ -75,7 +89,9 @@ contains
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_serial_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+    subroutine s_write_serial_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
@@ -83,6 +99,14 @@ contains
         ! IB markers
         type(integer_field), &
             intent(in) :: ib_markers
+
+        ! Levelset
+        type(levelset_field), &
+            intent(IN) :: levelset
+
+        ! Levelset Norm
+        type(levelset_norm_field), &
+            intent(IN) :: levelset_norm
 
         logical :: file_exist !< checks if file exists
 
@@ -97,17 +121,19 @@ contains
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
 
-        integer :: i, j, k, l, r !< Generic loop iterator
+        integer :: i, j, k, l, r, c, dir !< Generic loop iterator
         integer :: t_step
 
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
         real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)) :: pres                         !< Temporary pressure
+        real(kind(0d0)) :: pres, Temp                         !< Temporary pressure
 
         real(kind(0d0)) :: nR3
         real(kind(0d0)) :: ntmp
+
+        real(kind(0d0)) :: rhoYks(1:num_species) !< Temporary species mass fractions
 
         t_step = 0
 
@@ -173,6 +199,19 @@ contains
         end if
         ! ==================================================================
 
+        ! Outtputting Levelset Info ============================
+        file_loc = trim(t_step_dir)//'/levelset.dat'
+
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        write (1) levelset%sf
+        close (1)
+
+        file_loc = trim(t_step_dir)//'/levelset_norm.dat'
+
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        write (1) levelset_norm%sf
+        close (1)
+
         ! Outputting Conservative Variables ================================
         do i = 1, sys_size
             write (file_num, '(I0)') i
@@ -230,6 +269,8 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
+        if (cfl_dt) t_step = n_start
+
         !1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2) then
@@ -238,14 +279,27 @@ contains
 
                     open (2, FILE=trim(file_loc))
                     do j = 0, m
+
+                        if (chemistry) then
+                            do c = 1, num_species
+                                rhoYks(c) = q_cons_vf(chemxb + c - 1)%sf(j, 0, 0)
+                            end do
+                        end if
+
                         call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
 
                         lit_gamma = 1d0/gamma + 1d0
 
-                        if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                            .or. &
-                            ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                            ) then
+                        if ((i >= chemxb) .and. (i <= chemxe)) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
+                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
+                                 .or. &
+                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
+                                 .or. &
+                                 ((i >= chemxb) .and. (i <= chemxe)) &
+                                 .or. &
+                                 ((i == T_idx)) &
+                                 ) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
@@ -256,7 +310,7 @@ contains
                                 q_cons_vf(E_idx)%sf(j, 0, 0), &
                                 q_cons_vf(alf_idx)%sf(j, 0, 0), &
                                 0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
-                                pi_inf, gamma, rho, qv, pres)
+                                pi_inf, gamma, rho, qv, rhoYks, pres, Temp)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
 
@@ -425,27 +479,23 @@ contains
 
         if (ib) then
 
-            do i = 1, num_ibs
-
-                write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
-                open (2, FILE=trim(file_loc))
-                do j = 0, m
-                    do k = 0, n
-                        do l = 0, p
-                            if (p > 0) then
-                                write (2, FMT) x_cc(j), y_cc(k), z_cc(l), real(ib_markers%sf(j, k, l))
-                            else
-                                write (2, FMT) x_cc(j), y_cc(k), real(ib_markers%sf(j, k, l))
-                            end if
-                        end do
+            ! Write IB Markers
+            write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
+            open (2, FILE=trim(file_loc))
+            do j = 0, m
+                do k = 0, n
+                    do l = 0, p
+                        if (p > 0) then
+                            write (2, FMT) x_cc(j), y_cc(k), z_cc(l), real(ib_markers%sf(j, k, l))
+                        else
+                            write (2, FMT) x_cc(j), y_cc(k), real(ib_markers%sf(j, k, l))
+                        end if
                     end do
                 end do
-
-                close (2)
             end do
-        end if
 
-        if (ib) then
+            close (2)
+
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 4) then
 
@@ -474,7 +524,9 @@ contains
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         ! Conservative variables
         type(scalar_field), &
@@ -484,6 +536,14 @@ contains
         ! IB markers
         type(integer_field), &
             intent(in) :: ib_markers
+
+        ! Levelset
+        type(levelset_field), &
+            intent(IN) :: levelset
+
+        ! Levelset Norm
+        type(levelset_norm_field), &
+            intent(IN) :: levelset_norm
 
 #ifdef MFC_MPI
 
@@ -515,13 +575,18 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                           levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A,i7.7,A)') n_start, '_', proc_rank, '.dat'
+            else
+                write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(restart_dir)//'/lustre_0'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -575,13 +640,18 @@ contains
         else
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                           levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A)') n_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
@@ -647,6 +717,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
+        ! IB Markers
         if (ib) then
 
             write (file_loc, '(A)') 'ib.dat'
@@ -665,6 +736,46 @@ contains
                                    'native', mpi_info_int, ierr)
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                     MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            ! Levelset
+            write (file_loc, '(A)') 'levelset.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Initial displacement to skip at beginning of file
+            disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
+                                    MPI_DOUBLE_PRECISION, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            ! Levelset Norm
+            write (file_loc, '(A)') 'levelset_norm.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Initial displacement to skip at beginning of file
+            disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
+                                    MPI_DOUBLE_PRECISION, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
@@ -725,9 +836,12 @@ contains
     subroutine s_initialize_data_output_module
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
+        character(len=15) :: temp
+        character(LEN=1), dimension(3) :: coord = (/'x', 'y', 'z'/)
 
         ! Generic logical used to check the existence of directories
         logical :: dir_check
+        integer :: i
 
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
@@ -771,15 +885,45 @@ contains
 
         end if
 
-        open (1, FILE='equations.dat', STATUS='unknown')
+        open (1, FILE='indices.dat', STATUS='unknown')
 
-        write (1, '(A)') "Equations: "
-        if (momxb /= 0) write (1, '(A,I3,I3)') " * Momentum:          ", momxb, momxe
-        if (advxb /= 0) write (1, '(A,I3,I3)') " * Advection:         ", advxb, advxe
-        if (contxb /= 0) write (1, '(A,I3,I3)') " * Continuity:        ", contxb, contxe
-        if (bubxb /= 0) write (1, '(A,I3,I3)') " * Bubbles:           ", bubxb, bubxe
-        if (strxb /= 0) write (1, '(A,I3,I3)') " * Stress:            ", strxb, strxe
-        if (intxb /= 0) write (1, '(A,I3,I3)') " * Internal Energies: ", intxb, intxe
+        write (1, '(A)') "Warning: The creation of file is currently experimental."
+        write (1, '(A)') "This file may contain errors and not support all features."
+
+        write (1, '(A3,A20,A20)') "#", "Conservative", "Primitive"
+        write (1, '(A)') "-------------------------------------------"
+        do i = contxb, contxe
+            write (temp, '(I0)') i - contxb + 1
+            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"} \rho_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"} \rho"
+        end do
+        do i = momxb, momxe
+            write (1, '(I3,A20,A20)') i, "\rho u_"//coord(i - momxb + 1), "u_"//coord(i - momxb + 1)
+        end do
+        do i = E_idx, E_idx
+            write (1, '(I3,A20,A20)') i, "\rho U", "p"
+        end do
+        do i = advxb, advxe
+            write (temp, '(I0)') i - contxb + 1
+            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"}"
+        end do
+        if (chemistry) then
+            do i = 1, num_species
+                write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
+            end do
+
+            write (1, '(I3,A20,A20)') T_idx, "T", "T"
+        end if
+
+        write (1, '(A)') ""
+        if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
+        if (E_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') E_idx, E_idx, " Energy/Pressure"
+        if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
+        if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
+        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles"
+        if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
+        if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
+        if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
+        if (T_idx /= 0) write (1, '("[",I2,",",I2,"]",A)') T_idx, T_idx, " Temperature"
 
         close (1)
 

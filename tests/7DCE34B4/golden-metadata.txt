@@ -1,84 +1,19 @@
-This file was created on 2024-01-28 12:00:39.103960.
+This file was created on 2024-10-24 01:51:14.649277.
 
 mfc.sh:
 
-    Invocation: test -j 12 -o 7DCE34B4 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.24.0 on Anshs-MBP-2.attlocal.net
-    
-        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v13.2.0 (/usr/local/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : 
-        FC       : /usr/local/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : g++-11
-        OMPI_FC  : gfortran-11
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.24.0 on Anshs-MBP-2.attlocal.net
-    
-        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v13.2.0 (/usr/local/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : 
-        FC       : /usr/local/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : g++-11
-        OMPI_FC  : gfortran-11
+    Invocation: test -j 12 -f B9D934CF -t 7DCE34B4 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
+    Git:        d64b621a64cbe025c58909c80369dbb9e12d388b on levelset_rewrite_pr (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.24.0 on Anshs-MBP-2.attlocal.net
+        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
     
-        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v13.2.0 (/usr/local/bin/gfortran)
+        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
+        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -97,21 +32,87 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : 
-        FC       : /usr/local/bin/gfortran
+        CC       : gcc-13
+        CXX      : g++-13
+        FC       : gfortran-13
         OMPI_CC  : 
-        OMPI_CXX : g++-11
-        OMPI_FC  : gfortran-11
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+    
+        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
+        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : gcc-13
+        CXX      : g++-13
+        FC       : gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
+    
+        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
+        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/anshgupta1234/Desktop/Coding/MFC-copy/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : gcc-13
+        CXX      : g++-13
+        FC       : gfortran-13
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.24.0 on Anshs-MBP-2.attlocal.net
+        CMake v3.30.2 on Anshs-MacBook-Pro-2.local
     
-        C       : AppleClang v14.0.0.14000029 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v13.2.0 (/usr/local/bin/gfortran)
+        C       : GNU v13.3.0 (/usr/local/bin/gcc-13)
+        Fortran : GNU v13.3.0 (/usr/local/bin/gfortran-13)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -130,40 +131,21 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : 
-        FC       : /usr/local/bin/gfortran
+        CC       : gcc-13
+        CXX      : g++-13
+        FC       : gfortran-13
         OMPI_CC  : 
-        OMPI_CXX : g++-11
-        OMPI_FC  : gfortran-11
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 CPU:
 
     CPU Info:
     From sysctl -a 
-    machdep.cpu.cache.linesize: 64
-    machdep.cpu.cache.L2_associativity: 4
-    machdep.cpu.cache.size: 256
     machdep.cpu.mwait.linesize_min: 64
     machdep.cpu.mwait.linesize_max: 64
     machdep.cpu.mwait.extensions: 3
     machdep.cpu.mwait.sub_Cstates: 286531872
-    machdep.cpu.tlb.inst.large: 8
-    machdep.cpu.tlb.data.small: 64
-    machdep.cpu.tlb.data.small_level1: 64
-    machdep.cpu.address_bits.physical: 39
-    machdep.cpu.address_bits.virtual: 48
-    machdep.cpu.tsc_ccc.numerator: 216
-    machdep.cpu.tsc_ccc.denominator: 2
-    machdep.cpu.xsave.extended_state: 31 832 1088 0
-    machdep.cpu.xsave.extended_state1: 15 832 256 0
-    machdep.cpu.arch_perf.version: 4
-    machdep.cpu.arch_perf.number: 4
-    machdep.cpu.arch_perf.width: 48
-    machdep.cpu.arch_perf.events_number: 7
-    machdep.cpu.arch_perf.events: 0
-    machdep.cpu.arch_perf.fixed_number: 3
-    machdep.cpu.arch_perf.fixed_width: 48
     machdep.cpu.thermal.sensor: 1
     machdep.cpu.thermal.dynamic_acceleration: 1
     machdep.cpu.thermal.invariant_APIC_timer: 1
@@ -174,6 +156,25 @@ CPU:
     machdep.cpu.thermal.package_thermal_intr: 1
     machdep.cpu.thermal.hardware_feedback: 0
     machdep.cpu.thermal.energy_policy: 1
+    machdep.cpu.xsave.extended_state: 31 832 1088 0
+    machdep.cpu.xsave.extended_state1: 15 832 256 0
+    machdep.cpu.arch_perf.version: 4
+    machdep.cpu.arch_perf.number: 4
+    machdep.cpu.arch_perf.width: 48
+    machdep.cpu.arch_perf.events_number: 7
+    machdep.cpu.arch_perf.events: 0
+    machdep.cpu.arch_perf.fixed_number: 3
+    machdep.cpu.arch_perf.fixed_width: 48
+    machdep.cpu.cache.linesize: 64
+    machdep.cpu.cache.L2_associativity: 4
+    machdep.cpu.cache.size: 256
+    machdep.cpu.tlb.inst.large: 8
+    machdep.cpu.tlb.data.small: 64
+    machdep.cpu.tlb.data.small_level1: 64
+    machdep.cpu.address_bits.physical: 39
+    machdep.cpu.address_bits.virtual: 48
+    machdep.cpu.tsc_ccc.numerator: 216
+    machdep.cpu.tsc_ccc.denominator: 2
     machdep.cpu.max_basic: 22
     machdep.cpu.max_ext: 2147483656
     machdep.cpu.vendor: GenuineIntel
@@ -194,7 +195,7 @@ CPU:
     machdep.cpu.extfeatures: SYSCALL XD 1GBPAGE EM64T LAHF LZCNT PREFETCHW RDTSCP TSCI
     machdep.cpu.logical_per_package: 16
     machdep.cpu.cores_per_package: 8
-    machdep.cpu.microcode_version: 240
+    machdep.cpu.microcode_version: 248
     machdep.cpu.processor_flag: 5
     machdep.cpu.core_count: 6
     machdep.cpu.thread_count: 12
