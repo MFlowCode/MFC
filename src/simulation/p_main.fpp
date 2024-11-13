@@ -21,6 +21,8 @@ program p_main
     use m_start_up
 
     use m_time_steppers
+
+    use m_nvtx
     ! ==========================================================================
 
     implicit none
@@ -36,16 +38,24 @@ program p_main
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
+    call nvtxStartRange("INIT")
+
     !Initialize MPI
+    call nvtxStartRange("INIT-MPI")
     call s_initialize_mpi_domain()
+    call nvtxEndRange
 
     !Initialize Modules
+    call nvtxStartRange("INIT-MODULES")
     call s_initialize_modules()
+    call nvtxEndRange
 
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
 
+    call nvtxStartRange("INIT-GPU-VARS")
     call s_initialize_gpu_vars()
+    call nvtxEndRange
 
     ! Setting the time-step iterator to the first time-step
     if (cfl_dt) then
@@ -61,6 +71,9 @@ program p_main
         finaltime = t_step_stop*dt
     end if
 
+    call nvtxEndRange ! INIT
+
+    call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop =======================================================
     do
 
@@ -95,8 +108,12 @@ program p_main
     end do
     ! ==========================================================================
 
+    call nvtxEndRange ! Simulation
+
     deallocate (proc_time, io_proc_time)
 
+    call nvtxStartRange("FINALIZE-MODULES")
     call s_finalize_modules()
+    call nvtxEndRange
 
 end program p_main
