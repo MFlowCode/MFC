@@ -1687,7 +1687,7 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
 
-        deallocate (c_mass)
+        !deallocate (c_mass)
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE_GLOBAL(icfl_sf)
         if (viscous) then
