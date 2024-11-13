@@ -298,8 +298,11 @@ module m_derived_types
         real(kind(0d0)) :: element_spacing_angle !< Spacing between aperture elements in 2D acoustic array
         real(kind(0d0)) :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
         real(kind(0d0)) :: rotate_angle !< Angle of rotation of the entire circular 3D acoustic array
+        real(kind(0d0)) :: bb_bandwidth !< Bandwidth of each frequency in broadband wave
+        real(kind(0d0)) :: bb_lowest_freq !< The lower frequency bound of broadband wave
         integer :: num_elements !< Number of elements in the acoustic array
         integer :: element_on !< Element in the acoustic array to turn on
+        integer :: bb_num_freq !< Number of frequencies in the broadband wave
     end type acoustic_parameters
 
     !> Acoustic source source_spatial pre-calculated values

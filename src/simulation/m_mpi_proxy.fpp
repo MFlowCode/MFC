@@ -252,14 +252,15 @@ contains
 
             call MPI_BCAST(acoustic(j)%dipole, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on' ]
+            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on', 'bb_num_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             #:for VAR in [ 'mag', 'length', 'height', &
                 'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
                 'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
-                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
+                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle', &
+                'bb_bandwidth', 'bb_lowest_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -2331,6 +2332,14 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
+
+    subroutine s_mpi_send_random_number(phi_rn, num_freq)
+        integer, intent(in) :: num_freq
+        real(kind(0d0)), intent(inout), dimension(1:num_freq) :: phi_rn
+#ifdef MFC_MPI
+        call MPI_BCAST(phi_rn, num_freq, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+#endif
+    end subroutine s_mpi_send_random_number
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module
