@@ -65,9 +65,9 @@ contains
     !> This subroutine initializes the acoustic source module
     subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
-        
+
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
-        
+
         do i = 1, num_source
             do j = 1, 3
                 loc_acoustic(j, i) = acoustic(i)%loc(j)
