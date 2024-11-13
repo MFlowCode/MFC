@@ -1,6 +1,6 @@
 #!/bin/bash
 
-n_ranks=4
+n_ranks=12
 
 if [ "$job_device" == "gpu" ]; then
     n_ranks=$(nvidia-smi -L | wc -l)        # number of GPUs on node
