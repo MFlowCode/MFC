@@ -622,7 +622,7 @@ contains
         real(kind(0d0)) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
 
-        call nvtxStartRange("Compute_RHS")
+        call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
         ! Association/Population of Working Variables ======================
@@ -668,7 +668,7 @@ contains
             gm_alpha_qp%vf)
         call nvtxEndRange
 
-        call nvtxStartRange("RHS-MPI")
+        call nvtxStartRange("RHS-COMMUNICATION")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
@@ -686,21 +686,25 @@ contains
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3), nbub)
 
-        call nvtxStartRange("Viscous")
-        if (viscous) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                        dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                        qL_prim, &
-                                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                        dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                        qR_prim, &
-                                        q_prim_qp, &
-                                        dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                        idwbuff(1), idwbuff(2), idwbuff(3))
-        call nvtxEndRange
+        if (viscous) then
+            call nvtxStartRange("RHS-VISCOUS")
+            call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                               dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                               qL_prim, &
+                               qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                               dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                               qR_prim, &
+                               q_prim_qp, &
+                               dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                               idwbuff(1), idwbuff(2), idwbuff(3))
+            call nvtxEndRange
+        end if
 
-        call nvtxStartRange("Surface_Tension")
-        if (surface_tension) call s_get_capilary(q_prim_qp%vf)
-        call nvtxEndRange
+        if (surface_tension) then
+            call nvtxStartRange("RHS-SURFACE-TENSION")
+            call s_get_capilary(q_prim_qp%vf)
+            call nvtxEndRange
+        end if
         ! Dimensional Splitting Loop =======================================
 
         do id = 1, num_dims
@@ -779,6 +783,7 @@ contains
             end if
             irx%end = m; iry%end = n; irz%end = p
             ! ===============================================================
+
             ! Computing Riemann Solver Flux and Source Flux =================
             call nvtxStartRange("RHS_riemann_solver")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
@@ -801,7 +806,7 @@ contains
             ! ===============================================================
             ! Additional physics and source terms ===========================
             ! RHS addition for advection source
-            call nvtxStartRange("RHS_advection_source")
+            call nvtxStartRange("RHS-ADVECTION-SRC")
             call s_compute_advection_source_term(id, &
                                                  rhs_vf, &
                                                  q_cons_qp, &
@@ -810,15 +815,15 @@ contains
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
-            call nvtxStartRange("RHS_Hypoelasticity")
+            call nvtxStartRange("RHS-HYPOELASTICITY")
             if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
                                                                q_prim_qp%vf, &
                                                                rhs_vf)
             call nvtxEndRange
 
             ! RHS additions for viscosity
-            call nvtxStartRange("RHS_add_phys")
             if (viscous .or. surface_tension) then
+                call nvtxStartRange("RHS-ADD-PHYSICS")
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
@@ -826,34 +831,38 @@ contains
                                                       dq_prim_dx_qp(1)%vf, &
                                                       dq_prim_dy_qp(1)%vf, &
                                                       dq_prim_dz_qp(1)%vf)
+                call nvtxEndRange
             end if
-            call nvtxEndRange
 
             ! RHS additions for sub-grid bubbles
-            call nvtxStartRange("RHS_bubbles")
-            if (bubbles) call s_compute_bubbles_rhs(id, &
-                                                    q_prim_qp%vf)
-            call nvtxEndRange
+            if (bubbles) then
+                call nvtxStartRange("RHS-BUBBLES-COMPUTE")
+                call s_compute_bubbles_rhs(id, q_prim_qp%vf)
+                call nvtxEndRange
+            end if
 
             ! RHS additions for qbmm bubbles
-            call nvtxStartRange("RHS_qbmm")
-            if (qbmm) call s_compute_qbmm_rhs(id, &
-                                              q_cons_qp%vf, &
-                                              q_prim_qp%vf, &
-                                              rhs_vf, &
-                                              flux_n(id)%vf, &
-                                              pb, &
-                                              rhs_pb, &
-                                              mv, &
-                                              rhs_mv)
-            call nvtxEndRange
+
+            if (qbmm) then
+                call nvtxStartRange("RHS-QBMM")
+                call s_compute_qbmm_rhs(id, &
+                                        q_cons_qp%vf, &
+                                        q_prim_qp%vf, &
+                                        rhs_vf, &
+                                        flux_n(id)%vf, &
+                                        pb, &
+                                        rhs_pb, &
+                                        mv, &
+                                        rhs_mv)
+                call nvtxEndRange
+            end if
             ! END: Additional physics and source terms =========================
 
         end do
         ! END: Dimensional Splitting Loop =================================
 
         if (chemistry) then
-            call nvtxStartRange("RHS_Chem_Advection")
+            call nvtxStartRange("RHS-CHEM-ADVECTION")
             call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
             call nvtxEndRange
         end if
@@ -875,25 +884,29 @@ contains
 
         ! Additional Physics and Source Temrs ==================================
         ! Additions for acoustic_source
-        call nvtxStartRange("RHS_acoustic_src")
-        if (acoustic_source) call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                                              q_prim_qp%vf(1:sys_size), &
-                                                              t_step, &
-                                                              rhs_vf)
-        call nvtxEndRange
+        if (acoustic_source) then
+            call nvtxStartRange("RHS-ACOUSTIC-SRC")
+            call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
+                                             q_prim_qp%vf(1:sys_size), &
+                                             t_step, &
+                                             rhs_vf)
+            call nvtxEndRange
+        end if
 
         ! Add bubles source term
-        call nvtxStartRange("RHS_bubbles")
-        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source( &
-            q_cons_qp%vf(1:sys_size), &
-            q_prim_qp%vf(1:sys_size), &
-            t_step, &
-            rhs_vf)
-        call nvtxEndRange
+        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) then
+            call nvtxStartRange("RHS-BUBBLES-SRC")
+            call s_compute_bubble_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                t_step, &
+                rhs_vf)
+            call nvtxEndRange
+        end if
 
         if (chemistry) then
             if (chem_params%reactions) then
-                call nvtxStartRange("RHS_Chem_Reactions")
+                call nvtxStartRange("RHS-CHEM-REACTIONS")
                 call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
                 call nvtxEndRange
             end if

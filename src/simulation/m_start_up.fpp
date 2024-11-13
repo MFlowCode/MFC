@@ -1356,7 +1356,7 @@ contains
         integer :: save_count
 
         call cpu_time(start)
-        !  call nvtxStartRange("I/O")
+        call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
@@ -1384,7 +1384,7 @@ contains
 
         call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
 
-        !  call nvtxEndRange
+        call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
             nt = mytime/t_save
