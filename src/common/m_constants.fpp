@@ -28,4 +28,13 @@ module m_constants
     real(kind(0d0)), parameter :: broadband_spectral_level_constant = 20d0 !< The constant to scale the spectral level at the lower frequency bound
     real(kind(0d0)), parameter :: broadband_spectral_level_growth_rate = 10d0 !< The spectral level constant to correct the magnitude at each frqeuency to ensure the source is overall broadband
 
+    ! IBM+STL interpolation constants
+    integer, parameter :: Ifactor_2D = 100 !< Number of interpolated vertices per edge for 2D models
+    integer, parameter :: Ifactor_3D = 10 !< Number of interpolated vertices per edge for 3D models
+    integer, parameter :: Ifactor_bary_3D = 30 !< Number of interpolated vertices per barycentric facet for 3D models
+    real(kind(0d0)), parameter :: threshold_vector_zero = 1d-10 !< Threshold to treat the component of a vector to be zero
+    real(kind(0d0)), parameter :: threshold_edge_zero = 1d-8 !< Threshold to treat two edges to be overlapped
+    real(kind(0d0)), parameter :: threshold_bary = 1d-1 !< Threshold to interpolate a barycentric facet
+    real(kind(0d0)), parameter :: initial_distance_buffer = 1d12 !< Threshold to interpolate a barycentric facet
+
 end module m_constants

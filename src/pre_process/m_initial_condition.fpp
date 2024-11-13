@@ -181,7 +181,7 @@ contains
 
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
 
@@ -206,6 +206,10 @@ contains
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                     call s_compute_3D_airfoil_levelset(levelset, levelset_norm, i)
+
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 12) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, .true., levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -262,7 +266,7 @@ contains
 
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
                 !> @}
@@ -284,6 +288,9 @@ contains
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
                     call s_compute_airfoil_levelset(levelset, levelset_norm, i)
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 5) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, .true., levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -350,6 +357,9 @@ contains
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
         deallocate (ib_markers%sf)
+
+        ! deallocate (STL_levelset)
+        ! deallocate (STL_levelset_norm)
 
     end subroutine s_finalize_initial_condition_module
 

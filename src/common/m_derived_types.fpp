@@ -234,6 +234,8 @@ module m_derived_types
 
         logical :: slip
 
+        type(ic_model_parameters) :: model
+
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These

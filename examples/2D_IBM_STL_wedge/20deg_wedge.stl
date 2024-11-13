@@ -1,0 +1,9 @@
+solid 20deg_wedge
+   facet normal 0.000000e+00 -0.000000e+00 1.000000e+00
+      outer loop
+         vertex 1.511113e-02 0.000000e+00 0.000000e+00
+         vertex 1.511113e-02 1.100000e-02 0.000000e+00
+         vertex 0.000000e+00 5.500000e-03 0.000000e+00
+      endloop
+   endfacet
+endsolid 20deg_wedge
