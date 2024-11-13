@@ -644,9 +644,6 @@ contains
             acoustic(j)%rotate_angle = dflt_real
             acoustic(j)%num_elements = dflt_int
             acoustic(j)%element_on = dflt_int
-            acoustic(j)%rotate_angle = dflt_real
-            acoustic(j)%num_elements = dflt_int
-            acoustic(j)%element_on = dflt_int
             acoustic(j)%bb_num_freq = dflt_int
             acoustic(j)%bb_lowest_freq = dflt_real
             acoustic(j)%bb_bandwidth = dflt_real
