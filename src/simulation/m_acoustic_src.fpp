@@ -65,8 +65,9 @@ contains
     !> This subroutine initializes the acoustic source module
     subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
-
-        @:ALLOCATE_GLOBAL(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
+        
+        @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
+        
         do i = 1, num_source
             do j = 1, 3
                 loc_acoustic(j, i) = acoustic(i)%loc(j)
@@ -110,9 +111,9 @@ contains
         end do
         !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq)
 
-        @:ALLOCATE_GLOBAL(mass_src(0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(mom_src(1:num_dims, 0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(E_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(mom_src(1:num_dims, 0:m, 0:n, 0:p))
+        @:ALLOCATE(E_src(0:m, 0:n, 0:p))
 
     end subroutine s_initialize_acoustic_src
 
@@ -413,8 +414,8 @@ contains
             dim = 3
         end if
 
-        @:ALLOCATE_GLOBAL(source_spatials_num_points(1:num_source))
-        @:ALLOCATE_GLOBAL(source_spatials(1:num_source))
+        @:ALLOCATE(source_spatials_num_points(1:num_source))
+        @:ALLOCATE(source_spatials(1:num_source))
 
         do ai = 1, num_source
             ! First pass: Count the number of points for each source
