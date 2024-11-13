@@ -94,8 +94,8 @@ contains
         call s_find_num_ghost_points()
 
         !$acc update device(num_gps, num_inner_gps)
-        @:ALLOCATE_GLOBAL(ghost_points(num_gps))
-        @:ALLOCATE_GLOBAL(inner_points(num_inner_gps))
+        @:ALLOCATE(ghost_points(1:num_gps))
+        @:ALLOCATE(inner_points(1:num_inner_gps))
 
         !$acc enter data copyin(ghost_points, inner_points)
 
@@ -869,6 +869,7 @@ contains
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(levelset%sf)
         @:DEALLOCATE(levelset_norm%sf)
+
     end subroutine s_finalize_ibm_module
 
 end module m_ibm

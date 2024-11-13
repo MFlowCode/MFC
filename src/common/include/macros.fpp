@@ -22,20 +22,6 @@
     !$acc exit data delete(${', '.join(args)}$)
 #:enddef DEALLOCATE
 
-#:def ALLOCATE_GLOBAL(*args)
-    @:LOG({'@:ALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-
-    allocate (${', '.join(args)}$)
-
-#:enddef ALLOCATE_GLOBAL
-
-#:def DEALLOCATE_GLOBAL(*args)
-    @:LOG({'@:DEALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-
-    deallocate (${', '.join(args)}$)
-
-#:enddef DEALLOCATE_GLOBAL
-
 #:def ACC_SETUP_VFs(*args)
 #ifdef _CRAYFTN
     block
