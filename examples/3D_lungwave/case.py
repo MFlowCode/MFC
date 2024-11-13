@@ -65,7 +65,7 @@ P_amp_n = P_amp/stress_char
 #geometry
 amp = 0.5
 interface_amp = amp*lambda_wave
-Namp = 60 #25               #20                                                     # Dont Change
+Namp = 50 #25               #20                                                     # Dont Change
 
 dlengx = 6.*lambda_wave
 dlengy = 1.*lambda_wave/2.
@@ -127,12 +127,12 @@ print(json.dumps({
 
     # Simulation Algorithm Parameters ==========================================
     'num_patches'                  : 2,
-    'model_eqns'                   : 3,
+    'model_eqns'                   : 2,
     ####Change
-    'relax'                        : 'T',
-    'relax_model'                  : 5,
-    'palpha_eps'                   : 1.0E-8,            #check smaller  -6/-8
-    'ptgalpha_eps'                 : 1.0-1E-8,
+    #'relax'                        : 'T',
+    #'relax_model'                  : 5,
+    #'palpha_eps'                   : 1.0E-8,            #check smaller  -6/-8
+    #'ptgalpha_eps'                 : 1.0-1E-8,
     ########Change
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
@@ -149,8 +149,8 @@ print(json.dumps({
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
-    'bc_x%beg'                     : -6,
-    'bc_x%end'                     : -6,
+    'bc_x%beg'                     : -3,
+    'bc_x%end'                     : -3,
     'bc_y%beg'                     : -2,                # was -1 for all of them
     'bc_y%end'                     : -2,
     'bc_z%beg'                     : -2,
