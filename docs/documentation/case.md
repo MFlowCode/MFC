@@ -34,24 +34,26 @@ Input files can accept command line arguments, forwarded by `mfc.sh run`.
 Consider this example from the `scaling` case:
 
 ```python
-import argparse
+import json, argparse
 
 parser = argparse.ArgumentParser(
     prog="scaling",
     description="Weak- and strong-scaling benchmark case.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT")
-parser.add_argument("-s", "--scaling",  type=str, metavar="SCALING",  choices=["weak", "strong"], help="Whether weak- or strong-scaling is being exercised.")
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-s", "--scaling", type=str, metavar="SCALING", choices=["weak", "strong"],
+                    help="Whether weak- or strong-scaling is being exercised.")
 
 # Your parsed arguments are here
 args = parser.parse_args()
 ```
 
-The first argument is always a JSON string representing `mfc.sh run`'s internal
-state.
+The `--mfc` argument is a JSON string representing `mfc.sh run`'s internal
+state, passed in when MFC runs your input file.
 It contains all the runtime information you might want from the build/run system.
-You can add as many additional arguments as you may need.
+You can add as many additional arguments and options as you may need.
 
 To run such a case, use the following format:
 
@@ -123,7 +125,7 @@ For example, $m=n=p=499$ discretizes the domain into $500^3$ cells.
 When the simulation is 2D/axi-symmetric or 1D, it requires that $p=0$ or $p=n=0$, respectively.
 
 - `stretch_[x,y,z]` activates grid stretching in the $[x,y,z]$ directions.
-The grid is gradually stretched such that the domain boundaries are pushed away from the origin along a specified axis.
+The grid is gradually stretched such that the domain boundaries are pushed away from the origin along a specified axis. WENO7 does not support grid stretching.
 
 - `a_[x,y,z]`, `[x,y,z]_a`, and `[x,y,z]_b` are parameters that define the grid stretching function. When grid stretching along the $x$ axis is considered, the stretching function is given as:
 
@@ -347,6 +349,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
 | `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
 | `wenoz`	             | Logical | WENO-Z |
+| `wenoz_q`              | Real    | WENO-Z power parameter q (only for WENO7) |
 | `teno`                 | Logical | TENO (Targeted ENO) |
 | `teno_CT`              | Real    | TENO threshold for smoothness detection |
 | `null_weights`         | Logical | Null WENO weights at boundaries |
@@ -368,6 +371,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `n_start`              | Integer | Save file from which to start simulation |
 | `t_save`               | Real    | Time duration between data output |
 | `t_stop`               | Real    | Simulation stop time |
+| `surface_tension`      | Logical | Activate surface tension |
+| `viscous`              | Logical | Activate viscosity |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -406,18 +411,20 @@ Note that `time_stepper = 3` specifies the total variation diminishing (TVD), th
 
 - `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
 
-- `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
+- `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, 5, and 7, that correspond to the 1st, 3rd, 5th, and 7th order, respectively. WENO7 does not support grid stretching.
 
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
-Practically, `weno_eps` $<10^{-6}$ is used.
+It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ for other WENO variants.
 
 - `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](references.md#Henrick05)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
 
 - `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](references.md#Borges08)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
 
-- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5`. Requires `teno_CT` to be set.
+- `wenoz_q` specifies the power parameter `q` used in the WENO-Z scheme. It controls how aggressively the smoothness coefficients scale the weights. A higher value of `wenoz_q` increases the sensitivity to smoothness, improving stability but worsening numerical dissipation. For WENO3 and WENO5, `q=1` is fixed, so `wenoz_q` must not be set. For WENO7, `wenoz_q` can be set to 2, 3, or 4.
 
-- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`.
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set.
+
+- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7` for TENO5. A smaller value can be used for TENO7.
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]%%beg[end]} = -4`).
 
@@ -440,33 +447,37 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set.
+
+- `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
+
 #### Constant Time-Stepping
 
-- `dt` specifies the constant time step size that is used in simulation.
-The value of `dt` needs to be sufficiently small such that the Courant-Friedrichs-Lewy (CFL) condition is satisfied.
+- `dt` specifies the constant time step size used in the simulation.
+The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedrichs-Lewy (CFL) condition.
 
-- `t_step_start` and `t_step_end` define the time steps at which simulation starts and ends, respectively.
+- `t_step_start` and `t_step_end` define the time steps at which the simulation starts and ends.
 
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
-To restart simulation from $k$-th time step, set `t_step_start = k`, see [Restarting Cases](running.md#restarting-cases).
+To restart the simulation from $k$-th time step, set `t_step_start = k`; see [Restarting Cases](running.md#restarting-cases).
 
 ##### Adaptive Time-Stepping
 
 - `cfl_adap_dt` enables adaptive time stepping with a constant CFL when true
 
-- `cfl_const_dt` enables constant dt time-stepping where dt results in a specified CFL for the initial condition
+- `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
 - `cfl_target` specifies the target CFL value
 
 - `n_start` specifies the save file to start at
 
-- `t_save` specifies the time interval between data output during simulation
+- `t_save` specifies the time interval between data output during the simulation
 
 - `t_stop` specifies at what time the simulation should stop
 
 To newly start the simulation, set `n_start = 0`.
-To restart simulation from $k$-th time step, see [Restarting Cases](running.md#restarting-cases).
+To restart the simulation from $k$-th time step, see [Restarting Cases](running.md#restarting-cases).
 
 ### 7. Formatted Output
 
@@ -507,24 +518,23 @@ The table lists formatted database output parameters. The parameters define vari
 
 - `parallel_io` activates parallel input/output (I/O) of data files. It is highly recommended to activate this option in a parallel environment.
 With parallel I/O, MFC inputs and outputs a single file throughout pre-process, simulation, and post-process, regardless of the number of processors used.
-Parallel I/O enables the use of different number of processors in each of the processes (i.e., simulation data generated using 1000 processors can be post-processed using a single processor).
+Parallel I/O enables the use of different numbers of processors in each process (e.g., simulation data generated using 1000 processors can be post-processed using a single processor).
 
 - `file_per_process` deactivates shared file MPI-IO and activates file per process MPI-IO.
 The default behavior is to use a shared file.
-File per process is useful when running on 10's of thousands of ranks.
+File per process is useful when running on >10K ranks.
 If `file_per_process` is true, then pre_process, simulation, and post_process must be run with the same number of ranks.
 
-- `cons_vars_wrt` and `prim_vars_wrt` activate output of conservative and primitive state variables into the database, respectively.
+- `cons_vars_wrt` and `prim_vars_wrt` activate the output of conservative and primitive state variables into the database.
 
-- `[variable's name]_wrt` activates output of the each specified variable into the database.
+- `[variable's name]_wrt` activates the output of each specified variable into the database.
 
 - `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
 
-- `fd_order` specifies the order of the finite difference scheme that is used to compute the vorticity from the velocity field and the numerical schlieren from the density field by an integer of 1, 2, and 4.
-`fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes, respectively.
+- `fd_order` specifies the order of the finite difference scheme used to compute the vorticity from the velocity field and the numerical schlieren from the density field using an integer of 1, 2, and 4.
+`fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes.
 
-- `probe_wrt` activates output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
-
+- `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
 ### 8. Acoustic Source {#acoustic-source}
 
@@ -586,15 +596,15 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%foc_length` specifies the focal length of the transducer for transducer waves. It is the distance from the transducer to the focal point.
 
-- `%%aperture` specifies the aperture of the transducer. It is the diameter of the projection of the transducer arc onto the y-axis (2D) or spherical cap onto the y-z plane (3D). To simulate a transducer enclosing half of the circle/sphere, set the aperture to double the focal length. For transducer array, it is the total aperture of the array.
+- `%%aperture` specifies the aperture of the transducer. It is the diameter of the projection of the transducer arc onto the y-axis (2D) or spherical cap onto the y-z plane (3D). Set the aperture to double the focal length to simulate a transducer enclosing half of the circle/sphere. For the transducer array, it is the total aperture of the array.
 
 - `%%num_elements` specifies the number of transducer elements in a transducer array. 
 
-- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1. If all elements are on, set `%%element_on` to 0.
+- `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1, if all elements are on, set `%%element_on` to 0.
 
-- `%%element_spacing_angle` specifies the spacing angle between adjacent transducer in radians. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
+- `%%element_spacing_angle` specifies the spacing angle between adjacent transducers in radians. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
 
-- `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcicle diameter, and `%%num_elements` as the number of sides of the polygon. The ratio is used specify the aperture size of each transducer element in the array, as a ratio of the total aperture. 
+- `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcircle diameter and `%%num_elements` as the number of sides of the polygon. The ratio is used to specify the aperture size of each transducer element in the array as a ratio of the total aperture. 
 
 - `%%rotate_angle` specifies the rotation angle of the 3D circular transducer array along the x-axis (principal axis). It is optional and defaults to 0.
 
@@ -622,16 +632,16 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 | `mu_v` †	     | Real 		|	Viscosity |
 | `k_v` †	       | Real 		|	Thermal conductivity |
 | `qbmm` 	       | Logical 		|	Quadrature by  method of moments|
-| `dist_type` 	       | Integer 		|	Joint probability density function for bubble radius and velocity (only when qbmm is true)|
-| `sigR` 	       | Real 		|	Standard deviation for probability density function of bubble radius (only when qbmm is true) |
-| `sigV` 	       | Real 		|	Standard deviation for probability density function of bubble velocity (only when qbmm is true) |
-| `rhoRV`	       | Real 		|	Correlation coefficient for joint probability density function of bubble radius and velocity (only when qbmm is true) |
+| `dist_type` 	       | Integer 		|	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``)|
+| `sigR` 	       | Real 		|	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) |
+| `sigV` 	       | Real 		|	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) |
+| `rhoRV`	       | Real 		|	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
 
-These options work only for gas-liquid two component flows.
+These options work only for gas-liquid two-component flows.
 Component indexes are required to be 1 for liquid and 2 for gas.
 
-- \* These parameters should be pretended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
-- †  These parameters should be pretended with patch indexes that are respectively filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
+- \* These parameters should be prepended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
+- †  These parameters should be prepended with patch indexes filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
 
 This table lists the ensemble-averaged bubble model parameters.
 
@@ -641,9 +651,9 @@ This table lists the ensemble-averaged bubble model parameters.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
 - `polytropic` activates polytropic gas compression in the bubble.
-When `polytropic` is set `False`, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md#Preston07)).
+When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md#Preston07)).
 
-- `polydisperse` activates polydispersity in the bubble model by means of a probability density function (PDF) of the equiliibrium bubble radius.
+- `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius.
 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
 `thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md#Preston07), respectively.
@@ -668,17 +678,17 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 - `dist_type` specifies the initial joint PDF of initial bubble radius and bubble velocity required in qbmm. `dist_type = 1`  and `2` correspond to binormal and lognormal-normal distributions respectively.
 
-- `sigR` specifies the standard deviation of the PDF of bubble radius required in qbmm.
+- `sigR` specifies the standard deviation of the PDF of bubble radius required in the QBMM feature.
 
-- `sigV` specifies the standard deviation of the PDF of bubble velocity required in qbmm.
+- `sigV` specifies the standard deviation of the PDF of bubble velocity required in the QBMM feature.
 
-- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in qbmm.
+- `rhoRV` specifies the correlation coefficient of the joint PDF of bubble radius and bubble velocity required in the QBMM feature.
 
 ### 10. Velocity Field Setup
 
 | Parameter              | Type    | Description |
 | ---:                   | :----:  | :--- |
-| `perturb_flow`         | Logical | Perturb the initlial velocity field by random noise |
+| `perturb_flow`         | Logical | Perturb the initial velocity field by random noise |
 | `perturb_flow_fluid`   | Integer | Fluid density whose flow is to be perturbed |
 | `perturb_flow_mag`     | Real    | Set the magnitude of flow perturbations |
 | `perturb_sph`          | Logical | Perturb the initial partial density by random noise |
@@ -693,7 +703,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
-- `perturb_flow_fluid` specifies the fluid component whose flow is to be perturbed.
+- `perturb_flow_fluid` specifies the fluid component whose flow will be perturbed.
 
 - `perturb_flow` activates the perturbation of initial velocity by random noise.
 
@@ -701,7 +711,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
 
-- `mixlayer_vel_profile` activates setting of the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
+- `mixlayer_vel_profile` activates setting the mean streamwise velocity to a hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
 - `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
 
@@ -723,7 +733,7 @@ $$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
 
 - `relax_model` Specifies the phase change model to be used: [5] enables pT-equilibrium, while [6] activates pTg-equilibrium (if criteria are met).
 
-- `palpha_eps` Specifies the tolerance used for the Newton Solvers used in the pT-equilibrium model.
+- `palpha_eps` Specifies the tolerance for the Newton Solvers used in the pT-equilibrium model.
 
 - `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model.
 
@@ -733,7 +743,7 @@ $$ u = patch\_icpp(1)\%vel(1) * tanh(y\_cc * mixlayer\_vel\_profile) $$
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
 
 - `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`).
-This parameter enables the use of true `pi_\infty` in bubble dynamics models, when the `pi_\infty` given in the `case.py` file is an artificial value.
+This parameter enables the use of true `pi_\infty` in bubble dynamics models when the `pi_\infty` given in the `case.py` file is an artificial value.
 
 ### 13. Body Forces
 
@@ -749,7 +759,23 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models, wh
 
 $$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
 
-Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]` direction by convention.
+By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
+
+### 14. Cylindrical Coordinates
+
+When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
+
+- `bc_y%beg = -14`  enables the axis boundary condition
+
+- `bc_z%beg = bc_z%end = -1`  enables periodic boundary conditions in the azimuthal direction
+
+- `z_domain%beg = 0`  sets the azimuthal starting point to 0
+
+- `z_comain%end = 2*math.pi` to set the azimuthal ending point to $2\pi$ (note, requires `import math` in the case file)
+
+When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
+
+- `bc_y%beg = -2` to enable reflective boundary conditions
 
 ## Enumerations
 
@@ -835,7 +861,7 @@ Each patch requires a different set of parameters, which are also listed in this
 | 10   | Annular Transducer Array     | 2D-Axisym | #9 requirements                                                                         |
 | 11   | Circular Transducer Array    | 3D        | #7 requirements, `%%element_polygon_ratio`, and `%%rotate_angle`                        |
 
-Details of the required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
+The required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
 The acoustic support number (`#`) corresponds to the acoustic support type `Acoustic(i)%%support`, where $i$ is the acoustic source index.
 For each `%%parameter`, prepend the parameter with `acoustic(i)%`.
 
@@ -844,7 +870,7 @@ Additional requirements for all acoustic support types:
 
 - `num_source` must be set to the total number of acoustic sources.
 
-- `%%support` must be set to the acoustic support number listed in the table.
+- `%%support` must be set to the acoustic support number in the table.
 
 - `%%dipole` is only supported for planar sources.
 

@@ -120,7 +120,6 @@ contains
         ! Generic logical used to test the existence of a particular folder
         logical :: dir_check
 
-        ! Generic loop iterator
         integer :: i
 
         ! Allocating the generic storage for the flow variable(s) that are
@@ -1123,7 +1122,7 @@ contains
 
                     call s_compute_speed_of_sound(pres, rho, &
                                                   gamma, pi_inf, &
-                                                  H, adv, 0d0, c)
+                                                  H, adv, 0d0, 0d0, c)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then

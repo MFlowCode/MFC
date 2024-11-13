@@ -103,7 +103,7 @@ When used, `--roc` will run the simulation and generate files in the case direct
 `results.json` can then be imported in [Perfetto's UI](https://ui.perfetto.dev/).
 Learn more about AMD Rocprof [here](https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.5.1/rocprof.html)
 It is best to run case files with few timesteps to keep the report file sizes manageable.
-- Omniperf (OMNI): `./mfc.sh run ... -t simulation --omni [omniperf flags]` allows one to conduct kernel-level profiling with [AMD Omniperf](https://rocm.github.io/omniperf/introduction.html#what-is-omniperf).
+- Omniperf (OMNI): `./mfc.sh run ... -t simulation --omni [omniperf flags]` allows one to conduct kernel-level profiling with [AMD's Omniperf](https://rocm.docs.amd.com/projects/omniperf/en/latest/index.html).
 When used, `--omni` will output profiling information for all subroutines, including rooflines, cache usage, register usage, and more, after the simulation is run.
 Adding this argument will moderately slow down the simulation and run the MFC executable several times.
 For this reason, it should only be used with case files with few timesteps.

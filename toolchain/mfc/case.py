@@ -1,5 +1,4 @@
-import re, json, math, copy, dataclasses, jsonschema
-import jsonschema.exceptions
+import re, json, math, copy, dataclasses, fastjsonschema
 
 from . import common
 from . import build
@@ -72,13 +71,12 @@ class Case:
         is assigned a vlaie of the wrong type, this method throws an exception
         highlighting the violating parameter and specifying what it expects.'''
         try:
-            jsonschema.validate(self.params, case_dicts.SCHEMA)
-        except jsonschema.exceptions.ValidationError as e:
-            exception_txt = f"Case parameter '{e.path[0]}' is of the wrong type. Expected type: '{e.schema['type']}'. Got value '{e.instance}' of type '{type(e.instance).__name__}'."
+            case_dicts.get_validator()(self.params)
+        except fastjsonschema.JsonSchemaException as e:
             if origin_txt:
-                exception_txt = f"Origin: {origin_txt}. {exception_txt}"
+                raise common.MFCException(f"{origin_txt}: {e}")
 
-            raise common.MFCException(exception_txt)
+            raise common.MFCException(f"{e}")
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
@@ -191,10 +189,20 @@ class Case:
             teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
 
+            weno_order = int(self.params["weno_order"])
+            weno_polyn = int((self.params["weno_order"] - 1) / 2)
+
+            if teno:
+                weno_num_stencils = weno_order - 3
+            else:
+                weno_num_stencils = weno_polyn
+
+            # Throw error if wenoz_q is required but not set
             return f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
-#:set weno_order            = {int(self.params["weno_order"])}
-#:set weno_polyn            = {int((self.params["weno_order"] - 1) / 2)}
+#:set weno_order            = {weno_order}
+#:set weno_polyn            = {weno_polyn}
+#:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
 #:set num_dims              = {1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)}
 #:set nterms                = {nterms}
@@ -203,6 +211,7 @@ class Case:
 #:set mapped_weno           = {mapped_weno}
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
+#:set wenoz_q               = {self.params.get("wenoz_q", -1)}
 """
 
         return """\

@@ -27,22 +27,13 @@ module m_mpi_proxy
 
     use m_mpi_common
 
+    use m_nvtx
+
     use ieee_arithmetic
     ! ==========================================================================
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_recv)
-    !$acc declare link(q_cons_buff_recv, q_cons_buff_send)
-    !$acc declare link(ib_buff_send, ib_buff_recv)
-    !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
-#else
     real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
@@ -76,7 +67,7 @@ module m_mpi_proxy
     !$acc declare create(q_cons_buff_send, q_cons_buff_recv)
     !$acc declare create( ib_buff_send, ib_buff_recv)
     !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-#endif
+
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
@@ -143,7 +134,7 @@ contains
             v_size = sys_size
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
@@ -236,14 +227,19 @@ contains
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',                           &
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
+            & 'viscous', 'shear_stress', 'bulk_stress',                          &
             & 'hyperelasticity' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         if (chemistry) then
-            #:for VAR in [ 'advection', 'diffusion', 'reactions' ]
+            #:for VAR in [ 'diffusion', 'reactions' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'gamma_method' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
 
@@ -265,6 +261,7 @@ contains
             call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(nb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(num_fluids, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(wenoz_q, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endif
 
         do i = 1, num_fluids_max
@@ -900,13 +897,12 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
+        call nvtxStartRange("RHS-COMM-PACKBUF")
         !$acc update device(v_size)
 
         if (qbmm .and. .not. polytropic) then
@@ -1099,6 +1095,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange ! Packbuf
 
         ! Send/Recv
         #:for rdma_mpi in [False, True]
@@ -1108,26 +1105,34 @@ contains
                 #:if rdma_mpi
                     !$acc data attach(p_send, p_recv)
                     !$acc host_data use_device(p_send, p_recv)
+                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
                     !$acc update host(q_cons_buff_send, ib_buff_send)
+                    call nvtxEndRange
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
 
                 call MPI_SENDRECV( &
                     p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
                     p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
                     !$acc end host_data
                     !$acc end data
                     !$acc wait
                 #:else
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
                     !$acc update device(q_cons_buff_recv)
+                    call nvtxEndRange
                 #:endif
             end if
         #:endfor
 
         ! Unpack Received Buffer
+        call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
@@ -1296,6 +1301,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange
 
 #endif
 
@@ -2165,7 +2171,6 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
 
@@ -2373,7 +2378,7 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 

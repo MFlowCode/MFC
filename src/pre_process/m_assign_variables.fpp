@@ -15,7 +15,7 @@ module m_assign_variables
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
-    use m_thermochem            !< Thermodynamic and chemical properties
+    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     ! one form to another
     ! ==========================================================================
@@ -166,7 +166,7 @@ contains
             + (1d0 - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
         ! Species Concentrations
-        #:if chemistry
+        if (chemistry) then
             block
                 real(kind(0d0)) :: sum, term
 
@@ -191,10 +191,10 @@ contains
             end block
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
-            q_prim_vf(tempxb)%sf(j, k, l) = &
+            q_prim_vf(T_idx)%sf(j, k, l) = &
                 q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight &
                 /(gas_constant*q_prim_vf(1)%sf(j, k, l))
-        #:endif
+        end if
 
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
@@ -571,7 +571,7 @@ contains
         end do
 
         ! Species Concentrations
-        #:if chemistry
+        if (chemistry) then
             block
                 real(kind(0d0)) :: sum, term
 
@@ -598,9 +598,9 @@ contains
             end block
 
             call get_mixture_molecular_weight(Ys, mean_molecular_weight)
-            q_prim_vf(tempxb)%sf(j, k, l) = &
+            q_prim_vf(T_idx)%sf(j, k, l) = &
                 q_prim_vf(E_idx)%sf(j, k, l)*mean_molecular_weight/(gas_constant*q_prim_vf(1)%sf(j, k, l))
-        #:endif
+        end if
 
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (mixlayer_vel_profile) then
@@ -691,7 +691,7 @@ contains
             end do
         end if
 
-        if (.not. f_is_default(sigma)) then
+        if (surface_tension) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
                                            (1d0 - eta)*patch_icpp(smooth_patch_id)%cf_val
         end if

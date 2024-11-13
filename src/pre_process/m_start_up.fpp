@@ -141,8 +141,8 @@ contains
             sigR, sigV, dist_type, rhoRV, R0_type, &
             file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps, ib, num_ibs, patch_ib, &
-            sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, n_start_old, &
-            hyperelasticity, pre_stress
+            sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
+            n_start_old, surface_tension, hyperelasticity, pre_stress
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -683,7 +683,7 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -859,7 +859,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, ib_markers)
+        call s_write_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition

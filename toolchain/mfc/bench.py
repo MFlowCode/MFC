@@ -60,7 +60,7 @@ def bench(targets = None):
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
                 case.args +
-                ["--", ARG('mem')],
+                ["--", "--gbpp", ARG('mem')],
                 stdout=log_file,
                 stderr=subprocess.STDOUT)
 

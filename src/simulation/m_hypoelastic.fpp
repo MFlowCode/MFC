@@ -23,22 +23,6 @@ module m_hypoelastic
  s_finalize_hypoelastic_module, &
  s_compute_hypoelastic_rhs
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), Gs)
-    !$acc declare link(Gs)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), du_dx, du_dy, du_dz)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dv_dx, dv_dy, dv_dz)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), dw_dx, dw_dy, dw_dz)
-    !$acc declare link(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rho_K_field, G_K_field)
-    !$acc declare link(rho_K_field, G_K_field)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), allocatable, dimension(:, :), fd_coeff_x, fd_coeff_y, fd_coeff_z)
-    !$acc declare link(fd_coeff_x,fd_coeff_y,fd_coeff_z)
-
-#else
     real(kind(0d0)), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 
@@ -54,7 +38,6 @@ module m_hypoelastic
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_z
     !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
-#endif
 
 contains
 

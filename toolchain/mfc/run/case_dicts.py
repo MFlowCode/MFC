@@ -1,5 +1,9 @@
+import fastjsonschema
+
 from enum import Enum
 from ..state import ARG
+from functools import cache
+
 
 class ParamType(Enum):
     INT = {"type": "integer"}
@@ -86,7 +90,8 @@ PRE_PROCESS.update({
     'pre_stress': ParamType.LOG,
     'cfl_dt': ParamType.LOG,
     'n_start': ParamType.INT,
-    'n_start_old': ParamType.INT
+    'n_start_old': ParamType.INT,
+    'surface_tension': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -190,6 +195,7 @@ SIMULATION.update({
     'time_stepper': ParamType.INT,
     'weno_eps': ParamType.REAL,
     'teno_CT': ParamType.REAL,
+    'wenoz_q': ParamType.REAL,
     'mapped_weno': ParamType.LOG,
     'wenoz': ParamType.LOG,
     'teno': ParamType.LOG,
@@ -225,10 +231,15 @@ SIMULATION.update({
     't_save': ParamType.REAL,
     'cfl_target': ParamType.REAL,
     'low_Mach': ParamType.INT,
+    'surface_tension': ParamType.LOG,
+    'viscous': ParamType.LOG,
 })
 
-for var in [ 'advection', 'diffusion', 'reactions' ]:
+for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
+
+for var in [ 'gamma_method' ]:
+    SIMULATION[f'chem_params%{var}'] = ParamType.INT
 
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
@@ -293,7 +304,7 @@ for f_id in range(1,10+1):
             SIMULATION[f"integral({int_id})%{cmp}min"] = ParamType.REAL
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
 
-# Removed: 'fourier_modes%beg', 'fourier_modes%end', 'chem_wrt_Y'
+# Removed: 'fourier_modes%beg', 'fourier_modes%end'.
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
 POST_PROCESS.update({
@@ -329,10 +340,12 @@ POST_PROCESS.update({
     'cf_wrt': ParamType.LOG,
     'sim_data': ParamType.LOG,
     'ib': ParamType.LOG,
+    'num_ibs': ParamType.INT,
     'cfl_target': ParamType.REAL,
     't_save': ParamType.REAL,
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
+    'surface_tension': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):
@@ -344,9 +357,9 @@ for cmp_id in range(1,3+1):
     for real_attr in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS[f'{real_attr}({cmp_id})'] = ParamType.LOG
 
-# NOTE: `chem_wrt_Y` is missing
-# for cmp_id in range(100):
-#     POST_PROCESS.append(f'chem_wrt_Y({cmp_id})')
+for cmp_id in range(100):
+    POST_PROCESS[f'chem_wrt_Y({cmp_id})'] = ParamType.LOG
+POST_PROCESS['chem_wrt_T'] = ParamType.LOG
 
 for fl_id in range(1,10+1):
     for append, ty in [("schlieren_alpha", ParamType.REAL),
@@ -365,13 +378,14 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 
 SCHEMA = {
     "type": "object",
-    "properties": _properties
+    "properties": _properties,
+    "additionalProperties": False
 }
 
 
@@ -386,3 +400,8 @@ def get_input_dict_keys(target_name: str) -> list:
         return result
 
     return [ x for x in result if x not in CASE_OPTIMIZATION ]
+
+
+@cache
+def get_validator():
+    return fastjsonschema.compile(SCHEMA)

@@ -92,8 +92,8 @@ if ! module load $MODULES; then
 fi
 
 if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
-    log " $ export $VARIABLES"
-    export $VARIABLES > /dev/null
+    log " $ export $(eval "echo $VARIABLES")"
+    export $(eval "echo $VARIABLES") > /dev/null
 fi
 
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
