@@ -42,11 +42,11 @@ contains
 
         integer :: l
 
-        @:ALLOCATE_GLOBAL(rs(1:nb))
-        @:ALLOCATE_GLOBAL(vs(1:nb))
+        @:ALLOCATE(rs(1:nb))
+        @:ALLOCATE(vs(1:nb))
         if (.not. polytropic) then
-            @:ALLOCATE_GLOBAL(ps(1:nb))
-            @:ALLOCATE_GLOBAL(ms(1:nb))
+            @:ALLOCATE(ps(1:nb))
+            @:ALLOCATE(ms(1:nb))
         end if
 
         do l = 1, nb
@@ -66,11 +66,11 @@ contains
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ACC_SETUP_SFs(divu)
 
-        @:ALLOCATE_GLOBAL(bub_adv_src(0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(bub_r_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_v_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_p_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
     end subroutine s_initialize_bubbles_module
 

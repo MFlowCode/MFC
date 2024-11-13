@@ -143,20 +143,20 @@ contains
 
         is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(1, is1_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
+        @:ALLOCATE(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
             is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -175,20 +175,20 @@ contains
 
         is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(2, is2_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
+        @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
             is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -200,20 +200,20 @@ contains
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
         is3_weno%beg = -buff_size; is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(3, is3_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
+        @:ALLOCATE(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
             is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -1219,34 +1219,34 @@ contains
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_x)
+        @:DEALLOCATE(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction ====================
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_x, poly_coef_cbR_x)
-        @:DEALLOCATE_GLOBAL(d_cbL_x, d_cbR_x)
-        @:DEALLOCATE_GLOBAL(beta_coef_x)
+        @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
+        @:DEALLOCATE(d_cbL_x, d_cbR_x)
+        @:DEALLOCATE(beta_coef_x)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in y-direction ====================
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_y)
+        @:DEALLOCATE(v_rs_ws_y)
 
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_y, poly_coef_cbR_y)
-        @:DEALLOCATE_GLOBAL(d_cbL_y, d_cbR_y)
-        @:DEALLOCATE_GLOBAL(beta_coef_y)
+        @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
+        @:DEALLOCATE(d_cbL_y, d_cbR_y)
+        @:DEALLOCATE(beta_coef_y)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in z-direction ====================
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_z)
+        @:DEALLOCATE(v_rs_ws_z)
 
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_z, poly_coef_cbR_z)
-        @:DEALLOCATE_GLOBAL(d_cbL_z, d_cbR_z)
-        @:DEALLOCATE_GLOBAL(beta_coef_z)
+        @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)
+        @:DEALLOCATE(d_cbL_z, d_cbR_z)
+        @:DEALLOCATE(beta_coef_z)
         ! ==================================================================
 
     end subroutine s_finalize_weno_module
