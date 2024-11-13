@@ -152,7 +152,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8
                 })
 
-                if (len(dimInfo[0]) > 1):
+                if len(dimInfo[0]) > 1:
                     alter_capillary()
 
             alter_riemann_solvers(num_fluids)
