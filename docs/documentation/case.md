@@ -165,6 +165,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `pres` *             | Real    | Supported             | Pressure.                                                    |
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
+| `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model%%filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
 | `model%%scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
 | `model%%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
@@ -447,7 +448,7 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
-- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set.
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%cf_val = 1` in patches where `patch_icpp(i)%alpha = 1 - eps` and `patch_icpp(i)%cf_val = 0` in patches where `patch_icpp(i)%alpha = eps`.
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
@@ -545,7 +546,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%support`                | Integer | Geometry of spatial support for the acoustic source |
 | `acoustic(i)%%dipole`                 | Logical | Dipole source activation (optional; default = false -> monopole) |
 | `acoustic(i)%%loc(j)`                 | Real    | $j$-th coordinate of the point that defines the acoustic source location |
-| `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square |
+| `acoustic(i)%%pulse`                  | Integer | Acoustic wave form: [1] Sine [2] Gaussian [3] Square [4] Broadband  |
 | `acoustic(i)%%npulse`                 | Real    | Number of pulse cycles |
 | `acoustic(i)%%mag`                    | Real    | Pulse magnitude	|
 | `acoustic(i)%%frequency`              | Real    | Sine/Square - Frequency of the acoustic wave  (exclusive) |
@@ -563,6 +564,9 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | `acoustic(i)%%element_spacing_angle`  | Real    | 2D Transducer array - Spacing angle (in rad) between adjacent transducer elements |
 | `acoustic(i)%%element_polygon_ratio`  | Real    | 3D Transducer array - Ratio of polygon side length to transducer element radius |
 | `acoustic(i)%%rotate_angle`           | Real    | 3D Transducer array - Rotation angle of the transducer array (optional; default = 0) |
+| `acoustic(i)%%bb_num_freq`            | integer | Number of frequencies in broadband wave |
+| `acoustic(i)%%bb_bandwidth`           | Real    | The bandwidth of each frequency in the broadband wave |
+| `acoustic(i)%%bb_lowest_freq`         | Real    | The lower frequency bound of the broadband wave |
 
 Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](references.md#Maeda17).
 
@@ -574,9 +578,9 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%dipole` changes the default monopole (one-sided) source to a dipole source. It is only available for planar waves.
 
-- `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc). 
+- `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc).
 
-- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, and `3` correspond to sinusoidal wave, Gaussian wave, and square wave, respectively.
+- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively. The implementation of the broadband wave is based on [Tam (2005)](references.md#Tam05)
 
 - `%%npulse` specifies the number of cycles of the acoustic wave generated. Only applies to `%%pulse = 1 and 3` (sine and square waves), and must be an integer for non-planar waves.
 
@@ -598,15 +602,21 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%aperture` specifies the aperture of the transducer. It is the diameter of the projection of the transducer arc onto the y-axis (2D) or spherical cap onto the y-z plane (3D). Set the aperture to double the focal length to simulate a transducer enclosing half of the circle/sphere. For the transducer array, it is the total aperture of the array.
 
-- `%%num_elements` specifies the number of transducer elements in a transducer array. 
+- `%%num_elements` specifies the number of transducer elements in a transducer array.
 
 - `%%element_on` specifies the element number of the transducer array that is on. The element number starts from 1, if all elements are on, set `%%element_on` to 0.
 
 - `%%element_spacing_angle` specifies the spacing angle between adjacent transducers in radians. The total aperture (`%%aperture`) is set, so each transducer element is smaller if `%%element_spacing_angle` is larger.
 
-- `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcircle diameter and `%%num_elements` as the number of sides of the polygon. The ratio is used to specify the aperture size of each transducer element in the array as a ratio of the total aperture. 
+- `%%element_polygon_ratio` specifies the ratio of the polygon side length to the aperture diameter of each transducer element in a circular 3D transducer array. The polygon side length is calculated by using the total aperture (`%%aperture`) as the circumcircle diameter and `%%num_elements` as the number of sides of the polygon. The ratio is used to specify the aperture size of each transducer element in the array as a ratio of the total aperture.
 
 - `%%rotate_angle` specifies the rotation angle of the 3D circular transducer array along the x-axis (principal axis). It is optional and defaults to 0.
+
+- `%%bb_num_freq` specifies the number discretized frequencies in the broadband acoustic wave. If `%%bb_num_freq` is 1, the acoustic wave will be a discrete tone (i.e. single frequency sine wave).
+
+- `%%bb_bandwidth` specifies the bandwidth of the discretized frequencies.
+
+- `%%bb_lowest_freq` specifies the lower frequency bound of the broadband acoustic wave. The upper frequency bound will be calculated as `%%bb_lowest_freq + %%bb_num_freq * %%bb_bandwidth`. The wave is no longer broadband below the lower bound and above the upper bound.
 
 ### 9. Ensemble-Averaged Bubble Model
 
@@ -855,14 +865,14 @@ Each patch requires a different set of parameters, which are also listed in this
 
 ### Immersed Boundary Patch Types
 
-| #    | Name               | Dim.   | 
-| ---: | :----:             | :---   | 
-| 2    | 2D Circle          | 2      | 
-| 3    | 2D Rectangle       | 2      |   
-| 4    | 2D Airfoil         | 2      |      
-| 8    | 3D Sphere          | 3      |      
-| 10   | 3D Cylinder        | 3      |      
-| 11   | 3D Airfoil         | 3      |      
+| #    | Name               | Dim.   |
+| ---: | :----:             | :---   |
+| 2    | 2D Circle          | 2      |
+| 3    | 2D Rectangle       | 2      |
+| 4    | 2D Airfoil         | 2      |
+| 8    | 3D Sphere          | 3      |
+| 10   | 3D Cylinder        | 3      |
+| 11   | 3D Airfoil         | 3      |
 
 ### Acoustic Supports {#acoustic-supports}
 

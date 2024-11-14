@@ -62,7 +62,9 @@ contains
 
     !! @param q_cons_vf Conservative variables
     !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers)
+    !! @param levelset closest distance from every cell to the IB
+    !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+    subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -71,6 +73,14 @@ contains
         type(integer_field), &
             optional, &
             intent(in) :: ib_markers
+
+        type(levelset_field), &
+            optional, &
+            intent(IN) :: levelset
+
+        type(levelset_norm_field), &
+            optional, &
+            intent(IN) :: levelset_norm
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -137,13 +147,30 @@ contains
 
 #ifdef MFC_PRE_PROCESS
             MPI_IO_IB_DATA%var%sf => ib_markers%sf
+            MPI_IO_levelset_DATA%var%sf => levelset%sf
+            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf
 #else
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
+
+#ifndef MFC_POST_PROCESS
+            MPI_IO_levelset_DATA%var%sf => levelset%sf(0:m, 0:n, 0:p, 1:num_ibs)
+            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3)
+#endif
+
 #endif
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
 
+#ifndef MFC_POST_PROCESS
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, ierr)
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, ierr)
+
+            call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
+#endif
         end if
 
 #ifndef MFC_POST_PROCESS

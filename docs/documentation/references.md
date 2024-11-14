@@ -42,6 +42,8 @@
 
 - <a id="Suresh97">Suresh, A. and Huynh, H. (1997). Accurate monotonicity-preserving schemes with runge–kutta time stepping. Journal of Computational Physics, 136(1):83–99.</a>
 
+- <a id="Tam05">Tam, C. K., Ju, H., Jones, M. G., Watson, W. R., and Parrott, T. L. (2005). A computational and experimental study of slit resonators. Journal of Sound and Vibration, 284(3-5), 947-984.</a>
+
 - <a id="Thompson87">Thompson, K. W. (1987). Time dependent boundary conditions for hyperbolic systems. Journal of computational physics, 68(1):1–24.</a>
 
 - <a id="Thompson90">Thompson, K. W. (1990). Time-dependent boundary conditions for hyperbolic systems, ii. Journal of computational physics, 89(2):439–461.</a>

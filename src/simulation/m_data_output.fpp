@@ -733,7 +733,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -806,7 +806,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -1568,12 +1568,12 @@ contains
     subroutine s_initialize_data_output_module
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
+        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
+            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0d0
             Rc_min = 1d3
@@ -1585,9 +1585,9 @@ contains
     subroutine s_finalize_data_output_module
 
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE_GLOBAL(icfl_sf)
+        @:DEALLOCATE(icfl_sf)
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
+            @:DEALLOCATE(vcfl_sf, Rc_sf)
         end if
 
     end subroutine s_finalize_data_output_module
