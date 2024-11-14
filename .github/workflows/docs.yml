@@ -47,6 +47,12 @@ jobs:
         echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
         echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
 
+    - name: Run linkspector
+      uses: umbrelladocs/action-linkspector@v1
+      with:
+        reporter: github-pr-review
+        fail_on_error: true
+
     - name: Publish Documentation
       if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' && github.event_name == 'cron'
       run:  |
