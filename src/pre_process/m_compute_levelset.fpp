@@ -352,7 +352,7 @@ contains
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
 
-        integer :: ib_patch_id
+        integer, intent(IN) :: ib_patch_id
         real(kind(0d0)) :: Right, Left, Bottom, Top, Front, Back
         real(kind(0d0)) :: x, y, z, min_dist
         real(kind(0d0)) :: side_dists(6)
