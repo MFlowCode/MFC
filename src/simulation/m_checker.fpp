@@ -164,8 +164,8 @@ contains
                 "acoustic("//trim(jStr)//")%mag must be specified")
             @:PROHIBIT(acoustic(j)%pulse == dflt_int, &
                 "acoustic("//trim(jStr)//")%pulse must be specified")
-            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3/)), &
-                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, or 3 is allowed")
+            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3, 4/)), &
+                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, 3 or 4 is allowed")
 
             @:PROHIBIT(any(acoustic(j)%pulse == (/1, 3/)) .and. &
                 (f_is_default(acoustic(j)%frequency) .eqv. f_is_default(acoustic(j)%wavelength)), &
@@ -175,6 +175,12 @@ contains
                 (f_is_default(acoustic(j)%gauss_sigma_time) .eqv. f_is_default(acoustic(j)%gauss_sigma_dist)), &
                 "One and only one of acoustic("//trim(jStr)//")%gauss_sigma_time "// &
                 "or acoustic("//trim(jStr)//")%gauss_sigma_dist must be specified for pulse = 2")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. acoustic(j)%bb_num_freq == dflt_int, &
+                "The number of broadband frequencies acoustic("//trim(jStr)//")%bb_num_freq must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_bandwidth), &
+                "The broadband wave band width acoustic("//trim(jStr)//")%bb_bandwidth must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_lowest_freq), &
+                "The broadband wave lower frequency bound acoustic("//trim(jStr)//")%bb_lowest_freq must be specified for pulse = 4")
 
             @:PROHIBIT(f_is_default(acoustic(j)%npulse), &
                 "acoustic("//trim(jStr)//")%npulse must be specified")

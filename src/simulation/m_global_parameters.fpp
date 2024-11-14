@@ -657,6 +657,9 @@ contains
             acoustic(j)%rotate_angle = dflt_real
             acoustic(j)%num_elements = dflt_int
             acoustic(j)%element_on = dflt_int
+            acoustic(j)%bb_num_freq = dflt_int
+            acoustic(j)%bb_lowest_freq = dflt_real
+            acoustic(j)%bb_bandwidth = dflt_real
         end do
 
         fd_order = dflt_int
@@ -778,7 +781,7 @@ contains
                         sys_size = n_idx
                     end if
 
-                    @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
@@ -840,7 +843,7 @@ contains
                         if (polytropic) then
                             pv = fluid_pp(1)%pv
                             pv = pv/pref
-                            @:ALLOCATE_GLOBAL(pb0(nb))
+                            @:ALLOCATE(pb0(nb))
                             if ((f_is_default(Web))) then
                                 pb0 = pref
                                 pb0 = pb0/pref
@@ -934,7 +937,7 @@ contains
 
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
-                    @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(weight(nb), R0(nb), V0(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -984,7 +987,7 @@ contains
             ! fluids whose interface will support effects of surface tension
             if (viscous) then
 
-                @:ALLOCATE_GLOBAL(Re_idx(1:2, 1:maxval(Re_size)))
+                @:ALLOCATE(Re_idx(1:2, 1:maxval(Re_size)))
 
                 k = 0
                 do i = 1, num_fluids
@@ -1088,7 +1091,7 @@ contains
 
         ! Configuring Coordinate Direction Indexes =========================
         if (bubbles) then
-            @:ALLOCATE_GLOBAL(ptil(&
+            @:ALLOCATE(ptil(&
                 & idwbuff(1)%beg:idwbuff(1)%end, &
                 & idwbuff(2)%beg:idwbuff(2)%end, &
                 & idwbuff(3)%beg:idwbuff(3)%end))
@@ -1155,19 +1158,19 @@ contains
         !$acc enter data copyin(relax, relax_model, palpha_eps,ptgalpha_eps)
 
         ! Allocating grid variables for the x-, y- and z-directions
-        @:ALLOCATE_GLOBAL(x_cb(-1 - buff_size:m + buff_size))
-        @:ALLOCATE_GLOBAL(x_cc(-buff_size:m + buff_size))
-        @:ALLOCATE_GLOBAL(dx(-buff_size:m + buff_size))
+        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
+        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
+        @:ALLOCATE(dx(-buff_size:m + buff_size))
 
         if (n == 0) return; 
-        @:ALLOCATE_GLOBAL(y_cb(-1 - buff_size:n + buff_size))
-        @:ALLOCATE_GLOBAL(y_cc(-buff_size:n + buff_size))
-        @:ALLOCATE_GLOBAL(dy(-buff_size:n + buff_size))
+        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
+        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
+        @:ALLOCATE(dy(-buff_size:n + buff_size))
 
         if (p == 0) return; 
-        @:ALLOCATE_GLOBAL(z_cb(-1 - buff_size:p + buff_size))
-        @:ALLOCATE_GLOBAL(z_cc(-buff_size:p + buff_size))
-        @:ALLOCATE_GLOBAL(dz(-buff_size:p + buff_size))
+        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
+        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
+        @:ALLOCATE(dz(-buff_size:p + buff_size))
 
     end subroutine s_initialize_global_parameters_module
 
@@ -1211,7 +1214,7 @@ contains
         ! fluids and any pairs of fluids whose interfaces supported effects
         ! of surface tension
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(Re_idx)
+            @:DEALLOCATE(Re_idx)
         end if
 
         deallocate (proc_coords)
@@ -1228,13 +1231,13 @@ contains
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 
         ! Deallocating grid variables for the x-, y- and z-directions
-        @:DEALLOCATE_GLOBAL(x_cb, x_cc, dx)
+        @:DEALLOCATE(x_cb, x_cc, dx)
 
         if (n == 0) return; 
-        @:DEALLOCATE_GLOBAL(y_cb, y_cc, dy)
+        @:DEALLOCATE(y_cb, y_cc, dy)
 
         if (p == 0) return; 
-        @:DEALLOCATE_GLOBAL(z_cb, z_cc, dz)
+        @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module
 

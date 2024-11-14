@@ -284,7 +284,7 @@ for f_id in range(1,10+1):
         SIMULATION[f"fluid_pp({f_id})%Re({re_id})"] = ParamType.REAL
 
     for mono_id in range(1,4+1):
-        for int_attr in ["pulse", "support", "num_elements", "element_on"]:
+        for int_attr in ["pulse", "support", "num_elements", "element_on", "bb_num_freq"]:
             SIMULATION[f"acoustic({mono_id})%{int_attr}"] = ParamType.INT
 
         SIMULATION[f"acoustic({mono_id})%dipole"] = ParamType.LOG
@@ -293,7 +293,7 @@ for f_id in range(1,10+1):
                           "gauss_sigma_dist", "gauss_sigma_time", "npulse",
                           "dir", "delay", "foc_length", "aperture",
                           "element_spacing_angle", "element_polygon_ratio",
-                          "rotate_angle"]:
+                          "rotate_angle", "bb_bandwidth", "bb_lowest_freq"]:
             SIMULATION[f"acoustic({mono_id})%{real_attr}"] = ParamType.REAL
 
         for cmp_id in range(1,3+1):
