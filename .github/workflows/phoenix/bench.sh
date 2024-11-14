@@ -1,6 +1,6 @@
 #!/bin/bash
 
-n_ranks=4
+n_ranks=12
 
 if [ "$job_device" == "gpu" ]; then
     n_ranks=$(nvidia-smi -L | wc -l)        # number of GPUs on node
@@ -9,7 +9,7 @@ if [ "$job_device" == "gpu" ]; then
 fi
 
 if ["$job_device" == "gpu"]; then
-    ./mfc.sh bench --mem 8 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
+    ./mfc.sh bench --mem 12 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
 else
     ./mfc.sh bench --mem 1 -j $(nproc) -o "$job_slug.yaml" -- -c phoenix $device_opts -n $n_ranks
 fi
