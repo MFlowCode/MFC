@@ -279,6 +279,12 @@ These physical parameters must be consistent with fluid material's parameters de
 | `m`                    | Real    | NACA airfoil parameters (see below) |
 | `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
+| `model%%filepath`      | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
+| `model%%scale(i)`      | Real    | Model's (applied) scaling factor for component $i$.          |
+| `model%%rotate(i)`     | Real    | Model's (applied) angle of rotation about axis $i$.          |
+| `model%%translate(i)`  | Real    | Model's $i$-th component of (applied) translation.           |
+| `model%%spc`           | Integer | Number of samples per cell when discretizing the model into the grid. |
+| `model%%threshold`     | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 

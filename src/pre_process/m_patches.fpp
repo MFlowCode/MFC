@@ -1981,7 +1981,7 @@ contains
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
         type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
-        logical, intent(IN) :: ib   !< True if this patch is an immersed boundary
+        logical, intent(in) :: ib   !< True if this patch is an immersed boundary
         real(kind(0d0)) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(kind(0d0)), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
@@ -2116,25 +2116,7 @@ contains
                         eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
                     end if
 
-                    if (.not. ib) then
-                        if (patch_icpp(patch_id)%smoothen) then
-                            if (eta > patch_icpp(patch_id)%model%threshold) then
-                                eta = 1d0
-                            end if
-                        else
-                            if (eta > patch_icpp(patch_id)%model%threshold) then
-                                eta = 1d0
-                            else
-                                eta = 0d0
-                            end if
-                        end if
-                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                eta, q_prim_vf, patch_id_fp)
-
-                        ! Note: Should probably use *eta* to compute primitive variables
-                        ! if defining them analytically.
-                        @:analytical()
-                    else
+                    if (ib) then
                         ! Reading STL boundary vertices and compute the levelset and levelset_norm
                         if (eta > patch_ib(patch_id)%model%threshold) then
                             patch_id_fp(i, j, k) = patch_id
@@ -2206,18 +2188,25 @@ contains
                             STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
 
                         end if
-                    end if
+                    else
+                        if (patch_icpp(patch_id)%smoothen) then
+                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                                eta = 1d0
+                            end if
+                        else
+                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                                eta = 1d0
+                            else
+                                eta = 0d0
+                            end if
+                        end if
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                eta, q_prim_vf, patch_id_fp)
 
-                    if (i == 33 .and. j > 10 .and. j < 30) then
-                        ! print*, i, j, k, 'levelset', STL_levelset%sf(i, j, k, patch_id), patch_id_fp(i, j, k)
-                        ! print*, i, j, k, STL_levelset_norm%vf(i, j, k, patch_id, 1:3)
+                        ! Note: Should probably use *eta* to compute primitive variables
+                        ! if defining them analytically.
+                        @:analytical()
                     end if
-
-                    if (j == 41) then
-                        ! print*, i, j, 0, STL_levelset%sf(i, j, 0, patch_id), patch_id_fp(i, j, k)
-                        ! print*, i, j, normals
-                    end if
-
                 end do; end do; end do
 
         if (proc_rank == 0) then

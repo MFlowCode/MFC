@@ -294,6 +294,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
+        
+    def IBM_STL():
+        common_mods = {
+        't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(2, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> IBM -> STL',
+                f'examples/{ndim}D_IBM_STL/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+    IBM_STL()
+
 
     def alter_acoustic_src(dimInfo):
         stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1, 'dt': 1e-3, 't_step_stop': 50, 't_step_save': 50})

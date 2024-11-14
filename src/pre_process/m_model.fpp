@@ -640,12 +640,6 @@ contains
             end if
         end do
 
-        !  do i = 1, boundary_edge_count
-        !     print*, 'edge:',i, 'start', boundary_v(i, 1, 1:2)
-        !     print*, 'edge:',i, 'end', boundary_v(i, 2, 1:2)
-        !     print*, '=============================================='
-        ! end do
-
         ! Find/store the normal vector of the boundary edges
         do i = 1, boundary_edge_count
             boundary_edge(1) = boundary_v(i, 2, 1) - boundary_v(i, 1, 1)
