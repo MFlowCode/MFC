@@ -97,39 +97,39 @@ contains
         if (qbmm .and. .not. polytropic) then
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
             end if
 
-            @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
             v_size = sys_size + 2*nb*4
         else
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
             end if
 
-            @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
             v_size = sys_size
         end if
@@ -138,20 +138,20 @@ contains
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
+                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
+                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
+                @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
             end if
 
-            @:ALLOCATE_GLOBAL(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
+            @:ALLOCATE(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
         !$acc update device(v_size, nVars)
 
@@ -252,14 +252,15 @@ contains
 
             call MPI_BCAST(acoustic(j)%dipole, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on' ]
+            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on', 'bb_num_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             #:for VAR in [ 'mag', 'length', 'height', &
                 'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
                 'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
-                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
+                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle', &
+                'bb_bandwidth', 'bb_lowest_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -1287,19 +1288,19 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers * &
+                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
                                         & (m + 2*gp_layers + 1)* &
                                         & (n + 2*gp_layers + 1)* &
                                         & (p + 2*gp_layers + 1)/ &
                                         & (min(m, n, p) + 2*gp_layers + 1)))
             else
-                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers* &
+                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
                                         & (max(m, n) + 2*gp_layers + 1)))
             end if
         else
-            @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers))
+            @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
         end if
-        @:ALLOCATE_GLOBAL(ib_buff_recv(0:ubound(ib_buff_send, 1)))
+        @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
 
         !nCalls_time = nCalls_time + 1
 
@@ -2332,19 +2333,27 @@ contains
 
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
+    subroutine s_mpi_send_random_number(phi_rn, num_freq)
+        integer, intent(in) :: num_freq
+        real(kind(0d0)), intent(inout), dimension(1:num_freq) :: phi_rn
+#ifdef MFC_MPI
+        call MPI_BCAST(phi_rn, num_freq, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+#endif
+    end subroutine s_mpi_send_random_number
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
         ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        @:DEALLOCATE_GLOBAL(q_cons_buff_send, q_cons_buff_recv)
+        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
         if (ib) then
-            @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
+            @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
         if (surface_tension) then
-            @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
+            @:DEALLOCATE(c_divs_buff_send, c_divs_buff_recv)
         end if
 
 #endif

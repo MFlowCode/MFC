@@ -113,8 +113,8 @@ print(json.dumps({
     'p'                            : Nz,
     'dt'                           : dt,
     't_step_start'                 : 0,
-    't_step_stop'                  : int(30*(25*size + 5)),
-    't_step_save'                  : int(30*(25*size + 5)),
+    't_step_stop'                  : int(15*(25*size + 5)),
+    't_step_save'                  : int(15*(25*size + 5)),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
