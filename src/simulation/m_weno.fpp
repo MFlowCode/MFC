@@ -44,12 +44,7 @@ module m_weno
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
-    !$acc declare link(v_rs_ws_x, v_rs_ws_y, v_rs_ws_z)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
-#endif
     !> @}
 
     ! WENO Coefficients ========================================================
@@ -60,17 +55,6 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbL_z)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), poly_coef_cbR_z)
-    !$acc declare link(poly_coef_cbL_x, poly_coef_cbL_y, poly_coef_cbL_z)
-    !$acc declare link(poly_coef_cbR_x, poly_coef_cbR_y, poly_coef_cbR_z)
-#else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
@@ -78,7 +62,6 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-#endif
 
     !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_L => null()
     !    real(kind(0d0)), pointer, dimension(:, :, :) :: poly_coef_R => null()
@@ -89,16 +72,6 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbL_z)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), d_cbR_z)
-    !$acc declare link(d_cbL_x, d_cbL_y, d_cbL_z, d_cbR_x, d_cbR_y, d_cbR_z)
-#else
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -106,7 +79,6 @@ module m_weno
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_x
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_y
     real(kind(0d0)), target, allocatable, dimension(:, :) :: d_cbR_z
-#endif
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_L => null()
 !    real(kind(0d0)), pointer, dimension(:, :) :: d_R => null()
     !> @}
@@ -116,16 +88,9 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_x)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_y)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), beta_coef_z)
-    !$acc declare link(beta_coef_x, beta_coef_y, beta_coef_z)
-#else
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(kind(0d0)), target, allocatable, dimension(:, :, :) :: beta_coef_z
-#endif
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
@@ -143,15 +108,13 @@ module m_weno
     !> @}
 
     real(kind(0d0)) :: test
-!$acc declare create(test)
+    !$acc declare create(test)
 
-#ifndef CRAY_ACC_WAR
-!$acc declare create( &
-!$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
-!$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
-!$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
-!$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
-#endif
+    !$acc declare create( &
+    !$acc                v_rs_ws_x, v_rs_ws_y, v_rs_ws_z, &
+    !$acc                poly_coef_cbL_x,poly_coef_cbL_y,poly_coef_cbL_z, &
+    !$acc                poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z,d_cbL_x,       &
+    !$acc                d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z,beta_coef_x,beta_coef_y,beta_coef_z)
 
 contains
 
@@ -160,7 +123,6 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_weno_module
 
-        integer :: i, j
         if (weno_order == 1) return
 
         ! Allocating/Computing WENO Coefficients in x-direction ============
@@ -181,20 +143,20 @@ contains
 
         is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(1, is1_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
+        @:ALLOCATE(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
             is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -213,20 +175,20 @@ contains
 
         is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(2, is2_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
+        @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
             is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -238,20 +200,20 @@ contains
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
         is3_weno%beg = -buff_size; is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE_GLOBAL(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
-        @:ALLOCATE_GLOBAL(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn - 1))
 
-        @:ALLOCATE_GLOBAL(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
-        @:ALLOCATE_GLOBAL(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
 
-        @:ALLOCATE_GLOBAL(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
             0:2*(weno_polyn - 1)))
 
         call s_compute_weno_coefficients(3, is3_weno)
 
-        @:ALLOCATE_GLOBAL(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
+        @:ALLOCATE(v_rs_ws_z(is3_weno%beg:is3_weno%end, &
             is2_weno%beg:is2_weno%end, is1_weno%beg:is1_weno%end, 1:sys_size))
 
         ! ==================================================================
@@ -552,7 +514,6 @@ contains
         real(kind(0d0)), dimension(0:weno_num_stencils) :: delta
         real(kind(0d0)), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
         real(kind(0d0)) :: tau
-        real(kind(0d0)), pointer :: beta_p(:)
 
         integer :: i, j, k, l
 
@@ -974,7 +935,7 @@ contains
         integer, intent(IN) :: norm_dir
         integer, intent(IN) :: weno_dir
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l, q
 
         ! Determining the number of cell-average variables which will be
         ! WENO-reconstructed and mapping their indical bounds in the x-,
@@ -1253,41 +1214,39 @@ contains
     !>  Module deallocation and/or disassociation procedures
     subroutine s_finalize_weno_module()
 
-        integer :: i, j
-
         if (weno_order == 1) return
 
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_x)
+        @:DEALLOCATE(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction ====================
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_x, poly_coef_cbR_x)
-        @:DEALLOCATE_GLOBAL(d_cbL_x, d_cbR_x)
-        @:DEALLOCATE_GLOBAL(beta_coef_x)
+        @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
+        @:DEALLOCATE(d_cbL_x, d_cbR_x)
+        @:DEALLOCATE(beta_coef_x)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in y-direction ====================
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_y)
+        @:DEALLOCATE(v_rs_ws_y)
 
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_y, poly_coef_cbR_y)
-        @:DEALLOCATE_GLOBAL(d_cbL_y, d_cbR_y)
-        @:DEALLOCATE_GLOBAL(beta_coef_y)
+        @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
+        @:DEALLOCATE(d_cbL_y, d_cbR_y)
+        @:DEALLOCATE(beta_coef_y)
         ! ==================================================================
 
         ! Deallocating WENO coefficients in z-direction ====================
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)
-        @:DEALLOCATE_GLOBAL(v_rs_ws_z)
+        @:DEALLOCATE(v_rs_ws_z)
 
-        @:DEALLOCATE_GLOBAL(poly_coef_cbL_z, poly_coef_cbR_z)
-        @:DEALLOCATE_GLOBAL(d_cbL_z, d_cbR_z)
-        @:DEALLOCATE_GLOBAL(beta_coef_z)
+        @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)
+        @:DEALLOCATE(d_cbL_z, d_cbR_z)
+        @:DEALLOCATE(beta_coef_z)
         ! ==================================================================
 
     end subroutine s_finalize_weno_module

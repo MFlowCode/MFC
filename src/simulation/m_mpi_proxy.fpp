@@ -27,22 +27,13 @@ module m_mpi_proxy
 
     use m_mpi_common
 
+    use m_nvtx
+
     use ieee_arithmetic
     ! ==========================================================================
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), q_cons_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_send)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), ib_buff_recv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_send)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), c_divs_buff_recv)
-    !$acc declare link(q_cons_buff_recv, q_cons_buff_send)
-    !$acc declare link(ib_buff_send, ib_buff_recv)
-    !$acc declare link(c_divs_buff_send, c_divs_buff_recv)
-#else
     real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
@@ -76,7 +67,7 @@ module m_mpi_proxy
     !$acc declare create(q_cons_buff_send, q_cons_buff_recv)
     !$acc declare create( ib_buff_send, ib_buff_recv)
     !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
-#endif
+
     !> @name Generic flags used to identify and report MPI errors
     !> @{
     integer, private :: err_code, ierr, v_size
@@ -106,39 +97,39 @@ contains
         if (qbmm .and. .not. polytropic) then
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
             end if
 
-            @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
             v_size = sys_size + 2*nb*4
         else
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size))
+                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
             end if
 
-            @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
             v_size = sys_size
         end if
@@ -147,20 +138,20 @@ contains
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
+                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
+                    @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
+                @:ALLOCATE(c_divs_buff_send(0:-1 + buff_size*(num_dims+1)))
             end if
 
-            @:ALLOCATE_GLOBAL(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
+            @:ALLOCATE(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
         !$acc update device(v_size, nVars)
 
@@ -261,14 +252,15 @@ contains
 
             call MPI_BCAST(acoustic(j)%dipole, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on' ]
+            #:for VAR in [ 'pulse', 'support', 'num_elements', 'element_on', 'bb_num_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             #:for VAR in [ 'mag', 'length', 'height', &
                 'wavelength', 'frequency', 'gauss_sigma_dist', 'gauss_sigma_time', &
                 'npulse', 'dir', 'delay', 'foc_length', 'aperture', &
-                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle' ]
+                'element_spacing_angle', 'element_polygon_ratio', 'rotate_angle', &
+                'bb_bandwidth', 'bb_lowest_freq' ]
                 call MPI_BCAST(acoustic(j)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -871,13 +863,12 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
 
 #ifdef MFC_MPI
 
+        call nvtxStartRange("RHS-COMM-PACKBUF")
         !$acc update device(v_size)
 
         if (qbmm .and. .not. polytropic) then
@@ -1070,6 +1061,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange ! Packbuf
 
         ! Send/Recv
         #:for rdma_mpi in [False, True]
@@ -1079,26 +1071,34 @@ contains
                 #:if rdma_mpi
                     !$acc data attach(p_send, p_recv)
                     !$acc host_data use_device(p_send, p_recv)
+                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
                     !$acc update host(q_cons_buff_send, ib_buff_send)
+                    call nvtxEndRange
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
 
                 call MPI_SENDRECV( &
                     p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
                     p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
                     !$acc end host_data
                     !$acc end data
                     !$acc wait
                 #:else
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
                     !$acc update device(q_cons_buff_recv)
+                    call nvtxEndRange
                 #:endif
             end if
         #:endfor
 
         ! Unpack Received Buffer
+        call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
@@ -1267,6 +1267,7 @@ contains
                 #:endif
             end if
         #:endfor
+        call nvtxEndRange
 
 #endif
 
@@ -1287,19 +1288,19 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers * &
+                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
                                         & (m + 2*gp_layers + 1)* &
                                         & (n + 2*gp_layers + 1)* &
                                         & (p + 2*gp_layers + 1)/ &
                                         & (min(m, n, p) + 2*gp_layers + 1)))
             else
-                @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers* &
+                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
                                         & (max(m, n) + 2*gp_layers + 1)))
             end if
         else
-            @:ALLOCATE_GLOBAL(ib_buff_send(0:-1 + gp_layers))
+            @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
         end if
-        @:ALLOCATE_GLOBAL(ib_buff_recv(0:ubound(ib_buff_send, 1)))
+        @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
 
         !nCalls_time = nCalls_time + 1
 
@@ -2136,7 +2137,6 @@ contains
 
         logical :: beg_end_geq_0
 
-        integer :: pack_offsets(1:3), unpack_offsets(1:3)
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
 
@@ -2333,19 +2333,27 @@ contains
 
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
+    subroutine s_mpi_send_random_number(phi_rn, num_freq)
+        integer, intent(in) :: num_freq
+        real(kind(0d0)), intent(inout), dimension(1:num_freq) :: phi_rn
+#ifdef MFC_MPI
+        call MPI_BCAST(phi_rn, num_freq, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+#endif
+    end subroutine s_mpi_send_random_number
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
         ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        @:DEALLOCATE_GLOBAL(q_cons_buff_send, q_cons_buff_recv)
+        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
         if (ib) then
-            @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
+            @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
         if (surface_tension) then
-            @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
+            @:DEALLOCATE(c_divs_buff_send, c_divs_buff_recv)
         end if
 
 #endif

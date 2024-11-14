@@ -49,19 +49,12 @@ module m_fftw
     !! Filtered complex data in Fourier space
 
 #if defined(MFC_OpenACC)
-!$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
+    !$acc declare create(real_size, cmplx_size, x_size, batch_size, Nfq)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:),  data_real_gpu)
-    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_cmplx_gpu)
-    @:CRAY_DECLARE_GLOBAL(complex(kind(0d0)), dimension(:), data_fltr_cmplx_gpu)
-    !$acc declare link(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-#else
     real(kind(0d0)), allocatable, target :: data_real_gpu(:)
     complex(kind(0d0)), allocatable, target :: data_cmplx_gpu(:)
     complex(kind(0d0)), allocatable, target :: data_fltr_cmplx_gpu(:)
-    !$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
-#endif
+!$acc declare create(data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu)
 
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
@@ -117,9 +110,9 @@ contains
 #endif
 
 #if defined(MFC_OpenACC)
-        @:ALLOCATE_GLOBAL(data_real_gpu(1:real_size*x_size*sys_size))
-        @:ALLOCATE_GLOBAL(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
-        @:ALLOCATE_GLOBAL(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
+        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
 
 #if defined(__PGI)
         ierr = cufftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, CUFFT_D2Z, batch_size)
@@ -312,7 +305,7 @@ contains
     subroutine s_finalize_fftw_module
 
 #if defined(MFC_OpenACC)
-        @:DEALLOCATE_GLOBAL(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+        @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)
 
         ierr = cufftDestroy(fwd_plan_gpu)

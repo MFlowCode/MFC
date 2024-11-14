@@ -152,6 +152,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8
                 })
 
+                if len(dimInfo[0]) > 1:
+                    alter_capillary()
+
             alter_riemann_solvers(num_fluids)
             alter_low_Mach_correction()
             alter_ib(dimInfo)
@@ -291,6 +294,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
+        
+    def IBM_STL():
+        common_mods = {
+        't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(2, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> IBM -> STL',
+                f'examples/{ndim}D_IBM_STL/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+    IBM_STL()
+
 
     def alter_acoustic_src(dimInfo):
         stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1, 'dt': 1e-3, 't_step_stop': 50, 't_step_save': 50})
@@ -707,10 +724,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
-                alter_capillary()
             if len(dimInfo[0]) == 3:
                 alter_3d()
-                alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_acoustic_src(dimInfo)

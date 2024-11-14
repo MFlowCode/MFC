@@ -48,41 +48,11 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-    abstract interface ! ===================================================
-
-        !> Write data files
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf Primitive variables
-        !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
-
-            import :: scalar_field, sys_size, pres_field
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(in) :: q_cons_vf
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_prim_vf
-
-            integer, intent(in) :: t_step
-
-        end subroutine s_write_abstract_data_files
-    end interface ! ========================================================
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), icfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), vcfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), ccfl_sf)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Rc_sf)
-    !$acc declare link(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(kind(0d0)), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
-#endif
 
     real(kind(0d0)) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(kind(0d0)) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
@@ -98,9 +68,30 @@ module m_data_output
     real(kind(0d0)) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
-
 contains
+
+    !> Write data files. Dispatch subroutine that replaces procedure pointer.
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
+        !! @param t_step Current time step
+    subroutine s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(in) :: q_cons_vf
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: q_prim_vf
+
+        integer, intent(in) :: t_step
+
+        if (.not. parallel_io) then
+            call s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+        else
+            call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
+        end if
+    end subroutine s_write_data_files
 
     !>  The purpose of this subroutine is to open a new or pre-
         !!          existing run-time information file and append to it the
@@ -224,7 +215,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer, intent(IN) :: t_step
 
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho  !< Cell-avg. partial density
         real(kind(0d0)) :: rho        !< Cell-avg. density
         real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
@@ -232,34 +222,17 @@ contains
         real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
         real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: qv         !< Cell-avg. fluid reference energy
         real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: E          !< Cell-avg. energy
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-
-        ! ICFL, VCFL, CCFL and Rc stability criteria extrema for the current
-        ! time-step and located on both the local (loc) and the global (glb)
-        ! computational domains
-
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
-
-        integer :: i, j, k, l, q !< Generic loop iterators
-
-        integer :: Nfq
-        real(kind(0d0)) :: fltr_dtheta   !<
-            !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+        integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step ================
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_rho, vel, alpha, Re, fltr_dtheta, Nfq)
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-
-                    ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
 
                     if (viscous) then
@@ -275,7 +248,7 @@ contains
 
         ! Determining local stability criteria extrema at current time-step
 
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !$acc update host(icfl_sf)
 
         if (viscous) then
@@ -380,14 +353,9 @@ contains
 
         character(LEN=15) :: FMT
 
-        integer :: i, j, k, l, ii, r!< Generic loop iterators
+        integer :: i, j, k, l, r
 
-        real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(kind(0d0)) :: nbub, nR3, vftmp                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(kind(0d0)) :: rho                          !< Temporary density
-        real(kind(0d0)), dimension(2) :: Re !< Temporary Reynolds number
-        real(kind(0d0)) :: E_e                          !< Temp. elastic energy contribution
 
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
@@ -765,7 +733,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -838,7 +806,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -950,20 +918,16 @@ contains
         real(kind(0d0)) :: int_pres
         real(kind(0d0)) :: max_pres
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: E_e
         real(kind(0d0)), dimension(6) :: tau_e
         real(kind(0d0)) :: G
         real(kind(0d0)) :: dyn_p, Temp
 
-        integer :: i, j, k, l, s, q, d !< Generic loop iterator
+        integer :: i, j, k, l, s, d !< Generic loop iterator
 
         real(kind(0d0)) :: nondim_time !< Non-dimensional time
 
         real(kind(0d0)) :: tmp !<
             !! Temporary variable to store quantity for mpi_allreduce
-
-        real(kind(0d0)) :: blkmod1, blkmod2 !<
-            !! Fluid bulk modulus for Woods mixture sound speed
 
         integer :: npts !< Number of included integral points
         real(kind(0d0)) :: rad, thickness !< For integral quantities
@@ -978,7 +942,7 @@ contains
             if (t_step_old /= dflt_int) then
                 nondim_time = real(t_step + t_step_old, kind(0d0))*dt
             else
-                nondim_time = real(t_step, kind(0d0))*dt !*1.d-5/10.0761131451d0
+                nondim_time = real(t_step, kind(0d0))*dt
             end if
         end if
 
@@ -1603,40 +1567,16 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_data_output_module
 
-        type(int_bounds_info) :: ix, iy, iz
-
-        integer :: i !< Generic loop iterator
-
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE_GLOBAL(icfl_sf(0:m, 0:n, 0:p))
+        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE_GLOBAL(Rc_sf  (0:m, 0:n, 0:p))
+            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
+            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
             vcfl_max = 0d0
             Rc_min = 1d3
-        end if
-
-        ! Associating the procedural pointer to the appropriate subroutine
-        ! that will be utilized in the conversion to the mixture variables
-
-        if (model_eqns == 1) then        ! Gamma/pi_inf model
-            s_convert_to_mixture_variables => &
-                s_convert_mixture_to_mixture_variables
-        elseif (bubbles) then           ! Volume fraction for bubbles
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables_bubbles
-        else                            ! Volume fraction model
-            s_convert_to_mixture_variables => &
-                s_convert_species_to_mixture_variables
-        end if
-
-        if (parallel_io .neqv. .true.) then
-            s_write_data_files => s_write_serial_data_files
-        else
-            s_write_data_files => s_write_parallel_data_files
         end if
 
     end subroutine s_initialize_data_output_module
@@ -1644,18 +1584,11 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
 
-        integer :: i !< Generic loop iterator
-
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE_GLOBAL(icfl_sf)
+        @:DEALLOCATE(icfl_sf)
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(vcfl_sf, Rc_sf)
+            @:DEALLOCATE(vcfl_sf, Rc_sf)
         end if
-
-        ! Disassociating the pointer to the procedure that was utilized to
-        ! to convert mixture or species variables to the mixture variables
-        s_convert_to_mixture_variables => null()
-        s_write_data_files => null()
 
     end subroutine s_finalize_data_output_module
 

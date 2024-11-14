@@ -30,6 +30,8 @@ module m_initial_condition
 
     use m_patches
 
+    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
+
     use m_assign_variables
 
     use m_perturbation          ! Subroutines to perturb initial flow fields
@@ -57,6 +59,9 @@ module m_initial_condition
     !! immersed boundary. The default is 0, otherwise the value is assigned
     !! to the patch ID of the immersed boundary.
 
+    type(levelset_field) :: levelset
+    type(levelset_norm_field) :: levelset_norm
+
 contains
 
     !> Computation of parameters, allocation procedures, and/or
@@ -78,6 +83,9 @@ contains
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         allocate (ib_markers%sf(0:m, 0:n, 0:p))
+
+        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -173,7 +181,7 @@ contains
 
                     ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
 
@@ -190,12 +198,18 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
+                    call s_compute_sphere_levelset(levelset, levelset_norm, i)
                     ! Cylindrical patch
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
-
+                    call s_compute_cylinder_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                    call s_compute_3D_airfoil_levelset(levelset, levelset_norm, i)
+
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 12) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, .true., levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -252,7 +266,7 @@ contains
 
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
+                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
 
                 end if
                 !> @}
@@ -266,13 +280,17 @@ contains
                 end if
                 if (patch_ib(i)%geometry == 2) then
                     call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
-
+                    call s_compute_circle_levelset(levelset, levelset_norm, i)
                     ! Rectangular patch
                 elseif (patch_ib(i)%geometry == 3) then
                     call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
-
+                    call s_compute_rectangle_levelset(levelset, levelset_norm, i)
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                    call s_compute_airfoil_levelset(levelset, levelset_norm, i)
+                    ! STL+IBM patch
+                elseif (patch_ib(i)%geometry == 5) then
+                    call s_model(i, ib_markers%sf, q_prim_vf, .true., levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -339,6 +357,9 @@ contains
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
         deallocate (ib_markers%sf)
+
+        ! deallocate (STL_levelset)
+        ! deallocate (STL_levelset_norm)
 
     end subroutine s_finalize_initial_condition_module
 

@@ -150,6 +150,8 @@ module m_global_parameters
     type(mpi_io_var), public :: MPI_IO_DATA
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
+    type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
+    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
@@ -443,6 +445,14 @@ contains
             patch_ib(i)%m = dflt_real
             patch_ib(i)%p = dflt_real
             patch_ib(i)%slip = .false.
+
+            ! Proper default values for translating STL models
+            patch_ib(i)%model%scale(:) = 1d0
+            patch_ib(i)%model%translate(:) = 0d0
+            patch_ib(i)%model%rotate(:) = 0d0
+            patch_ib(i)%model%filepath(:) = ' '
+            patch_ib(i)%model%spc = 20
+            patch_ib(i)%model%threshold = 0.9d0
         end do
 
         ! Fluids physical parameters
@@ -758,8 +768,11 @@ contains
             end do
         end if
 
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
-
+        if (ib) then
+            allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
+            allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        end if
 #endif
 
         ! Allocating grid variables for the x-direction

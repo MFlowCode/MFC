@@ -44,30 +44,6 @@ module m_time_steppers
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
-    !! Cell-average conservative variables at each time-stage (TS)
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), q_prim_vf)
-    !! Cell-average primitive variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
-    !! Cell-average RHS variables at the current time-stage
-
-    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
-    !! Cell-average primitive variables at consecutive TIMESTEPS
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_pb)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
-
-    integer, private :: num_ts !<
-    !! Number of time stages in the time-stepping scheme
-
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -90,7 +66,6 @@ module m_time_steppers
     !! Number of time stages in the time-stepping scheme
 
     !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
-#endif
 
 contains
 
@@ -109,7 +84,7 @@ contains
         end if
 
         ! Allocating the cell-average conservative variables
-        @:ALLOCATE_GLOBAL(q_cons_ts(1:num_ts))
+        @:ALLOCATE(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
@@ -126,7 +101,7 @@ contains
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE_GLOBAL(q_prim_ts(0:3))
+            @:ALLOCATE(q_prim_ts(0:3))
 
             do i = 0, 3
                 @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
@@ -146,7 +121,7 @@ contains
         end if
 
         ! Allocating the cell-average primitive variables
-        @:ALLOCATE_GLOBAL(q_prim_vf(1:sys_size))
+        @:ALLOCATE(q_prim_vf(1:sys_size))
 
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -210,7 +185,7 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(T_idx))
         end if
 
-        @:ALLOCATE_GLOBAL(pb_ts(1:2))
+        @:ALLOCATE(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -223,7 +198,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then
@@ -237,12 +212,12 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         end if
 
-        @:ALLOCATE_GLOBAL(mv_ts(1:2))
+        @:ALLOCATE(mv_ts(1:2))
 
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -255,7 +230,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
 
@@ -270,13 +245,13 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         end if
 
         ! Allocating the cell-average RHS variables
-        @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
+        @:ALLOCATE(rhs_vf(1:sys_size))
 
         do i = 1, sys_size
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
@@ -289,7 +264,7 @@ contains
         end if
 
         if (cfl_dt) then
-            @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+            @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -301,16 +276,10 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: nR3bar
-        real(kind(0d0)) :: e_mix
-
-        real(kind(0d0)) :: T
-        real(kind(0d0)), dimension(num_species) :: Ys
+        integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -384,7 +353,6 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
         call nvtxEndRange
 
@@ -402,8 +370,6 @@ contains
             end if
         end if
 
-        call nvtxEndRange
-
         ! ==================================================================
 
     end subroutine s_1st_order_tvd_rk
@@ -417,13 +383,12 @@ contains
 
         integer :: i, j, k, l, q!< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 2 =====================================================
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -489,9 +454,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -564,9 +527,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -599,15 +560,13 @@ contains
         real(kind(0d0)), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
         real(kind(0d0)) :: start, finish
-        real(kind(0d0)) :: nR3bar
 
         ! Stage 1 of 3 =====================================================
 
         if (.not. adap_dt) then
             call cpu_time(start)
-            call nvtxStartRange("Time_Step")
+            call nvtxStartRange("TIMESTEP")
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -674,9 +633,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -749,9 +706,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -823,9 +778,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -862,12 +815,11 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(inout) :: time_avg
 
-        integer :: i, j, k, l !< Generic loop iterator
         real(kind(0d0)) :: start, finish
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
@@ -896,8 +848,6 @@ contains
 
         type(vector_field) :: gm_alpha_qp
 
-        integer :: i, j, k, l, q !< Generic loop iterator
-
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_prim_vf, &
@@ -924,7 +874,7 @@ contains
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
         real(kind(0d0)) :: dt_local
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: j, k, l !< Generic loop iterators
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
@@ -972,6 +922,7 @@ contains
 
         integer :: i, j, k, l
 
+        call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -985,6 +936,8 @@ contains
                 end do
             end do
         end do
+
+        call nvtxEndRange
 
     end subroutine s_apply_bodyforces
 
@@ -1043,7 +996,7 @@ contains
 
         end do
 
-        @:DEALLOCATE_GLOBAL(q_cons_ts)
+        @:DEALLOCATE(q_cons_ts)
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -1053,7 +1006,7 @@ contains
                 end do
                 @:DEALLOCATE(q_prim_ts(i)%vf)
             end do
-            @:DEALLOCATE_GLOBAL(q_prim_ts)
+            @:DEALLOCATE(q_prim_ts)
         end if
 
         ! Deallocating the cell-average primitive variables
@@ -1079,14 +1032,14 @@ contains
             end do
         end if
 
-        @:DEALLOCATE_GLOBAL(q_prim_vf)
+        @:DEALLOCATE(q_prim_vf)
 
         ! Deallocating the cell-average RHS variables
         do i = 1, sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 
-        @:DEALLOCATE_GLOBAL(rhs_vf)
+        @:DEALLOCATE(rhs_vf)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

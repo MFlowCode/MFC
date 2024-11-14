@@ -24,24 +24,8 @@ module m_bubbles
     real(kind(0.d0)) :: chi_vw  !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: k_mw    !< Bubble wall properties (Ando 2010)
     real(kind(0.d0)) :: rho_mw  !< Bubble wall properties (Ando 2010)
-!$acc declare create(chi_vw, k_mw, rho_mw)
+    !$acc declare create(chi_vw, k_mw, rho_mw)
 
-#ifdef CRAY_ACC_WAR
-    !> @name Bubble dynamic source terms
-    !> @{
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), bub_adv_src)
-    !$acc declare link(bub_adv_src)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :), bub_r_src, bub_v_src, bub_p_src, bub_m_src)
-    !$acc declare link(bub_r_src, bub_v_src, bub_p_src, bub_m_src)
-
-    type(scalar_field) :: divu !< matrix for div(u)
-    !$acc declare create(divu)
-
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), rs, vs, ms, ps)
-    !$acc declare link(rs, vs, ms, ps)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
@@ -51,19 +35,18 @@ module m_bubbles
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
     !$acc declare create(rs, vs, ms, ps)
-#endif
 
 contains
 
     subroutine s_initialize_bubbles_module
 
-        integer :: i, j, k, l, q
+        integer :: l
 
-        @:ALLOCATE_GLOBAL(rs(1:nb))
-        @:ALLOCATE_GLOBAL(vs(1:nb))
+        @:ALLOCATE(rs(1:nb))
+        @:ALLOCATE(vs(1:nb))
         if (.not. polytropic) then
-            @:ALLOCATE_GLOBAL(ps(1:nb))
-            @:ALLOCATE_GLOBAL(ms(1:nb))
+            @:ALLOCATE(ps(1:nb))
+            @:ALLOCATE(ms(1:nb))
         end if
 
         do l = 1, nb
@@ -83,11 +66,11 @@ contains
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ACC_SETUP_SFs(divu)
 
-        @:ALLOCATE_GLOBAL(bub_adv_src(0:m, 0:n, 0:p))
-        @:ALLOCATE_GLOBAL(bub_r_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_v_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_p_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE_GLOBAL(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
+        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
     end subroutine s_initialize_bubbles_module
 
@@ -119,7 +102,7 @@ contains
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        integer :: i, j, k, l, q
+        integer :: j, k, l
 
         if (idir == 1) then
 
@@ -183,18 +166,11 @@ contains
         real(kind(0d0)) :: rddot
         real(kind(0d0)) :: pb, mv, vflux, pbdot
         real(kind(0d0)) :: n_tait, B_tait
-
         real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
-        real(kind(0d0)) :: start, finish
-
         real(kind(0d0)) :: nbub !< Bubble number density
-
-        real(kind(0d0)), dimension(2) :: Re !< Reynolds number
-
         integer :: i, j, k, l, q, ii !< Loop variables
-        integer :: ndirs  !< Number of coordinate directions
 
         real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
@@ -452,7 +428,7 @@ contains
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(kind(0d0)), intent(out) :: h
 
-        real(kind(0d0)) :: h0, h1, h_min !< Time step size
+        real(kind(0d0)) :: h0, h1 !< Time step size
         real(kind(0d0)) :: d0, d1, d2 !< norms
         real(kind(0d0)), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
@@ -912,7 +888,6 @@ contains
 
         real(kind(0.d0)) :: T_bar
         real(kind(0.d0)) :: grad_T
-        real(kind(0.d0)) :: tmp1, tmp2
         real(kind(0.d0)) :: f_bpres_dot
 
         if (thermal == 3) then

@@ -1969,11 +1969,25 @@ contains
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Primitive variables
-    subroutine s_model(patch_id, patch_id_fp, q_prim_vf)
+    !! @param ib True if this patch is an immersed boundary
+    !! @param STL_levelset STL levelset
+    !! @param STL_levelset_norm STL levelset normals
+    subroutine s_model(patch_id, patch_id_fp, q_prim_vf, ib, STL_levelset, STL_levelset_norm)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+
+        ! Variables for IBM+STL
+        type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
+        type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
+        logical, intent(in) :: ib   !< True if this patch is an immersed boundary
+        real(kind(0d0)) :: normals(1:3) !< Boundary normal buffer
+        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
+        real(kind(0d0)), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
+        real(kind(0d0)), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
+        real(kind(0d0)) :: distance !< Levelset distance buffer
+        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1990,18 +2004,70 @@ contains
 
         t_mat4x4 :: transform
 
-        if (proc_rank == 0) then
+        if (ib .and. proc_rank == 0) then
+            print *, " * Reading model: "//trim(patch_ib(patch_id)%model%filepath)
+        else if (.not. ib .and. proc_rank == 0) then
             print *, " * Reading model: "//trim(patch_icpp(patch_id)%model%filepath)
         end if
-        model = f_model_read(patch_icpp(patch_id)%model%filepath)
+
+        if (ib) then
+            model = f_model_read(patch_ib(patch_id)%model%filepath)
+        else
+            model = f_model_read(patch_icpp(patch_id)%model%filepath)
+        end if
 
         if (proc_rank == 0) then
             print *, " * Transforming model..."
         end if
-        transform = f_create_transform_matrix(patch_icpp(patch_id)%model)
+
+        if (ib) then
+            transform = f_create_transform_matrix(patch_ib(patch_id)%model)
+        else
+            transform = f_create_transform_matrix(patch_icpp(patch_id)%model)
+        end if
+
         call s_transform_model(model, transform)
 
         bbox = f_create_bbox(model)
+
+        ! Show the number of vertices in the original STL model
+        if (proc_rank == 0) then
+            print *, 'Number of input model vertices:', 3*model%ntrs
+        end if
+
+        call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
+        ! Check if the model needs interpolation
+        if (p > 0) then
+            call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
+        else
+            call f_check_interpolation_2D(boundary_v, boundary_vertex_count, (/dx, dy, dz/), interpolate)
+        end if
+
+        ! Show the number of edges and boundary edges in 2D STL models
+        if (proc_rank == 0 .and. p == 0) then
+            print *, 'Number of 2D model edges:', 3*model%ntrs
+            print *, ""
+            print *, 'Number of 2D model boundary edges:', boundary_edge_count
+        end if
+
+        ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
+        if (interpolate) then
+            if (proc_rank == 0) then
+                print *, ""
+                print *, 'Interpolating STL vertices...'
+            end if
+
+            if (p > 0) then
+                call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+            else
+                call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+            end if
+
+            if (proc_rank == 0) then
+                print *, 'Total number of interpolated boundary vertices:', total_vertices
+            end if
+        end if
 
         if (proc_rank == 0) then
             write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
@@ -2044,27 +2110,103 @@ contains
                         point = f_convert_cyl_to_cart(point)
                     end if
 
-                    eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
-
-                    if (patch_icpp(patch_id)%smoothen) then
-                        if (eta > patch_icpp(patch_id)%model%threshold) then
-                            eta = 1d0
-                        end if
+                    if (ib) then
+                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model%spc)
                     else
-                        if (eta > patch_icpp(patch_id)%model%threshold) then
-                            eta = 1d0
-                        else
-                            eta = 0d0
-                        end if
+                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
                     end if
 
-                    call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                            eta, q_prim_vf, patch_id_fp)
+                    if (ib) then
+                        ! Reading STL boundary vertices and compute the levelset and levelset_norm
+                        if (eta > patch_ib(patch_id)%model%threshold) then
+                            patch_id_fp(i, j, k) = patch_id
+                        end if
 
-                    ! Note: Should probably use *eta* to compute primitive variables
-                    ! if defining them analytically.
-                    @:analytical()
+                        ! 3D models
+                        if (p > 0) then
 
+                            ! Get the boundary normals and shortest distance between the cell center and the model boundary
+                            call f_distance_normals_3D(model, point, normals, distance)
+
+                            ! Get the shortest distance between the cell center and the interpolated model boundary
+                            if (interpolate) then
+                                STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
+                                                                                             total_vertices, &
+                                                                                             point, &
+                                                                                             (/dx, dy, dz/))
+                            else
+                                STL_levelset%sf(i, j, k, patch_id) = distance
+                            end if
+
+                            ! Correct the sign of the levelset
+                            if (patch_id_fp(i, j, k) > 0) then
+                                STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
+                            end if
+
+                            ! Correct the sign of the levelset_norm
+                            if (patch_id_fp(i, j, k) == 0) then
+                                normals(1:3) = -normals(1:3)
+                            end if
+
+                            ! Assign the levelset_norm
+                            STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
+                        else
+                            ! 2D models
+                            if (interpolate) then
+                                ! Get the shortest distance between the cell center and the model boundary
+                                STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
+                                                                                             total_vertices, &
+                                                                                             point, &
+                                                                                             (/dx, dy, dz/))
+                            else
+                                ! Get the shortest distance between the cell center and the interpolated model boundary
+                                STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
+                                                                                boundary_vertex_count, &
+                                                                                boundary_edge_count, &
+                                                                                point, &
+                                                                                (/dx, dy, dz/))
+                            end if
+
+                            ! Correct the sign of the levelset
+                            if (patch_id_fp(i, j, k) > 0) then
+                                STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
+                            end if
+
+                            ! Get the boundary normals
+                            call f_normals(boundary_v, &
+                                            boundary_vertex_count, &
+                                            boundary_edge_count, &
+                                            point, &
+                                            & (/dx, dy, dz/), normals)
+
+                            ! Correct the sign of the levelset_norm
+                            if (patch_id_fp(i, j, k) == 0) then
+                                normals(1:3) = -normals(1:3)
+                            end if
+
+                            ! Assign the levelset_norm
+                            STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
+
+                        end if
+                    else
+                        if (patch_icpp(patch_id)%smoothen) then
+                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                                eta = 1d0
+                            end if
+                        else
+                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                                eta = 1d0
+                            else
+                                eta = 0d0
+                            end if
+                        end if
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                eta, q_prim_vf, patch_id_fp)
+
+                        ! Note: Should probably use *eta* to compute primitive variables
+                        ! if defining them analytically.
+                        @:analytical()
+                    end if
                 end do; end do; end do
 
         if (proc_rank == 0) then
