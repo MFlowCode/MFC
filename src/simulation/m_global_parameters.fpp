@@ -670,17 +670,12 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
-        bc_x%grcbc_in = .false.
-        bc_x%grcbc_out = .false.
-        bc_x%grcbc_vel_out = .false.
-
-        bc_y%grcbc_in = .false.
-        bc_y%grcbc_out = .false.
-        bc_y%grcbc_vel_out = .false.
-
-        bc_z%grcbc_in = .false.
-        bc_z%grcbc_out = .false.
-        bc_z%grcbc_vel_out = .false.
+        ! GRCBC flags
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%grcbc_in = .false.
+            bc_${dir}$%grcbc_out = .false.
+            bc_${dir}$%grcbc_vel_out = .false.
+        #:endfor
 
     end subroutine s_assign_default_values_to_user_inputs
 

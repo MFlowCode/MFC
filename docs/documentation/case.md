@@ -822,15 +822,14 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
 | `bc_[x,y,z]%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
 | `bc_[x,y,z]%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
-| `bc_[x,y,z]%[u, v, w]_in`     | Real    | Inflow velocities in x, y and z directions |
-| `bc_[x,y,z]%[u, v, w]_out`    | Real    | Outflow velocities in x, y and z directions |
+| `bc_[x,y,z]%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
+| `bc_[x,y,z]%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
 | `bc_[x,y,z]%pres_in`          | Real    | Inflow pressure |
 | `bc_[x,y,z]%pres_out`         | Real    | Outflow pressure |
 | `bc_[x,y,z]%alpha_rho_in`     | Real Array | Inflow density |
 | `bc_[x,y,z]%alpha_in`         | Real Array | Inflow void fraction |
 
-*: This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](references.md#Pirozzoli13). This enables to provide inflow and outflow conditions outside the computational domain. The parameters associated with this feature are listed in table [Generalized Characteristic Boundary conditions](#generalized-characteristic-boundary-conditions).
-
+This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](references.md#Pirozzoli13). This enables to provide inflow and outflow conditions outside the computational domain.
 
 ### Patch types
 

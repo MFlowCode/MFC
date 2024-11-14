@@ -102,17 +102,16 @@ module m_cbc
     integer :: cbc_dir, cbc_loc
     !$acc declare create(dj, bcxb, bcxe, bcyb, bcye, bczb, bcze, cbc_dir, cbc_loc)
 
-    real(kind(0d0)) :: ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out
-    real(kind(0d0)) :: uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out
-    real(kind(0d0)) :: uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out
-    !$acc declare create(ux_in, ux_out, vx_in, vx_out, wx_in, wx_out, presx_in, presx_out, Delx_in, Delx_out)
-    !$acc declare create(uy_in, uy_out, vy_in, vy_out, wy_in, wy_out, presy_in, presy_out, Dely_in, Dely_out)
-    !$acc declare create(uz_in, uz_out, vz_in, vz_out, wz_in, wz_out, presz_in, presz_out, Delz_in, Delz_out)
+    !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
+    !! inflow velocities, pressure, density and void fraction as well as
+    !! outflow velocities and pressure
 
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhox_in, alphax_in
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhoy_in, alphay_in
-    real(kind(0d0)), allocatable, dimension(:) :: alpha_rhoz_in, alphaz_in
-    !$acc declare create(alpha_rhox_in, alphax_in, alpha_rhoy_in, alphay_in, alpha_rhoz_in, alphaz_in)
+    real(kind(0d0)), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
+    real(kind(0d0)), allocatable, dimension(:, :) :: vel_in, vel_out
+    real(kind(0d0)), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
+    !$acc declare create(pres_in, pres_out, Del_in, Del_out)
+    !$acc declare create(vel_in, vel_out)
+    !$acc declare create(alpha_rho_in, alpha_in)
 
     !$acc declare create(q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf,  F_rsx_vf, F_src_rsx_vf,flux_rsx_vf_l, flux_src_rsx_vf_l, &
     !$acc                 F_rsy_vf, F_src_rsy_vf,flux_rsy_vf_l, flux_src_rsy_vf_l, F_rsz_vf, F_src_rsz_vf,flux_rsz_vf_l, flux_src_rsz_vf_l, &
@@ -404,52 +403,36 @@ contains
             !$acc update device(bczb, bcze)
         end if
 
-        @:ALLOCATE_GLOBAL(alpha_rhox_in(1:num_fluids), alpha_rhoy_in(1:num_fluids), alpha_rhoz_in(1:num_fluids))
-        @:ALLOCATE_GLOBAL(alphax_in(1:num_fluids), alphay_in(1:num_fluids), alphaz_in(1:num_fluids))
+        ! Allocate GRCBC inputs
+        @:ALLOCATE(pres_in(1:num_dims), pres_out(1:num_dims))
+        @:ALLOCATE(Del_in(1:num_dims), Del_out(1:num_dims))
+        @:ALLOCATE(vel_in(1:num_dims, 1:num_dims), vel_out(1:num_dims, 1:num_dims))
+        @:ALLOCATE(alpha_rho_in(1:num_fluids, 1:num_dims), alpha_in(1:num_fluids, 1:num_dims))
 
+        ! Assign and update GRCBC inputs
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (${CBC_DIR}$ == 1) then
-                u${XYZ}$_in = bc_${XYZ}$%u_in
-                v${XYZ}$_in = bc_${XYZ}$%v_in
-                w${XYZ}$_in = bc_${XYZ}$%w_in
-                u${XYZ}$_out = bc_${XYZ}$%u_out
-                v${XYZ}$_out = bc_${XYZ}$%v_out
-                w${XYZ}$_out = bc_${XYZ}$%w_out
-                Del${XYZ}$_in = maxval(dx)
-                Del${XYZ}$_out = maxval(dx)
-            else if (${CBC_DIR}$ == 2) then
-                u${XYZ}$_in = bc_${XYZ}$%v_in
-                v${XYZ}$_in = bc_${XYZ}$%u_in
-                w${XYZ}$_in = bc_${XYZ}$%w_in
-                u${XYZ}$_out = bc_${XYZ}$%v_out
-                v${XYZ}$_out = bc_${XYZ}$%u_out
-                w${XYZ}$_out = bc_${XYZ}$%w_out
+            if (${CBC_DIR}$ <= num_dims) then
+                vel_in(${CBC_DIR}$, 1) = bc_${XYZ}$%vel_in(1)
+                vel_out(${CBC_DIR}$, 1) = bc_${XYZ}$%vel_out(1)
                 if (n > 0) then
-                    Del${XYZ}$_in = maxval(dy)
-                    Del${XYZ}$_out = maxval(dy)
+                    vel_in(${CBC_DIR}$, 2) = bc_${XYZ}$%vel_in(2)
+                    vel_out(${CBC_DIR}$, 2) = bc_${XYZ}$%vel_out(2)
+                    if (p > 0) then
+                        vel_in(${CBC_DIR}$, 3) = bc_${XYZ}$%vel_in(3)
+                        vel_out(${CBC_DIR}$, 3) = bc_${XYZ}$%vel_out(3)
+                    end if
                 end if
-            else if (${CBC_DIR}$ == 3) then
-                u${XYZ}$_in = bc_${XYZ}$%w_in
-                v${XYZ}$_in = bc_${XYZ}$%u_in
-                w${XYZ}$_in = bc_${XYZ}$%v_in
-                u${XYZ}$_out = bc_${XYZ}$%w_out
-                v${XYZ}$_out = bc_${XYZ}$%u_out
-                w${XYZ}$_out = bc_${XYZ}$%v_out
-                if (p > 0) then
-                    Del${XYZ}$_in = maxval(dz)
-                    Del${XYZ}$_out = maxval(dz)
-                end if
+                Del_in(${CBC_DIR}$) = maxval(d${XYZ}$)
+                Del_out(${CBC_DIR}$) = maxval(d${XYZ}$)
+                pres_in(${CBC_DIR}$) = bc_${XYZ}$%pres_in
+                pres_out(${CBC_DIR}$) = bc_${XYZ}$%pres_out
+                do i = 1, num_fluids
+                    alpha_rho_in(i, ${CBC_DIR}$) = bc_${XYZ}$%alpha_rho_in(i)
+                    alpha_in(i, ${CBC_DIR}$) = bc_${XYZ}$%alpha_in(i)
+                end do
             end if
-            pres${XYZ}$_in = bc_${XYZ}$%pres_in
-            pres${XYZ}$_out = bc_${XYZ}$%pres_out
-            do i = 1, num_fluids
-                alpha_rho${XYZ}$_in(i) = bc_${XYZ}$%alpha_rho_in(i)
-                alpha${XYZ}$_in(i) = bc_${XYZ}$%alpha_in(i)
-            end do
-            !$acc update device(u${XYZ}$_in, v${XYZ}$_in, w${XYZ}$_in, u${XYZ}$_out, v${XYZ}$_out, w${XYZ}$_out)
-            !$acc update device(pres${XYZ}$_in, pres${XYZ}$_out, alpha_rho${XYZ}$_in, alpha${XYZ}$_in)
-            !$acc update device(Del${XYZ}$_in, Del${XYZ}$_out)
         #:endfor
+        !$acc update device(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
 
     end subroutine s_initialize_cbc_module
 
@@ -895,33 +878,33 @@ contains
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                            !Add GRCBC for Subsonic Inflow
+                            ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
                                 do i = 2, momxb
-                                    L(2) = c**3d0*Ma*(alpha_rho(i - 1) - alpha_rho${XYZ}$_in(i - 1))/Del${XYZ}$_in - c*Ma*(pres - pres${XYZ}$_in)/Del${XYZ}$_in
+                                    L(2) = c**3d0*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - v${XYZ}$_in)/Del${XYZ}$_in
+                                    L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(momxb + 2) = c*Ma*(vel(dir_idx(3)) - w${XYZ}$_in)/Del${XYZ}$_in
+                                        L(momxb + 2) = c*Ma*(vel(dir_idx(3)) - vel_in(${CBC_DIR}$, dir_idx(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
                                 !$acc loop seq
                                 do i = E_idx, advxe - 1
-                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha${XYZ}$_in(i + 1 - E_idx))/Del${XYZ}$_in
+                                    L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(advxe) = rho*c**2d0*(1d0 + Ma)*(vel(dir_idx(1)) + u${XYZ}$_in*sign(1, cbc_loc))/Del${XYZ}$_in + c*(1d0 + Ma)*(pres - pres${XYZ}$_in)/Del${XYZ}$_in
+                                L(advxe) = rho*c**2d0*(1d0 + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1d0 + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
-                            !Add GRCBC for Subsonic Outflow (Pressure)
+                            ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
-                                L(advxe) = c*(1d0 - Ma)*(pres - pres${XYZ}$_out)/Del${XYZ}$_out
+                                L(advxe) = c*(1d0 - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
 
-                                !Add GRCBC for Subsonic Outflow (Normal Velocity)
+                                ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(advxe) = L(advxe) + rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + u${XYZ}$_out*sign(1, cbc_loc))/Del${XYZ}$_out
+                                    L(advxe) = L(advxe) + rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
@@ -1581,6 +1564,9 @@ contains
 
         ! Deallocating the cell-width distribution in the s-direction
         @:DEALLOCATE(ds)
+
+        ! Deallocating GRCBC inputs
+        @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
 
         ! Deallocating CBC Coefficients in x-direction =====================
         if (any((/bc_x%beg, bc_x%end/) <= -5) .and. any((/bc_x%beg, bc_x%end/) >= -13)) then
