@@ -45,14 +45,14 @@ contains
 
         integer :: i, k, r
 
-        @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
-        @:ALLOCATE_GLOBAL(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:ALLOCATE_GLOBAL(du_dx(0:m,0:n,0:p))
+        @:ALLOCATE(Gs(1:num_fluids))
+        @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
+        @:ALLOCATE(du_dx(0:m,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE_GLOBAL(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
+            @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p))
             if (p > 0) then
-                @:ALLOCATE_GLOBAL(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
-                @:ALLOCATE_GLOBAL(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+                @:ALLOCATE(du_dz(0:m,0:n,0:p), dv_dz(0:m,0:n,0:p))
+                @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
             end if
         end if
 
@@ -61,12 +61,12 @@ contains
         end do
         !$acc update device(Gs)
 
-        @:ALLOCATE_GLOBAL(fd_coeff_x(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
         if (n > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_y(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
         end if
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_z(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, 0:p))
         end if
 
         ! Computing centered finite difference coefficients
@@ -340,16 +340,16 @@ contains
 
     subroutine s_finalize_hypoelastic_module() ! --------------------
 
-        @:DEALLOCATE_GLOBAL(Gs)
-        @:DEALLOCATE_GLOBAL(rho_K_field, G_K_field)
-        @:DEALLOCATE_GLOBAL(du_dx)
-        @:DEALLOCATE_GLOBAL(fd_coeff_x)
+        @:DEALLOCATE(Gs)
+        @:DEALLOCATE(rho_K_field, G_K_field)
+        @:DEALLOCATE(du_dx)
+        @:DEALLOCATE(fd_coeff_x)
         if (n > 0) then
-            @:DEALLOCATE_GLOBAL(du_dy,dv_dx,dv_dy)
-            @:DEALLOCATE_GLOBAL(fd_coeff_y)
+            @:DEALLOCATE(du_dy,dv_dx,dv_dy)
+            @:DEALLOCATE(fd_coeff_y)
             if (p > 0) then
-                @:DEALLOCATE_GLOBAL(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
-                @:DEALLOCATE_GLOBAL(fd_coeff_z)
+                @:DEALLOCATE(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
+                @:DEALLOCATE(fd_coeff_z)
             end if
         end if
 
