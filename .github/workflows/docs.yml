@@ -48,7 +48,7 @@ jobs:
         echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
 
     - name: Publish Documentation
-      if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' && github.event_name == 'cron'
+      if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' && ( github.event_name == 'cron' || github.event_name == 'workflow_dispatch' )
       run:  |
         set +e
         git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
