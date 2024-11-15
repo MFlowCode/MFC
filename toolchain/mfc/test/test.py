@@ -10,7 +10,7 @@ from .case     import TestCase
 from .cases    import list_cases
 from ..        import sched
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS, REQUIRED_TARGETS
+from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
 
 from ..packer import tol as packtol
 from ..packer import packer

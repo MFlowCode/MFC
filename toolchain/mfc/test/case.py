@@ -222,7 +222,7 @@ print(json.dumps({{**case, **mods}}))
             self.get_filepath(),
             self.get_dirpath(),
             self.get_parameters())
-    
+ 
     # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
         if self.override_tol:
