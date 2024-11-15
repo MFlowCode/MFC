@@ -50,7 +50,7 @@ jobs:
     - name: Linkcheck - Lychee
       uses: lycheeverse/lychee-action@v2
       with:
-        args: --verbose --no-progress build/install/docs/mfc/
+        args: -c .lychee.toml build/install/docs/mfc/
         fail: false
 
     - name: Publish Documentation
