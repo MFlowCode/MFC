@@ -156,10 +156,14 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
+    integer :: num_ibs  !< Number of immersed boundaries
+
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
+    type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
+    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
 #endif
 
@@ -402,6 +406,9 @@ contains
         sigma = dflt_real
         surface_tension = .false.
         adv_n = .false.
+
+        ! IBM
+        num_ibs = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs
 

@@ -48,9 +48,12 @@ module m_data_output
         !>  Interface for the conservative data
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+        subroutine s_write_abstract_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
-            import :: scalar_field, integer_field, sys_size, m, n, p, pres_field
+            import :: scalar_field, integer_field, sys_size, m, n, p, &
+                pres_field, levelset_field, levelset_norm_field
 
             ! Conservative variables
             type(scalar_field), &
@@ -60,6 +63,14 @@ module m_data_output
             ! IB markers
             type(integer_field), &
                 intent(in) :: ib_markers
+
+            ! Levelset
+            type(levelset_field), &
+                intent(IN) :: levelset
+
+            ! Levelset Norm
+            type(levelset_norm_field), &
+                intent(IN) :: levelset_norm
 
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
@@ -78,7 +89,9 @@ contains
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_serial_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+    subroutine s_write_serial_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
@@ -86,6 +99,14 @@ contains
         ! IB markers
         type(integer_field), &
             intent(in) :: ib_markers
+
+        ! Levelset
+        type(levelset_field), &
+            intent(IN) :: levelset
+
+        ! Levelset Norm
+        type(levelset_norm_field), &
+            intent(IN) :: levelset_norm
 
         logical :: file_exist !< checks if file exists
 
@@ -100,7 +121,7 @@ contains
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
 
-        integer :: i, j, k, l, r, c !< Generic loop iterator
+        integer :: i, j, k, l, r, c, dir !< Generic loop iterator
         integer :: t_step
 
         real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
@@ -177,6 +198,19 @@ contains
             end do
         end if
         ! ==================================================================
+
+        ! Outtputting Levelset Info ============================
+        file_loc = trim(t_step_dir)//'/levelset.dat'
+
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        write (1) levelset%sf
+        close (1)
+
+        file_loc = trim(t_step_dir)//'/levelset_norm.dat'
+
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        write (1) levelset_norm%sf
+        close (1)
 
         ! Outputting Conservative Variables ================================
         do i = 1, sys_size
@@ -445,27 +479,23 @@ contains
 
         if (ib) then
 
-            do i = 1, num_ibs
-
-                write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
-                open (2, FILE=trim(file_loc))
-                do j = 0, m
-                    do k = 0, n
-                        do l = 0, p
-                            if (p > 0) then
-                                write (2, FMT) x_cc(j), y_cc(k), z_cc(l), real(ib_markers%sf(j, k, l))
-                            else
-                                write (2, FMT) x_cc(j), y_cc(k), real(ib_markers%sf(j, k, l))
-                            end if
-                        end do
+            ! Write IB Markers
+            write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
+            open (2, FILE=trim(file_loc))
+            do j = 0, m
+                do k = 0, n
+                    do l = 0, p
+                        if (p > 0) then
+                            write (2, FMT) x_cc(j), y_cc(k), z_cc(l), real(ib_markers%sf(j, k, l))
+                        else
+                            write (2, FMT) x_cc(j), y_cc(k), real(ib_markers%sf(j, k, l))
+                        end if
                     end do
                 end do
-
-                close (2)
             end do
-        end if
 
-        if (ib) then
+            close (2)
+
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 4) then
 
@@ -494,7 +524,9 @@ contains
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param ib_markers track if a cell is within the immersed boundary
-    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers)
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
+    subroutine s_write_parallel_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         ! Conservative variables
         type(scalar_field), &
@@ -504,6 +536,14 @@ contains
         ! IB markers
         type(integer_field), &
             intent(in) :: ib_markers
+
+        ! Levelset
+        type(levelset_field), &
+            intent(IN) :: levelset
+
+        ! Levelset Norm
+        type(levelset_norm_field), &
+            intent(IN) :: levelset_norm
 
 #ifdef MFC_MPI
 
@@ -535,7 +575,8 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                           levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -599,7 +640,8 @@ contains
         else
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                           levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -675,6 +717,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
+        ! IB Markers
         if (ib) then
 
             write (file_loc, '(A)') 'ib.dat'
@@ -693,6 +736,46 @@ contains
                                    'native', mpi_info_int, ierr)
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                     MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            ! Levelset
+            write (file_loc, '(A)') 'levelset.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Initial displacement to skip at beginning of file
+            disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
+                                    mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            ! Levelset Norm
+            write (file_loc, '(A)') 'levelset_norm.dat'
+            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                               mpi_info_int, ifile, ierr)
+
+            ! Initial displacement to skip at beginning of file
+            disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                                   'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
+                                    mpi_p, status, ierr)
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if

@@ -159,7 +159,7 @@ contains
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
             & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
-            & 'n_start' ]
+            & 'n_start', 'num_ibs' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -1414,7 +1414,7 @@ contains
         !!  the second dimension corresponds to the processor rank.
     subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(kind(0d0)), dimension(1:, 0:), intent(INOUT) :: spatial_extents
+        real(wp), dimension(1:, 0:), intent(INOUT) :: spatial_extents
 
 #ifdef MFC_MPI
 

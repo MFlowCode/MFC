@@ -621,14 +621,14 @@ contains
 !$acc enter data copyin(is1b, is1e, is2b, is2e, is3b, is3e)
 
 #ifdef MFC_SIMULATION
-        @:ALLOCATE_GLOBAL(gammas (1:num_fluids))
-        @:ALLOCATE_GLOBAL(gs_min (1:num_fluids))
-        @:ALLOCATE_GLOBAL(pi_infs(1:num_fluids))
-        @:ALLOCATE_GLOBAL(ps_inf(1:num_fluids))
-        @:ALLOCATE_GLOBAL(cvs    (1:num_fluids))
-        @:ALLOCATE_GLOBAL(qvs    (1:num_fluids))
-        @:ALLOCATE_GLOBAL(qvps    (1:num_fluids))
-        @:ALLOCATE_GLOBAL(Gs     (1:num_fluids))
+        @:ALLOCATE(gammas (1:num_fluids))
+        @:ALLOCATE(gs_min (1:num_fluids))
+        @:ALLOCATE(pi_infs(1:num_fluids))
+        @:ALLOCATE(ps_inf(1:num_fluids))
+        @:ALLOCATE(cvs    (1:num_fluids))
+        @:ALLOCATE(qvs    (1:num_fluids))
+        @:ALLOCATE(qvps    (1:num_fluids))
+        @:ALLOCATE(Gs     (1:num_fluids))
 #else
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
@@ -655,7 +655,7 @@ contains
 #ifdef MFC_SIMULATION
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
@@ -668,7 +668,7 @@ contains
 
         if (bubbles) then
 #ifdef MFC_SIMULATION
-            @:ALLOCATE_GLOBAL(bubrs(1:nb))
+            @:ALLOCATE(bubrs(1:nb))
 #else
             @:ALLOCATE(bubrs(1:nb))
 #endif
@@ -1363,9 +1363,9 @@ contains
 #endif
 
 #ifdef MFC_SIMULATION
-        @:DEALLOCATE_GLOBAL(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
         if (bubbles) then
-            @:DEALLOCATE_GLOBAL(bubrs)
+            @:DEALLOCATE(bubrs)
         end if
 #else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)

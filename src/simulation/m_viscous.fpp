@@ -37,7 +37,7 @@ contains
 
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE_GLOBAL(Res_viscous(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE(Res_viscous(1:2, 1:maxval(Re_size)))
 
         do i = 1, 2
             do j = 1, Re_size(i)
@@ -1462,7 +1462,7 @@ contains
 
     subroutine s_finalize_viscous_module()
 
-        @:DEALLOCATE_GLOBAL(Res_viscous)
+        @:DEALLOCATE(Res_viscous)
 
     end subroutine s_finalize_viscous_module
 

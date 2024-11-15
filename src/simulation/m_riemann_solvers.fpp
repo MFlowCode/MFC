@@ -2505,7 +2505,7 @@ contains
         ! the Riemann problem solution
         integer :: i, j
 
-        @:ALLOCATE_GLOBAL(Gs(1:num_fluids))
+        @:ALLOCATE(Gs(1:num_fluids))
 
         do i = 1, num_fluids
             Gs(i) = fluid_pp(i)%G
@@ -2513,7 +2513,7 @@ contains
         !$acc update device(Gs)
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
         end if
 
         if (viscous) then
@@ -2530,24 +2530,24 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE_GLOBAL(flux_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_gsrc_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_src_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsx_vf(is1%beg:is1%end, &
+        @:ALLOCATE(vel_src_rsx_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_dims))
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE(mom_sp_rsx_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsx_vf(is1%beg:is1%end, &
+            @:ALLOCATE(Re_avg_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
         end if
@@ -2557,25 +2557,25 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
 
-        @:ALLOCATE_GLOBAL(flux_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_gsrc_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_src_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsy_vf(is1%beg:is1%end, &
+        @:ALLOCATE(vel_src_rsy_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE(mom_sp_rsy_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsy_vf(is1%beg:is1%end, &
+            @:ALLOCATE(Re_avg_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
         end if
@@ -2585,25 +2585,25 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
 
-        @:ALLOCATE_GLOBAL(flux_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_gsrc_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_gsrc_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(flux_src_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE(flux_src_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, advxb:sys_size))
-        @:ALLOCATE_GLOBAL(vel_src_rsz_vf(is1%beg:is1%end, &
+        @:ALLOCATE(vel_src_rsz_vf(is1%beg:is1%end, &
             is2%beg:is2%end, &
             is3%beg:is3%end, 1:num_dims))
 
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
+            @:ALLOCATE(mom_sp_rsz_vf(is1%beg:is1%end + 1, is2%beg:is2%end, is3%beg:is3%end, 1:4))
         end if
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Re_avg_rsz_vf(is1%beg:is1%end, &
+            @:ALLOCATE(Re_avg_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
         end if
@@ -4328,40 +4328,40 @@ contains
     subroutine s_finalize_riemann_solvers_module
 
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsx_vf)
+            @:DEALLOCATE(Re_avg_rsx_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsx_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsx_vf)
+        @:DEALLOCATE(vel_src_rsx_vf)
+        @:DEALLOCATE(flux_rsx_vf)
+        @:DEALLOCATE(flux_src_rsx_vf)
+        @:DEALLOCATE(flux_gsrc_rsx_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsx_vf)
+            @:DEALLOCATE(mom_sp_rsx_vf)
         end if
 
         if (n == 0) return
 
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsy_vf)
+            @:DEALLOCATE(Re_avg_rsy_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsy_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsy_vf)
+        @:DEALLOCATE(vel_src_rsy_vf)
+        @:DEALLOCATE(flux_rsy_vf)
+        @:DEALLOCATE(flux_src_rsy_vf)
+        @:DEALLOCATE(flux_gsrc_rsy_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsy_vf)
+            @:DEALLOCATE(mom_sp_rsy_vf)
         end if
 
         if (p == 0) return
 
         if (viscous) then
-            @:DEALLOCATE_GLOBAL(Re_avg_rsz_vf)
+            @:DEALLOCATE(Re_avg_rsz_vf)
         end if
-        @:DEALLOCATE_GLOBAL(vel_src_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_src_rsz_vf)
-        @:DEALLOCATE_GLOBAL(flux_gsrc_rsz_vf)
+        @:DEALLOCATE(vel_src_rsz_vf)
+        @:DEALLOCATE(flux_rsz_vf)
+        @:DEALLOCATE(flux_src_rsz_vf)
+        @:DEALLOCATE(flux_gsrc_rsz_vf)
         if (qbmm) then
-            @:DEALLOCATE_GLOBAL(mom_sp_rsz_vf)
+            @:DEALLOCATE(mom_sp_rsz_vf)
         end if
 
     end subroutine s_finalize_riemann_solvers_module

@@ -683,7 +683,7 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -859,7 +859,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, ib_markers)
+        call s_write_data_files(q_cons_vf, ib_markers, levelset, levelset_norm)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition

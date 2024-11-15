@@ -53,7 +53,7 @@ module m_data_output
     ! minimum and maximum values of the grid and flow variable(s), respectively.
     ! The purpose of bookkeeping this information is to boost the visualization
     ! of the Silo-HDF5 database file(s) in VisIt.
-    real(dp), allocatable, dimension(:, :) :: spatial_extents
+    real(wp), allocatable, dimension(:, :) :: spatial_extents
     real(wp), allocatable, dimension(:, :) :: data_extents
 
     ! The size of the ghost zone layer at beginning of each coordinate direction
@@ -576,18 +576,18 @@ contains
 
             elseif (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:, 0) = dble((/minval(y_cb), minval(z_cb), &
-                                                   minval(x_cb), maxval(y_cb), &
-                                                   maxval(z_cb), maxval(x_cb)/))
+                    spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), &
+                                              minval(x_cb), maxval(y_cb), &
+                                              maxval(z_cb), maxval(x_cb)/)
                 else
-                    spatial_extents(:, 0) = dble((/minval(x_cb), minval(y_cb), &
-                                                   minval(z_cb), maxval(x_cb), &
-                                                   maxval(y_cb), maxval(z_cb)/))
+                    spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
+                                              minval(z_cb), maxval(x_cb), &
+                                              maxval(y_cb), maxval(z_cb)/)
                 end if
 
             else
-                spatial_extents(:, 0) = dble((/minval(x_cb), minval(y_cb), &
-                                               maxval(x_cb), maxval(y_cb)/))
+                spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), &
+                                          maxval(x_cb), maxval(y_cb)/)
 
             end if
 
@@ -836,7 +836,7 @@ contains
                 if (num_procs > 1) then
                     call s_mpi_gather_data_extents(q_sf, data_extents)
                 else
-                    data_extents(:, 0) = dble((/minval(q_sf), maxval(q_sf)/))
+                    data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
                 end if
 
                 ! Next, the root process proceeds to write the gathered flow

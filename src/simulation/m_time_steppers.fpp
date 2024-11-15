@@ -84,7 +84,7 @@ contains
         end if
 
         ! Allocating the cell-average conservative variables
-        @:ALLOCATE_GLOBAL(q_cons_ts(1:num_ts))
+        @:ALLOCATE(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
@@ -101,7 +101,7 @@ contains
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE_GLOBAL(q_prim_ts(0:3))
+            @:ALLOCATE(q_prim_ts(0:3))
 
             do i = 0, 3
                 @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
@@ -121,7 +121,7 @@ contains
         end if
 
         ! Allocating the cell-average primitive variables
-        @:ALLOCATE_GLOBAL(q_prim_vf(1:sys_size))
+        @:ALLOCATE(q_prim_vf(1:sys_size))
 
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -185,7 +185,7 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(T_idx))
         end if
 
-        @:ALLOCATE_GLOBAL(pb_ts(1:2))
+        @:ALLOCATE(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -198,7 +198,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then
@@ -212,12 +212,12 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         end if
 
-        @:ALLOCATE_GLOBAL(mv_ts(1:2))
+        @:ALLOCATE(mv_ts(1:2))
 
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -230,7 +230,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
 
@@ -245,13 +245,13 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
-            @:ALLOCATE_GLOBAL(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
                 idwbuff(2)%beg:idwbuff(2)%beg + 1, &
                 idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         end if
 
         ! Allocating the cell-average RHS variables
-        @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
+        @:ALLOCATE(rhs_vf(1:sys_size))
 
         do i = 1, sys_size
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
@@ -264,7 +264,7 @@ contains
         end if
 
         if (cfl_dt) then
-            @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+            @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -279,7 +279,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -353,7 +353,6 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
         call nvtxEndRange
 
@@ -370,8 +369,6 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
         end if
-
-        call nvtxEndRange
 
         ! ==================================================================
 
@@ -391,7 +388,7 @@ contains
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
@@ -457,9 +454,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -532,9 +527,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -574,7 +567,7 @@ contains
 
         if (.not. adap_dt) then
             call cpu_time(start)
-            call nvtxStartRange("Time_Step")
+            call nvtxStartRange("TIMESTEP")
         end if
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -641,9 +634,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -716,9 +707,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -790,9 +779,7 @@ contains
             end do
         end if
 
-        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
-        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -833,7 +820,7 @@ contains
 
         call cpu_time(start)
 
-        call nvtxStartRange("Time_Step")
+        call nvtxStartRange("TIMESTEP")
 
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
@@ -937,6 +924,7 @@ contains
 
         integer :: i, j, k, l
 
+        call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -950,6 +938,8 @@ contains
                 end do
             end do
         end do
+
+        call nvtxEndRange
 
     end subroutine s_apply_bodyforces
 
@@ -1008,7 +998,7 @@ contains
 
         end do
 
-        @:DEALLOCATE_GLOBAL(q_cons_ts)
+        @:DEALLOCATE(q_cons_ts)
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -1018,7 +1008,7 @@ contains
                 end do
                 @:DEALLOCATE(q_prim_ts(i)%vf)
             end do
-            @:DEALLOCATE_GLOBAL(q_prim_ts)
+            @:DEALLOCATE(q_prim_ts)
         end if
 
         ! Deallocating the cell-average primitive variables
@@ -1044,14 +1034,14 @@ contains
             end do
         end if
 
-        @:DEALLOCATE_GLOBAL(q_prim_vf)
+        @:DEALLOCATE(q_prim_vf)
 
         ! Deallocating the cell-average RHS variables
         do i = 1, sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 
-        @:DEALLOCATE_GLOBAL(rhs_vf)
+        @:DEALLOCATE(rhs_vf)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

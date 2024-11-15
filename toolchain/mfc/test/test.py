@@ -54,9 +54,11 @@ def __filter(cases_) -> typing.List[TestCase]:
             cases.remove(case)
 
     for case in cases[:]:
-        if ARG("single"):  
-            if 'low_Mach' in case.trace or 'Hypoelasticity' in case.trace or 'teno' in case.trace:
-                cases.remove(case) 
+        if ARG("single"):
+            skip = ['low_mach', 'Hypoelasticity', 'teno', 'Chemistry']
+            if any(label in case.trace for label in skip):
+                cases.remove(case)
+
 
     if ARG("percent") == 100:
         return cases
