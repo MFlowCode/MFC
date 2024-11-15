@@ -291,6 +291,8 @@ contains
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_surface_tension
 
+        integer :: i
+
         @:PROHIBIT(surface_tension .and. sigma < 0._wp, &
             "sigma must be greater than or equal to zero")
 
@@ -302,6 +304,16 @@ contains
 
         @:PROHIBIT(surface_tension .and. model_eqns /= 3, &
             "The surface tension model requires model_eqns=3")
+
+        @:PROHIBIT(surface_tension .and. num_fluids /= 2, &
+            "The surface tension model requires num_fluids=2")
+
+#ifdef MFC_PRE_PROCESS
+        do i = 1, num_patches
+            @:PROHIBIT(surface_tension .and. f_is_default(patch_icpp(i)%cf_val), &
+                "patch_icpp(i)%cf_val must be set if surface_tension is enabled")
+        end do
+#endif MFC_PRE_PROCESS
 
     end subroutine s_check_inputs_surface_tension
 

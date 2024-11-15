@@ -50,7 +50,7 @@ sbatch <<EOT
 #SBATCH --account=gts-sbryngelson3 # Charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 04:00:00                # Duration of the job
+#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
 #SBATCH -o $job_slug.out           # Output file
 #SBATCH -W                         # Wait for the job to finish

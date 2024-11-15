@@ -20,7 +20,8 @@ jobs:
 
   self:
     name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: file-changes
     strategy:
       matrix:
         device: ['cpu', 'gpu']
