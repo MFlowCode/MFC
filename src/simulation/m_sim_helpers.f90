@@ -31,7 +31,12 @@ contains
         !! @param k y index
         !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_enthalpy
+#else
         !$acc routine seq
+#endif
+
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(kind(0d0)), dimension(num_fluids) :: alpha_rho
         real(kind(0d0)), dimension(num_fluids) :: alpha
@@ -81,7 +86,7 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
         real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
+        real(kind(0d0)) :: c, rho
         real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: icfl_sf
         real(kind(0d0)), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
         real(kind(0d0)) :: fltr_dtheta   !<
@@ -113,7 +118,7 @@ contains
                                           dz(l)/(abs(vel(3)) + c))
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 if (grid_geometry == 3) then
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
@@ -140,7 +145,7 @@ contains
             icfl_sf(j, k, l) = dt/min(dx(j)/(abs(vel(1)) + c), &
                                       dy(k)/(abs(vel(2)) + c))
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2d0
 
@@ -154,7 +159,7 @@ contains
             !1D
             icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
 
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2d0
 
@@ -208,7 +213,7 @@ contains
                                          dz(l)/(abs(vel(3)) + c))
             end if
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 if (grid_geometry == 3) then
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2d0) &
                               /minval(1/(rho*Re_l))
@@ -223,7 +228,7 @@ contains
             icfl_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), &
                                      dy(k)/(abs(vel(2)) + c))
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2d0)/maxval((1/Re_l)/rho)
             end if
 
@@ -231,7 +236,7 @@ contains
             !1D
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
-            if (any(Re_size > 0)) then
+            if (viscous) then
                 vcfl_dt = cfl_target*(dx(j)**2d0)/minval(1/(rho*Re_l))
             end if
 

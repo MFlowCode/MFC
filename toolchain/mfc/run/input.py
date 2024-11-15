@@ -34,13 +34,19 @@ class MFCInputFile(Case):
         common.file_write(fpp_path, contents, True)
 
     def get_cantera_solution(self) -> ct.Solution:
-        cantera_file = self.params["cantera_file"]
+        if self.params.get("chemistry", 'F') == 'T':
+            cantera_file = self.params["cantera_file"]
 
-        candidates = [
-            cantera_file,
-            os.path.join(self.dirpath, cantera_file),
-            os.path.join(common.MFC_MECHANISMS_DIR, cantera_file),
-        ]
+            candidates = [
+                cantera_file,
+                os.path.join(self.dirpath, cantera_file),
+                os.path.join(common.MFC_MECHANISMS_DIR, cantera_file),
+            ]
+        else:
+            # If Chemistry is turned off, we return a default (dummy) solution
+            # that will not be used in the simulation, so that MFC can still
+            # be compiled.
+            candidates = ["h2o2.yaml"]
 
         for candidate in candidates:
             try:
@@ -60,19 +66,17 @@ class MFCInputFile(Case):
         # Case FPP file
         self.__save_fpp(target, self.get_fpp(target))
 
-        # Chemistry Rates FPP file
+        # (Thermo)Chemistry source file
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
-
-        if self.params.get("chemistry", 'F') == 'T':
-            common.file_write(
-                os.path.join(modules_dir, "m_pyrometheus.f90"),
-                pyro.codegen.fortran90.gen_thermochem_code(
-                    self.get_cantera_solution(),
-                    module_name="m_pyrometheus"
-                ),
-                True
-            )
+        common.file_write(
+            os.path.join(modules_dir, "m_thermochem.f90"),
+            pyro.codegen.fortran90.gen_thermochem_code(
+                self.get_cantera_solution(),
+                module_name="m_thermochem"
+            ),
+            True
+        )
 
         cons.unindent()
 
@@ -144,7 +148,7 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
         raise common.MFCException(f"Input file '{filename}' does not exist. Please check the path is valid.")
 
     if filename.endswith(".py"):
-        (json_str, err) = common.get_py_program_output(filename, [json.dumps(ARGS())] + (args or []))
+        (json_str, err) = common.get_py_program_output(filename, ["--mfc", json.dumps(ARGS())] + (args or []))
 
         if err != 0:
             raise common.MFCException(f"Input file {filename} terminated with a non-zero exit code. Please make sure running the file doesn't produce any errors.")

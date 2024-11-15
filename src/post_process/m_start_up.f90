@@ -35,8 +35,7 @@ module m_start_up
 
     use m_checker
 
-    use m_thermochem            !< Procedures used to compute thermodynamic
-                                !! quantities
+    use m_thermochem, only: num_species, species_names
 
     use m_finite_differences
 
@@ -70,7 +69,7 @@ contains
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
             hypoelasticity, G, &
-            chem_wrt_Y, chem_wrt_T, &
+            chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
@@ -81,9 +80,9 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, ib, &
+            relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target
+            cfl_target, surface_tension
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -180,7 +179,7 @@ contains
         end if
 
         ! Converting the conservative variables to the primitive ones
-        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf)
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwbuff)
 
     end subroutine s_perform_time_step
 
@@ -296,19 +295,32 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the species' concentrations to the formatted database file ----
-        do i = 1, num_species
-            if (chem_wrt_Y(i) .or. prim_vars_wrt) then
-                q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
-                                                    -offset_y%beg:n + offset_y%end, &
-                                                    -offset_z%beg:p + offset_z%end)
+        if (chemistry) then
+            do i = 1, num_species
+                if (chem_wrt_Y(i) .or. prim_vars_wrt) then
+                    q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
+                                                        -offset_y%beg:n + offset_y%end, &
+                                                        -offset_z%beg:p + offset_z%end)
 
-                write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                    write (varname, '(A,A)') 'Y_', trim(species_names(i))
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+
+                end if
+            end do
+
+            if (chem_wrt_T) then
+                q_sf = q_prim_vf(T_idx)%sf(-offset_x%beg:m + offset_x%end, &
+                                           -offset_y%beg:n + offset_y%end, &
+                                           -offset_z%beg:p + offset_z%end)
+
+                write (varname, '(A)') 'T'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
 
                 varname(:) = ' '
-
             end if
-        end do
+        end if
 
         ! Adding the flux limiter function to the formatted database file
         do i = 1, E_idx - mom_idx%beg
@@ -487,7 +499,7 @@ contains
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                                                      H, adv, 0d0, c)
+                                                      H, adv, 0d0, 0d0, c)
 
                         q_sf(i, j, k) = c
                     end do

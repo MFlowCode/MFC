@@ -24,13 +24,8 @@ module m_body_forces
               s_initialize_body_forces_module, &
               s_finalize_body_forces_module
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rhoM)
-    !$acc declare link(rhoM)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rhoM
     !$acc declare create(rhoM)
-#endif
 
 contains
 
@@ -42,18 +37,18 @@ contains
         if (n > 0) then
             ! Simulation is 3D
             if (p > 0) then
-                @:ALLOCATE_GLOBAL (rhoM(-buff_size:buff_size + m, &
+                @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                     -buff_size:buff_size + n, &
                     -buff_size:buff_size + p))
                 ! Simulation is 2D
             else
-                @:ALLOCATE_GLOBAL (rhoM(-buff_size:buff_size + m, &
+                @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                     -buff_size:buff_size + n, &
                     0:0))
             end if
             ! Simulation is 1D
         else
-            @:ALLOCATE_GLOBAL (rhoM(-buff_size:buff_size + m, &
+            @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                 0:0, &
                 0:0))
         end if
@@ -178,7 +173,7 @@ contains
 
     subroutine s_finalize_body_forces_module
 
-        @:DEALLOCATE_GLOBAL(rhoM)
+        @:DEALLOCATE(rhoM)
 
     end subroutine s_finalize_body_forces_module
 

@@ -1,4 +1,4 @@
-import os, typing, shutil, time
+import os, typing, shutil, time, itertools
 from random import sample
 
 import rich, rich.table
@@ -9,7 +9,6 @@ from ..state   import ARG
 from .case     import TestCase
 from .cases    import list_cases
 from ..        import sched
-from ..run.input import MFCInputFile
 from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS, REQUIRED_TARGETS
 
@@ -48,7 +47,6 @@ def __filter(cases_) -> typing.List[TestCase]:
             checkCase.append(case.get_uuid())
             if not set(ARG("only")).issubset(set(checkCase)):
                 cases.remove(case)
-
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -92,18 +90,16 @@ def test():
 
         return
 
-    codes = list(REQUIRED_TARGETS) + [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
-
-    built_slugs = set()
-    for case in cases:
-        case.delete_output()
-        case.create_directory()
-
-        for code in codes:
-            slug = code.get_slug(case)
-            if slug not in built_slugs:
-                build(code, case.to_MFCInputFile())
-                built_slugs.add(slug)
+    # Some cases require a specific build of MFC for features like Chemistry,
+    # Analytically defined patches, and --case-optimization. Here, we build all
+    # the unique versions of MFC we need to run cases.
+    codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
+    unique_builds = set()
+    for case, code in itertools.product(cases, codes):
+        slug = code.get_slug(case.to_input_file())
+        if slug not in unique_builds:
+            build(code, case.to_input_file())
+            unique_builds.add(slug)
 
     cons.print()
 
@@ -184,10 +180,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         common.file_write(out_filepath, cmd.stdout)
 
         for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
-
             silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
-
-            h5dump = f"{HDF5.get_install_dirpath(MFCInputFile(os.path.basename(case.get_filepath()), case.get_dirpath(), case.get_parameters()))}/bin/h5dump"
+            h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
 
             if not os.path.exists(h5dump or ""):
                 if not does_command_exist("h5dump"):

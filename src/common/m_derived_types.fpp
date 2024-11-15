@@ -9,7 +9,8 @@
 module m_derived_types
 
     use m_constants  !< Constants
-    use m_thermochem !< Thermodynamic properties
+
+    use m_thermochem, only: num_species
 
     implicit none
 
@@ -33,6 +34,16 @@ module m_derived_types
         integer, pointer, dimension(:, :, :) :: sf => null()
     end type integer_field
 
+    !> Derived type for levelset
+    type levelset_field
+        real(kind(0d0)), pointer, dimension(:, :, :, :) :: sf => null()
+    end type levelset_field
+
+    !> Derived type for levelset norm
+    type levelset_norm_field
+        real(kind(0d0)), pointer, dimension(:, :, :, :, :) :: sf => null()
+    end type levelset_norm_field
+
     type mpi_io_var
         integer, allocatable, dimension(:) :: view
         type(scalar_field), allocatable, dimension(:) :: var
@@ -42,6 +53,16 @@ module m_derived_types
         integer :: view
         type(integer_field) :: var
     end type mpi_io_ib_var
+
+    type mpi_io_levelset_var
+        integer :: view
+        type(levelset_field) :: var
+    end type mpi_io_levelset_var
+
+    type mpi_io_levelset_norm_var
+        integer :: view
+        type(levelset_norm_field) :: var
+    end type mpi_io_levelset_norm_var
 
     !> Derived type annexing a vector field (VF)
     type vector_field
@@ -277,8 +298,11 @@ module m_derived_types
         real(kind(0d0)) :: element_spacing_angle !< Spacing between aperture elements in 2D acoustic array
         real(kind(0d0)) :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
         real(kind(0d0)) :: rotate_angle !< Angle of rotation of the entire circular 3D acoustic array
+        real(kind(0d0)) :: bb_bandwidth !< Bandwidth of each frequency in broadband wave
+        real(kind(0d0)) :: bb_lowest_freq !< The lower frequency bound of broadband wave
         integer :: num_elements !< Number of elements in the acoustic array
         integer :: element_on !< Element in the acoustic array to turn on
+        integer :: bb_num_freq !< Number of frequencies in the broadband wave
     end type acoustic_parameters
 
     !> Acoustic source source_spatial pre-calculated values
@@ -311,9 +335,13 @@ module m_derived_types
     type chemistry_parameters
         character(LEN=name_len) :: cantera_file !< Path to Cantera file
 
-        logical :: advection
         logical :: diffusion
         logical :: reactions
+
+        !> Method of determining gamma.
+        !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+        !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+        integer :: gamma_method
     end type chemistry_parameters
 
 end module m_derived_types

@@ -2,8 +2,6 @@ import os, glob, hashlib, binascii, subprocess, itertools, dataclasses
 
 from typing import List, Set, Union, Callable, Optional
 
-from ..run.input import MFCInputFile
-
 from ..      import case, common
 from ..state import ARG
 from ..run   import input
@@ -40,8 +38,6 @@ BASE_CFG = {
     'avg_state'                    : 2,
     'format'                       : 1,
     'precision'                    : 2,
-    'prim_vars_wrt'                :'F',
-    'parallel_io'                  :'F',
 
     'patch_icpp(1)%pres'           : 1.0,
     'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
@@ -102,12 +98,14 @@ def trace_to_uuid(trace: str) -> str:
 
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
-    ppn:   int
-    trace: str
+    ppn:          int
+    trace:        str
+    override_tol: Optional[float] = None
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None) -> None:
-        self.trace = trace
-        self.ppn   = ppn or 1
+    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None) -> None:
+        self.trace        = trace
+        self.ppn          = ppn or 1
+        self.override_tol = override_tol
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
@@ -131,6 +129,9 @@ class TestCase(case.Case):
         ]
 
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    def get_trace(self) -> str:
+        return self.trace
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -181,16 +182,15 @@ parser = argparse.ArgumentParser(
     description="{self.get_filepath()}: {self.trace}",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument("dict", type=str, metavar="DICT", help=argparse.SUPPRESS)
+parser.add_argument("--mfc", type=json.loads, default='{{}}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
 
 ARGS = vars(parser.parse_args())
-
-ARGS["dict"] = json.loads(ARGS["dict"])
 
 case = {self.gen_json_dict_str()}
 mods = {{}}
 
-if "post_process" in ARGS["dict"]["targets"]:
+if "post_process" in ARGS["mfc"]["targets"]:
     mods = {{
         'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
         'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
@@ -207,18 +207,27 @@ if "post_process" in ARGS["dict"]["targets"]:
         mods['omega_wrt(1)'] = 'T'
         mods['omega_wrt(2)'] = 'T'
         mods['omega_wrt(3)'] = 'T'
+else:
+    mods['parallel_io']   = 'F'
+    mods['prim_vars_wrt'] = 'F'
 
 print(json.dumps({{**case, **mods}}))
 """)
 
-    def to_MFCInputFile(self) -> MFCInputFile:
-        return MFCInputFile(self.get_filepath(), self.get_dirpath(), self.params)
-
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"
 
+    def to_input_file(self) -> input.MFCInputFile:
+        return input.MFCInputFile(
+            self.get_filepath(),
+            self.get_dirpath(),
+            self.get_parameters())
+    
     # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
+        if self.override_tol:
+            return self.override_tol
+
         tolerance = 1e-12 # Default
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
@@ -238,14 +247,16 @@ print(json.dumps({{**case, **mods}}))
 
         return tolerance
 
+
 @dataclasses.dataclass
 class TestCaseBuilder:
-    trace:   str
-    mods:    dict
-    path:    Optional[str]
-    args:    Optional[List[str]]
-    ppn:     int
-    functor: Optional[Callable]
+    trace:        str
+    mods:         dict
+    path:         str
+    args:         List[str]
+    ppn:          int
+    functor:      Optional[Callable]
+    override_tol: Optional[float] = None
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -264,12 +275,10 @@ class TestCaseBuilder:
                     if os.path.exists(path):
                         dictionary[key] = path
 
-        dictionary.update(self.mods)
+        if self.mods:
+            dictionary.update(self.mods)
 
-        if self.functor:
-            self.functor(dictionary)
-
-        return TestCase(self.trace, dictionary, self.ppn)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol)
 
 
 @dataclasses.dataclass
@@ -291,11 +300,13 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-# pylint: disable=too-many-arguments too-many-positional-arguments
-def define_case_f(trace: str, path: str, args: List[str] = None, newMods: dict = None, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, newMods or {}, path, args or [], ppn or 1, functor)
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol)
 
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None) -> TestCaseBuilder:
+
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -311,4 +322,4 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(' -> '.join(traces), mods, None, [], ppn or 1, functor)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
