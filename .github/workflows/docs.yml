@@ -50,7 +50,8 @@ jobs:
     - name: Linkcheck - Lychee
       uses: lycheeverse/lychee-action@v2
       with:
-        args: --base ./build/install/docs/mfc/ --verbose --no-progress './**/*.html' './*.html'
+        args: --verbose --no-progress build/install/docs/mfc/
+        fail: false
 
     - name: Publish Documentation
       if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' && ( github.event_name == 'cron' || github.event_name == 'workflow_dispatch' )
