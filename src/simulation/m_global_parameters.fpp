@@ -908,7 +908,7 @@ contains
                     sys_size = xi_idx%end + 1
                 end if
 
-                if (.not. f_is_default(sigma)) then
+                if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
