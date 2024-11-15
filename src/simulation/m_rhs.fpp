@@ -224,7 +224,7 @@ contains
         end if
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(tau_Re_vf(1:sys_size))
+            @:ALLOCATE(tau_Re_vf(1:sys_size))
             do i = 1, num_dims
                 @:ALLOCATE(tau_Re_vf(cont_idx%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                                     &  idwbuff(2)%beg:idwbuff(2)%end, &
@@ -240,7 +240,7 @@ contains
         ! ==================================================================
 
         if (qbmm) then
-            @:ALLOCATE_GLOBAL(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
+            @:ALLOCATE(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
 
             do i = 0, 2
                 do j = 0, 2
@@ -264,8 +264,8 @@ contains
         end if
 
         ! Allocation/Association of qK_cons_n and qK_prim_n ==========
-        @:ALLOCATE_GLOBAL(qL_prim(1:num_dims))
-        @:ALLOCATE_GLOBAL(qR_prim(1:num_dims))
+        @:ALLOCATE(qL_prim(1:num_dims))
+        @:ALLOCATE(qR_prim(1:num_dims))
 
         do i = 1, num_dims
             @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
@@ -282,42 +282,42 @@ contains
         end if
         ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
-        @:ALLOCATE_GLOBAL(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+        @:ALLOCATE(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
-        @:ALLOCATE_GLOBAL(qR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+        @:ALLOCATE(qR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
 
         if (n > 0) then
 
-            @:ALLOCATE_GLOBAL(qL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+            @:ALLOCATE(qL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
-            @:ALLOCATE_GLOBAL(qR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+            @:ALLOCATE(qR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
         else
-            @:ALLOCATE_GLOBAL(qL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(qL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
-            @:ALLOCATE_GLOBAL(qR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(qR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
         end if
 
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(qL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+            @:ALLOCATE(qL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:sys_size))
-            @:ALLOCATE_GLOBAL(qR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+            @:ALLOCATE(qR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:sys_size))
         else
-            @:ALLOCATE_GLOBAL(qL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(qL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
-            @:ALLOCATE_GLOBAL(qR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(qR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
 
         end if
 
         ! Allocation of dq_prim_ds_qp ======================================
 
-        @:ALLOCATE_GLOBAL(dq_prim_dx_qp(1:1))
-        @:ALLOCATE_GLOBAL(dq_prim_dy_qp(1:1))
-        @:ALLOCATE_GLOBAL(dq_prim_dz_qp(1:1))
+        @:ALLOCATE(dq_prim_dx_qp(1:1))
+        @:ALLOCATE(dq_prim_dy_qp(1:1))
+        @:ALLOCATE(dq_prim_dz_qp(1:1))
 
         if (viscous) then
             @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
@@ -378,12 +378,12 @@ contains
         ! END: Allocation of dq_prim_ds_qp =================================
 
         ! Allocation/Association of dqK_prim_ds_n =======================
-        @:ALLOCATE_GLOBAL(dqL_prim_dx_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(dqL_prim_dy_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(dqL_prim_dz_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(dqR_prim_dx_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(dqR_prim_dy_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(dqR_prim_dz_n(1:num_dims))
+        @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
+        @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
+        @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
+        @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
+        @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
+        @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
 
         if (viscous) then
             do i = 1, num_dims
@@ -439,34 +439,34 @@ contains
 
         if (viscous) then
             if (weno_Re_flux) then
-                @:ALLOCATE_GLOBAL(dqL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                @:ALLOCATE(dqL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
-                @:ALLOCATE_GLOBAL(dqR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                @:ALLOCATE(dqR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
 
                 if (n > 0) then
 
-                    @:ALLOCATE_GLOBAL(dqL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(dqL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
-                    @:ALLOCATE_GLOBAL(dqR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(dqR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
                 else
-                    @:ALLOCATE_GLOBAL(dqL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(dqL_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
-                    @:ALLOCATE_GLOBAL(dqR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(dqR_rsy_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
 
                 end if
 
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(dqL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+                    @:ALLOCATE(dqL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, mom_idx%beg:mom_idx%end))
-                    @:ALLOCATE_GLOBAL(dqR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+                    @:ALLOCATE(dqR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, mom_idx%beg:mom_idx%end))
                 else
-                    @:ALLOCATE_GLOBAL(dqL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(dqL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
-                    @:ALLOCATE_GLOBAL(dqR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(dqR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
 
                 end if
@@ -476,14 +476,14 @@ contains
         ! ==================================================================
 
         ! Allocation of gm_alphaK_n =====================================
-        @:ALLOCATE_GLOBAL(gm_alphaL_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(gm_alphaR_n(1:num_dims))
+        @:ALLOCATE(gm_alphaL_n(1:num_dims))
+        @:ALLOCATE(gm_alphaR_n(1:num_dims))
         ! ==================================================================
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
-        @:ALLOCATE_GLOBAL(flux_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(flux_src_n(1:num_dims))
-        @:ALLOCATE_GLOBAL(flux_gsrc_n(1:num_dims))
+        @:ALLOCATE(flux_n(1:num_dims))
+        @:ALLOCATE(flux_src_n(1:num_dims))
+        @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
         do i = 1, num_dims
 
@@ -565,10 +565,10 @@ contains
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n ===
 
         if (alt_soundspeed) then
-            @:ALLOCATE_GLOBAL(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
+            @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
         end if
 
-        @:ALLOCATE_GLOBAL(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
+        @:ALLOCATE(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
 
         do i = 1, num_fluids
             gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
@@ -577,7 +577,7 @@ contains
         !$acc update device(gamma_min, pres_inf)
 
         if (viscous) then
-            @:ALLOCATE_GLOBAL(Res(1:2, 1:maxval(Re_size)))
+            @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
         end if
 
         if (viscous) then
@@ -603,7 +603,7 @@ contains
         end do
 
         if (bubbles) then
-            @:ALLOCATE_GLOBAL(nbub(0:m, 0:n, 0:p))
+            @:ALLOCATE(nbub(0:m, 0:n, 0:p))
         end if
 
     end subroutine s_initialize_rhs_module
@@ -622,7 +622,7 @@ contains
         real(kind(0d0)) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
 
-        call nvtxStartRange("Compute_RHS")
+        call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
         ! Association/Population of Working Variables ======================
@@ -668,7 +668,7 @@ contains
             gm_alpha_qp%vf)
         call nvtxEndRange
 
-        call nvtxStartRange("RHS-MPI")
+        call nvtxStartRange("RHS-COMMUNICATION")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
@@ -686,21 +686,25 @@ contains
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3), nbub)
 
-        call nvtxStartRange("Viscous")
-        if (viscous) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                        dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                        qL_prim, &
-                                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                        dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                        qR_prim, &
-                                        q_prim_qp, &
-                                        dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                        idwbuff(1), idwbuff(2), idwbuff(3))
-        call nvtxEndRange
+        if (viscous) then
+            call nvtxStartRange("RHS-VISCOUS")
+            call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                               dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                               qL_prim, &
+                               qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                               dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                               qR_prim, &
+                               q_prim_qp, &
+                               dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                               idwbuff(1), idwbuff(2), idwbuff(3))
+            call nvtxEndRange
+        end if
 
-        call nvtxStartRange("Surface_Tension")
-        if (surface_tension) call s_get_capilary(q_prim_qp%vf)
-        call nvtxEndRange
+        if (surface_tension) then
+            call nvtxStartRange("RHS-SURFACE-TENSION")
+            call s_get_capilary(q_prim_qp%vf)
+            call nvtxEndRange
+        end if
         ! Dimensional Splitting Loop =======================================
 
         do id = 1, num_dims
@@ -779,6 +783,9 @@ contains
             end if
             irx%end = m; iry%end = n; irz%end = p
             ! ===============================================================
+
+            call nvtxStartRange("RHS-RIEMANN-SOLVER")
+
             ! Computing Riemann Solver Flux and Source Flux =================
             call nvtxStartRange("RHS_riemann_solver")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
@@ -801,7 +808,7 @@ contains
             ! ===============================================================
             ! Additional physics and source terms ===========================
             ! RHS addition for advection source
-            call nvtxStartRange("RHS_advection_source")
+            call nvtxStartRange("RHS-ADVECTION-SRC")
             call s_compute_advection_source_term(id, &
                                                  rhs_vf, &
                                                  q_cons_qp, &
@@ -810,15 +817,15 @@ contains
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
-            call nvtxStartRange("RHS_Hypoelasticity")
+            call nvtxStartRange("RHS-HYPOELASTICITY")
             if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
                                                                q_prim_qp%vf, &
                                                                rhs_vf)
             call nvtxEndRange
 
             ! RHS additions for viscosity
-            call nvtxStartRange("RHS_add_phys")
             if (viscous .or. surface_tension) then
+                call nvtxStartRange("RHS-ADD-PHYSICS")
                 call s_compute_additional_physics_rhs(id, &
                                                       q_prim_qp%vf, &
                                                       rhs_vf, &
@@ -826,34 +833,38 @@ contains
                                                       dq_prim_dx_qp(1)%vf, &
                                                       dq_prim_dy_qp(1)%vf, &
                                                       dq_prim_dz_qp(1)%vf)
+                call nvtxEndRange
             end if
-            call nvtxEndRange
 
             ! RHS additions for sub-grid bubbles
-            call nvtxStartRange("RHS_bubbles")
-            if (bubbles) call s_compute_bubbles_rhs(id, &
-                                                    q_prim_qp%vf)
-            call nvtxEndRange
+            if (bubbles) then
+                call nvtxStartRange("RHS-BUBBLES-COMPUTE")
+                call s_compute_bubbles_rhs(id, q_prim_qp%vf)
+                call nvtxEndRange
+            end if
 
             ! RHS additions for qbmm bubbles
-            call nvtxStartRange("RHS_qbmm")
-            if (qbmm) call s_compute_qbmm_rhs(id, &
-                                              q_cons_qp%vf, &
-                                              q_prim_qp%vf, &
-                                              rhs_vf, &
-                                              flux_n(id)%vf, &
-                                              pb, &
-                                              rhs_pb, &
-                                              mv, &
-                                              rhs_mv)
-            call nvtxEndRange
+
+            if (qbmm) then
+                call nvtxStartRange("RHS-QBMM")
+                call s_compute_qbmm_rhs(id, &
+                                        q_cons_qp%vf, &
+                                        q_prim_qp%vf, &
+                                        rhs_vf, &
+                                        flux_n(id)%vf, &
+                                        pb, &
+                                        rhs_pb, &
+                                        mv, &
+                                        rhs_mv)
+                call nvtxEndRange
+            end if
             ! END: Additional physics and source terms =========================
 
         end do
         ! END: Dimensional Splitting Loop =================================
 
         if (chemistry) then
-            call nvtxStartRange("RHS_Chem_Advection")
+            call nvtxStartRange("RHS-CHEM-ADVECTION")
             call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
             call nvtxEndRange
         end if
@@ -875,25 +886,29 @@ contains
 
         ! Additional Physics and Source Temrs ==================================
         ! Additions for acoustic_source
-        call nvtxStartRange("RHS_acoustic_src")
-        if (acoustic_source) call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                                              q_prim_qp%vf(1:sys_size), &
-                                                              t_step, &
-                                                              rhs_vf)
-        call nvtxEndRange
+        if (acoustic_source) then
+            call nvtxStartRange("RHS-ACOUSTIC-SRC")
+            call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
+                                             q_prim_qp%vf(1:sys_size), &
+                                             t_step, &
+                                             rhs_vf)
+            call nvtxEndRange
+        end if
 
         ! Add bubles source term
-        call nvtxStartRange("RHS_bubbles")
-        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) call s_compute_bubble_source( &
-            q_cons_qp%vf(1:sys_size), &
-            q_prim_qp%vf(1:sys_size), &
-            t_step, &
-            rhs_vf)
-        call nvtxEndRange
+        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) then
+            call nvtxStartRange("RHS-BUBBLES-SRC")
+            call s_compute_bubble_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                t_step, &
+                rhs_vf)
+            call nvtxEndRange
+        end if
 
         if (chemistry) then
             if (chem_params%reactions) then
-                call nvtxStartRange("RHS_Chem_Reactions")
+                call nvtxStartRange("RHS-CHEM-REACTIONS")
                 call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
                 call nvtxEndRange
             end if
@@ -2126,25 +2141,25 @@ contains
         end do
 
         @:DEALLOCATE(q_cons_qp%vf, q_prim_qp%vf)
-        @:DEALLOCATE_GLOBAL(qL_rsx_vf, qR_rsx_vf)
+        @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
         if (n > 0) then
-            @:DEALLOCATE_GLOBAL(qL_rsy_vf, qR_rsy_vf)
+            @:DEALLOCATE(qL_rsy_vf, qR_rsy_vf)
         end if
 
         if (p > 0) then
-            @:DEALLOCATE_GLOBAL(qL_rsz_vf, qR_rsz_vf)
+            @:DEALLOCATE(qL_rsz_vf, qR_rsz_vf)
         end if
 
         if (viscous .and. weno_Re_flux) then
-            @:DEALLOCATE_GLOBAL(dqL_rsx_vf, dqR_rsx_vf)
+            @:DEALLOCATE(dqL_rsx_vf, dqR_rsx_vf)
 
             if (n > 0) then
-                @:DEALLOCATE_GLOBAL(dqL_rsy_vf, dqR_rsy_vf)
+                @:DEALLOCATE(dqL_rsy_vf, dqR_rsy_vf)
             end if
 
             if (p > 0) then
-                @:DEALLOCATE_GLOBAL(dqL_rsz_vf, dqR_rsz_vf)
+                @:DEALLOCATE(dqL_rsz_vf, dqR_rsz_vf)
             end if
         end if
 
@@ -2208,8 +2223,8 @@ contains
             end do
         end if
 
-        @:DEALLOCATE_GLOBAL(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-        @:DEALLOCATE_GLOBAL(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+        @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+        @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 
         do i = num_dims, 1, -1
             if (i /= 1) then
@@ -2246,14 +2261,14 @@ contains
             @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
         end do
 
-        @:DEALLOCATE_GLOBAL(flux_n, flux_src_n, flux_gsrc_n)
+        @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
 
         if (viscous .and. cyl_coord) then
             do i = 1, num_dims
                 @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
             end do
             @:DEALLOCATE(tau_re_vf(e_idx)%sf)
-            @:DEALLOCATE_GLOBAL(tau_re_vf)
+            @:DEALLOCATE(tau_re_vf)
         end if
 
     end subroutine s_finalize_rhs_module

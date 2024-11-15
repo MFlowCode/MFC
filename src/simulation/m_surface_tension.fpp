@@ -49,22 +49,22 @@ contains
 
     subroutine s_initialize_surface_tension_module
 
-        @:ALLOCATE_GLOBAL(c_divs(1:num_dims + 1))
+        @:ALLOCATE(c_divs(1:num_dims + 1))
 
         do j = 1, num_dims + 1
             @:ALLOCATE(c_divs(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(c_divs(j))
         end do
 
-        @:ALLOCATE_GLOBAL(gL_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
-        @:ALLOCATE_GLOBAL(gR_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gL_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gR_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
 
-        @:ALLOCATE_GLOBAL(gL_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
-        @:ALLOCATE_GLOBAL(gR_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gL_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gR_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
 
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
-            @:ALLOCATE_GLOBAL(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
+            @:ALLOCATE(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
+            @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
         end if
     end subroutine s_initialize_surface_tension_module
 
@@ -384,13 +384,13 @@ contains
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 
-        @:DEALLOCATE_GLOBAL(c_divs)
+        @:DEALLOCATE(c_divs)
 
-        @:DEALLOCATE_GLOBAL(gL_x, gR_x)
+        @:DEALLOCATE(gL_x, gR_x)
 
-        @:DEALLOCATE_GLOBAL(gL_y, gR_y)
+        @:DEALLOCATE(gL_y, gR_y)
         if (p > 0) then
-            @:DEALLOCATE_GLOBAL(gL_z, gR_z)
+            @:DEALLOCATE(gL_z, gR_z)
         end if
 
     end subroutine s_finalize_surface_tension_module
