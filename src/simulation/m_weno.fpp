@@ -94,21 +94,6 @@ module m_weno
 !    real(kind(0d0)), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), CpL)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), CpR)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), Cb)
-    !$acc declare link(CpL, CpR, Cb)
-#else
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: CpL
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: CpR
-    real(kind(0d0)), target, allocatable, dimension(:, :, :) :: Cb
-#endif
-
-    real(kind(0d0)) :: w(1:8) ! Intermediate variables for overall stencil for ideal weights
-    real(kind(0d0)) :: x(1:5) ! Intermediate variables for sub-stencils for poly and beta
-    real(kind(0d0)) :: y(1:4) ! Differences in x
-
     ! END: WENO Coefficients ===================================================
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
@@ -170,10 +155,6 @@ contains
             0:weno_polyn*(weno_polyn + 1)/2 - 1))
         ! Number of cross terms for dvd = (k-1)(k-1+1)/2, where weno_polyn = k-1
         ! Note: k-1 not k because we are using value differences (dvd) not the values themselves
-
-        @:ALLOCATE_GLOBAL(CpL(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:3, 4))
-        @:ALLOCATE_GLOBAL(CpR(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:3, 4))
-        @:ALLOCATE_GLOBAL(Cb(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:3, 10))
 
         call s_compute_weno_coefficients(1, is1_weno)
 
@@ -260,6 +241,9 @@ contains
         type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
 
         integer :: i !< Generic loop iterator
+
+        real(kind(0d0)) :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
+        real(kind(0d0)) :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
         ! Determining the number of cells, the cell-boundary locations and
         ! the boundary conditions in the coordinate direction selected for
