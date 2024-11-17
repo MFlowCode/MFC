@@ -32,6 +32,8 @@
 
 - <a id="Meng16">Meng, J. C. C. (2016). Numerical simulations of droplet aerobreakup. PhD thesis, California Institute of Technology.</a>
 
+- <a id="Pirozzoli13">Pirozzoli, S., and Colonius, T. (2013). Generalized characteristic relaxation boundary conditions for unsteady compressible flow simulations. Journal of Computational Physics, 248:109-126.</a>
+
 - <a id="Preston07">Preston, A., Colonius, T., and Brennen, C. (2007). A reduced-order model of diffusive effects on the dynamics of bubbles. Physics of Fluids, 19(12):123302.</a>
 
 - <a id="Saurel09">Saurel, R., Petitpas, F., and Berry, R. A. (2009). Simple and efficient relaxation methods for interfaces separating compressible fluids, cavitating flows and shocks in multiphase mixtures. journal of Computational Physics, 228(5):1678–1712</a>
