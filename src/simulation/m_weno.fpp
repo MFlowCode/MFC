@@ -509,18 +509,19 @@ contains
                             poly_coef_cbR_${XYZ}$ (i + 1, 3, 1) = -10d0/12d0
                             poly_coef_cbR_${XYZ}$ (i + 1, 3, 2) = 3d0/12d0
 
-                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 0) = poly_coef_cbR_${XYZ}$ (i + 1, 3, 2)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 1) = poly_coef_cbR_${XYZ}$ (i + 1, 3, 1)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 2) = poly_coef_cbR_${XYZ}$ (i + 1, 3, 0)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 0) = poly_coef_cbR_${XYZ}$ (i + 1, 2, 2)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 1) = poly_coef_cbR_${XYZ}$ (i + 1, 2, 1)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 2) = poly_coef_cbR_${XYZ}$ (i + 1, 2, 0)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 0) = poly_coef_cbR_${XYZ}$ (i + 1, 1, 2)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 1) = poly_coef_cbR_${XYZ}$ (i + 1, 1, 1)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 2) = poly_coef_cbR_${XYZ}$ (i + 1, 1, 0)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 0) = poly_coef_cbR_${XYZ}$ (i + 1, 0, 2)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 1) = poly_coef_cbR_${XYZ}$ (i + 1, 0, 1)
-                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 2) = poly_coef_cbR_${XYZ}$ (i + 1, 0, 0)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 3, 2)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 1) = -poly_coef_cbR_${XYZ}$ (i + 1, 3, 1)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 0, 2) = -poly_coef_cbR_${XYZ}$ (i + 1, 3, 0)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 2, 2)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 1) = -poly_coef_cbR_${XYZ}$ (i + 1, 2, 1)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 1, 2) = -poly_coef_cbR_${XYZ}$ (i + 1, 2, 0)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 1, 2)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 1) = -poly_coef_cbR_${XYZ}$ (i + 1, 1, 1)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 2, 2) = -poly_coef_cbR_${XYZ}$ (i + 1, 1, 0)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 0, 2)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 1) = -poly_coef_cbR_${XYZ}$ (i + 1, 0, 1)
+                            poly_coef_cbL_${XYZ}$ (i + 1, 3, 2) = -poly_coef_cbR_${XYZ}$ (i + 1, 0, 0)
+                            ! NOTE: negative sign as the direction of taking the difference (dvd) is reversed
 
                             beta_coef_${XYZ}$ (i + 1, 3, 0) = 2107d0/240d0
                             beta_coef_${XYZ}$ (i + 1, 3, 1) = -5188d0/240d0
@@ -1259,7 +1260,6 @@ contains
                                                 + beta_coef_${XYZ}$ (j, 3, 4)*dvd(-2)*dvd(-3) &
                                                 + beta_coef_${XYZ}$ (j, 3, 5)*dvd(-3)*dvd(-3) &
                                                 + weno_eps
-                                                
 
                                     else ! TENO
                                         ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019) Section 3.2

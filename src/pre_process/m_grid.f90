@@ -59,16 +59,114 @@ contains
         ! Generic loop iterator
         integer :: i, j             !< generic loop operators
         real(kind(0d0)) :: length   !< domain lengths
+        real(kind(0d0)) :: sum_factors, base_dx !< sum of factors for normalization
+        real(kind(0d0)) :: factor(0:200) !< factor for non-uniform grid; hard-coded for m=200
 
-        ! Grid Generation in the x-direction ===============================
-        dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
+        ! ! Grid Generation in the x-direction ===============================
+        ! dx = (x_domain%end - x_domain%beg)/real(m + 1, kind(0d0))
 
-        do i = 0, m
-            x_cc(i) = x_domain%beg + 5d-1*dx*real(2*i + 1, kind(0d0))
-            x_cb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+        ! do i = 0, m
+        !     x_cc(i) = x_domain%beg + 5d-1*dx*real(2*i + 1, kind(0d0))
+        !     x_cb(i - 1) = x_domain%beg + dx*real(i, kind(0d0))
+        ! end do
+
+        ! x_cb(m) = x_domain%end
+
+        ! Hard-coded non-uniform grid for debugging
+
+        ! do i = 0, m
+        !     ! Example: factor oscillates between 1 and 100
+        !     ! Using multiple sine terms for more variation
+        !     factor(i) = 10.0d0 + 90.0d0 * &
+        !                ( 0.5d0 * (1.0d0 + sin(2.0d0 * pi * i / m)) + &
+        !                  0.3d0 * (1.0d0 + cos(4.0d0 * pi * i / m)) )
+        !             !    ( 0.5d0 * (1.0d0 + sin(17.0d0 * pi * i / m)) + &
+        !             !      0.3d0 * (1.0d0 + cos(31.0d0 * pi * i / m)) )
+        !     ! Ensure factor is within desired range
+        !     ! if (mod(i, 2) == 0) factor(i) = factor(i) / 2.0d0
+        !     ! if (mod(i, 3) == 0) factor(i) = factor(i) * 3.0d0
+        !     ! if (mod(i, 5) == 0) factor(i) = factor(i) / 5.0d0
+        !     ! if (mod(i, 7) == 0) factor(i) = factor(i) * 7.0d0
+        !     if (factor(i) < 10.0d0) factor(i) = 10.0d0
+        !     if (factor(i) > 100.0d0) factor(i) = 100.0d0
+        ! end do
+    
+        ! ! Compute the sum of factors for normalization
+        ! sum_factors = 0.0d0
+        ! do i = -1, m
+        !     sum_factors = sum_factors + factor(i)
+        ! end do
+    
+        ! ! Compute base grid spacing
+        ! base_dx = (x_domain%end - x_domain%beg) / sum_factors
+    
+        ! ! Compute cell boundaries
+        ! x_cb(-1) = x_domain%beg + base_dx * factor(-1)
+        ! do i = 0, m
+        !     x_cb(i) = x_cb(i-1) + base_dx * factor(i)
+        ! end do
+        ! x_cb(m) = x_domain%end
+
+
+        ! Hard-coded for Shu-Osher
+        factor(0:19) = 2d0/20d0
+        factor(20:180) = 6d0/161d0
+        factor(181:200) = 2d0/20d0
+        do i = 0, 200
+            factor(i) = factor(i) * (1.1d0 + sin(real(i, kind(0d0))))
+            ! if (i == 0) then
+            !     print *, sin(pi * real(i, kind(0d0)) / 10d0)
+            !     print *, pi * real(i, kind(0d0)) / 10d0
+            !     print *, pi * real(i, kind(0d0))
+            !     print *, real(i, kind(0d0))
+            !     print *, pi
+            !     print *, i
+            !     print *, ' '
+            !     print *, factor(i)
+            !     print *, ' '
+            !     print *, ' '
+            !     print *, ' '
+            !     print *, ' '
+            !     print *, ' -----------------'
+            ! end if
         end do
 
-        x_cb(m) = x_domain%end
+        print *, factor
+
+        factor = factor / sum(factor) * 10d0
+
+        print *, factor
+
+        ! x_cb(-1) = 0d0
+        ! dx = 2d0/20d0
+        ! do i = 0, 19
+        !     x_cb(i) = x_cb(i-1) + dx
+        ! end do
+        ! dx = 6d0/161d0
+        ! do i = 20, 180
+        !     x_cb(i) = x_cb(i-1) + dx
+        ! end do
+        ! dx = 2d0/20d0
+        ! do i = 181, 200
+        !     x_cb(i) = x_cb(i-1) + dx
+        ! end do
+        x_cb(-1) = 0d0
+        do i = 0, 200
+            x_cb(i) = sum(factor(0:i))
+        end do
+        x_cb(200) = 10d0
+    
+        x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2d0
+
+        dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
+
+        print *, ' '
+        print *, size(x_cb)
+        print *, x_cb
+        print *, ' '
+        print *, size(x_cc)
+        print *, x_cc
+    
 
         if (stretch_x) then
 
