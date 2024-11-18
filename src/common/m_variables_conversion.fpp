@@ -1032,6 +1032,14 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                         end do
                     end if
+#ifndef POST_PROCESS
+                    ! to save von Mises stress instead of elastic internal energy
+                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3/2)*qK_prim_vf(1)%sf(j, k, l)**2 + &
+                                            2*qK_prim_vf(2)%sf(j, k, l)**2 + qK_prim_vf(3)%sf(j, k, l)**2 + &
+                                            2*qK_prim_vf(4)%sf(j, k, l)**2 + 2*qK_prim_vf(5)%sf(j, k, l)**2 + &
+                                            qK_prim_vf(6)%sf(j, k, l)**2)
+#endif
+                   end if
 
                     !$acc loop seq
                     do i = advxb, advxe
