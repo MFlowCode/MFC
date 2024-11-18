@@ -360,7 +360,7 @@ contains
             end if
         end do
 
-        if ((bubbles .eqv. .true.) .or. (elasticity .eqv. .true.)) then
+        if (bubbles .or. elasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb

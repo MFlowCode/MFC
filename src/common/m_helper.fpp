@@ -36,7 +36,12 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              s_prohibit_abort
+              s_prohibit_abort, &
+              unassociated_legendre, &
+              associated_legendre, &
+              spherical_harmonic_func, &
+              double_factorial, &
+              factorial
 
 contains
 
@@ -481,5 +486,95 @@ contains
         print *, ""
         call s_mpi_abort
     end subroutine s_prohibit_abort
+
+    !! This function generates the unassociated legendre poynomials with input
+    ! mode number and evaluates them at input x
+    recursive function unassociated_legendre(x, l) result(P)
+        integer, intent(in) :: l
+        real(kind(0d0)), intent(in) :: x
+        real(kind(0d0)) :: P
+
+        if (l == 0) then
+            P = 1d0
+        else if (l == 1) then
+            P = x
+        else
+            P = ((2*l - 1)*x*unassociated_legendre(x, l - 1) - (l - 1)*unassociated_legendre(x, l - 2))/l
+        end if
+
+    end function unassociated_legendre
+
+        !! This function generated the spherical harmonic function valu, Y,
+    !based on inputs of x, phi, l and m
+
+    recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+        integer, intent(in) :: l, m
+        real(kind(0d0)), intent(in) :: x, phi
+        real(kind(0d0)) :: Y, prefactor, pi
+
+        pi = acos(-1d0)
+        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
+        if (m == 0) then
+            Y = prefactor*associated_legendre(x, l, m); 
+        elseif (m > 0) then
+            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+        end if
+    end function spherical_harmonic_func
+
+        !! This function generates the associated legendre polynomials evaluated
+    !at x with inputs l and m
+
+    recursive function associated_legendre(x, l, m) result(P)
+        integer, intent(in) :: l, m
+        real(kind(0d0)), intent(in) :: x
+        real(kind(0d0)) :: P
+
+        if (m <= 0 .and. l <= 0) then
+            P = 1; 
+        elseif (l == 1 .and. m <= 0) then
+            P = x; 
+        elseif (l == 1 .and. m == 1) then
+            P = -(1 - x**2)**(1/2); 
+        elseif (m == l) then
+            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+        elseif (m == l - 1) then
+            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+        else
+            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m); 
+        end if
+
+    end function associated_legendre
+
+        !! This function calculates the double factorial value of an integer
+
+    recursive function double_factorial(n) result(R)
+        integer, intent(in) :: n
+        integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer(kind=int64_kind) :: R
+
+        if (n <= 0) then
+            R = 1
+        else if (n == 1) then
+            R = 1
+        else
+            R = n*double_factorial(n - 2)
+        end if
+
+    end function double_factorial
+
+        !! The following function calculates the factorial value of an integer
+
+    recursive function factorial(n) result(R)
+        integer, intent(in) :: n
+        integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer(kind=int64_kind) :: R
+
+        if (n == 0) then
+            R = 1
+        else
+            R = n*factorial(n - 1)
+        end if
+
+    end function factorial
 
 end module m_helper

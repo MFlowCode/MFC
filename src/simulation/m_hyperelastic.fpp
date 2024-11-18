@@ -27,30 +27,10 @@ module m_hyperelastic
  s_initialize_hyperelastic_module, &
  s_finalize_hyperelastic_module
 
-    !> @name Abstract interface for creating function pointers
-    !> @{
-    abstract interface
-
-        !> @name Abstract subroutine for the infinite relaxation solver
-        !> @{
-        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, G, j, k, l)
-            !!!!$acc routine seq
-            import :: scalar_field, sys_size, b_size
-            type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            type(scalar_field), dimension(b_size), intent(inout) :: btensor
-            real(kind(0d0)), intent(in) :: G
-            integer, intent(in) :: j, k, l
-
-        end subroutine s_abstract_hyperelastic_solver
-        !> @}
-
-    end interface
-    !> @}
-
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: btensor !<
-!$acc declare create(btensor)
+    !$acc declare create(btensor)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_x
     real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y
@@ -130,11 +110,11 @@ contains
         real(kind(0d0)) :: G
         integer :: j, k, l, i, r
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, & 
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, &
         !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
-        do l = 0, p 
-            do k = 0, n 
-                do j = 0, m 
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
@@ -147,7 +127,7 @@ contains
                     G = max(G, sgm_eps)
                     !if ( G <= verysmall ) G_K = 0d0
 
-                    if ( G > verysmall ) then
+                    if (G > verysmall) then
                         !$acc loop seq
                         do i = 1, tensor_size
                             tensora(i) = 0d0
@@ -208,15 +188,15 @@ contains
                             tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
                             ! STEP 4: update the btensor, this is consistent with Riemann solvers
                             #:for BIJ, TXY in [(1,1),(2,2),(3,5),(4,3),(5,6),(6,9)]
-                               btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
+                                btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
                             #:endfor
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
                             if (hyper_model == 1) then
-                              call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
+                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
                             elseif (hyper_model == 2) then
-                              call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
+                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
                             end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
@@ -259,7 +239,7 @@ contains
 
         ! calculate the deviatoric of the tensor
         #:for IJ in [1,3,6]
-           btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+            btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
         ! setting the tensor to the stresses for riemann solver

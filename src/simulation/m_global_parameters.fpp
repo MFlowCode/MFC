@@ -1059,8 +1059,6 @@ contains
         ! the next one
         if (viscous) then
             buff_size = 2*weno_polyn + 2
-!        else if (elasticity) then !TODO: check if necessary
-!            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2
         end if

@@ -1001,7 +1001,7 @@ contains
                         end if
                     end if
 
-                    if (elasticity) then 
+                    if (elasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
@@ -1012,7 +1012,7 @@ contains
                         !$acc loop seq
                         do i = strxb, strxe
                             ! subtracting elastic contribution for pressure calculation
-                            if (G_K > verysmall) then !TODO: check if stable for >0
+                            if (G_K > verysmall) then
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2d0)/(4d0*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
@@ -1191,7 +1191,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then 
+                    if (elasticity) then
                         ! adding the elastic contribution
                         ! Multiply \tau to \rho \tau
                         do i = strxb, strxe

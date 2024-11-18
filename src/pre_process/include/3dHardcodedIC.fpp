@@ -46,7 +46,7 @@
     case (301) ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
         h = 0.0
         lam = 1.0
-        amp = patch_icpp(patch_id)%a2
+        amp = patch_icpp(patch_id)%a(2)
         intH = amp*abs((sin(2*pi*y_cc(j)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + h)
         if (x_cc(i) > intH) then
             q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)

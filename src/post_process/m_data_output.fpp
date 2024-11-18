@@ -1016,7 +1016,7 @@ contains
 
         thres = 0.9d0*maxalph_glb
         do k = 0, n
-            OLoop: do j = 0, m
+            do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
                 axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
                 ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
@@ -1034,7 +1034,7 @@ contains
                         tgp = dsqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
                             if (euc_d < tgp) then
-                                cycle OLoop
+                                cycle
                             elseif (euc_d > tgp .and. i == counter) then
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
@@ -1044,11 +1044,11 @@ contains
                         end do
                     end if
                 end if
-            end do OLoop
+            end do
         end do
 
-        allocate (y_d(counter))
-        allocate (x_d(counter))
+        allocate (x_d(counter), y_d(counter))
+
         do i = 1, counter
             y_d(i) = y_d1(i)
             x_d(i) = x_d1(i)

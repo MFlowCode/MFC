@@ -103,7 +103,7 @@
     case (205) ! 2D lung wave interaction problem
         h = 0.0           !non dim origin y
         lam = 1.0         !non dim lambda
-        amp = patch_icpp(patch_id)%a2         !to be changed later!       !non dim amplitude
+        amp = patch_icpp(patch_id)%a(2)         !to be changed later!       !non dim amplitude
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
 
@@ -118,7 +118,7 @@
     case (206) ! 2D lung wave interaction problem - horizontal domain
         h = 0.0           !non dim origin y
         lam = 1.0         !non dim lambda
-        amp = patch_icpp(patch_id)%a2
+        amp = patch_icpp(patch_id)%a(2)
 
         intL = amp*sin(2*pi*y_cc(j)/lam - pi/2) + h
 

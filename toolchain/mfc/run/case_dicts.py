@@ -52,7 +52,6 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
-    'hyperelasticity': ParamType.LOG,
     'cfl_adap_dt': ParamType.LOG,
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
