@@ -821,6 +821,22 @@ The boundary condition supported by the MFC are listed in table [Boundary Condit
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md#Thompson87) and [Thompson (1990)](references.md#Thompson90).
 
+### Generalized Characteristic Boundary conditions
+
+| Parameter                     | Type    | Description |
+| ---:                          | :----:  | :--- |
+| `bc_[x,y,z]%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
+| `bc_[x,y,z]%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
+| `bc_[x,y,z]%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
+| `bc_[x,y,z]%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
+| `bc_[x,y,z]%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
+| `bc_[x,y,z]%pres_in`          | Real    | Inflow pressure |
+| `bc_[x,y,z]%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%alpha_rho_in`     | Real Array | Inflow density |
+| `bc_[x,y,z]%alpha_in`         | Real Array | Inflow void fraction |
+
+This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](references.md#Pirozzoli13). This enables to provide inflow and outflow conditions outside the computational domain.
+
 ### Patch types
 
 | #    | Name               | Dim.  | Smooth | Description |
