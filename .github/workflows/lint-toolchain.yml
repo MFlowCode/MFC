@@ -11,4 +11,4 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Lint the toolchain
-      run: ./mfc.sh lint << EOF > $GITHUB_STEP_SUMMARY
+      run: ./mfc.sh lint > $GITHUB_STEP_SUMMARY
