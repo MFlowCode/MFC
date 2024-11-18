@@ -86,7 +86,7 @@ module m_derived_types
         real(wp), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
         logical :: grcbc_in, grcbc_out, grcbc_vel_out
 
-end type int_bounds_info
+    end type int_bounds_info
 
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info

@@ -11,7 +11,6 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
-
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
@@ -26,7 +25,7 @@ jobs:
       matrix:
         device: ['cpu', 'gpu']
     runs-on:
-      group:  phoenix
+      group: phoenix
       labels: gt
     timeout-minutes: 1400
     env:
@@ -37,7 +36,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pr
-
       - name: Clone - Master
         uses: actions/checkout@v4
         with:
@@ -45,28 +43,28 @@ jobs:
           ref: master
           path: master
 
-      - name: Bench (Master v. PR)
+      - name: Bench (Master vs PR)
         run: |
-          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
+          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} double) &
+          (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} double) &
           wait %1 && wait %2
 
-          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
-          (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} --single) &
-          wait %3 && wait %4
+          (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} single) &
+          wait %3
 
-      - name: Generate & Post Comment
+      - name: Check PR Single vs Double Precision
         run: |
-          (cd pr && . ./mfc.sh load -c p -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-single.yaml ../pr/bench-${{ matrix.device }}-single.yaml)
+          # Compare single and double precision within the PR
+          cd pr
+          . ./mfc.sh load -c p -m ${{ matrix.device }}
+          ./mfc.sh bench_diff bench-${{ matrix.device }}-double.yaml bench-${{ matrix.device }}-single.yaml
+
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   always()
+        if: always()
         with:
           name: logs-${{ matrix.device }}
           path: |
             pr/bench-${{ matrix.device }}.*
-            pr/build/benchmarks/*
             master/bench-${{ matrix.device }}.*
-            master/build/benchmarks/*
+
