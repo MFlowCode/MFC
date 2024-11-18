@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Fortitude
-      run: pip install --break-system-packages fortitude-lint
+      run: pip install fortitude-lint
 
     - name: Lint the source code
       run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* >> $GITHUB_STEP_SUMMARY
