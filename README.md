@@ -111,13 +111,13 @@ They are organized below. Just click the drop-downs!
 	* Low Mach number treatment available
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
-   	* Kapila and Allaire models
+   	* Kapila and Allaire models 5-equation models
 * Multi- and single-phase 
 	* Phase change via p, pT, and pTg schemes
 * Grids
 	* 1-3D Cartesian, cylindrical, axisymmetric. 
 	* Arbitrary grid stretching for multiple domain regions.
-	* Complex/arbitrary geometries via immersed boundary methods 
+	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
 * Surface tension for multiphase cases
 * Sub-grid Euler-Euler multiphase models for bubble dynamics and similar
@@ -135,9 +135,13 @@ They are organized below. Just click the drop-downs!
  	* WENO reconstructions of order 3, 5, and 7
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
-	* Reliable handling of high density ratios
+	* Reliable handling of large density ratios
 * Exact and approximate (e.g., HLL, HLLC) Riemann solvers
-* Boundary conditions: Periodic, reflective, extrapolation/Neumann, slip/no-slip, non-reflecting characteristic buffers, inflows, outflows, and more
+* Boundary conditions
+	* Periodic, reflective, extrapolation/Neumann
+	* Slip and no-slip
+ 	* Thompson-based characteristic BCs: non-reflecting sub/supersonic buffers, inflows, outflows
+	* Generalized characteristic relaxation boundary conditions
 * Runge-Kutta orders 1-3 (SSP TVD)
 * Interface sharpening (THINC-like)
 </details>
@@ -158,7 +162,7 @@ They are organized below. Just click the drop-downs!
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>100 Regression tests with each PR.
+	* \>250 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel, Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
