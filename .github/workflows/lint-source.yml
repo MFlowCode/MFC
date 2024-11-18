@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Fortitude
-      run: pip install fortitude-lint
+      run: pip install fortitude-lint ansi2txt
 
     - name: Lint the source code
       run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* &> lint.txt || true
@@ -20,4 +20,5 @@ jobs:
       run: cat lint.txt
       
     - name: Output Summary
-      run:  cat lint.txt << EOF > $GITHUB_STEP_SUMMARY
+      run:  cat lint.txt | ansi2txt > lint2.txt
+            cat lint2.txt << EOF > $GITHUB_STEP_SUMMARY
