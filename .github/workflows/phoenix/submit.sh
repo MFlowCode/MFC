@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -es
+set -e
 usage() {
     echo "Usage: $0 [script.sh] [cpu|gpu] [single|double]"
 }
