@@ -1,59 +1,75 @@
 #!/bin/bash
 
 set -e
+
 usage() {
-    echo "Usage: $0 [script.sh] [cpu|gpu] [single|double]"
+    echo "Usage: $0 [script.sh] [cpu|gpu]"
 }
 
 if [ ! -z "$1" ]; then
-    script_path="$1"
+    sbatch_script_contents=`cat $1`
 else
     usage
     exit 1
 fi
+
+sbatch_cpu_opts="\
+#SBATCH -p cpu-small               # partition
+#SBATCH --ntasks-per-node=24       # Number of cores per node required
+#SBATCH --mem-per-cpu=2G           # Memory per core\
+"
+
+sbatch_gpu_opts="\
+#SBATCH -CV100-16GB
+#SBATCH -G2\
+"
 
 if [ "$2" == "cpu" ]; then
-    sbatch_device_opts="#SBATCH -p cpu-small
-#SBATCH --ntasks-per-node=24
-#SBATCH --mem-per-cpu=2G"
+    sbatch_device_opts="$sbatch_cpu_opts"
 elif [ "$2" == "gpu" ]; then
-    sbatch_device_opts="#SBATCH -C V100-16GB
-#SBATCH -G2"
+    sbatch_device_opts="$sbatch_gpu_opts"
 else
     usage
     exit 1
 fi
 
-if [ "$3" != "single" ] && [ "$3" != "double" ]; then
-    usage
-    exit 1
+# Set default precision to 'double' if not provided
+
+if [ -z "$3" ]; then
+    precision="double"
+else
+    if [ "$3" != "single" ] && [ "$3" != "double" ]; then
+        usage
+        exit 1
+    fi
+    precision="$3"
 fi
 
-job_device="$2"
-job_precision="$3"
-job_slug="$(basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-$job_device-$job_precision"
+
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$precision"
 
 sbatch <<EOT
 #!/bin/bash
 #SBATCH -Jshb-$job_slug            # Job name
-#SBATCH --account=gts-sbryngelson3 # Charge account
+#SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 02:00:00                # Duration of the job
+#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
-#SBATCH -o $job_slug-$job_precision.out  # Include precision in the log file
+#SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
 
 cd "\$SLURM_SUBMIT_DIR"
-echo "Running in \$(pwd):"
+echo "Running in $(pwd):"
 
-# Load necessary modules
-. ./mfc.sh load -c p -m \$job_device
+job_slug="$job_slug"
+job_device="$2"
+job_precision="$precision"
 
-# Execute the script with arguments
-bash $script_path "\$job_device" "\$job_precision"
+. ./mfc.sh load -c p -m $2
+
+$sbatch_script_contents
 EOT
-
