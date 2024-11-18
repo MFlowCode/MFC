@@ -14,7 +14,7 @@ jobs:
       run: pip install fortitude-lint
 
     - name: Lint the source code
-      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true >> lint.txt
+      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* &> lint.txt || true
 
     - name: Print output to step
       run: cat lint.txt
