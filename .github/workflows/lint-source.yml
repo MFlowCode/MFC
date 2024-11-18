@@ -3,9 +3,24 @@ name: Lint Source
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
   lint:
     name: Lint Source
-    runs-on: macos-latest
+    runs-on: 'ubuntu-latest'
 
     steps:
     - uses: actions/checkout@v4
