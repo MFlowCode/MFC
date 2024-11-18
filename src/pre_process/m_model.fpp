@@ -704,13 +704,13 @@ contains
         interpolate = .false.
 
         do j = 1, boundary_edge_count
-            edge_v(1,1) = boundary_v(j, 1, 1)
-            edge_v(2,1) = boundary_v(j, 2, 1)
-            edge_v(1,2) = boundary_v(j, 1, 2)
-            edge_v(2,2) = boundary_v(j, 2, 2)
+            edge_v(1, 1) = boundary_v(j, 1, 1)
+            edge_v(2, 1) = boundary_v(j, 2, 1)
+            edge_v(1, 2) = boundary_v(j, 1, 2)
+            edge_v(2, 2) = boundary_v(j, 2, 2)
 
-            l1 = dsqrt((edge_v(2,1) - edge_v(1,1))**2 + &
-                       (edge_v(2,2) - edge_v(1,2))**2)
+            l1 = dsqrt((edge_v(2, 1) - edge_v(1, 1))**2 + &
+                       (edge_v(2, 2) - edge_v(1, 2))**2)
 
             if ((l1 > cell_width)) then
                 interpolate = .true.
@@ -737,23 +737,23 @@ contains
 
         do i = 1, model%ntrs
             do j = 1, 3
-               tri_v(1, j) = model%trs(i)%v(1, j)
-               tri_v(2, j) = model%trs(i)%v(2, j)
-               tri_v(3, j) = model%trs(i)%v(3, j)
+                tri_v(1, j) = model%trs(i)%v(1, j)
+                tri_v(2, j) = model%trs(i)%v(2, j)
+                tri_v(3, j) = model%trs(i)%v(3, j)
             end do
 
-            edge_l(1) = dsqrt((tri_v(1, 2) - tri_v(1, 1))**2 + & 
-                              (tri_v(2, 2) - tri_v(2, 1))**2 + & 
+            edge_l(1) = dsqrt((tri_v(1, 2) - tri_v(1, 1))**2 + &
+                              (tri_v(2, 2) - tri_v(2, 1))**2 + &
                               (tri_v(3, 2) - tri_v(3, 1))**2)
-            edge_l(2) = dsqrt((tri_v(1, 3) - tri_v(1, 2))**2 + & 
-                              (tri_v(2, 3) - tri_v(2, 2))**2 + & 
+            edge_l(2) = dsqrt((tri_v(1, 3) - tri_v(1, 2))**2 + &
+                              (tri_v(2, 3) - tri_v(2, 2))**2 + &
                               (tri_v(3, 3) - tri_v(3, 2))**2)
-            edge_l(3) = dsqrt((tri_v(1, 1) - tri_v(1, 3))**2 + & 
-                              (tri_v(2, 1) - tri_v(2, 3))**2 + & 
+            edge_l(3) = dsqrt((tri_v(1, 1) - tri_v(1, 3))**2 + &
+                              (tri_v(2, 1) - tri_v(2, 3))**2 + &
                               (tri_v(3, 1) - tri_v(3, 3))**2)
 
             if ((edge_l(1) > cell_width) .or. &
-                (edge_l(2) > cell_width) .or. & 
+                (edge_l(2) > cell_width) .or. &
                 (edge_l(3) > cell_width)) then
                 interpolate = .true.
             end if
@@ -791,7 +791,7 @@ contains
             edge_y(2) = boundary_v(i, 2, 2)
 
             ! Compute the length of the edge
-            edge_length = dsqrt((edge_x(2) - edge_x(1))**2 + & 
+            edge_length = dsqrt((edge_x(2) - edge_x(1))**2 + &
                                 (edge_y(2) - edge_y(1))**2)
 
             ! Determine the number of segments
@@ -818,7 +818,7 @@ contains
             edge_y(2) = boundary_v(i, 2, 2)
 
             ! Compute the length of the edge
-            edge_length = dsqrt((edge_x(2) - edge_x(1))**2 + & 
+            edge_length = dsqrt((edge_x(2) - edge_x(1))**2 + &
                                 (edge_y(2) - edge_y(1))**2)
 
             ! Determine the number of segments and interpolation step
@@ -896,7 +896,7 @@ contains
                 tri(2, 3) = model%trs(i)%v(mod(j, 3) + 1, 3)
 
                 ! Compute the length of the edge
-                edge_length = dsqrt((tri(2, 1) - tri(1, 1))**2 + & 
+                edge_length = dsqrt((tri(2, 1) - tri(1, 1))**2 + &
                                     (tri(2, 2) - tri(1, 2))**2 + &
                                     (tri(2, 3) - tri(1, 3))**2)
 
@@ -943,7 +943,7 @@ contains
                 tri(2, 3) = model%trs(i)%v(mod(j, 3) + 1, 3)
 
                 ! Compute the length of the edge
-                edge_length = dsqrt((tri(2, 1) - tri(1, 1))**2 + & 
+                edge_length = dsqrt((tri(2, 1) - tri(1, 1))**2 + &
                                     (tri(2, 2) - tri(1, 2))**2 + &
                                     (tri(2, 3) - tri(1, 3))**2)
 
@@ -1034,13 +1034,13 @@ contains
                 tri(j, 2) = model%trs(i)%v(j, 2)
                 tri(j, 3) = model%trs(i)%v(j, 3)
                 dist_buffer(j) = dsqrt((point(1) - tri(j, 1))**2 + &
-                                    (point(2) - tri(j, 2))**2 + &
-                                    (point(3) - tri(j, 3))**2)
+                                       (point(2) - tri(j, 2))**2 + &
+                                       (point(3) - tri(j, 3))**2)
             end do
-            
+
             ! Get the surface center of each triangle facet
             do j = 1, 3
-                midp(j) = (tri(1, j) + tri(2, j)+ tri(3, j))/3
+                midp(j) = (tri(1, j) + tri(2, j) + tri(3, j))/3
             end do
 
             dist_t_min = minval(dist_buffer(1:3))
@@ -1163,7 +1163,7 @@ contains
         do i = 1, total_vertices
             dist_buffer = dsqrt((point(1) - interpolated_boundary_v(i, 1))**2 + &
                                 (point(2) - interpolated_boundary_v(i, 2))**2 + &
-                                (point(3)- interpolated_boundary_v(i, 3))**2)
+                                (point(3) - interpolated_boundary_v(i, 3))**2)
 
             if (min_dist > dist_buffer) then
                 min_dist = dist_buffer

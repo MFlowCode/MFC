@@ -35,6 +35,6 @@ module m_constants
     real(kind(0d0)), parameter :: threshold_vector_zero = 1d-10 !< Threshold to treat the component of a vector to be zero
     real(kind(0d0)), parameter :: threshold_edge_zero = 1d-8 !< Threshold to treat two edges to be overlapped
     real(kind(0d0)), parameter :: threshold_bary = 1d-1 !< Threshold to interpolate a barycentric facet
-    real(kind(0d0)), parameter :: initial_distance_buffer = 1d12 !< Initialized levelset distance for the shortest path pair algorithm 
+    real(kind(0d0)), parameter :: initial_distance_buffer = 1d12 !< Initialized levelset distance for the shortest path pair algorithm
 
 end module m_constants

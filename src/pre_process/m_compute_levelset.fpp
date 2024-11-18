@@ -20,12 +20,12 @@ module m_compute_levelset
 
     implicit none
 
-    private; public :: s_compute_cylinder_levelset, s_compute_circle_levelset, &
- s_compute_airfoil_levelset, &
- s_compute_3D_airfoil_levelset, &
- s_compute_rectangle_levelset, &
- s_compute_cuboid_levelset, &
- s_compute_sphere_levelset
+    private; public :: s_cylinder_levelset, s_circle_levelset, &
+ s_airfoil_levelset, &
+ s_3D_airfoil_levelset, &
+ s_rectangle_levelset, &
+ s_cuboid_levelset, &
+ s_sphere_levelset
 
     real(kind(0d0)) :: x_centroid, y_centroid, z_centroid
     real(kind(0d0)) :: length_x, length_y, length_z
@@ -39,7 +39,7 @@ module m_compute_levelset
 
 contains
 
-    subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -73,9 +73,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_circle_levelset
+    end subroutine s_circle_levelset
 
-    subroutine s_compute_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -156,9 +156,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_airfoil_levelset
+    end subroutine s_airfoil_levelset
 
-    subroutine s_compute_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -257,10 +257,10 @@ contains
             end do
         end do
 
-    end subroutine s_compute_3D_airfoil_levelset
+    end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    subroutine s_compute_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -345,9 +345,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_rectangle_levelset
+    end subroutine s_rectangle_levelset
 
-    subroutine s_compute_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -459,9 +459,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_cuboid_levelset
+    end subroutine s_cuboid_levelset
 
-    subroutine s_compute_sphere_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -496,9 +496,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_sphere_levelset
+    end subroutine s_sphere_levelset
 
-    subroutine s_compute_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -569,6 +569,6 @@ contains
             end do
         end do
 
-    end subroutine s_compute_cylinder_levelset
+    end subroutine s_cylinder_levelset
 
 end module m_compute_levelset
