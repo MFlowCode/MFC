@@ -2032,7 +2032,7 @@ contains
 
         ! Show the number of vertices in the original STL model
         if (proc_rank == 0) then
-            print *, 'Number of input model vertices:', 3*model%ntrs
+            print *, ' * Number of input model vertices:', 3*model%ntrs
         end if
 
         call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
@@ -2046,16 +2046,13 @@ contains
 
         ! Show the number of edges and boundary edges in 2D STL models
         if (proc_rank == 0 .and. p == 0) then
-            print *, 'Number of 2D model edges:', 3*model%ntrs
-            print *, ""
-            print *, 'Number of 2D model boundary edges:', boundary_edge_count
+            print *, '* Number of 2D model boundary edges:', boundary_edge_count
         end if
 
         ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
         if (interpolate) then
             if (proc_rank == 0) then
-                print *, ""
-                print *, 'Interpolating STL vertices...'
+                print *, ' * Interpolating STL vertices...'
             end if
 
             if (p > 0) then
@@ -2065,7 +2062,7 @@ contains
             end if
 
             if (proc_rank == 0) then
-                print *, 'Total number of interpolated boundary vertices:', total_vertices
+                print *, ' * Total number of interpolated boundary vertices:', total_vertices
             end if
         end if
 

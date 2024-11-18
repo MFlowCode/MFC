@@ -358,9 +358,6 @@ contains
         deallocate (patch_id_fp)
         deallocate (ib_markers%sf)
 
-        ! deallocate (STL_levelset)
-        ! deallocate (STL_levelset_norm)
-
     end subroutine s_finalize_initial_condition_module
 
 end module m_initial_condition

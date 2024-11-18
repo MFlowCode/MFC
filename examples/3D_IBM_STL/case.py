@@ -26,7 +26,7 @@ print(json.dumps({
     'm'                            : 99,
     'n'                            : 49,
     'p'                            : 49,
-    'dt'                           : 1.0E-6,
+    'dt'                           : 1.0E-12,
     't_step_start'                 : 0,
     't_step_stop'                  : 1000,
     't_step_save'                  : 10,
@@ -91,12 +91,12 @@ print(json.dumps({
 
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
-    'patch_ib(1)%model%filepath'               : 'IBM_ellipsoid.stl',
+    'patch_ib(1)%model%filepath'               : 'Sphere_IBM.stl',
     'patch_ib(1)%model%translate(1)'           : 0 - 0.02056,
     'patch_ib(1)%model%translate(2)'           : 0 - 0.01,
     'patch_ib(1)%model%translate(3)'           : 0 - 0.01,
-    'patch_ib(1)%model%spc'                    : 100,
-    'patch_ib(1)%model%threshold'              : 0.01,
+    'patch_ib(1)%model%spc'                    : 200,
+    'patch_ib(1)%model%threshold'              : 0.99,
     'patch_ib(1)%slip'                         : 'F',
     # ==========================================================================
 
