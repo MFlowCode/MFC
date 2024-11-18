@@ -673,7 +673,10 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+        if (hyperelasticity) then
+            call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+            call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
+        end if
         call nvtxEndRange
 
         if (cfl_dt) then
