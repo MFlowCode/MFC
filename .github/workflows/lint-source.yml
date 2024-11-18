@@ -1,10 +1,10 @@
-name: Lint Source Code
+name: Lint Source
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
   lint:
-    name: Lint Source Code
+    name: Lint Source
     runs-on: macos-latest
 
     steps:
