@@ -1039,7 +1039,6 @@ contains
                                             2*qK_prim_vf(4)%sf(j, k, l)**2 + 2*qK_prim_vf(5)%sf(j, k, l)**2 + &
                                             qK_prim_vf(6)%sf(j, k, l)**2)
 #endif
-                   end if
 
                     !$acc loop seq
                     do i = advxb, advxe
