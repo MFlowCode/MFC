@@ -675,6 +675,13 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
+        ! GRCBC flags
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%grcbc_in = .false.
+            bc_${dir}$%grcbc_out = .false.
+            bc_${dir}$%grcbc_vel_out = .false.
+        #:endfor
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !>  The computation of parameters, the allocation of memory,

@@ -74,13 +74,19 @@ module m_derived_types
     type int_bounds_info
         integer :: beg
         integer :: end
+
         real(wp) :: vb1
         real(wp) :: vb2
         real(wp) :: vb3
         real(wp) :: ve1
         real(wp) :: ve2
         real(wp) :: ve3
-    end type int_bounds_info
+        real(wp) :: pres_in, pres_out
+        real(wp), dimension(3) :: vel_in, vel_out
+        real(wp), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
+        logical :: grcbc_in, grcbc_out, grcbc_vel_out
+
+end type int_bounds_info
 
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info
