@@ -49,5 +49,5 @@ jobs:
           cd $BASE
           export MFC_PR=$PR
           pwd
-          ./mfc.sh count_diff
+          ./mfc.sh count_diff << EOF > $GITHUB_STEP_SUMMARY
 
