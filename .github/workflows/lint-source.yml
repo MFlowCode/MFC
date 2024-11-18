@@ -14,9 +14,8 @@ jobs:
       run: pip install fortitude-lint
 
     - name: Lint the source code
-      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true >> lint.md
-            cat lint.md
-            cat lint.md << EOF >> $GITHUB_STEP_SUMMARY
+      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true >> lint.txt
 
-    - name: Test job summary
-      run: echo -e "Test! \nTest line 2" >> $GITHUB_STEP_SUMMARY
+    - name: Print
+    - run:  cat lint.txt
+            cat lint.txt << EOF >> $GITHUB_STEP_SUMMARY
