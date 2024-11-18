@@ -85,12 +85,12 @@ contains
         end do
         !$acc update device(Gs)
 
-        @:ALLOCATE_GLOBAL(fd_coeff_x(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
         if (n > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_y(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
         end if
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(fd_coeff_z(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, 0:p))
         end if
 
         ! Computing centered finite difference coefficients
@@ -321,13 +321,13 @@ contains
 
         ! Deallocating memory
         do i = 1, b_size
-            @:DEALLOCATE_GLOBAL(btensor%vf(i)%sf)
+            @:DEALLOCATE(btensor%vf(i)%sf)
         end do
-        @:DEALLOCATE_GLOBAL(fd_coeff_x)
+        @:DEALLOCATE(fd_coeff_x)
         if (n > 0) then
-            @:DEALLOCATE_GLOBAL(fd_coeff_y)
+            @:DEALLOCATE(fd_coeff_y)
             if (p > 0) then
-                @:DEALLOCATE_GLOBAL(fd_coeff_z)
+                @:DEALLOCATE(fd_coeff_z)
             end if
         end if
 
