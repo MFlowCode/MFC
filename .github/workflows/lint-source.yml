@@ -17,5 +17,5 @@ jobs:
       run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true >> lint.txt
 
     - name: Print
-    - run:  cat lint.txt
+      run:  cat lint.txt
             cat lint.txt << EOF >> $GITHUB_STEP_SUMMARY
