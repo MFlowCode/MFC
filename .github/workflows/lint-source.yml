@@ -16,6 +16,8 @@ jobs:
     - name: Lint the source code
       run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true >> lint.txt
 
-    - name: Print
-      run:  cat lint.txt
-            cat lint.txt << EOF >> $GITHUB_STEP_SUMMARY
+    - name: Print output to step
+      run: cat lint.txt
+      
+    - name: Output Summary
+      run:  cat lint.txt << EOF > $GITHUB_STEP_SUMMARY
