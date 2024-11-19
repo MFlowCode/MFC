@@ -917,15 +917,14 @@ contains
         elseif (weno_order == 7) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau, delta, v)
-                    ! Note: dvd is not used as the equations are not cast in terms of the differences
+                    !$acc parallel loop vector gang collapse(3) default(present) private(poly, beta, alpha, omega, tau, delta, dvd, v)
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
                                 !$acc loop seq
                                 do i = 1, v_size
 
-                                    v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, i) ! temporary field value array for clarity
+                                    if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, i) ! temporary field value array for clarity
 
                                     if (.not. teno) then
                                         dvd(2) = v_rs_ws_${XYZ}$ (j + 3, k, l, i) &
