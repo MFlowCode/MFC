@@ -1035,10 +1035,10 @@ contains
 
 #ifdef MFC_POST_PROCESS
                     ! to save von Mises stress instead of elastic internal energy
-                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3/2)*qK_prim_vf(1)%sf(j, k, l)**2 + &
-                                            2*qK_prim_vf(2)%sf(j, k, l)**2 + qK_prim_vf(3)%sf(j, k, l)**2 + &
-                                            2*qK_prim_vf(4)%sf(j, k, l)**2 + 2*qK_prim_vf(5)%sf(j, k, l)**2 + &
-                                            qK_prim_vf(6)%sf(j, k, l)**2)
+                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3d0/2d0)* (qK_prim_vf(1)%sf(j, k, l)**2d0 + &
+                                            2d0*qK_prim_vf(2)%sf(j, k, l)**2d0 + qK_prim_vf(3)%sf(j, k, l)**2d0 + &
+                                            2d0*qK_prim_vf(4)%sf(j, k, l)**2d0 + 2d0*qK_prim_vf(5)%sf(j, k, l)**2d0 + &
+                                            qK_prim_vf(6)%sf(j, k, l)**2d0) )
 #endif
 
                     !$acc loop seq
@@ -1055,7 +1055,6 @@ contains
         end do
         !$acc end parallel loop
 
-        !print *, 'I got here AA'
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
