@@ -60,8 +60,36 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
+    
+    case (302) ! (3D lung geometry in X direction - axisym, with smoothing)
+        lam = 1.0*200.E-06
+        amp = patch_icpp(patch_id)%a2
+        h = 0.125*amp
+        
+        intH = amp/2*(sin(2*pi*y_cc(j)/lam + pi/2) + sin(2*pi*z_cc(k)/lam + pi/2))
+        
+        alph = patch_icpp(2)%alpha(1) + (patch_icpp(1)%alpha(1)-patch_icpp(2)%alpha(1))/(h)*(x_cc(i)-(intH-h/2))
+        
+        if (x_cc(i) > intH + h/2) then
+        
+            q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
+            q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
+        
+        else if ((x_cc(i) .le. intH + h/2) .and. (x_cc(i) .ge. intH - h/2)) then
+        
+            q_prim_vf(advxb)%sf(i, j, k) = alph !0.5
+            q_prim_vf(advxe)%sf(i, j, k) = 1- alph !0.5
+            q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)*alph!0.5
+            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(2)%alpha_rho(2)/patch_icpp(2)%alpha(2)*(1-alph)!0.5
+            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
+        
+        end if
+    
+    case (303) ! pre_stress for hyperelasticity, bubble in material
 
-    case (302) ! pre_stress for hyperelasticity, bubble in material
         R0ref = 30E-6    ! equilibrium radius
         Rinit = patch_icpp(3)%radius ! initial radius
         x_bcen = patch_icpp(3)%x_centroid

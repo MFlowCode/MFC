@@ -660,6 +660,7 @@ contains
                 end do
             end do
         end if
+
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -673,10 +674,10 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) then
-            call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
-            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
-        end if
+           if (hyperelasticity) then 
+             call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+             call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+           end if
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -916,7 +917,6 @@ contains
         end if
 
         ! END: Additional pphysics and source terms ============================
-
         if (run_time_info .or. probe_wrt .or. ib) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -938,7 +938,6 @@ contains
             time_avg = 0d0
         end if
         ! ==================================================================
-
         call nvtxEndRange
 
     end subroutine s_compute_rhs
