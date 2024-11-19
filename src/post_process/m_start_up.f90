@@ -210,7 +210,7 @@ contains
         end if
        
         if (kymograph) then
-            call s_write_kymo_data_file()
+            call s_write_kymo_data_file(q_prim_vf)
         end if
 
         ! Adding the grid to the formatted database file

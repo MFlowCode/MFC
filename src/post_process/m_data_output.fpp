@@ -1187,8 +1187,18 @@ contains
 
     end subroutine s_write_energy_data_file
 
-    subroutine s_write_kymo_data_file
-
+    subroutine s_write_kymo_data_file(q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        integer :: j, k, l, t !< Generic loop iterators
+   
+        do l = 0, p
+           do k = 0, n
+              do j = 0, m
+                 
+              end do
+           end do
+        end do
+ 
 
     end subroutine s_write_kymo_data_file
 
