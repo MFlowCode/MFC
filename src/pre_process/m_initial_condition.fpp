@@ -229,11 +229,11 @@ contains
                 !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_circle(i, patch_id_fp, q_prim_vf)
 
                     ! Rectangular patch
                 elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_rectangle(i, patch_id_fp, q_prim_vf)
 
                     ! Swept line patch
                 elseif (patch_icpp(i)%geometry == 4) then
@@ -266,7 +266,7 @@ contains
 
                     ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf, .false.)
+                    call s_model(i, patch_id_fp, q_prim_vf)
 
                 end if
                 !> @}

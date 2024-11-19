@@ -2012,7 +2012,7 @@ contains
         if (p > 0) then
             call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
         else
-            call f_check_interpolation_2D(boundary_v, boundary_vertex_count, (/dx, dy, dz/), interpolate)
+            call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolate)
         end if
 
         ! Show the number of edges and boundary edges in 2D STL models

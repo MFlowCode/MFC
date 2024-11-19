@@ -6,10 +6,10 @@ import math
 # Dynamic Viscosity
 Mu1 = 0.0000184
 #Mu2 = 0.01
-rho1 = 1.19 #rho1 = 0.2199
+rho1 = 1.19 #0.2199
 gam_a = 1.4
 # Patch Design
-D = 0.01
+D = 0.1
 
 # Configuring case dictionary
 print(json.dumps({
@@ -22,10 +22,10 @@ print(json.dumps({
     'x_domain%end'                 : 6*D,
     'y_domain%beg'                 : -3*D,
     'y_domain%end'                 : 3*D,
-    'm'                            : 199,
-    'n'                            : 99,
+    'm'                            : 60,
+    'n'                            : 30,
     'p'                            : 0,
-    'dt'                           : 1.0E-12,
+    'dt'                           : 1.0E-9,
     't_step_start'                 : 0,
     't_step_stop'                  : 3000,
     't_step_save'                  : 30,
@@ -47,7 +47,7 @@ print(json.dumps({
     'mp_weno'                      : 'F',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
-    'viscous'                      : 'T',
+    'viscous'                      : 'F',
     'bc_x%beg'                     : -3,
     'bc_x%end'                     : -3,
     'bc_y%beg'                     : -3,
@@ -71,17 +71,17 @@ print(json.dumps({
     'patch_icpp(1)%y_centroid'     : 0,
     'patch_icpp(1)%length_x'       : 1000*D,
     'patch_icpp(1)%length_y'       : 1000*D,
-    'patch_icpp(1)%vel(1)'         : 10, #527.2E+00,
+    'patch_icpp(1)%vel(1)'         : 1,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
-    'patch_icpp(1)%pres'           : 100000, #10918.2549,
+    'patch_icpp(1)%pres'           : 100000,
     'patch_icpp(1)%alpha_rho(1)'   : (1.0)*rho1,
     'patch_icpp(1)%alpha(1)'       : 1.0,
     # ==========================================================================
     'patch_ib(1)%geometry'              : 5,
     'patch_ib(1)%model%filepath'        : 'Circle_IBM.stl',
-    'patch_ib(1)%model%translate(1)'    : -0.05 + 0.0424444350,
-    'patch_ib(1)%model%translate(2)'    : -0.05 + 0.0445000000,
-    'patch_ib(1)%model%spc'             : 2000,
+    'patch_ib(1)%model%translate(1)'    : -0.05,
+    'patch_ib(1)%model%translate(2)'    : -0.05,
+    'patch_ib(1)%model%spc'             : 200,
     'patch_ib(1)%model%threshold'       : 0.99,
     'patch_ib(1)%slip'                  : 'F',
     # # ========================================================================
@@ -89,8 +89,6 @@ print(json.dumps({
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0,
-    'fluid_pp(1)%Re(1)'            : 5000,
-    #'fluid_pp(1)%Re(1)'            : 7535533.2,
     # ==========================================================================
 }))
 

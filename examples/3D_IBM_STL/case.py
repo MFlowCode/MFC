@@ -3,8 +3,8 @@ import math
 
 Mu = 1.84E-05
 gam_a = 1.4
-rho1 = 0.2199
-D = 0.02
+rho1 = 1.19
+D = 2
 
 # Configuring case dictionary
 print(json.dumps({
@@ -13,8 +13,7 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    # x direction
-    'x_domain%beg'                 : -4.0*D,
+    'x_domain%beg'                 : -4*D,
     'x_domain%end'                 : 4.0*D,
     # y direction
     'y_domain%beg'                 : -2*D,
@@ -23,10 +22,10 @@ print(json.dumps({
     'z_domain%beg'                 : -2*D,
     'z_domain%end'                 : 2*D,
     'cyl_coord'                    : 'F',
-    'm'                            : 99,
-    'n'                            : 49,
-    'p'                            : 49,
-    'dt'                           : 1.0E-12,
+    'm'                            : 59,
+    'n'                            : 29,
+    'p'                            : 29,
+    'dt'                           : 1.0E-9,
     't_step_start'                 : 0,
     't_step_stop'                  : 1000,
     't_step_save'                  : 10,
@@ -42,7 +41,7 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'T',
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'T',
     'avg_state'                    : 2,
     'mapped_weno'                  : 'T',
@@ -50,7 +49,7 @@ print(json.dumps({
     'mp_weno'                      : 'F',
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
-    'viscous'                      :'T',
+    'viscous'                      :'F',
     'bc_x%beg'                     : -3,
     'bc_x%end'                     : -3,
     'bc_y%beg'                     : -3,
@@ -81,10 +80,10 @@ print(json.dumps({
     'patch_icpp(1)%length_x'       : 100*D,
     'patch_icpp(1)%length_y'       : 50*D,
     'patch_icpp(1)%length_z'       : 50*D,
-    'patch_icpp(1)%vel(1)'         : 527.2E+00,
+    'patch_icpp(1)%vel(1)'         : 1,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
     'patch_icpp(1)%vel(3)'         : 0.0E+00,
-    'patch_icpp(1)%pres'           : 10918.2549,
+    'patch_icpp(1)%pres'           : 100000,
     'patch_icpp(1)%alpha_rho(1)'   : (1.0)*rho1,
     'patch_icpp(1)%alpha(1)'       : 1.E+00,
     # # ========================================================================
@@ -92,17 +91,16 @@ print(json.dumps({
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
     'patch_ib(1)%model%filepath'               : 'Sphere_IBM.stl',
-    'patch_ib(1)%model%translate(1)'           : 0 - 0.02056,
-    'patch_ib(1)%model%translate(2)'           : 0 - 0.01,
-    'patch_ib(1)%model%translate(3)'           : 0 - 0.01,
-    'patch_ib(1)%model%spc'                    : 200,
-    'patch_ib(1)%model%threshold'              : 0.99,
+    'patch_ib(1)%model%translate(1)'           : 0,
+    'patch_ib(1)%model%translate(2)'           : -0.05,
+    'patch_ib(1)%model%translate(3)'           : -0.05,
+    'patch_ib(1)%model%spc'                    : 100,
+    'patch_ib(1)%model%threshold'              : 0.95,
     'patch_ib(1)%slip'                         : 'F',
     # ==========================================================================
 
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0,
-    'fluid_pp(1)%Re(1)'            : 7535533.2,
     # ==========================================================================
 }))

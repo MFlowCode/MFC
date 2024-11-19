@@ -32,6 +32,8 @@ module m_constants
     integer, parameter :: Ifactor_2D = 100 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 2D models
     integer, parameter :: Ifactor_3D = 10 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 3D models
     integer, parameter :: Ifactor_bary_3D = 30 !< Multiple factor of the ratio (triangle area to cell face area) for interpolation on triangle facets for 3D models
+    integer, parameter :: num_ray = 20 !< Default number of rays traced per cell
+    real(kind(0d0)), parameter :: ray_tracing_threshold = 0.9d0 !< Threshold above which the cell is marked as the model patch
     real(kind(0d0)), parameter :: threshold_vector_zero = 1d-10 !< Threshold to treat the component of a vector to be zero
     real(kind(0d0)), parameter :: threshold_edge_zero = 1d-8 !< Threshold to treat two edges to be overlapped
     real(kind(0d0)), parameter :: threshold_bary = 1d-1 !< Threshold to interpolate a barycentric facet

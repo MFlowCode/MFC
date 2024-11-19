@@ -582,18 +582,18 @@ contains
         ! Collect all edges of all triangles and store them
         do i = 1, model%ntrs
             ! First edge (v1, v2)
-            edge(1, :) = model%trs(i)%v(1, 1:2)
-            edge(2, :) = model%trs(i)%v(2, 1:2)
+            edge(1, 1:2) = model%trs(i)%v(1, 1:2)
+            edge(2, 1:2) = model%trs(i)%v(2, 1:2)
             call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Second edge (v2, v3)
-            edge(1, :) = model%trs(i)%v(2, 1:2)
-            edge(2, :) = model%trs(i)%v(3, 1:2)
+            edge(1, 1:2) = model%trs(i)%v(2, 1:2)
+            edge(2, 1:2) = model%trs(i)%v(3, 1:2)
             call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Third edge (v3, v1)
-            edge(1, :) = model%trs(i)%v(3, 1:2)
-            edge(2, :) = model%trs(i)%v(1, 1:2)
+            edge(1, 1:2) = model%trs(i)%v(3, 1:2)
+            edge(2, 1:2) = model%trs(i)%v(1, 1:2)
             call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
         end do
 
@@ -635,8 +635,8 @@ contains
         do i = 1, edge_count
             if (edge_occurrence(i) == 0) then
                 store_index = store_index + 1
-                boundary_v(store_index, 1, :) = temp_boundary_v(i, 1, :)
-                boundary_v(store_index, 2, :) = temp_boundary_v(i, 2, :)
+                boundary_v(store_index, 1, 1:2) = temp_boundary_v(i, 1, 1:2)
+                boundary_v(store_index, 2, 1:2) = temp_boundary_v(i, 2, 1:2)
             end if
         end do
 
@@ -680,8 +680,8 @@ contains
 
         ! Increment edge index and store the edge
         edge_index = edge_index + 1
-        temp_boundary_v(edge_index, 1, :) = edge(1, :)
-        temp_boundary_v(edge_index, 2, :) = edge(2, :)
+        temp_boundary_v(edge_index, 1, 1:2) = edge(1, 1:2)
+        temp_boundary_v(edge_index, 2, 1:2) = edge(2, 1:2)
 
     end subroutine f_register_edge
 
@@ -693,24 +693,19 @@ contains
     subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
         logical, intent(out) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
-        real(kind(0d0)), optional, intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(kind(0d0)), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: spacing
 
         real(kind(0d0)) :: l1, cell_width !< Length of each boundary edge and cell width
-        real(kind(0d0)), dimension(1:2, 1:2) :: edge_v !< Boundary points of each boundary edge
         integer :: j !< Boundary edge index iterator
 
         cell_width = minval(spacing(1:2))
         interpolate = .false.
 
         do j = 1, boundary_edge_count
-            edge_v(1, 1) = boundary_v(j, 1, 1)
-            edge_v(2, 1) = boundary_v(j, 2, 1)
-            edge_v(1, 2) = boundary_v(j, 1, 2)
-            edge_v(2, 2) = boundary_v(j, 2, 2)
 
-            l1 = dsqrt((edge_v(2, 1) - edge_v(1, 1))**2 + &
-                       (edge_v(2, 2) - edge_v(1, 2))**2)
+            l1 = dsqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
+                       (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
 
             if ((l1 > cell_width)) then
                 interpolate = .true.

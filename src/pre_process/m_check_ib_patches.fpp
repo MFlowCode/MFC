@@ -269,7 +269,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model%filepath == ' ', &
+        @:PROHIBIT(patch_ib(patch_id)%model%filepath == dflt_char, &
             'Empty model file path for patch '//trim(iStr))
 
         @:PROHIBIT(patch_ib(patch_id)%model%scale(1) <= 0d0 &

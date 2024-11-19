@@ -1,10 +1,10 @@
-This file was created on 2024-11-14 14:39:02.513175.
+This file was created on 2024-11-18 20:15:58.424303.
 
 mfc.sh:
 
-    Invocation: test -o EA8FA07E -j 4 --generate
+    Invocation: test -o EA8FA07E --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        b32b22974ef35dbaac944015caad85b1caa6e86b on master (dirty)
+    Git:        f2a801365b5e6ac90d9520c15c94dbdd99d64289 on master (dirty)
 
 pre_process:
 
@@ -19,6 +19,39 @@ pre_process:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
+    
+        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -85,39 +118,6 @@ simulation:
         SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
