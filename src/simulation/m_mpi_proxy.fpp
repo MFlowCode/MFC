@@ -167,8 +167,6 @@ contains
 
     subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
-#ifdef MFC_MPI
-
         implicit none
         integer, intent(in) :: counts          ! Array of vector lengths for each process
         real(kind(0d0)), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
@@ -177,6 +175,8 @@ contains
 
         integer :: i, offset, ierr
         integer, allocatable :: recounts(:), displs(:)
+
+#ifdef MFC_MPI
 
         allocate (recounts(num_procs))
 
