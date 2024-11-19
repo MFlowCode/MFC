@@ -745,14 +745,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case['t_step_save'] = 50
 
                 caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
-                if caseSize > 625:
+                if caseSize > 25 * 25:
                     if case['n'] == 0 and case['p'] == 0:
-                        case['m'] = 625
+                        case['m'] = 25 * 25
                     elif case['p'] == 0:
                         case['m'] = 25
                         case['n'] = 25
-                    # m, n, p < 25 causes errors
-                    elif caseSize > 15625:
+                    elif caseSize > 25 * 25 * 25:
                         case['m'] = 25
                         case['n'] = 25
                         case['p'] = 25

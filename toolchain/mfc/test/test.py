@@ -136,6 +136,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
     tol = case.compute_tolerance()
+    case.delete_output()
+    case.create_directory()
+
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 

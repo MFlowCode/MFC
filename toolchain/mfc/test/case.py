@@ -7,7 +7,6 @@ from ..state import ARG
 from ..run   import input
 from ..build import MFCTarget, get_target
 
-count = 0
 Tend = 0.25
 Nt   = 50
 mydt = 0.0005
@@ -219,7 +218,7 @@ print(json.dumps({{**case, **mods}}))
 
     def to_input_file(self) -> input.MFCInputFile:
         return input.MFCInputFile(
-            self.get_filepath(),
+            os.path.basename(self.get_filepath()),
             self.get_dirpath(),
             self.get_parameters())
  
@@ -262,7 +261,7 @@ class TestCaseBuilder:
         return trace_to_uuid(self.trace)
 
     def to_case(self) -> TestCase:
-        dictionary = {}
+        dictionary = self.mods.copy()
         if self.path:
             dictionary.update(input.load(self.path, self.args, do_print=False).params)
 
@@ -274,6 +273,7 @@ class TestCaseBuilder:
                     path = os.path.abspath(path)
                     if os.path.exists(path):
                         dictionary[key] = path
+                        break
 
         if self.mods:
             dictionary.update(self.mods)

@@ -1,6 +1,5 @@
 import os, typing, hashlib, dataclasses
 
-from .case    import Case
 from .printer import cons
 from .common  import MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
@@ -22,7 +21,7 @@ class MFCTarget:
             return r
 
     name:         str              # Name of the target
-    flags:        typing.List[str] # Extra flags to pass to CMake
+    flags:        typing.List[str] # Extra flags to pass to CMakeMFCTarget
     isDependency: bool             # Is it a dependency of an MFC target?
     isDefault:    bool             # Should it be built by default? (unspecified -t | --targets)
     isRequired:   bool             # Should it always be built? (no matter what -t | --targets is)
@@ -32,7 +31,7 @@ class MFCTarget:
     def __hash__(self) -> int:
         return hash(self.name)
 
-    def get_slug(self, case: Case) -> str:
+    def get_slug(self, case: input.MFCInputFile) -> str:
         if self.isDependency:
             return self.name
 
@@ -47,7 +46,7 @@ class MFCTarget:
         return m.hexdigest()[:10]
 
     # Get path to directory that will store the build files
-    def get_staging_dirpath(self, case: Case) -> str:
+    def get_staging_dirpath(self, case: input.MFCInputFile) -> str:
         return os.sep.join([os.getcwd(), "build", "staging", self.get_slug(case) ])
 
     # Get the directory that contains the target's CMakeLists.txt
@@ -64,18 +63,18 @@ class MFCTarget:
         # The install directory is located <root>/build/install/<slug>
         return os.sep.join([os.getcwd(), "build", "install", self.get_slug(case)])
 
-    def get_install_binpath(self, case: Case) -> str:
+    def get_install_binpath(self, case: input.MFCInputFile) -> str:
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
 
-    def is_configured(self, case: Case) -> bool:
+    def is_configured(self, case: input.MFCInputFile) -> bool:
         # We assume that if the CMakeCache.txt file exists, then the target is
         # configured. (this isn't perfect, but it's good enough for now)
         return os.path.isfile(
             os.sep.join([self.get_staging_dirpath(case), "CMakeCache.txt"])
         )
 
-    def get_configuration_txt(self, case: Case) -> typing.Optional[dict]:
+    def get_configuration_txt(self, case: input.MFCInputFile) -> typing.Optional[dict]:
         if not self.is_configured(case):
             return None
 
@@ -261,8 +260,6 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
         targets = [ targets ]
     if targets is None:
         targets = ARG("targets")
-    elif isinstance(targets, (MFCTarget, str)):
-        targets = [targets]
 
     targets = get_targets(list(REQUIRED_TARGETS) + targets)
     case    = case or input.load(ARG("input"), ARG("--"), {})
