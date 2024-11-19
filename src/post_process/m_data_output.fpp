@@ -31,13 +31,16 @@ module m_data_output
  s_open_formatted_database_file, &
  s_open_intf_data_file, &
  s_open_energy_data_file, &
+ s_open_kymo_data_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
+ s_write_kymo_data_file, &
  s_close_formatted_database_file, &
  s_close_intf_data_file, &
  s_close_energy_data_file, &
+ s_close_kymo_data_file, &
  s_finalize_data_output_module
 
     ! Including the Silo Fortran interface library that features the subroutines
@@ -570,7 +573,23 @@ contains
 
     end subroutine s_open_energy_data_file ! ----------------------------------------
 
-    subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
+    subroutine s_open_kymo_data_file() ! ------------------------
+
+        character(LEN=path_len + 3*name_len) :: file_path !<
+              !! Relative path to a file in the case directory
+
+        write (file_path, '(A)') '/kymo_data.dat'
+        file_path = trim(case_dir)//trim(file_path)
+
+        ! Opening the simulation data file
+        open (251, FILE=trim(file_path), &
+              FORM='formatted', &
+              POSITION='append', &
+              STATUS='unknown')
+
+   end subroutine s_open_kymo_data_file ! ----------------------------------------
+
+   subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
 
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
@@ -1168,6 +1187,11 @@ contains
 
     end subroutine s_write_energy_data_file
 
+    subroutine s_write_kymo_data_file
+
+
+    end subroutine s_write_kymo_data_file
+
     subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
@@ -1206,6 +1230,12 @@ contains
         close (251)
 
     end subroutine s_close_energy_data_file !---------------------
+
+    subroutine s_close_kymo_data_file()
+
+        close (251)
+
+    end subroutine s_close_kymo_data_file
 
     subroutine s_finalize_data_output_module() ! -------------------------
         ! Description: Deallocation procedures for the module
