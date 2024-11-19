@@ -54,7 +54,7 @@ jobs:
       - name: Generate & Post Comment
         run: |
           (cd pr && . ./mfc.sh load -c p -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml) > $GITHUB_STEP_SUMMARY
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4

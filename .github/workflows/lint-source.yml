@@ -18,7 +18,7 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
 
-  lint:
+  lint-source:
     name: Lint Source
     runs-on: 'ubuntu-latest'
 
@@ -29,10 +29,4 @@ jobs:
       run: pip install fortitude-lint ansi2txt
 
     - name: Lint the source code
-      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* &> lint.txt || true
-
-    - name: Sanitize
-      run: cat lint.txt | ansi2txt > lint2.txt
-      
-    - name: Output Summary
-      run: cat lint2.txt << EOF > $GITHUB_STEP_SUMMARY
+      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true

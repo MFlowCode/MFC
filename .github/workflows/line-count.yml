@@ -1,4 +1,4 @@
-name: Check Line Counts
+name: Lines of Code
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -49,5 +49,5 @@ jobs:
           cd $BASE
           export MFC_PR=$PR
           pwd
-          ./mfc.sh count_diff > $GITHUB_STEP_SUMMARY
+          ./mfc.sh count_diff
 

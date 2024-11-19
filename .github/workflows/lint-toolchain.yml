@@ -3,7 +3,7 @@ name: Lint Toolchain
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  docs:
+  lint-toolchain:
     name:    Lint Toolchain
     runs-on: ubuntu-latest
 
@@ -11,4 +11,4 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Lint the toolchain
-      run: ./mfc.sh lint > $GITHUB_STEP_SUMMARY
+      run: ./mfc.sh lint
