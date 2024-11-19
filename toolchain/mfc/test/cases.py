@@ -365,7 +365,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ndim in range(2, 4):
             cases.append(define_case_f(
                 f'{ndim}D -> IBM -> STL',
-                f'examples/{ndim}D_ibm_stl/case.py',
+                f'examples/{ndim}D_ibm_stl_test/case.py',
                 ['--ndim', str(ndim)],
                 mods=common_mods
             ))
