@@ -262,6 +262,19 @@ for cmp in ["x", "y", "z"]:
     SIMULATION[f'bc_{cmp}%ve1'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve2'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%ve3'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%pres_in'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%pres_out'] = ParamType.REAL
+    SIMULATION[f'bc_{cmp}%grcbc_in'] = ParamType.LOG
+    SIMULATION[f'bc_{cmp}%grcbc_out'] = ParamType.LOG
+    SIMULATION[f'bc_{cmp}%grcbc_vel_out'] = ParamType.LOG
+
+    for int_id in range(1, 10+1):
+        SIMULATION[f"bc_{cmp}%alpha_rho_in({int_id})"] = ParamType.REAL
+        SIMULATION[f"bc_{cmp}%alpha_in({int_id})"] = ParamType.REAL
+
+    for int_id in range(1, 3+1):
+        SIMULATION[f"bc_{cmp}%vel_in({int_id})"] = ParamType.REAL
+        SIMULATION[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL
 
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
