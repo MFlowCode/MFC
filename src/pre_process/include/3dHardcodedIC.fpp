@@ -4,6 +4,11 @@
     real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
     real(kind(0d0)) :: eps
+   
+    real(kind(0d0)) :: rcoord, theta, phi, xi_sph, x_bcen, y_bcen, z_bcen, Rinit
+    real(kind(0d0)) :: x_ccs, y_ccs, z_ccs
+    real(kind(0d0)), dimension(num_dims) :: xi_cart
+    integer :: l
 
     eps = 1e-9
 #:enddef
@@ -55,6 +60,33 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
+
+    case (302) ! pre_stress for hyperelasticity, bubble in material
+        R0ref = 30E-6    ! equilibrium radius
+        Rinit = patch_icpp(3)%radius ! initial radius
+        x_bcen = patch_icpp(3)%x_centroid
+        y_bcen = patch_icpp(3)%y_centroid
+        z_bcen = patch_icpp(3)%z_centroid
+        x_ccs = x_cc(i) - x_bcen
+        y_ccs = y_cc(j) - y_bcen
+        z_ccs = z_cc(k) - z_bcen
+        rcoord = sqrt(x_ccs**2 + y_ccs**2 + z_ccs**2)
+        phi = atan2(y_ccs, x_ccs)
+        theta = atan2(sqrt(x_ccs**2 + y_ccs**2), z_ccs)
+        !spherical coord, assuming Rmax=1
+        xi_sph = (rcoord**3 - R0ref**3 + Rinit**3)**(1d0/3d0) 
+        xi_cart(1) = xi_sph*sin(theta)*cos(phi)
+        xi_cart(2) = xi_sph*sin(theta)*sin(phi)
+        xi_cart(3) = xi_sph*cos(theta)
+        ! shift back
+        xi_cart(1) = xi_cart(1) + x_bcen
+        xi_cart(2) = xi_cart(2) + y_bcen
+        xi_cart(3) = xi_cart(3) + z_bcen
+!        print *, 'xi_cart(1) ::', xi_cart(1), 'xi_cart(2) ::', xi_cart(2), 'xi_cart(3) ::', xi_cart(3)
+        ! assigning the reference map to the q_prim vector field
+        do l = 1, 3
+            q_prim_vf(l + xibeg - 1)%sf(i, j, k) = xi_cart(l)
+        end do
 
         ! Put your variable assignments here
     case default
