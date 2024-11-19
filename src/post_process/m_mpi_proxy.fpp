@@ -197,7 +197,7 @@ contains
 
         #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                  &
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
-            & 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',                    &
+            & 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data', 'kymograph',        &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
             & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &

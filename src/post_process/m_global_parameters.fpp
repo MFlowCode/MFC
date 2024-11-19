@@ -154,6 +154,7 @@ module m_global_parameters
     logical :: parallel_io    !< Format of the data files
     logical :: sim_data
     logical :: file_per_process !< output format
+    logical :: kymograph
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -392,6 +393,7 @@ contains
         qm_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
+        kymograph = .false.
         cf_wrt = .false.
         ib = .false.
 

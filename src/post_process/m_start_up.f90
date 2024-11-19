@@ -83,7 +83,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension &
-            sim_data, hyperelasticity
+            sim_data, hyperelasticity, kymograph
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -203,6 +203,14 @@ contains
         if (sim_data) then
             call s_write_intf_data_file(q_prim_vf)
             call s_write_energy_data_file(q_prim_vf, q_cons_vf)
+        end if
+
+        if (kymograph .and. proc_rank == 0) then
+            call s_open_kymo_data_file()
+        end if
+       
+        if (kymograph) then
+            call s_write_kymo_data_file(q_prim_vf)
         end if
 
         ! Adding the grid to the formatted database file
@@ -707,6 +715,10 @@ contains
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()
             call s_close_energy_data_file()
+        end if
+
+        if (kymograph .and. proc_rank == 0) then
+            call s_close_kymo_data_file()
         end if
 
         ! Closing the formatted database file
