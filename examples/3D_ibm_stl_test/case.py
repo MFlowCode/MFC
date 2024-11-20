@@ -4,7 +4,7 @@ import math
 Mu = 1.84E-05
 gam_a = 1.4
 rho1 = 1.19
-D = 2
+D = 3
 
 # Configuring case dictionary
 print(json.dumps({
@@ -22,9 +22,9 @@ print(json.dumps({
     'z_domain%beg'                 : -2*D,
     'z_domain%end'                 : 2*D,
     'cyl_coord'                    : 'F',
-    'm'                            : 59,
-    'n'                            : 29,
-    'p'                            : 29,
+    'm'                            : 99,
+    'n'                            : 49,
+    'p'                            : 49,
     'dt'                           : 1.0E-9,
     't_step_start'                 : 0,
     't_step_stop'                  : 1000,
@@ -80,7 +80,7 @@ print(json.dumps({
     'patch_icpp(1)%length_x'       : 100*D,
     'patch_icpp(1)%length_y'       : 50*D,
     'patch_icpp(1)%length_z'       : 50*D,
-    'patch_icpp(1)%vel(1)'         : 1,
+    'patch_icpp(1)%vel(1)'         : 0.001,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
     'patch_icpp(1)%vel(3)'         : 0.0E+00,
     'patch_icpp(1)%pres'           : 100000,
@@ -90,7 +90,7 @@ print(json.dumps({
 
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
-    'patch_ib(1)%model%filepath'               : 'Sphere_IBM.stl',
+    'patch_ib(1)%model%filepath'               : 'Cube_IBM.stl',
     'patch_ib(1)%model%translate(1)'           : 0,
     'patch_ib(1)%model%translate(2)'           : -0.05,
     'patch_ib(1)%model%translate(3)'           : -0.05,

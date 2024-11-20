@@ -9,7 +9,7 @@ Mu1 = 0.0000184
 rho1 = 1.19 #0.2199
 gam_a = 1.4
 # Patch Design
-D = 2
+D = 3
 
 # Configuring case dictionary
 print(json.dumps({
@@ -22,8 +22,8 @@ print(json.dumps({
     'x_domain%end'                 : 6*D,
     'y_domain%beg'                 : -3*D,
     'y_domain%end'                 : 3*D,
-    'm'                            : 60,
-    'n'                            : 30,
+    'm'                            : 159,
+    'n'                            : 79,
     'p'                            : 0,
     'dt'                           : 1.0E-9,
     't_step_start'                 : 0,
@@ -71,7 +71,7 @@ print(json.dumps({
     'patch_icpp(1)%y_centroid'     : 0,
     'patch_icpp(1)%length_x'       : 1000*D,
     'patch_icpp(1)%length_y'       : 1000*D,
-    'patch_icpp(1)%vel(1)'         : 1,
+    'patch_icpp(1)%vel(1)'         : 0.001,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
     'patch_icpp(1)%pres'           : 100000,
     'patch_icpp(1)%alpha_rho(1)'   : (1.0)*rho1,
@@ -81,7 +81,7 @@ print(json.dumps({
     'patch_ib(1)%model%filepath'        : 'Circle_IBM.stl',
     'patch_ib(1)%model%translate(1)'    : -0.05,
     'patch_ib(1)%model%translate(2)'    : -0.05,
-    'patch_ib(1)%model%spc'             : 200,
+    'patch_ib(1)%model%spc'             : 100,
     'patch_ib(1)%model%threshold'       : 0.95,
     'patch_ib(1)%slip'                  : 'F',
     # # ========================================================================
