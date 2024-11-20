@@ -239,8 +239,6 @@ print(json.dumps({{**case, **mods}}))
                 tolerance = 1e-5
             else:
                 tolerance = 3e-12
-        elif self.params.get("weno_order") == 7:
-            tolerance = 1e-9
 
         return tolerance
 
