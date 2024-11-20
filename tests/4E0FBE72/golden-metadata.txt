@@ -1,12 +1,12 @@
-This file was created on 2024-11-19 12:03:36.888195.
+This file was created on 2024-11-20 15:28:52.323338.
 
 mfc.sh:
 
-    Invocation: test -o 4E0FBE72 --generate -j 8
+    Invocation: test -j 1 -o 4E0FBE72 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        f2a801365b5e6ac90d9520c15c94dbdd99d64289 on master (dirty)
+    Git:        2f891f6a48ca23289d62516fca007d20b9b1d8a5 on master (dirty)
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ pre_process:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -72,7 +72,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -81,10 +81,10 @@ syscheck:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

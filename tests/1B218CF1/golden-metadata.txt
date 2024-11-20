@@ -1,10 +1,10 @@
-This file was created on 2024-11-19 15:35:50.640913.
+This file was created on 2024-11-20 15:21:10.086374.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -f FA8643EF -t C5D96D9A
+    Invocation: test -j 8 -o 1B218CF1 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        579a5781114de323052ab02506c34c372de365ce on master (dirty)
+    Git:        2f891f6a48ca23289d62516fca007d20b9b1d8a5 on master (dirty)
 
 syscheck:
 
@@ -39,7 +39,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -49,8 +49,8 @@ simulation:
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -105,7 +105,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -115,8 +115,8 @@ post_process:
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

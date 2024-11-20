@@ -299,9 +299,6 @@ contains
 
                     min_dist = minval(abs(side_dists))
 
-                    if (i == 50 .and. j == 0) then
-                    end if
-
                     if (min_dist == abs(side_dists(1))) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
                         if (side_dists(1) == 0) then
