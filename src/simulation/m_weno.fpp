@@ -457,6 +457,17 @@ contains
 
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
+                            ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes for Hyperbolic Conservation Laws"
+                            ! Equation 2.20: Polynomial Coefficients (poly_coef_cb)
+                            ! Equation 2.61: Smoothness Indicators (beta_coef)
+                            ! To reduce computational cost, we leverage the fact that all polynomial coefficients in a stencil sum to 1
+                            ! and compute the polynomial coefficients (poly_coef_cb) for the cell value differences (dvd) instead of the values themselves.
+                            ! The computation of coefficients is further simplified by using grid spacing (y or w) rather than the grid locations (s_cb) directly.
+                            ! Ideal weights (d_cb) are obtained by comparing the grid location coefficients of the polynomial coefficients.
+                            ! The smoothness indicators (beta_coef) are calculated through numerical differentiation and integration of each cross term of the polynomial coefficients,
+                            ! using the cell value differences (dvd) instead of the values themselves.
+                            ! While the polynomial coefficients sum to 1, the derivative of 1 is 0, which means it does not create additional cross terms in the smoothness indicators.
+
                             w = s_cb(i - 3:i + 4) - s_cb(i) ! Offset using s_cb(i) to reduce floating point error
                             d_cbR_${XYZ}$ (0, i + 1) = ((w(5) - w(6))*(w(5) - w(7))*(w(5) - w(8)))/((w(1) - w(6))*(w(1) - w(7))*(w(1) - w(8))) !&
                             d_cbR_${XYZ}$ (1, i + 1) = ((w(1) - w(5))*(w(5) - w(7))*(w(5) - w(8))*(w(1)*w(2) - w(1)*w(6) - w(1)*w(7) - w(2)*w(6) - w(1)*w(8) - w(2)*w(7) - w(2)*w(8) + w(6)*w(7) + w(6)*w(8) + w(7)*w(8) + w(1)**2 + w(2)**2))/((w(1) - w(6))*(w(1) - w(7))*(w(1) - w(8))*(w(2) - w(7))*(w(2) - w(8))) !&
