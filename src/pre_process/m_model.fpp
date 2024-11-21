@@ -709,7 +709,7 @@ contains
 
             if ((l1 > cell_width)) then
                 interpolate = .true.
-            else 
+            else
                 interpolate = .false.
             end if
         end do
