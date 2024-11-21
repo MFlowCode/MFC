@@ -271,6 +271,7 @@ contains
         real(kind(0d0)) :: side_dists(4)
 
         integer :: i, j, k !< Loop index variables
+        integer :: idx !< Shortest path direction indicator
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
@@ -296,10 +297,17 @@ contains
                     side_dists(2) = x - top_right(1)
                     side_dists(3) = bottom_left(2) - y
                     side_dists(4) = y - top_right(2)
+                    min_dist = initial_distance_buffer
+                    idx = 1
 
-                    min_dist = minval(abs(side_dists))
+                    do k = 1, 4
+                        if (abs(side_dists(k)) < abs(min_dist)) then
+                            idx = k
+                            min_dist = side_dists(idx)
+                        end if
+                    end do
 
-                    if (min_dist == abs(side_dists(1))) then
+                    if (idx == 1) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
                         if (side_dists(1) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
@@ -308,7 +316,7 @@ contains
                                                                         abs(side_dists(1))
                         end if
 
-                    else if (min_dist == abs(side_dists(2))) then
+                    else if (idx == 2) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(2)
                         if (side_dists(2) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0d0
@@ -317,7 +325,7 @@ contains
                                                                         abs(side_dists(2))
                         end if
 
-                    else if (min_dist == abs(side_dists(3))) then
+                    else if (idx == 3) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(3)
                         if (side_dists(3) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0d0
@@ -326,7 +334,7 @@ contains
                                                                         abs(side_dists(3))
                         end if
 
-                    else if (min_dist == abs(side_dists(4))) then
+                    else if (idx == 4) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(4)
                         if (side_dists(4) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0d0

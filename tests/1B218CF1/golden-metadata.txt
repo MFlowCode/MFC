@@ -1,12 +1,12 @@
-This file was created on 2024-11-20 15:21:10.086374.
+This file was created on 2024-11-20 20:09:04.391798.
 
 mfc.sh:
 
     Invocation: test -j 8 -o 1B218CF1 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        2f891f6a48ca23289d62516fca007d20b9b1d8a5 on master (dirty)
+    Git:        27380da036623a668098a323776b3543f60b1894 on master (dirty)
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -16,9 +16,9 @@ syscheck:
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -72,7 +72,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -81,10 +81,10 @@ pre_process:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -105,7 +105,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -114,8 +114,8 @@ simulation:
         C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF

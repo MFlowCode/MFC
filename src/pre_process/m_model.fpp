@@ -691,7 +691,7 @@ contains
     !! @param spacing                   Dimensions of the current levelset cell
     !! @param interpolate               Logical output
     subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
-        logical, intent(out) :: interpolate !< Logical indicator of interpolation
+        logical, intent(inout) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
         real(kind(0d0)), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         t_vec3, intent(in) :: spacing
@@ -709,6 +709,8 @@ contains
 
             if ((l1 > cell_width)) then
                 interpolate = .true.
+            else 
+                interpolate = .false.
             end if
         end do
 
@@ -719,7 +721,7 @@ contains
     !! @param spacing            Dimensions of the current levelset cell
     !! @param interpolate        Logical output
     subroutine f_check_interpolation_3D(model, spacing, interpolate)
-        logical, intent(out) :: interpolate
+        logical, intent(inout) :: interpolate
         type(t_model), intent(in) :: model
         t_vec3, intent(in) :: spacing
         t_vec3 :: edge_l
@@ -751,6 +753,8 @@ contains
                 (edge_l(2) > cell_width) .or. &
                 (edge_l(3) > cell_width)) then
                 interpolate = .true.
+            else
+                interpolate = .false.
             end if
         end do
 
