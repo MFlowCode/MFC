@@ -213,11 +213,11 @@ contains
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
-                            if (hyper_model == 1) then
+                            !if (hyper_model == 1) then
                               call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
-                            elseif (hyper_model == 2) then
-                              call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
-                            end if
+                            !elseif (hyper_model == 2) then
+                            !  call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
+                            !end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                                                            G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
