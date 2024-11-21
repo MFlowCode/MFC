@@ -38,6 +38,7 @@ contains
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces
         call s_check_inputs_misc
+        call s_check_inputs_grcbc
 
     end subroutine s_check_inputs
 
@@ -107,6 +108,15 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. avg_state /= 2, "6-equation model (model_eqns = 3) requires avg_state = 2")
         @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, "6-equation model (model_eqns = 3) requires wave_speeds = 1")
     end subroutine s_check_inputs_model_eqns
+
+    !> Checks constraints for GRCBC
+    subroutine s_check_inputs_grcbc
+        #:for DIR in ['x', 'y', 'z']
+            @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), "Subsonic Inflow requires bc = -7")
+            @:PROHIBIT(bc_${DIR}$%grcbc_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), "Subsonic Outflow requires bc = -8")
+            @:PROHIBIT(bc_${DIR}$%grcbc_vel_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), "Subsonic Outflow requires bc = -8")
+        #:endfor
+    end subroutine s_check_inputs_grcbc
 
     !> Checks constraints on acoustic_source parameters
     subroutine s_check_inputs_acoustic_src
@@ -237,7 +247,7 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        @:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
+        !@:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
     end subroutine
 
     !> Checks constraints on bubble parameters

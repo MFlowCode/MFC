@@ -130,11 +130,10 @@ contains
         real(kind(0d0)) :: G
         integer :: j, k, l, i, r
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, & 
-        !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
-        do l = 0, p 
-            do k = 0, n 
-                do j = 0, m 
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
+        do l = 0, p
+            do k = 0, n
+                do j = 2, m-2
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho_k(i) = q_cons_vf(i)%sf(j, k, l)
@@ -145,7 +144,7 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                     rho = max(rho, sgm_eps)
                     G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G_K = 0d0
+                    !if ( G <= verysmall ) G = 0d0
 
                     if ( G > verysmall ) then
                         !$acc loop seq
@@ -224,8 +223,7 @@ contains
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             !$acc loop seq
                             do i = 1, b_size - 1
-                                q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
-                                    rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
+                                q_cons_vf(strxb+i-1)%sf(j, k, l) = rho*q_prim_vf(strxb+i-1)%sf(j, k, l)
                             end do
                         end if
                     end if
@@ -262,7 +260,7 @@ contains
            btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
-        ! setting the tensor to the stresses for riemann solver
+        ! setting the tensor to the stresses for Riemann solver
         !$acc loop seq
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
@@ -270,7 +268,7 @@ contains
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
+            0.5d0*(trace - 3d0)/btensor(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
