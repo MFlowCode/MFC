@@ -1,7 +1,5 @@
 #!/bin/bash
 
-job_device="${1}"
-job_precision="${2}"
 
 if [ -z "$job_device" ] || [ -z "$job_precision" ]; then
     echo "Usage: $0 [cpu|gpu] [single|double]"
