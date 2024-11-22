@@ -1198,11 +1198,25 @@ contains
         
         do t = 0, t_stop
            do j = 0, m
-              vonMises = q_prim_vf(xiend+1)%sf(j, 0, 0)
-              if (proc_rank == 0) then 
-                  write (251, '(10X, 8F24.8)') &
-                  vonMises
-              end if 
+             do k = 0, n
+              ! for bubliq, sf(j,0,0) for d and sf(0.5*xcen_bub,k,0) for h
+              ! for bubgel, sf(j,0,0) for d, sf(-xcen_bub,k,0) for h_1,
+              !                              sf(-0.5*xcen_bub,k,0) for h_2
+                 vonMises_d = q_prim_vf(xiend+1)%sf(j, 0, 0)
+                 if (xcen_bub < 0) then !liq
+                     vonMises_h1 = q_prim_vf(xiend+1)%sf(xcen_bub, k, 0)
+                     vonMises_h2 = q_prim_vf(xiend+1)%sf(0.25*xcen_bub, k, 0)
+                 else
+                     vonMises_h1 = q_prim_vf(xiend+1)%sf(-xcen_bub, k, 0)
+                     vonMises_h2 = q_prim_vf(xiend+1)%sf(-0.25*xcen_bub, k, 0)
+                 end if
+                 if (proc_rank == 0) then 
+                     write (251, '(10X, 8F24.8)') &
+                     vonMises_d, &
+                     vonMises_h1, &
+                     vonMises_h2
+                 end if
+              end do 
             end do   
         end do
 
