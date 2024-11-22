@@ -1031,15 +1031,17 @@ contains
                         do i = xibeg, xiend
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                         end do
+                    end if
 
 #ifdef MFC_POST_PROCESS
+                    if (hyperelasticity) then
                     ! to save von Mises stress instead of elastic internal energy
-                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3d0/2d0)* (qK_prim_vf(1)%sf(j, k, l)**2d0 + &
-                                            2d0*qK_prim_vf(2)%sf(j, k, l)**2d0 + qK_prim_vf(3)%sf(j, k, l)**2d0 + &
-                                            2d0*qK_prim_vf(4)%sf(j, k, l)**2d0 + 2d0*qK_prim_vf(5)%sf(j, k, l)**2d0 + &
-                                            qK_prim_vf(6)%sf(j, k, l)**2d0) )
-#endif
+                    qK_prim_vf(xiend+1)%sf(j, k, l) = sqrt((3d0/2d0)* (qK_prim_vf(strxb)%sf(j, k, l)**2d0 + &
+                                            2d0*qK_prim_vf(strxb+1)%sf(j, k, l)**2d0 + qK_prim_vf(strxb+2)%sf(j, k, l)**2d0 + &
+                                            2d0*qK_prim_vf(strxb+3)%sf(j, k, l)**2d0 + 2d0*qK_prim_vf(strxb+4)%sf(j, k, l)**2d0 + &
+                                            qK_prim_vf(strxe)%sf(j, k, l)**2d0) )
                     end if
+#endif
 
                     !$acc loop seq
                     do i = advxb, advxe

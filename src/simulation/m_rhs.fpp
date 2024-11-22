@@ -718,7 +718,7 @@ contains
             call nvtxStartRange("RHS-WENO")
 
             if (.not. surface_tension) then
-                ! Reconstruct densitiess
+                ! Reconstruct densities
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(1:sys_size), &

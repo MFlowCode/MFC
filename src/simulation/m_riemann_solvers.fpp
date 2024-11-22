@@ -1180,7 +1180,7 @@ contains
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
-                                    G_L = 0d0; G_R = 0d0; 
+                                    G_L = 0d0; G_R = 0d0 
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
