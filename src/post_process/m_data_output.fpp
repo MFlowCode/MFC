@@ -573,12 +573,16 @@ contains
 
     end subroutine s_open_energy_data_file ! ----------------------------------------
 
-    subroutine s_open_kymo_data_file() ! ------------------------
+    subroutine s_open_kymo_data_file(t_step) ! ------------------------
+        ! Time-step that is currently being post-processed
+        integer, intent(in) :: t_step
 
-        character(LEN=path_len + 3*name_len) :: file_path !<
-              !! Relative path to a file in the case directory
+        ! Relative path to a file in the case directory
+        character(LEN=path_len + 3*name_len) :: file_path
 
-        write (file_path, '(A)') '/kymo_data.dat'
+        ! Kymo information is in binary database format 
+        ! Generates relative path to database, opened for current time-step
+        write (file_path, '(A,I0,A)') '/', t_step, '/kymo_data.dat'
         file_path = trim(case_dir)//trim(file_path)
 
         ! Opening the simulation data file
@@ -1190,15 +1194,17 @@ contains
     subroutine s_write_kymo_data_file(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: j, k, l, t !< Generic loop iterators
-   
-        do l = 0, p
-           do k = 0, n
-              do j = 0, m
-                 
-              end do
-           end do
+        real(kind(0d0)) :: vonMises !< selected planes for kymograph comparison
+        
+        do t = 0, t_stop
+           do j = 0, m
+              vonMises = q_prim_vf(xiend+1)%sf(j, 0, 0)
+              if (proc_rank == 0) then 
+                  write (251, '(10X, 8F24.8)') &
+                  vonMises
+              end if 
+            end do   
         end do
- 
 
     end subroutine s_write_kymo_data_file
 

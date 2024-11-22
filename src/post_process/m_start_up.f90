@@ -82,7 +82,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension &
+            cfl_target, surface_tension, &
             sim_data, hyperelasticity, kymograph
 
         ! Inquiring the status of the post_process.inp file
@@ -206,7 +206,7 @@ contains
         end if
 
         if (kymograph .and. proc_rank == 0) then
-            call s_open_kymo_data_file()
+            call s_open_kymo_data_file(t_step)
         end if
        
         if (kymograph) then
