@@ -221,7 +221,7 @@ print(json.dumps({{**case, **mods}}))
             os.path.basename(self.get_filepath()),
             self.get_dirpath(),
             self.get_parameters())
- 
+
     # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
         if self.override_tol:
@@ -259,7 +259,7 @@ class TestCaseBuilder:
         return trace_to_uuid(self.trace)
 
     def to_case(self) -> TestCase:
-        dictionary = self.mods.copy()
+        dictionary = {}
         if self.path:
             dictionary.update(input.load(self.path, self.args, do_print=False).params)
 
@@ -271,10 +271,12 @@ class TestCaseBuilder:
                     path = os.path.abspath(path)
                     if os.path.exists(path):
                         dictionary[key] = path
-                        break
 
         if self.mods:
             dictionary.update(self.mods)
+
+        if self.functor:
+            self.functor(dictionary)
 
         return TestCase(self.trace, dictionary, self.ppn, self.override_tol)
 
