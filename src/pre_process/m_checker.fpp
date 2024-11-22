@@ -116,7 +116,6 @@ contains
 
         ! Common checks for all directions (stretch_x, stretch_y, and stretch_z)
         #:for X in ['x', 'y', 'z']
-            @:PROHIBIT(stretch_${X}$ .and. weno_order == 7, "weno_order = 7 does not support stretched grids")
             @:PROHIBIT(stretch_${X}$ .and. old_grid, "old_grid and stretch_${X}$ are incompatible")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(a_${X}$), "a_${X}$ must be set with stretch_${X}$ enabled")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(${X}$_a), "${X}$_a must be set with stretch_${X}$ enabled")

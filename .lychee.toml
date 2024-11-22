@@ -1,0 +1,17 @@
+# Maximum number of allowed retries before a link is declared dead.
+max_retries = 5
+
+# Don't show interactive progress bar while checking links.
+no_progress = true
+
+# Website timeout from connect to response finished.
+timeout = 20
+
+# Minimum wait time in seconds between retries of failed requests.
+retry_wait_time = 4
+
+# Comma-separated list of accepted status codes for valid links.
+# accept = ["200", "206", "403", "429"]
+accept = ["200", "429"]
+
+verbose = "error"
