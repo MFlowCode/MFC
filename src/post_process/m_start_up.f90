@@ -394,7 +394,10 @@ contains
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 if (prim_vars_wrt) then
-                    q_sf = q_prim_vf(xiend+1)%sf(j, k, l)
+                    q_sf = q_prim_vf(xiend+1)%sf( &
+                            -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
                     write (varname, '(A,I0)') 'vonMises'
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
