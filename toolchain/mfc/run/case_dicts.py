@@ -346,6 +346,7 @@ POST_PROCESS.update({
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'kymograph': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):
