@@ -206,7 +206,7 @@ contains
         end if
 
         if (kymograph .and. proc_rank == 0) then
-            call s_open_kymo_data_file(t_step)
+            call s_open_kymo_data_file()
         end if
        
         if (kymograph) then

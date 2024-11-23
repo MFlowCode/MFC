@@ -573,16 +573,17 @@ contains
 
     end subroutine s_open_energy_data_file ! ----------------------------------------
 
-    subroutine s_open_kymo_data_file(t_step) ! ------------------------
+    subroutine s_open_kymo_data_file() ! ------------------------
         ! Time-step that is currently being post-processed
-        integer, intent(in) :: t_step
+!        integer, intent(in) :: t_step
 
         ! Relative path to a file in the case directory
         character(LEN=path_len + 3*name_len) :: file_path
 
         ! Kymo information is in binary database format 
         ! Generates relative path to database, opened for current time-step
-        write (file_path, '(A,I0,A)') '/', t_step, '/kymo_data.dat'
+!        write (file_path, '(A,I0,A)') '/', t_step, '/kymo_data.dat'
+        write (file_path, '(A)') '/kymo_data.dat'
         file_path = trim(case_dir)//trim(file_path)
 
         ! Opening the simulation data file
