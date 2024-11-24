@@ -23,6 +23,8 @@ errors = []
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
+    selected_cases = cases_[:]
+    skipped_cases = cases_[:]
 
     # Check "--from" and "--to" exist and are in the right order
     bFoundFrom, bFoundTo = (False, False)
@@ -54,7 +56,6 @@ def __filter(cases_) -> typing.List[TestCase]:
             cases.remove(case)
 
     if ARG("percent") == 100:
-        skipped_cases = []
         return selected_cases, skipped_cases
 
     selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
@@ -136,13 +137,13 @@ def test():
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
 
     # Print a summary of all errors at the end if errors exist
-    if (len((errors)) != 0):
+    if len((errors) != 0):
         cons.print(f"[bold red]Failed Cases[/bold red]\n")
         for e in errors:
             cons.print(e)
 
     # Print the list of skipped cases
-    if (len(skipped_cases) != 0):
+    if len(skipped_cases) != 0:
         cons.print("[bold yellow]Skipped Cases[/bold yellow]\n")
         for c in skipped_cases:
             cons.print(f"[bold yellow]{c.trace}[/bold yellow]")
