@@ -19,6 +19,7 @@ from ..packer import packer
 nFAIL = 0
 nPASS = 0
 nSKIP = 0
+errors = []
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -61,6 +62,7 @@ def __filter(cases_) -> typing.List[TestCase]:
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     cases = list_cases()
 
@@ -124,6 +126,9 @@ def test():
     sched.sched(
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
+
+    for e in errors:
+        cons.print(e)
 
     cons.print()
     cons.unindent()
@@ -216,6 +221,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 def handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     nAttempts = 0
 
@@ -228,9 +234,11 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
+                errors.append(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-            cons.print(f"{exc}")
+            errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
+            errors.append(f"{exc}")
 
         return
