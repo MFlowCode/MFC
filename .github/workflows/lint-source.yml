@@ -1,0 +1,32 @@
+name: Lint Source
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  lint-source:
+    name: Lint Source
+    runs-on: 'ubuntu-latest'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Fortitude
+      run: pip install fortitude-lint ansi2txt
+
+    - name: Lint the source code
+      run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true

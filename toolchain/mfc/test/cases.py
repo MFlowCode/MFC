@@ -74,6 +74,50 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for bc in [ -1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16 ]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
+    def alter_grcbc(dimInfo):
+        if len(dimInfo[0]) == 1:
+            stack.push('', {'patch_icpp(1)%vel(1)':1.0, 'patch_icpp(2)%vel(1)':1.0, 'patch_icpp(3)%vel(1)':1.0,
+                            'bc_x%beg':-7, 'bc_x%end':-8, 'bc_x%grcbc_in':'T', 'bc_x%grcbc_out':'T', 'bc_x%grcbc_vel_out':'T',
+                            'bc_x%vel_in(1)':1.0, 'bc_x%vel_in(2)':0.0, 'bc_x%vel_in(3)':0.0, 'bc_x%vel_out(1)':1.0, 'bc_x%vel_out(2)':0.0, 'bc_x%vel_out(3)':0.0,
+                            'bc_x%pres_in':1.0, 'bc_x%pres_out':1.0, 'bc_x%alpha_in(1)':1.0, 'bc_x%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc x"],{}))
+            stack.pop()
+        elif len(dimInfo[0]) == 2:
+            stack.push('', {'patch_icpp(1)%vel(1)':1.0, 'patch_icpp(2)%vel(1)':1.0, 'patch_icpp(3)%vel(1)':1.0,
+                            'bc_x%beg':-7, 'bc_x%end':-8, 'bc_x%grcbc_in':'T', 'bc_x%grcbc_out':'T', 'bc_x%grcbc_vel_out':'T',
+                            'bc_x%vel_in(1)':1.0, 'bc_x%vel_in(2)':0.0, 'bc_x%vel_in(3)':0.0, 'bc_x%vel_out(1)':1.0, 'bc_x%vel_out(2)':0.0, 'bc_x%vel_out(3)':0.0,
+                            'bc_x%pres_in':1.0, 'bc_x%pres_out':1.0, 'bc_x%alpha_in(1)':1.0, 'bc_x%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc x"],{}))
+            stack.pop()
+
+            stack.push('', {'patch_icpp(1)%vel(2)':1.0, 'patch_icpp(2)%vel(2)':1.0, 'patch_icpp(3)%vel(2)':1.0,
+                            'bc_y%beg':-7, 'bc_y%end':-8, 'bc_y%grcbc_in':'T', 'bc_y%grcbc_out':'T', 'bc_y%grcbc_vel_out':'T',
+                            'bc_y%vel_in(1)':0.0, 'bc_y%vel_in(2)':1.0, 'bc_y%vel_in(3)':0.0, 'bc_y%vel_out(1)':0.0, 'bc_y%vel_out(2)':1.0, 'bc_y%vel_out(3)':0.0,
+                            'bc_y%pres_in':1.0, 'bc_y%pres_out':1.0, 'bc_y%alpha_in(1)':1.0, 'bc_y%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc y"],{}))
+            stack.pop()
+        elif len(dimInfo[0]) == 3:
+            stack.push('', {'patch_icpp(1)%vel(1)':1.0, 'patch_icpp(2)%vel(1)':1.0, 'patch_icpp(3)%vel(1)':1.0,
+                            'bc_x%beg':-7, 'bc_x%end':-8, 'bc_x%grcbc_in':'T', 'bc_x%grcbc_out':'T', 'bc_x%grcbc_vel_out':'T',
+                            'bc_x%vel_in(1)':1.0, 'bc_x%vel_in(2)':0.0, 'bc_x%vel_in(3)':0.0, 'bc_x%vel_out(1)':1.0, 'bc_x%vel_out(2)':0.0, 'bc_x%vel_out(3)':0.0,
+                            'bc_x%pres_in':1.0, 'bc_x%pres_out':1.0, 'bc_x%alpha_in(1)':1.0, 'bc_x%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc x"],{}))
+            stack.pop()
+
+            stack.push('', {'patch_icpp(1)%vel(2)':1.0, 'patch_icpp(2)%vel(2)':1.0, 'patch_icpp(3)%vel(2)':1.0,
+                            'bc_y%beg':-7, 'bc_y%end':-8, 'bc_y%grcbc_in':'T', 'bc_y%grcbc_out':'T', 'bc_y%grcbc_vel_out':'T',
+                            'bc_y%vel_in(1)':0.0, 'bc_y%vel_in(2)':1.0, 'bc_y%vel_in(3)':0.0, 'bc_y%vel_out(1)':0.0, 'bc_y%vel_out(2)':1.0, 'bc_y%vel_out(3)':0.0,
+                            'bc_y%pres_in':1.0, 'bc_y%pres_out':1.0, 'bc_y%alpha_in(1)':1.0, 'bc_y%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc y"],{}))
+            stack.pop()
+
+            stack.push('', {'patch_icpp(1)%vel(3)':1.0, 'patch_icpp(2)%vel(3)':1.0, 'patch_icpp(3)%vel(3)':1.0,
+                            'bc_z%beg':-7, 'bc_z%end':-8, 'bc_z%grcbc_in':'T', 'bc_z%grcbc_out':'T', 'bc_z%grcbc_vel_out':'T',
+                            'bc_z%vel_in(1)':0.0, 'bc_z%vel_in(2)':0.0, 'bc_z%vel_in(3)':1.0, 'bc_z%vel_out(1)':0.0, 'bc_z%vel_out(2)':0.0, 'bc_z%vel_out(3)':1.0,
+                            'bc_z%pres_in':1.0, 'bc_z%pres_out':1.0, 'bc_z%alpha_in(1)':1.0, 'bc_z%alpha_rho_in(1)':1.0})
+            cases.append(define_case_d(stack, [f"grcbc z"],{}))
+            stack.pop()
+
     def alter_capillary():
         stack.push('', {'patch_icpp(1)%cf_val':1, 'patch_icpp(2)%cf_val':0, 'patch_icpp(3)%cf_val':1,
                         'sigma':1, 'model_eqns':3, 'surface_tension': 'T'})
@@ -151,6 +195,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_icpp(2)%alpha(2)':     0.5,    'patch_icpp(3)%alpha_rho(1)': 0.08, 'patch_icpp(3)%alpha(1)':     0.2,
                     'patch_icpp(3)%alpha_rho(2)': 0.0225, 'patch_icpp(3)%alpha(2)':     0.8
                 })
+
+                if len(dimInfo[0]) > 1:
+                    alter_capillary()
 
             alter_riemann_solvers(num_fluids)
             alter_low_Mach_correction()
@@ -703,14 +750,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
             alter_bcs(dimInfo)
+            alter_grcbc(dimInfo)
             alter_weno(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
-                alter_capillary()
             if len(dimInfo[0]) == 3:
                 alter_3d()
-                alter_capillary()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_acoustic_src(dimInfo)
