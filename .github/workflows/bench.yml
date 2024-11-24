@@ -52,6 +52,11 @@ jobs:
           (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }} single) &
           wait %3
 
+      - name: Generate & Post Comment
+        run: |
+          (cd pr && . ./mfc.sh load -c p -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-double.yaml ../pr/bench-${{ matrix.device }}-double.yaml)
+
       - name: Check PR Single vs Double Precision
         run: |
           # Compare single and double precision within the PR

@@ -1,13 +1,10 @@
-import os, sys, uuid, subprocess, dataclasses, typing, math
-import rich.table
+import os, sys, uuid, subprocess, dataclasses, typing
 from .printer import cons
 from .state import ARG, CFG
-from .build import get_targets, DEFAULT_TARGETS, SIMULATION
+from .build import get_targets
 from .common import system, MFC_BENCH_FILEPATH, MFC_BUILD_DIR, format_list_to_string
 from .common import file_load_yaml, file_dump_yaml, create_directory
 from .common import MFCException
-
-SINGLE_PRECISION_SPEEDUP_THRESHOLD = 1.25  # Minimum speedup for PR double vs single precision
 
 @dataclasses.dataclass
 class BenchCase:
@@ -15,27 +12,19 @@ class BenchCase:
     path: str
     args: typing.List[str]
 
-def bench(targets=None, precision="double"):
-    """
-    Benchmarks the provided targets in the specified precision mode (single or double).
-    """
+def bench(targets=None):
     if targets is None:
         targets = ARG("targets")
 
-    if precision not in ["single", "double"]:
-        raise ValueError("Precision must be 'single' or 'double'.")
+    precision = "single" if ARG("single") else "double"
 
-    # Set precision_flag based on precision
-    if precision == "single":
-        precision_flag = ["--single"]
-    else:
-        precision_flag = []  # No flag needed for double precision
+    additional_args = ARG("--")
 
     targets = get_targets(targets)
     bench_dirpath = os.path.join(MFC_BUILD_DIR, "benchmarks", str(uuid.uuid4())[:4])
     create_directory(bench_dirpath)
 
-    cons.print(f"[bold]Benchmarking {format_list_to_string(ARG('targets'), 'magenta')} in {precision} precision "
+    cons.print(f"[bold]Benchmarking {format_list_to_string(ARG('targets'), 'magenta')} in '{precision}' precision "
                f"([magenta]{os.path.relpath(bench_dirpath)}[/magenta]):[/bold]")
     cons.indent()
     cons.print()
@@ -43,14 +32,16 @@ def bench(targets=None, precision="double"):
     CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
 
     for case in CASES:
-        case.args = case.args + ARG("--")
+        case.args = case.args + additional_args  
+        if precision == "single":
+            case.args.append("--single")  
         case.path = os.path.abspath(case.path)
 
     results = {
         "metadata": {
             "invocation": sys.argv[1:],
             "lock": dataclasses.asdict(CFG()),
-            "precision": precision,
+            "precision": precision
         },
         "cases": {},
     }
@@ -65,12 +56,19 @@ def bench(targets=None, precision="double"):
         cons.print(f"> Summary: [bold]{os.path.relpath(summary_filepath)}[/bold]")
 
         with open(log_filepath, "w") as log_file:
+            command = [
+                "./mfc.sh", "run", case.path, "--case-optimization",
+                "--targets"
+            ] + [t.name for t in targets] + [
+                "--output-summary", summary_filepath
+            ] + case.args  
+
+            cons.print(f"Case precision: {precision}")
+            cons.print(f"Case args: {case.args}")
+            cons.print(f"Running command: {' '.join(command)}")
+
             system(
-                ["./mfc.sh", "run", case.path, "--case-optimization"] +
-                ["--targets"] + [t.name for t in targets] +
-                ["--output-summary", summary_filepath] +
-                case.args +
-                precision_flag,  # Use the precision_flag here
+                command,
                 stdout=log_file,
                 stderr=subprocess.STDOUT
             )

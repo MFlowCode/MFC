@@ -26,5 +26,7 @@ if [ "$job_device" == "gpu" ]; then
     mem_value=12
 fi
 
+./mfc.sh clean
+./mfc.sh build -j 8 -- $precision_flag
 ./mfc.sh bench --mem $mem_value -j $(nproc) -o "bench-${job_device}-${job_precision}.yaml" -- $precision_flag -c phoenix $device_opts -n $n_ranks
 
