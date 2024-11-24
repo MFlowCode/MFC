@@ -9,7 +9,7 @@ Mu1 = 0.0000184
 rho1 = 1.19 #0.2199
 gam_a = 1.4
 # Patch Design
-D = 3
+D = 5
 
 # Configuring case dictionary
 print(json.dumps({

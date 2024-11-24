@@ -349,8 +349,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         elif len(dimInfo[0]) == 2:
             cases.append(define_case_d(stack, f'Rectangle', {
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%length_y': 0.1,
+                'patch_ib(1)%length_x': 0.05,
+                'patch_ib(1)%length_y': 0.05,
                 'patch_ib(1)%geometry': 3 }))
             cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
             if six_eqn_model:

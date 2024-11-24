@@ -13,8 +13,8 @@ print(json.dumps({
     # ==========================================================================
 
     # Computational Domain Parameters ==========================================
-    'x_domain%beg'                 : -2*D,
-    'x_domain%end'                 : 2*D,
+    'x_domain%beg'                 : -1.5*D,
+    'x_domain%end'                 : 1.5*D,
     # y direction
     'y_domain%beg'                 : -1.5*D,
     'y_domain%end'                 : 1.5*D,
@@ -22,13 +22,13 @@ print(json.dumps({
     'z_domain%beg'                 : -1.5*D,
     'z_domain%end'                 : 1.5*D,
     'cyl_coord'                    : 'F',
-    'm'                            : 239,
-    'n'                            : 179,
-    'p'                            : 179,
-    'dt'                           : 1.0E-6,
+    'm'                            : 299,
+    'n'                            : 299,
+    'p'                            : 299,
+    'dt'                           : 5.0E-7,
     't_step_start'                 : 0,
-    't_step_stop'                  : 1000,
-    't_step_save'                  : 10,
+    't_step_stop'                  : 1500,
+    't_step_save'                  : 30,
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
@@ -90,12 +90,12 @@ print(json.dumps({
 
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
-    'patch_ib(1)%model%filepath'               : 'Pyramid_IBM.stl',
+    'patch_ib(1)%model%filepath'               : '3DPyramid_IBM.stl',
     'patch_ib(1)%model%translate(1)'           : -0.0500000984,
     'patch_ib(1)%model%translate(2)'           : -0.0500001003,
     'patch_ib(1)%model%translate(3)'           : -0.0500001003,
     'patch_ib(1)%model%spc'                    : 100,
-    'patch_ib(1)%model%threshold'              : 0.01,
+    'patch_ib(1)%model%threshold'              : 0.95,
     'patch_ib(1)%slip'                         : 'F',
     # ==========================================================================
 

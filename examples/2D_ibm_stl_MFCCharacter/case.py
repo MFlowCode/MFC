@@ -5,8 +5,7 @@ import math
 
 # Dynamic Viscosity
 Mu1 = 0.0000184
-#Mu2 = 0.01
-rho1 = 1.19 #0.2199
+rho1 = 1.19
 gam_a = 1.4
 # Patch Design
 D = 0.1
@@ -22,13 +21,13 @@ print(json.dumps({
     'x_domain%end'                 : 1*D,
     'y_domain%beg'                 : -0.3*D,
     'y_domain%end'                 : 0.3*D,
-    'm'                            : 499,
-    'n'                            : 149,
+    'm'                            : 599,
+    'n'                            : 199,
     'p'                            : 0,
-    'dt'                           : 1.0E-6,
+    'dt'                           : 5.0E-7,
     't_step_start'                 : 0,
-    't_step_stop'                  : 1000,
-    't_step_save'                  : 10,
+    't_step_stop'                  : 6000,
+    't_step_save'                  : 20,
     # ==========================================================================
     
     # Simulation Algorithm Parameters ==========================================
@@ -71,9 +70,9 @@ print(json.dumps({
     'patch_icpp(1)%y_centroid'     : 0,
     'patch_icpp(1)%length_x'       : 1000*D,
     'patch_icpp(1)%length_y'       : 1000*D,
-    'patch_icpp(1)%vel(1)'         : 10, #527.2E+00,
+    'patch_icpp(1)%vel(1)'         : 20,
     'patch_icpp(1)%vel(2)'         : 0.0E+00,
-    'patch_icpp(1)%pres'           : 100000, #10918.2549,
+    'patch_icpp(1)%pres'           : 100000,
     'patch_icpp(1)%alpha_rho(1)'   : (1.0)*rho1,
     'patch_icpp(1)%alpha(1)'       : 1.0,
     # ==========================================================================
@@ -81,15 +80,15 @@ print(json.dumps({
     'patch_ib(1)%model%filepath'        : 'Character_IBM.stl',
     'patch_ib(1)%model%translate(1)'    : -0.0469828735,
     'patch_ib(1)%model%translate(2)'    : -0.0094892600,
-    'patch_ib(1)%model%spc'             : 100,
-    'patch_ib(1)%model%threshold'       : 0.95,
+    'patch_ib(1)%model%spc'             : 200,
+    'patch_ib(1)%model%threshold'       : 0.99,
     'patch_ib(1)%slip'                  : 'F',
     # # ========================================================================
    
     # Fluids Physical Parameters ===============================================
     'fluid_pp(1)%gamma'            : 1.E+00/(gam_a-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0,
-    'fluid_pp(1)%Re(1)'            : 1000, #7535533.2,
+    'fluid_pp(1)%Re(1)'            : 10000,
     # ==========================================================================
 }))
 
