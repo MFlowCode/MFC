@@ -137,7 +137,7 @@ def test():
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
 
     # Print a summary of all errors at the end if errors exist
-    if len((errors) != 0):
+    if len(errors) != 0:
         cons.print(f"[bold red]Failed Cases[/bold red]\n")
         for e in errors:
             cons.print(e)
