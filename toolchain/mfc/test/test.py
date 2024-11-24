@@ -23,8 +23,8 @@ errors = []
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
-    selected_cases = cases_[:]
-    skipped_cases = cases_[:]
+    selected_cases = []
+    skipped_cases  = []
 
     # Check "--from" and "--to" exist and are in the right order
     bFoundFrom, bFoundTo = (False, False)
@@ -56,7 +56,7 @@ def __filter(cases_) -> typing.List[TestCase]:
             cases.remove(case)
 
     if ARG("percent") == 100:
-        return selected_cases, skipped_cases
+        return cases, skipped_cases
 
     selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
     skipped_cases = [item for item in cases if item not in selected_cases]
@@ -132,6 +132,7 @@ def test():
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
+    nSKIP = len(skipped_cases)
     cons.print()
     cons.unindent()
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
