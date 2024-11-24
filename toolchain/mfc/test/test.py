@@ -54,6 +54,7 @@ def __filter(cases_) -> typing.List[TestCase]:
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
+            skipped_cases.append(case)
 
     if ARG("percent") == 100:
         return cases, skipped_cases
