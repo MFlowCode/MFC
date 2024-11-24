@@ -68,8 +68,11 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: logs-${{ matrix.device }}
-          path: |
-            pr/bench-${{ matrix.device }}.*
-            master/bench-${{ matrix.device }}.*
+            name: logs-${{ matrix.device }}
+            path: |
+                pr/bench-${{ matrix.device }}-*.*
+                pr/build/benchmarks/*
+                master/bench-${{ matrix.device }}-*.*
+                master/build/benchmarks/*
+        
 
