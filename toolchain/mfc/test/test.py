@@ -127,12 +127,14 @@ def test():
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
+    cons.print()
+    cons.unindent()
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
+
+    # Print a summary of all errors at the end if errors exist
     for e in errors:
         cons.print(e)
 
-    cons.print()
-    cons.unindent()
-    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
     exit(nFAIL)
 
 
