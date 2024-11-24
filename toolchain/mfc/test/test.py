@@ -54,10 +54,13 @@ def __filter(cases_) -> typing.List[TestCase]:
             cases.remove(case)
 
     if ARG("percent") == 100:
-        return cases
+        skipped_cases = []
+        return selected_cases, skipped_cases
 
-    return sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    skipped_cases = [item for item in cases if item not in selected_cases]
 
+    return selected_cases, skipped_cases
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
@@ -77,7 +80,8 @@ def test():
 
         return
 
-    cases = [ _.to_case() for _ in __filter(cases) ]
+    cases, skipped_cases = __filter(cases)
+    cases = [ _.to_case() for _ in cases ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -132,8 +136,16 @@ def test():
     cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
 
     # Print a summary of all errors at the end if errors exist
-    for e in errors:
-        cons.print(e)
+    if (len((errors)) != 0):
+        cons.print(f"[bold red]Failed Cases[/bold red]\n")
+        for e in errors:
+            cons.print(e)
+
+    # Print the list of skipped cases
+    if (len(skipped_cases) != 0):
+        cons.print("[bold yellow]Skipped Cases[/bold yellow]\n")
+        for c in skipped_cases:
+            cons.print(f"[bold yellow]{c.trace}[/bold yellow]")
 
     exit(nFAIL)
 
