@@ -31,7 +31,7 @@ lambda_wave = 1E-3
 #define pulse
 P_amp = 10.E+6
 P_len = 45                  #length of the impulse
-theta = -math.pi/2          #direction of propagation 
+theta = -math.pi/2          #direction of propagation
 
 #non-dim
 
@@ -43,8 +43,8 @@ time_char = length_char/c_char
 stress_char = rho_char*c_char*c_char/gammag
 
 #non-dim the properties
-rhog_n  = rhog/rho_char    
-c_g_n = c_g/c_char    
+rhog_n  = rhog/rho_char
+c_g_n = c_g/c_char
 rhol_n = rhol/rho_char
 c_l_n = c_l/c_char
 Bg_n = Bg/stress_char
@@ -72,7 +72,7 @@ interface_amp = 0.5
 time_end = 5
 cfl = 8.0
 
-dt = cfl * dx/c_l 
+dt = cfl * dx/c_l
 Nt = int(time_end/dt)
 Nframes = 500
 tstart = 0
@@ -110,7 +110,7 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
@@ -130,7 +130,7 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
- 
+
     # Monopole setting =========================================================
     'Monopole'                      : 'T',           # creating an acoustic wave
     'num_mono'                      : 1,             # place in the middle and expand
@@ -139,11 +139,11 @@ print(json.dumps({
     'Mono(1)%mag'                   : 100.0*patmos_n,# magnitude
     'Mono(1)%length'                : 45.0*dlengy,   # pulse length
     'Mono(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    'Mono(1)%support_width'         : 30,             
+    'Mono(1)%support_width'         : 30,
     'Mono(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain
     'Mono(1)%loc(2)'                : dlengy/2,      # upper boundary of the domain
     'Mono(1)%dir'                   : -math.pi,      # direction: -pi/2
-   
+
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : 0.,
@@ -164,10 +164,10 @@ print(json.dumps({
     'patch_icpp(2)%hcid'           : 206,
     'patch_icpp(2)%alter_patch(1)' : 'T',
     'patch_icpp(2)%x_centroid'     : -dlengx/4.,
-    'patch_icpp(2)%y_centroid'     : dlengy/2.,                  
+    'patch_icpp(2)%y_centroid'     : dlengy/2.,
     'patch_icpp(2)%length_x'       : dlengx/2.+2,
-    'patch_icpp(2)%length_y'       : dlengy,                 
-    'patch_icpp(2)%a2'             : interface_amp,
+    'patch_icpp(2)%length_y'       : dlengy,
+    'patch_icpp(2)%a(2)'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
     'patch_icpp(2)%pres'           : patmos_n,
@@ -181,8 +181,8 @@ print(json.dumps({
     'fluid_pp(1)%gamma'            : 1.E+00/(gammal-1.E+00),
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
-    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),   
- 
+    'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
+
  #==============================================================================
 }))
 

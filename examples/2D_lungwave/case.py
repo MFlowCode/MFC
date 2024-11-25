@@ -171,7 +171,7 @@ print(json.dumps({
     'patch_icpp(2)%y_centroid'     : -dlengy/4.,
     'patch_icpp(2)%length_x'       : dlengx,
     'patch_icpp(2)%length_y'       : dlengy/2.+2,
-    'patch_icpp(2)%a2'             : interface_amp,
+    'patch_icpp(2)%a(2)'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
     'patch_icpp(2)%pres'           : patmos_n,
