@@ -104,7 +104,6 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
@@ -132,17 +131,17 @@ print(json.dumps({
     # ==========================================================================
 
     # Monopole setting =========================================================
-    'Monopole'                      : 'T',           # creating an acoustic wave
-    'num_mono'                      : 1,             # place in the middle and expand
-    'Mono(1)%pulse'                 : 3,             # square  wave
-    'Mono(1)%npulse'                : 1,             # 1 pulse
-    'Mono(1)%mag'                   : 100.0*patmos_n,# magnitude
-    'Mono(1)%length'                : 45.0*dlengy,   # pulse length
-    'Mono(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
-    'Mono(1)%support_width'         : 30,
-    'Mono(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain
-    'Mono(1)%loc(2)'                : dlengy/2,      # upper boundary of the domain
-    'Mono(1)%dir'                   : -math.pi,      # direction: -pi/2
+    'acoustic_source'               : 'T',           # creating an acoustic wave
+    'num_source'                    : 1,             # place in the middle and expand
+    'acoustic(1)%pulse'                 : 3,             # square  wave
+    'acoustic(1)%npulse'                : 1,             # 1 pulse
+    'acoustic(1)%mag'                   : 100.0*patmos_n,# magnitude
+    'acoustic(1)%length'                : 45.0*dlengy,   # pulse length
+    'acoustic(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'acoustic(1)%support_width'         : 30,
+    'acoustic(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain
+    'acoustic(1)%loc(2)'                : dlengy/2,      # upper boundary of the domain
+    'acoustic(1)%dir'                   : -math.pi,      # direction: -pi/2
 
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,

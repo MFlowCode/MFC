@@ -32,7 +32,7 @@ lambda_wave = 1E-3
 #define pulse
 P_amp = 10.E+6
 P_len = 45                  #length of the impulse
-theta = -math.pi/2          #direction of propagation 
+theta = -math.pi/2          #direction of propagation
 
 #non-dim
 
@@ -44,8 +44,8 @@ time_char = length_char/c_char
 stress_char = rho_char*c_char*c_char/gammag
 
 #non-dim the properties
-rhog_n  = rhog/rho_char    
-c_g_n = c_g/c_char    
+rhog_n  = rhog/rho_char
+c_g_n = c_g/c_char
 rhol_n = rhol/rho_char
 c_l_n = c_l/c_char
 Bg_n = Bg/stress_char
@@ -73,7 +73,7 @@ interface_amp = 0.5
 time_end = 2.5
 cfl = 0.5
 
-dt = cfl * dx/c_l 
+dt = cfl * dx/c_l
 Nt = int(time_end/dt)
 Nframes = 50000
 tstart = 0
@@ -81,7 +81,7 @@ tstop = Nt
 tsave = int(Nt/Nframes)
 
 #interface profile
-interface_amp = 0.5      
+interface_amp = 0.5
 
 # Configuring case dictionary
 print(json.dumps({
@@ -108,13 +108,12 @@ print(json.dumps({
     'model_eqns'                   : 2,
     'alt_soundspeed'               : 'F',
     'num_fluids'                   : 2,
-    'adv_alphan'                   : 'T',
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
@@ -134,19 +133,19 @@ print(json.dumps({
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
     # ==========================================================================
-    
+
     # Monopole setting =========================================================
-    'Monopole'                      : 'T',             # creating an acoustic wave
-    'num_mono'                      : 1,               # place in the middle and expand
-    'Mono(1)%pulse'                 : 3,               # sine  wave
-    'Mono(1)%npulse'                : 1,               # 1 pulse
-    'Mono(1)%mag'                   : 10.0*patmos_n,   # magnitude
-    'Mono(1)%length'                : 1*dlengx,        # impulse length
-    'Mono(1)%loc(1)'                : dlengx/2,        # x_center of the domain
-    'Mono(1)%loc(2)'                : 5.0*dlengx,      # upper boundary of the domain
-    'Mono(1)%dir'                   : -math.pi/2,      # direction: -pi/2
+    'acoustic_source'               : 'T',             # creating an acoustic wave
+    'num_source'                    : 1,               # place in the middle and expand
+    'acoustic(1)%pulse'             : 3,               # sine  wave
+    'acoustic(1)%npulse'            : 1,               # 1 pulse
+    'acoustic(1)%mag'               : 10.0*patmos_n,   # magnitude
+    'acoustic(1)%length'            : 1*dlengx,        # impulse length
+    'acoustic(1)%loc(1)'            : dlengx/2,        # x_center of the domain
+    'acoustic(1)%loc(2)'            : 5.0*dlengx,      # upper boundary of the domain
+    'acoustic(1)%dir'               : -math.pi/2,      # direction: -pi/2
  #==============================================================================
-                                                                
+
     # Patch 1: Background ======================================================
     'patch_icpp(1)%geometry'       : 3,
     'patch_icpp(1)%x_centroid'     : dlengx/2,
@@ -186,8 +185,8 @@ print(json.dumps({
     'fluid_pp(1)%pi_inf'           : gammal*Bl_n/(gammal-1.E+00),
     'fluid_pp(2)%gamma'            : 1.E+00/(gammag-1.E+00),
     'fluid_pp(2)%pi_inf'           : gammag*Bg_n/(gammag-1.E+00),
-    # ========================================================================== 
-    
+    # ==========================================================================
+
 }))
 
 # ==============================================================================
