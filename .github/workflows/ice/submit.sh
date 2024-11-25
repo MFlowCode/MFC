@@ -18,8 +18,8 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -G V100:2\
 #SBATCH --ntasks-per-node=20       # Number of cores per node required
+#SBATCH -G V100:2\
 "
 
 if [ "$2" == "cpu" ]; then
@@ -37,6 +37,7 @@ sbatch <<EOT
 #!/bin/bash
 #SBATCH -Jshb-$job_slug            # Job name
 #SBATCH -N1                        # Number of nodes required
+#SBATCH -n 20                        # Number of nodes required
 $sbatch_device_opts
 #SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
