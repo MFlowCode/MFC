@@ -340,11 +340,11 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model%scale(:) = 1d0
-            patch_icpp(i)%model%translate(:) = 0d0
-            patch_icpp(i)%model%filepath(:) = dflt_char
-            patch_icpp(i)%model%spc = num_ray
-            patch_icpp(i)%model%threshold = ray_tracing_threshold
+            patch_icpp(i)%model_scale(:) = 1d0
+            patch_icpp(i)%model_translate(:) = 0d0
+            patch_icpp(i)%model_filepath(:) = dflt_char
+            patch_icpp(i)%model_spc = num_ray
+            patch_icpp(i)%model_threshold = ray_tracing_threshold
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
@@ -447,12 +447,12 @@ contains
             patch_ib(i)%slip = .false.
 
             ! Proper default values for translating STL models
-            patch_ib(i)%model%scale(:) = 1d0
-            patch_ib(i)%model%translate(:) = 0d0
-            patch_ib(i)%model%rotate(:) = 0d0
-            patch_ib(i)%model%filepath(:) = dflt_char
-            patch_ib(i)%model%spc = num_ray
-            patch_ib(i)%model%threshold = ray_tracing_threshold
+            patch_ib(i)%model_scale(:) = 1d0
+            patch_ib(i)%model_translate(:) = 0d0
+            patch_ib(i)%model_rotate(:) = 0d0
+            patch_ib(i)%model_filepath(:) = dflt_char
+            patch_ib(i)%model_spc = num_ray
+            patch_ib(i)%model_threshold = ray_tracing_threshold
         end do
 
         ! Fluids physical parameters

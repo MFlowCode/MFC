@@ -29,9 +29,9 @@ module m_constants
     real(kind(0d0)), parameter :: broadband_spectral_level_growth_rate = 10d0 !< The spectral level constant to correct the magnitude at each frqeuency to ensure the source is overall broadband
 
     ! IBM+STL interpolation constants
-    integer, parameter :: Ifactor_2D = 100 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 2D models
-    integer, parameter :: Ifactor_3D = 10 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 3D models
-    integer, parameter :: Ifactor_bary_3D = 30 !< Multiple factor of the ratio (triangle area to cell face area) for interpolation on triangle facets for 3D models
+    integer, parameter :: Ifactor_2D = 50 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 2D models
+    integer, parameter :: Ifactor_3D = 5 !< Multiple factor of the ratio (edge to cell width) for interpolation along edges for 3D models
+    integer, parameter :: Ifactor_bary_3D = 20 !< Multiple factor of the ratio (triangle area to cell face area) for interpolation on triangle facets for 3D models
     integer, parameter :: num_ray = 20 !< Default number of rays traced per cell
     real(kind(0d0)), parameter :: ray_tracing_threshold = 0.9d0 !< Threshold above which the cell is marked as the model patch
     real(kind(0d0)), parameter :: threshold_vector_zero = 1d-10 !< Threshold to treat the component of a vector to be zero

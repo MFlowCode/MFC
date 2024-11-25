@@ -1976,27 +1976,32 @@ contains
         t_mat4x4 :: transform
 
         if (present(ib) .and. proc_rank == 0) then
-            print *, " * Reading model: "//trim(patch_ib(patch_id)%model%filepath)
+            print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
         else if (proc_rank == 0) then
-            print *, " * Reading model: "//trim(patch_icpp(patch_id)%model%filepath)
+            print *, " * Reading model: "//trim(patch_icpp(patch_id)%model_filepath)
         end if
 
         if (present(ib)) then
-            model = f_model_read(patch_ib(patch_id)%model%filepath)
+            model = f_model_read(patch_ib(patch_id)%model_filepath)
+            params%scale(:) = patch_ib(patch_id)%model_scale(:)
+            params%translate(:) = patch_ib(patch_id)%model_translate(:)
+            params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
+            params%spc = patch_ib(patch_id)%model_spc
+            params%threshold = patch_ib(patch_id)%model_threshold
         else
-            model = f_model_read(patch_icpp(patch_id)%model%filepath)
+            model = f_model_read(patch_icpp(patch_id)%model_filepath)
+            params%scale(:) = patch_icpp(patch_id)%model_scale(:)
+            params%translate(:) = patch_icpp(patch_id)%model_translate(:)
+            params%rotate(:) = patch_icpp(patch_id)%model_rotate(:)
+            params%spc = patch_icpp(patch_id)%model_spc
+            params%threshold = patch_icpp(patch_id)%model_threshold
         end if
 
         if (proc_rank == 0) then
             print *, " * Transforming model..."
         end if
 
-        if (present(ib)) then
-            transform = f_create_transform_matrix(patch_ib(patch_id)%model)
-        else
-            transform = f_create_transform_matrix(patch_icpp(patch_id)%model)
-        end if
-
+        transform = f_create_transform_matrix(params)
         call s_transform_model(model, transform)
 
         bbox = f_create_bbox(model)
@@ -2079,14 +2084,14 @@ contains
                     end if
 
                     if (present(ib)) then
-                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model%spc)
+                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
                     else
-                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model%spc)
+                        eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
                     end if
 
                     if (present(ib)) then
                         ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                        if (eta > patch_ib(patch_id)%model%threshold) then
+                        if (eta > patch_ib(patch_id)%model_threshold) then
                             patch_id_fp(i, j, k) = patch_id
                         end if
 
@@ -2158,11 +2163,11 @@ contains
                         end if
                     else
                         if (patch_icpp(patch_id)%smoothen) then
-                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                            if (eta > patch_icpp(patch_id)%model_threshold) then
                                 eta = 1d0
                             end if
                         else
-                            if (eta > patch_icpp(patch_id)%model%threshold) then
+                            if (eta > patch_icpp(patch_id)%model_threshold) then
                                 eta = 1d0
                             else
                                 eta = 0d0

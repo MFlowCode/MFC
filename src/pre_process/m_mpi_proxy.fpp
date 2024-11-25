@@ -84,31 +84,31 @@ contains
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model%threshold', 'cf_val']
+                & 'model_threshold', 'cf_val']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            call MPI_BCAST(patch_icpp(i)%model%filepath, len(patch_icpp(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%model_filepath, len(patch_icpp(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-            #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate', &
+            #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate', &
                 'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha' ]
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            call MPI_BCAST(patch_icpp(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             ! Broadcast IB variables
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model%filepath, len(patch_ib(i)%model%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model%threshold, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model%spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_threshold, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
                 & 'length_x', 'length_y', 'length_z', 'radius', 'c', 'p', 't', 'm', 'theta', 'slip']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'model%translate', 'model%scale', 'model%rotate']
+            #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do

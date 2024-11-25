@@ -269,14 +269,14 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model%filepath == dflt_char, &
+        @:PROHIBIT(patch_ib(patch_id)%model_filepath == dflt_char, &
             'Empty model file path for patch '//trim(iStr))
 
-        @:PROHIBIT(patch_ib(patch_id)%model%scale(1) <= 0d0 &
+        @:PROHIBIT(patch_ib(patch_id)%model_scale(1) <= 0d0 &
             .or. &
-            patch_ib(patch_id)%model%scale(2) <= 0d0 &
+            patch_ib(patch_id)%model_scale(2) <= 0d0 &
             .or. &
-            patch_ib(patch_id)%model%scale(3) <= 0d0, &
+            patch_ib(patch_id)%model_scale(3) <= 0d0, &
             'Negative scale in model IB patch '//trim(iStr))
 
     end subroutine s_check_model_ib_patch_geometry

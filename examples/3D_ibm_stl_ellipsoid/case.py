@@ -22,9 +22,9 @@ print(json.dumps({
     'z_domain%beg'                 : -2*D,
     'z_domain%end'                 : 2*D,
     'cyl_coord'                    : 'F',
-    'm'                            : 399,
-    'n'                            : 199,
-    'p'                            : 199,
+    'm'                            : 139,
+    'n'                            : 69,
+    'p'                            : 69,
     'dt'                           : 1.0E-6,
     't_step_start'                 : 0,
     't_step_stop'                  : 1000,
@@ -90,12 +90,12 @@ print(json.dumps({
 
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
-    'patch_ib(1)%model%filepath'               : 'Ellipsoid_IBM.stl',
-    'patch_ib(1)%model%translate(1)'           : -0.02056,
-    'patch_ib(1)%model%translate(2)'           : -0.01,
-    'patch_ib(1)%model%translate(3)'           : -0.01,
-    'patch_ib(1)%model%spc'                    : 100,
-    'patch_ib(1)%model%threshold'              : 0.01,
+    'patch_ib(1)%model_filepath'               : 'Ellipsoid_IBM.stl',
+    'patch_ib(1)%model_translate(1)'           : -0.02056,
+    'patch_ib(1)%model_translate(2)'           : -0.01,
+    'patch_ib(1)%model_translate(3)'           : -0.01,
+    'patch_ib(1)%model_spc'                    : 20,
+    'patch_ib(1)%model_threshold'              : 0.01,
     'patch_ib(1)%slip'                         : 'F',
     # ==========================================================================
 

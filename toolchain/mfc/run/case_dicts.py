@@ -105,11 +105,11 @@ for ib_id in range(1, 10+1):
 
     for real_attr_stl, ty_stl in [("filepath", ParamType.STR), ("spc", ParamType.INT),
                           ("threshold", ParamType.REAL)]:
-        PRE_PROCESS[f"patch_ib({ib_id})%model%{real_attr_stl}"] = ty_stl
+        PRE_PROCESS[f"patch_ib({ib_id})%model_{real_attr_stl}"] = ty_stl
 
     for real_attr_stl2 in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
-            PRE_PROCESS[f"patch_ib({ib_id})%model%{real_attr_stl2}({j})"] = ParamType.REAL
+            PRE_PROCESS[f"patch_ib({ib_id})%model_{real_attr_stl2}({j})"] = ParamType.REAL
 
 for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end", "a", "b"]:
@@ -143,14 +143,14 @@ for p_id in range(1, 10+1):
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()
 
-    PRE_PROCESS[f"patch_icpp({p_id})%model%filepath"] = ParamType.STR
+    PRE_PROCESS[f"patch_icpp({p_id})%model_filepath"] = ParamType.STR
 
     for real_attr in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
-            PRE_PROCESS[f"patch_icpp({p_id})%model%{real_attr}({j})"] = ParamType.REAL
+            PRE_PROCESS[f"patch_icpp({p_id})%model_{real_attr}({j})"] = ParamType.REAL
 
-    PRE_PROCESS[f"patch_icpp({p_id})%model%spc"] = ParamType.INT
-    PRE_PROCESS[f"patch_icpp({p_id})%model%threshold"] = ParamType.REAL
+    PRE_PROCESS[f"patch_icpp({p_id})%model_spc"] = ParamType.INT
+    PRE_PROCESS[f"patch_icpp({p_id})%model_threshold"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1

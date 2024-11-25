@@ -77,11 +77,11 @@ print(json.dumps({
     'patch_icpp(1)%alpha(1)'       : 1.0,
     # ==========================================================================
     'patch_ib(1)%geometry'              : 5,
-    'patch_ib(1)%model%filepath'        : 'Character_IBM.stl',
-    'patch_ib(1)%model%translate(1)'    : -0.0469828735,
-    'patch_ib(1)%model%translate(2)'    : -0.0094892600,
-    'patch_ib(1)%model%spc'             : 200,
-    'patch_ib(1)%model%threshold'       : 0.99,
+    'patch_ib(1)%model_filepath'        : 'Character_IBM.stl',
+    'patch_ib(1)%model_translate(1)'    : -0.0469828735,
+    'patch_ib(1)%model_translate(2)'    : -0.0094892600,
+    'patch_ib(1)%model_model_spc'       : 200,
+    'patch_ib(1)%model_threshold'       : 0.99,
     'patch_ib(1)%slip'                  : 'F',
     # # ========================================================================
    

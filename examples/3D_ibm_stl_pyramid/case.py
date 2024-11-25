@@ -90,12 +90,12 @@ print(json.dumps({
 
     # Patch: Model Immersed Boundary ===========================================
     'patch_ib(1)%geometry'                     : 12,
-    'patch_ib(1)%model%filepath'               : '3DPyramid_IBM.stl',
-    'patch_ib(1)%model%translate(1)'           : -0.0500000984,
-    'patch_ib(1)%model%translate(2)'           : -0.0500001003,
-    'patch_ib(1)%model%translate(3)'           : -0.0500001003,
-    'patch_ib(1)%model%spc'                    : 100,
-    'patch_ib(1)%model%threshold'              : 0.95,
+    'patch_ib(1)%model_filepath'               : '3DPyramid_IBM.stl',
+    'patch_ib(1)%model_translate(1)'           : -0.0500000984,
+    'patch_ib(1)%model_translate(2)'           : -0.0500001003,
+    'patch_ib(1)%model_translate(3)'           : -0.0500001003,
+    'patch_ib(1)%model_spc'                    : 100,
+    'patch_ib(1)%model_threshold'              : 0.95,
     'patch_ib(1)%slip'                         : 'F',
     # ==========================================================================
 
