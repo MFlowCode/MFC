@@ -123,7 +123,7 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'ice'
-        run:  bash .github/workflows/ice/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+        run:  bash .github/workflows/ice/submit.sh .github/workflows/ice/test.sh ${{ matrix.device }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
