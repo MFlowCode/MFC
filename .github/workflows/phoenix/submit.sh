@@ -33,20 +33,7 @@ else
     exit 1
 fi
 
-# Set default precision to 'double' if not provided
-
-if [ -z "$3" ]; then
-    precision="double"
-else
-    if [ "$3" != "single" ] && [ "$3" != "double" ]; then
-        usage
-        exit 1
-    fi
-    precision="$3"
-fi
-
-
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$precision"
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
 sbatch <<EOT
 #!/bin/bash
@@ -67,9 +54,9 @@ echo "Running in $(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
-job_precision="$precision"
 
 . ./mfc.sh load -c p -m $2
 
 $sbatch_script_contents
+
 EOT
