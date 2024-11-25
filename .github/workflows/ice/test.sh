@@ -5,6 +5,7 @@ if [ "$job_device" == "gpu" ]; then
     build_opts="--gpu"
 fi
 
+
 ./mfc.sh build -j 8 $build_opts
 
 n_test_threads=8
