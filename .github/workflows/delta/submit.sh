@@ -19,9 +19,9 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -p gpuA100x4
+#SBATCH -p gpuA100x4,gpuA100x8
 #SBATCH --account=bdiy-delta-gpu
-#SBATCH --gpus-per-node=2
+#SBATCH --gpus-per-node=4
 "
 
 if [ "$2" == "cpu" ]; then
