@@ -12,5 +12,6 @@ jobs:
 
     - name: Check formatting
       run: |
+        ./mfc.sh &> tmp.txt || true
         ./mfc.sh format -j $(nproc)
         git diff --exit-code
