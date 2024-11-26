@@ -233,6 +233,10 @@ module m_global_parameters
     integer :: tempxb, tempxe
     !> @}
 
+    !> @ lagrangian solver parameters
+    logical :: lag_adap_dt
+    !> @}
+
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     type(pres_field) :: pb
@@ -451,6 +455,9 @@ contains
             fluid_pp(i)%qvp = 0d0
             fluid_pp(i)%G = 0d0
         end do
+
+        ! Lagrangian solver
+        lag_adap_dt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

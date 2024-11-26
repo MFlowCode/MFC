@@ -123,24 +123,30 @@ contains
 
             v_size = sys_size + 2*nb*4
         else
+
+            if (lag_bubbles) then
+                v_size = adv_idx%end + 2
+            else
+                v_size = sys_size
+            end if
+
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*v_size* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ &
                                              & (min(m, n, p) + 2*buff_size + 1)))
                 else
-                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size* &
+                    @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*v_size* &
                                              & (max(m, n) + 2*buff_size + 1)))
                 end if
             else
-                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*sys_size))
+                @:ALLOCATE_GLOBAL(q_cons_buff_send(0:-1 + buff_size*v_size))
             end if
 
             @:ALLOCATE_GLOBAL(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
-            v_size = sys_size
         end if
 
         if (.not. f_is_default(sigma)) then
@@ -203,13 +209,32 @@ contains
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
-            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt' ]
+            & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'lag_bubbles' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         if (chemistry) then
             #:for VAR in [ 'advection', 'diffusion', 'reactions' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
+        if (lag_bubbles) then
+            #:for VAR in [ 'lag_write_bubbles', 'lag_write_bubble_stats', 'lag_pressure_corrector', &
+                & 'lag_heatTransfer_model', 'lag_massTransfer_model', 'lag_adap_dt']
+                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in ['lag_bubble_model', 'lag_cluster_type', 'lag_smooth_type',     &
+                & 'lag_solver_approach', 'lag_nBubs_glb']
+                call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in [ 'csonhost', 'vischost', 'Thost', 'gammagas', 'gammavapor',&
+                & 'pvap', 'cpgas', 'cpvapor', 'kgas', 'kvapor', 'Rgas', 'Rvap',    &
+                & 'diffcoefvap', 'sigmabubble', 'lag_rkck_tolerance', 'lag_epsilonb',    &
+                & 'lag_charwidth', 'lag_valmaxvoid']
+                call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
 

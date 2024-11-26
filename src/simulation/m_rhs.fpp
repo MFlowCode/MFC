@@ -169,7 +169,7 @@ module m_rhs
 
     !> @name Indical bounds in the x-, y- and z-directions
     !> @{
-    type(int_bounds_info) :: ix, iy, iz
+    type(int_bounds_info), public :: ix, iy, iz
     !$acc declare create(ix, iy, iz)
 
     type(int_bounds_info) :: is1, is2, is3

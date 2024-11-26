@@ -148,6 +148,7 @@ module m_global_parameters
 
     type(mpi_io_var), public :: MPI_IO_DATA
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
+    real(kind(0.d0)), allocatable, dimension(:, :), public :: MPI_IO_DATA_lg_bubbles
 
 #endif
 
@@ -279,6 +280,11 @@ module m_global_parameters
     integer :: tempxb, tempxe
     !> @}
 
+    !> @name Lagrangian bubbles
+    !> @{
+    logical :: lag_bubbles, lag_adap_dt
+    !> @}
+
 contains
 
     !> Assigns default values to user inputs prior to reading
@@ -388,6 +394,10 @@ contains
         sigR = dflt_real
         sigma = dflt_real
         adv_n = .false.
+
+        ! Lagrangian bubbles modeling
+        lag_bubbles = .false.
+        lag_adap_dt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -645,13 +655,22 @@ contains
         ! ==================================================================
 
 #ifdef MFC_MPI
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
-
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        
+        if (lag_bubbles) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
+            do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do           
+        end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -803,6 +822,8 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+
+            if (lag_bubbles) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

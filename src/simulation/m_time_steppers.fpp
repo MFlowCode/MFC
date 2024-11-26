@@ -40,6 +40,8 @@ module m_time_steppers
     use m_thermochem
 
     use m_body_forces
+
+    use m_lag_bubbles           !< Lagrangian bubbles routines
     ! ==========================================================================
 
     implicit none
@@ -54,6 +56,10 @@ module m_time_steppers
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
     !! Cell-average RHS variables at the current time-stage
 
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), rhs_ts_adapt)
+    !! Cell-average RHS variables at each time-stage (TS)
+    !! Adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time stepper
+
     @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
@@ -66,7 +72,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare link(q_cons_ts, q_prim_vf, rhs_vf, rhs_ts_adapt, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -76,6 +82,10 @@ module m_time_steppers
 
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
+
+    type(vector_field), allocatable, dimension(:) :: rhs_ts_adapt
+    !! Cell-average RHS variables at each time-stage (TS)
+    !! Adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time stepper
 
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
@@ -89,7 +99,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(q_cons_ts, q_prim_vf, rhs_vf, rhs_ts_adapt, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #endif
 
 contains
@@ -105,10 +115,14 @@ contains
         integer :: i, j !< Generic loop iterators
 
         ! Setting number of time-stages for selected time-stepping scheme
-        if (time_stepper == 1) then
-            num_ts = 1
-        elseif (any(time_stepper == (/2, 3/))) then
+        if (lag_bubbles) then
             num_ts = 2
+        else
+            if (time_stepper == 1) then
+                num_ts = 1
+            elseif (any(time_stepper == (/2, 3/))) then
+                num_ts = 2
+            end if
         end if
 
         ! Setting the indical bounds in the x-, y- and z-directions
@@ -301,6 +315,22 @@ contains
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(rhs_vf(i))
         end do
+
+        ! Allocating the cell-average RHS time-stages for adaptive RKCK stepper
+        if (lag_bubbles) then
+            @:ALLOCATE_GLOBAL(rhs_ts_adapt(1:6))
+            do i = 1, 6
+                @:ALLOCATE(rhs_ts_adapt(i)%vf(1:sys_size))
+            end do
+            do i = 1, 6
+                do j = 1, sys_size
+                    @:ALLOCATE(rhs_ts_adapt(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
+                                                        iy_t%beg:iy_t%end, &
+                                                        iz_t%beg:iz_t%end))
+                end do
+                @:ACC_SETUP_SFs(rhs_ts_adapt(i))
+            end do
+        end if
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
@@ -1053,6 +1083,161 @@ contains
         end if
 
     end subroutine s_time_step_cycling
+
+        !> (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (Cash J. and Karp A., 1990)
+        !!      Method for initial value problems with rapidly varying RHS. A maximum error between the 4th and 5th 
+        !!      order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is 
+        !!      smaller than a tolerance, then the algorithm employs the 5th order solution, while if not, both 
+        !!      eulerian/lagrangian variables are re-calculated with a smaller time step size.
+        !! @param t_step Current time-step
+        !! @param hdid Advanced time increment (adaptive time stepping)
+    subroutine s_4th_5th_order_rkck(t_step, hdid, time_prev, time_avg)
+
+        integer, intent(in) :: t_step
+        real(kind(0d0)), intent(inout) :: hdid
+        real(kind(0d0)), intent(in) :: time_prev
+        real(kind(0d0)), intent(inout) :: time_avg
+
+        real(kind(0.d0)) :: newtime, errmax_glb, dttarget, qtime
+        real(kind(0.d0)) :: RKh, RKh_glb, htemp, SAFETY = 0.9d0, PGROW = -0.2d0, &
+                            PSHRNK = -0.25d0, ERRCON = 1.89d-4
+        integer :: i, j, k
+        
+        RKh = min(dt, dt_max)
+        RKh = max(Rkh, 1.0d-12)
+        
+        if (num_procs > 1) then
+            call s_mpi_allreduce_min(RKh, RKh_glb)
+            RKh = RKh_glb
+        end if
+
+        dt = RKh
+        lag_largestep = .false.
+        !$acc update device(lag_largestep, dt)
+
+        !> Starting adaptive RKCK algorithm
+501     lag_errmax = 0.0d0
+        !$acc update device(lag_errmax)
+
+        ! First time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 1st time-stage at', time_prev
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_adapt(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev, 1)
+        call s_update_tmp_rkck(1, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        ! Second time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', time_prev + 0.2d0*dt
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_adapt(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev + 0.2d0*dt, 2)
+        call s_update_tmp_rkck(2, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        ! Third time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', time_prev + 0.3d0*dt
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_adapt(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev + 0.3d0*dt, 3)
+        call s_update_tmp_rkck(3, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        ! Fourth time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 4th time-stage at', time_prev + 0.6d0*dt
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_adapt(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev + 0.6d0*dt, 4)
+        call s_update_tmp_rkck(4, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        ! Fifth time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 5th time-stage at', time_prev + 1.0d0*dt
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_adapt(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev + 1.0d0*dt, 5)
+        call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        ! Sixth time-stage
+#ifdef DEBUG
+        if (proc_rank == 0) print *, 'RKCK 6th time-stage at', time_prev + 0.875d0*dt
+#endif
+        call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_adapt(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, time_prev + 0.875d0*dt, 6)
+        call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_adapt, q_prim_vf)
+        if (lag_largestep) goto 502
+
+        if (cfl_dt) then 
+            ! Truncation Error
+#ifdef DEBUG
+            if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
+#endif
+            call s_calculate_rkck_truncation_error()
+        end if
+
+502     if (lag_largestep) then ! Encountered negative radius, so reduce dt and restart time step
+            if (cfl_dt) then
+                if (RKh .gt. 1.0d-14) then
+                    RKh = RKh/2.0d0
+                    if (proc_rank==0) print*, '>>>>> WARNING: Reducing dt and restarting time step, now dt: ', RKh
+                    lag_largestep = .false.
+                    dt = RKh
+                    !$acc update device(lag_largestep, dt)
+                    goto 501
+                else
+                    call s_mpi_abort('Time step smaller than 1e-14')
+                end if
+            else
+                call s_mpi_abort('Time step too large, please reduce dt or enable cfl_adapt_dt')
+            end if
+        end if
+
+        if (cfl_dt) then ! Checking truncation error
+            lag_errmax = min(lag_errmax,1.0d0)
+            if (num_procs > 1) then
+                call s_mpi_allreduce_max(lag_errmax, errmax_glb)
+                lag_errmax=errmax_glb
+            end if
+            lag_errmax=lag_errmax/lag_rkck_tolerance ! Scale relative to user required tolerance.
+
+            if ((lag_errmax .gt. 1.0d0)) then   ! Truncation error too large, reduce dt and restart time step
+                htemp=SAFETY*RKh*(lag_errmax**PSHRNK)
+                RKh=sign(max(abs(htemp),0.1d0*abs(RKh)),RKh)  ! No more than a factor of 10.
+                if (proc_rank==0) print*, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', RKh
+                lag_largestep = .false.
+                dt = RKh
+                !$acc update device(lag_largestep, dt)
+                goto 501       
+            else                            ! Step succeeded. Compute size of next step.
+                if (lag_errmax .gt. ERRCON) then
+                    dt=SAFETY*RKh*(lag_errmax**PGROW) ! No more than a factor of 5 increase. 
+                else    
+                    dt=2.0d0*RKh            ! Truncation error too small (< 1.89e-4), increase time step
+                end if    
+            end if 
+            dt = min(dt, dt_max)
+            
+        else
+            dt = RKh
+        end if
+
+        hdid = RKh
+
+        !> Update values
+        qtime = time_prev + hdid
+        call s_update_rkck(q_cons_ts, q_prim_vf)
+
+        call s_write_void_evol(qtime)
+        if (lag_write_bubble_stats) call s_calculate_lag_bubble_stats()
+
+        if (run_time_info) then
+            call s_write_run_time_information(q_prim_vf, t_step)
+        end if
+
+        return
+
+    end subroutine s_4th_5th_order_rkck
+    
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
@@ -1113,6 +1298,17 @@ contains
         end do
 
         @:DEALLOCATE_GLOBAL(rhs_vf)
+
+        ! Deallocating the cell-average RHS variable for adaptive method, Lagrangian solver
+        if (lag_bubbles) then
+            do i = 1, 6
+                do j = 1, sys_size
+                    @:DEALLOCATE(rhs_ts_adapt(i)%vf(j)%sf)
+                end do
+                @:DEALLOCATE(rhs_ts_adapt(i)%vf)
+            end do
+            @:DEALLOCATE_GLOBAL(rhs_ts_adapt)
+        end if
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

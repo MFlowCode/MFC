@@ -65,7 +65,6 @@ def get_dimensions():
 
     return r
 
-
 # pylint: disable=too-many-locals, too-many-statements
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
@@ -694,6 +693,45 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             for _ in range(6):
                 stack.pop()
+    
+    def alter_lag_bubbles():
+        for adap_dt in ['F', 'T']:
+            stack.push("lagrangian bubbles", {"lag_bubbles": 'T',
+                'x_domain%beg': 4.9985, 'x_domain%end': 5.0015, 'y_domain%beg': 4.9985, 'y_domain%end': 5.0015,
+                'z_domain%beg': 4.9985, 'z_domain%end': 5.0015, 'stretch_x': 'F', 'stretch_y': 'F', 'stretch_z': 'F', 
+                'm': 30, 'n': 30, 'p': 30, 'dt': 4.e-08, 
+                'model_eqns': 2, 'num_fluids': 1, 'weno_order': 5, 'weno_eps': 1.0E-16,
+                'mapped_weno':'T', 'riemann_solver': 2, 'wave_speeds': 1,'avg_state': 2, 'bc_x%beg':-6,
+                'bc_x%end': -6, 'bc_y%beg': -6, 'bc_y%end': -6, 'bc_z%beg': -6, 'bc_z%end': -6, 
+                'format': 1, 'precision': 2, 'prim_vars_wrt':'T', 'parallel_io':'T',
+                'patch_icpp(3)%geometry': 9, 'patch_icpp(3)%x_centroid': 5., 'patch_icpp(3)%y_centroid': 5.,
+                'patch_icpp(3)%z_centroid': 5., 'patch_icpp(3)%length_x': 0.1, 'patch_icpp(3)%length_y': 0.1,
+                'patch_icpp(3)%length_z': 0.1, 'patch_icpp(3)%vel(1)': 0., 'patch_icpp(3)%vel(2)': 0.,
+                'patch_icpp(3)%vel(3)': 0., 'patch_icpp(3)%pres': 100000.0, 'patch_icpp(3)%alpha_rho(1)': 1000.0,
+                'patch_icpp(3)%alpha(1)': 1.,
+                'acoustic_source': 'T', 'num_source': 1, 'acoustic(1)%support': 3, 'acoustic(1)%pulse': 1,
+                'acoustic(1)%npulse': 10, 'acoustic(1)%wavelength': 0.0689252336448598,
+                'acoustic(1)%length': 0.1, 'acoustic(1)%height': 0.1, 'acoustic(1)%loc(1)': 4.9995,
+                'acoustic(1)%loc(2)': 4.9995, 'acoustic(1)%loc(3)': 4.9995, 'acoustic(1)%dir': 0., 'acoustic(1)%delay': 0.,
+                'lag_solver_approach': 2, 'lag_cluster_type': 2,
+                'lag_pressure_corrector': 'T', 'lag_smooth_type': 1, 'lag_bubble_model': 1, 'lag_heatTransfer_model': 'T',  
+                'lag_massTransfer_model': 'T', 'lag_rkck_tolerance': 1.0e-08, 
+                'fluid_pp(1)%gamma': 0.5725409366769725, 'fluid_pp(1)%pi_inf': 1245483872.6668956, 'fluid_pp(1)%Re(1)': 166.66666666666666
+            })
+
+            if (adap_dt=='F'):
+                stack.push('',{'lag_adap_dt': 'F',
+                        'acoustic(1)%mag': 13200.0, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
+            else:
+                stack.push('lag_adap_dt=T',{'lag_adap_dt': 'T',
+                        'acoustic(1)%mag': 332000.0, 'n_start': 0, 't_save': 1.5e-06, 't_stop': 1.5e-06,})
+
+            cases.append(define_case_d(stack, '', {}))
+
+            stack.pop()        
+
+            stack.pop()
+
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
@@ -707,6 +745,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) == 3:
                 alter_3d()
                 alter_capillary()
+                alter_lag_bubbles()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_acoustic_src(dimInfo)

@@ -54,7 +54,8 @@ module m_data_output
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step)
+        !! @param beta Eulerian void fraction from lagrangian bubbles
+    subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
             import :: scalar_field, sys_size, pres_field
 
@@ -67,6 +68,9 @@ module m_data_output
                 intent(inout) :: q_prim_vf
 
             integer, intent(in) :: t_step
+
+            type(scalar_field), &
+                intent(inout), optional :: beta
 
         end subroutine s_write_abstract_data_files
     end interface ! ========================================================
@@ -370,11 +374,13 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+        !!  @param beta Eulerian void fraction from lagrangian bubbles
+    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
+        type(scalar_field), intent(inout), optional :: beta
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the current time-step directory
@@ -736,6 +742,13 @@ contains
             end if
         end if
 
+        if (present(beta)) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', adv_idx%end + 1, '.dat'
+            open (2, FILE=trim(file_path), FORM='unformatted', STATUS='new')
+            write (2) beta%sf(0:m, 0:n, 0:p)
+            close (2)
+        end if
+
     end subroutine s_write_serial_data_files
 
     !>  The goal of this subroutine is to output the grid and
@@ -743,11 +756,13 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
+        !!  @param beta Eulerian void fraction from lagrangian bubbles
+    subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
+        type(scalar_field), intent(inout), optional :: beta
 
 #ifdef MFC_MPI
 
@@ -764,6 +779,14 @@ contains
         character(len=10) :: t_step_string
 
         integer :: i !< Generic loop iterator
+
+        integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
+
+        if (present(beta)) then
+            alt_sys = sys_size + 1
+        else
+            alt_sys = sys_size
+        end if
 
         if (file_per_process) then
 
@@ -846,6 +869,8 @@ contains
 
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            elseif (present(beta)) then
+                call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -869,7 +894,7 @@ contains
             WP_MOK = int(8d0, MPI_OFFSET_KIND)
             MOK = int(1d0, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             if (bubbles) then
                 ! Write the data for each variable
@@ -910,6 +935,19 @@ contains
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                             MPI_DOUBLE_PRECISION, status, ierr)
                 end do
+            end if
+
+            ! Correction for the lagrangian subgrid bubble model
+            if (present(beta)) then
+                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+
+                ! Initial displacement to skip at beginning of file
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(sys_size + 1), &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
+                                        MPI_DOUBLE_PRECISION, status, ierr)
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)

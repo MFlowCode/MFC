@@ -90,6 +90,34 @@ BASE_CFG = {
     'acoustic(1)%npulse'                : 1,
     'acoustic(1)%pulse'                 : 1,
     'rdma_mpi'                          : 'F',
+
+    'lag_bubbles'                 : 'F',
+    'lag_nBubs_glb'               : 1,
+    'lag_adap_dt'                 : 'F',
+    'lag_solver_approach'         : 2,
+    'lag_cluster_type'            : 2,
+    'lag_pressure_corrector'      : 'F',
+    'lag_smooth_type'             : 1,
+    'lag_bubble_model'            : 1,
+    'lag_heatTransfer_model'      : 'F',
+    'lag_massTransfer_model'      : 'F',
+    'lag_epsilonb'                : 1.0,
+    'lag_rkck_tolerance'          : 1.0,
+    'lag_valmaxvoid'              : 0.9,
+    'csonhost'                    : 1475.0,
+    'vischost'                    : 0.001,
+    'Thost'                       : 298,
+    'gammagas'                    : 1.4,
+    'gammavapor'                  : 1.33,
+    'pvap'                        : 2500,
+    'cpgas'                       : 1000.0,
+    'cpvapor'                     : 2100.0,
+    'kgas'                        : 0.025,
+    'kvapor'                      : 0.02,
+    'Rgas'                        : 296.92857142857144,
+    'Rvap'                        : 461.8888888888889,
+    'diffcoefvap'                 : 2.5e-05,
+    'sigmabubble'                 : 0.07,
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -118,6 +146,10 @@ class TestCase(case.Case):
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
         rebuild           = [] if self.rebuild or ARG("case_optimization") else ["--no-build"]
+
+        if "lagrangian bubbles" in self.trace:
+            path_lag_bubbles = f'{self.get_dirpath()}'
+            create_input_lag_bubbles(path_lag_bubbles)
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
@@ -156,6 +188,9 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "p_all"))
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
+        if "lagrangian bubbles" in self.trace:
+            common.delete_directory(os.path.join(dirpath, "input"))
+            common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -301,3 +336,16 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
             traces.append(trace)
 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn, rebuild)
+
+# create input file for the lag_bubbles solver
+def create_input_lag_bubbles(path_lag_bubbles):
+
+    folder_path_lag_bubbles = path_lag_bubbles + '/input'
+    file_path_lag_bubbles = folder_path_lag_bubbles + '/lag_bubbles.dat'
+
+    if not os.path.exists(folder_path_lag_bubbles):
+        os.mkdir(folder_path_lag_bubbles)
+
+    file_lag_bubbles = open(file_path_lag_bubbles, "w") 
+    file_lag_bubbles.write('%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e' % (5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 8e-6, 0.0))
+    file_lag_bubbles.close()

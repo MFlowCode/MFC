@@ -183,6 +183,7 @@ contains
         integer, parameter :: mass_label = 1, mom_label = 2
 
         sim_time = t_step*dt
+        if (lag_bubbles) sim_time = time_tmp
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
