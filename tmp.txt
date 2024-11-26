@@ -1,0 +1,185 @@
+mfc: OK > Created a Python virtual environment (venv).
+mfc: OK > (venv) Entered the Python 3.13.0 virtual environment (>= 3.9).
+mfc: (venv) (Re)Installing mfc.sh's Python dependencies (via Pip).
+Processing ./toolchain
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting argparse (from mfc==4.9.6)
+  Using cached argparse-1.4.0-py2.py3-none-any.whl.metadata (2.8 kB)
+Collecting cantera (from mfc==4.9.6)
+  Using cached Cantera-3.0.1-cp313-cp313-macosx_15_0_arm64.whl
+Collecting dataclasses (from mfc==4.9.6)
+  Using cached dataclasses-0.6-py3-none-any.whl.metadata (3.0 kB)
+Collecting fastjsonschema (from mfc==4.9.6)
+  Using cached fastjsonschema-2.20.0-py3-none-any.whl.metadata (2.1 kB)
+Collecting fprettify (from mfc==4.9.6)
+  Using cached fprettify-0.3.7-py3-none-any.whl.metadata (5.7 kB)
+Collecting fypp (from mfc==4.9.6)
+  Using cached fypp-3.2-py3-none-any.whl.metadata (7.9 kB)
+Collecting mako (from mfc==4.9.6)
+  Using cached Mako-1.3.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting matplotlib (from mfc==4.9.6)
+  Using cached matplotlib-3.9.2-cp313-cp313-macosx_11_0_arm64.whl.metadata (11 kB)
+Collecting numpy (from mfc==4.9.6)
+  Using cached numpy-2.1.3-cp313-cp313-macosx_14_0_arm64.whl.metadata (62 kB)
+Collecting pandas (from mfc==4.9.6)
+  Using cached pandas-2.2.3-cp313-cp313-macosx_11_0_arm64.whl.metadata (89 kB)
+Collecting pylint (from mfc==4.9.6)
+  Using cached pylint-3.3.1-py3-none-any.whl.metadata (12 kB)
+Collecting pyrometheus==1.0.2 (from mfc==4.9.6)
+  Using cached pyrometheus-1.0.2-py3-none-any.whl.metadata (2.9 kB)
+Collecting pyyaml (from mfc==4.9.6)
+  Using cached PyYAML-6.0.2-cp313-cp313-macosx_11_0_arm64.whl.metadata (2.1 kB)
+Collecting rich (from mfc==4.9.6)
+  Using cached rich-13.9.4-py3-none-any.whl.metadata (18 kB)
+Collecting seaborn (from mfc==4.9.6)
+  Using cached seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
+Collecting typing (from mfc==4.9.6)
+  Using cached typing-3.7.4.3-py3-none-any.whl
+Collecting typos (from mfc==4.9.6)
+  Using cached typos-1.28.0-py3-none-macosx_11_0_arm64.whl.metadata (6.3 kB)
+Collecting wheel (from mfc==4.9.6)
+  Using cached wheel-0.45.1-py3-none-any.whl.metadata (2.3 kB)
+Collecting pymbolic (from pyrometheus==1.0.2->mfc==4.9.6)
+  Using cached pymbolic-2024.2-py3-none-any.whl.metadata (3.2 kB)
+Collecting ruamel.yaml>=0.15.34 (from cantera->mfc==4.9.6)
+  Using cached ruamel.yaml-0.18.6-py3-none-any.whl.metadata (23 kB)
+Collecting configargparse (from fprettify->mfc==4.9.6)
+  Using cached ConfigArgParse-1.7-py3-none-any.whl.metadata (23 kB)
+Collecting MarkupSafe>=0.9.2 (from mako->mfc==4.9.6)
+  Using cached MarkupSafe-3.0.2-cp313-cp313-macosx_11_0_arm64.whl.metadata (4.0 kB)
+Collecting contourpy>=1.0.1 (from matplotlib->mfc==4.9.6)
+  Using cached contourpy-1.3.1-cp313-cp313-macosx_11_0_arm64.whl.metadata (5.4 kB)
+Collecting cycler>=0.10 (from matplotlib->mfc==4.9.6)
+  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib->mfc==4.9.6)
+  Using cached fonttools-4.55.0-cp313-cp313-macosx_10_13_universal2.whl.metadata (164 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib->mfc==4.9.6)
+  Using cached kiwisolver-1.4.7-cp313-cp313-macosx_11_0_arm64.whl.metadata (6.3 kB)
+Collecting packaging>=20.0 (from matplotlib->mfc==4.9.6)
+  Using cached packaging-24.2-py3-none-any.whl.metadata (3.2 kB)
+Collecting pillow>=8 (from matplotlib->mfc==4.9.6)
+  Using cached pillow-11.0.0-cp313-cp313-macosx_11_0_arm64.whl.metadata (9.1 kB)
+Collecting pyparsing>=2.3.1 (from matplotlib->mfc==4.9.6)
+  Using cached pyparsing-3.2.0-py3-none-any.whl.metadata (5.0 kB)
+Collecting python-dateutil>=2.7 (from matplotlib->mfc==4.9.6)
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting pytz>=2020.1 (from pandas->mfc==4.9.6)
+  Using cached pytz-2024.2-py2.py3-none-any.whl.metadata (22 kB)
+Collecting tzdata>=2022.7 (from pandas->mfc==4.9.6)
+  Using cached tzdata-2024.2-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting platformdirs>=2.2.0 (from pylint->mfc==4.9.6)
+  Using cached platformdirs-4.3.6-py3-none-any.whl.metadata (11 kB)
+Collecting astroid<=3.4.0-dev0,>=3.3.4 (from pylint->mfc==4.9.6)
+  Using cached astroid-3.3.5-py3-none-any.whl.metadata (4.5 kB)
+Collecting isort!=5.13.0,<6,>=4.2.5 (from pylint->mfc==4.9.6)
+  Using cached isort-5.13.2-py3-none-any.whl.metadata (12 kB)
+Collecting mccabe<0.8,>=0.6 (from pylint->mfc==4.9.6)
+  Using cached mccabe-0.7.0-py2.py3-none-any.whl.metadata (5.0 kB)
+Collecting tomlkit>=0.10.1 (from pylint->mfc==4.9.6)
+  Using cached tomlkit-0.13.2-py3-none-any.whl.metadata (2.7 kB)
+Collecting dill>=0.3.6 (from pylint->mfc==4.9.6)
+  Using cached dill-0.3.9-py3-none-any.whl.metadata (10 kB)
+Collecting markdown-it-py>=2.2.0 (from rich->mfc==4.9.6)
+  Using cached markdown_it_py-3.0.0-py3-none-any.whl.metadata (6.9 kB)
+Collecting pygments<3.0.0,>=2.13.0 (from rich->mfc==4.9.6)
+  Using cached pygments-2.18.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->mfc==4.9.6)
+  Using cached mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib->mfc==4.9.6)
+  Using cached six-1.16.0-py2.py3-none-any.whl.metadata (1.8 kB)
+Collecting immutabledict (from pymbolic->pyrometheus==1.0.2->mfc==4.9.6)
+  Using cached immutabledict-4.2.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting pytools>=2024.1.16 (from pymbolic->pyrometheus==1.0.2->mfc==4.9.6)
+  Using cached pytools-2024.1.16-py3-none-any.whl.metadata (2.9 kB)
+Collecting typing-extensions>=4.5 (from pymbolic->pyrometheus==1.0.2->mfc==4.9.6)
+  Using cached typing_extensions-4.12.2-py3-none-any.whl.metadata (3.0 kB)
+Collecting useful-types (from pymbolic->pyrometheus==1.0.2->mfc==4.9.6)
+  Using cached useful_types-0.2.1-py3-none-any.whl.metadata (975 bytes)
+Using cached pyrometheus-1.0.2-py3-none-any.whl (21 kB)
+Using cached argparse-1.4.0-py2.py3-none-any.whl (23 kB)
+Using cached numpy-2.1.3-cp313-cp313-macosx_14_0_arm64.whl (5.1 MB)
+Using cached dataclasses-0.6-py3-none-any.whl (14 kB)
+Using cached fastjsonschema-2.20.0-py3-none-any.whl (23 kB)
+Using cached fprettify-0.3.7-py3-none-any.whl (28 kB)
+Using cached fypp-3.2-py3-none-any.whl (29 kB)
+Using cached Mako-1.3.6-py3-none-any.whl (78 kB)
+Using cached matplotlib-3.9.2-cp313-cp313-macosx_11_0_arm64.whl (7.8 MB)
+Using cached pandas-2.2.3-cp313-cp313-macosx_11_0_arm64.whl (11.3 MB)
+Using cached pylint-3.3.1-py3-none-any.whl (521 kB)
+Using cached PyYAML-6.0.2-cp313-cp313-macosx_11_0_arm64.whl (171 kB)
+Using cached rich-13.9.4-py3-none-any.whl (242 kB)
+Using cached seaborn-0.13.2-py3-none-any.whl (294 kB)
+Using cached typos-1.28.0-py3-none-macosx_11_0_arm64.whl (2.9 MB)
+Using cached wheel-0.45.1-py3-none-any.whl (72 kB)
+Using cached astroid-3.3.5-py3-none-any.whl (274 kB)
+Using cached contourpy-1.3.1-cp313-cp313-macosx_11_0_arm64.whl (255 kB)
+Using cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Using cached dill-0.3.9-py3-none-any.whl (119 kB)
+Using cached fonttools-4.55.0-cp313-cp313-macosx_10_13_universal2.whl (2.8 MB)
+Using cached isort-5.13.2-py3-none-any.whl (92 kB)
+Using cached kiwisolver-1.4.7-cp313-cp313-macosx_11_0_arm64.whl (63 kB)
+Using cached markdown_it_py-3.0.0-py3-none-any.whl (87 kB)
+Using cached MarkupSafe-3.0.2-cp313-cp313-macosx_11_0_arm64.whl (12 kB)
+Using cached mccabe-0.7.0-py2.py3-none-any.whl (7.3 kB)
+Using cached packaging-24.2-py3-none-any.whl (65 kB)
+Using cached pillow-11.0.0-cp313-cp313-macosx_11_0_arm64.whl (3.0 MB)
+Using cached platformdirs-4.3.6-py3-none-any.whl (18 kB)
+Using cached pygments-2.18.0-py3-none-any.whl (1.2 MB)
+Using cached pyparsing-3.2.0-py3-none-any.whl (106 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached pytz-2024.2-py2.py3-none-any.whl (508 kB)
+Using cached ruamel.yaml-0.18.6-py3-none-any.whl (117 kB)
+Using cached tomlkit-0.13.2-py3-none-any.whl (37 kB)
+Using cached tzdata-2024.2-py2.py3-none-any.whl (346 kB)
+Using cached ConfigArgParse-1.7-py3-none-any.whl (25 kB)
+Using cached pymbolic-2024.2-py3-none-any.whl (135 kB)
+Using cached mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Using cached pytools-2024.1.16-py3-none-any.whl (88 kB)
+Using cached six-1.16.0-py2.py3-none-any.whl (11 kB)
+Using cached typing_extensions-4.12.2-py3-none-any.whl (37 kB)
+Using cached immutabledict-4.2.1-py3-none-any.whl (4.7 kB)
+Using cached useful_types-0.2.1-py3-none-any.whl (5.4 kB)
+Building wheels for collected packages: mfc
+  Building wheel for mfc (pyproject.toml): started
+  Building wheel for mfc (pyproject.toml): finished with status 'done'
+  Created wheel for mfc: filename=mfc-4.9.6-py2.py3-none-any.whl size=48835 sha256=88f0c16bc4e72749fdddde96e3733ff06f68cab2ceed04b300447e259e350ca3
+  Stored in directory: /private/var/folders/m0/m86tdy4s6h35s_80rvpykfr80000gn/T/pip-ephem-wheel-cache-xl6nfsmf/wheels/82/bf/97/dd2f006e8544bcca95a70f5624d35bb155d8124d33626ff6dc
+Successfully built mfc
+Installing collected packages: pytz, fypp, fastjsonschema, dataclasses, argparse, wheel, tzdata, typos, typing-extensions, typing, tomlkit, six, ruamel.yaml, pyyaml, pyparsing, pygments, platformdirs, pillow, packaging, numpy, mdurl, mccabe, MarkupSafe, kiwisolver, isort, immutabledict, fonttools, dill, cycler, configargparse, astroid, useful-types, pytools, python-dateutil, pylint, markdown-it-py, mako, fprettify, contourpy, cantera, rich, pymbolic, pandas, matplotlib, seaborn, pyrometheus, mfc
+Successfully installed MarkupSafe-3.0.2 argparse-1.4.0 astroid-3.3.5 cantera-3.0.1 configargparse-1.7 contourpy-1.3.1 cycler-0.12.1 dataclasses-0.6 dill-0.3.9 fastjsonschema-2.20.0 fonttools-4.55.0 fprettify-0.3.7 fypp-3.2 immutabledict-4.2.1 isort-5.13.2 kiwisolver-1.4.7 mako-1.3.6 markdown-it-py-3.0.0 matplotlib-3.9.2 mccabe-0.7.0 mdurl-0.1.2 mfc-4.9.6 numpy-2.1.3 packaging-24.2 pandas-2.2.3 pillow-11.0.0 platformdirs-4.3.6 pygments-2.18.0 pylint-3.3.1 pymbolic-2024.2 pyparsing-3.2.0 pyrometheus-1.0.2 python-dateutil-2.9.0.post0 pytools-2024.1.16 pytz-2024.2 pyyaml-6.0.2 rich-13.9.4 ruamel.yaml-0.18.6 seaborn-0.13.2 six-1.16.0 tomlkit-0.13.2 typing-3.7.4.3 typing-extensions-4.12.2 typos-1.28.0 tzdata-2024.2 useful-types-0.2.1 wheel-0.45.1
+mfc: OK > (venv) Installation succeeded.
+
+usage: ./mfc.sh count_diff [-h] [-t TARGET [TARGET ...]] [--mpi] [--no-mpi]
+                           [--gpu] [--no-gpu] [--debug] [--no-debug] [--gcov]
+                           [--no-gcov] [--unified] [--no-unified] [-j JOBS]
+                           [-v]
+
+options:
+  -h, --help            show this help message and exit
+  -t, --targets TARGET [TARGET ...]
+                        Space separated list of targets to act upon. Allowed
+                        values are: silo, pre_process, documentation, hipfort,
+                        post_process, hdf5, syscheck, fftw, and simulation.
+                        (default: ['pre_process', 'simulation',
+                        'post_process'])
+  --mpi                 Turn the mpi option ON. (default: True)
+  --no-mpi              Turn the mpi option OFF. (default: True)
+  --gpu                 Turn the gpu option ON. (default: False)
+  --no-gpu              Turn the gpu option OFF. (default: False)
+  --debug               Turn the debug option ON. (default: False)
+  --no-debug            Turn the debug option OFF. (default: False)
+  --gcov                Turn the gcov option ON. (default: False)
+  --no-gcov             Turn the gcov option OFF. (default: False)
+  --unified             Turn the unified option ON. (default: False)
+  --no-unified          Turn the unified option OFF. (default: False)
+  -j, --jobs JOBS       Allows for JOBS concurrent jobs. (default: 1)
+  -v, --verbose         Enables verbose compiler & linker output. (default:
+                        False)
+
+mfc: ERROR > main.py finished with a 255 exit code.
+mfc: (venv) Exiting the Python virtual environment.
