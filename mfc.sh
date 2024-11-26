@@ -47,6 +47,10 @@ mkdir -p "$(pwd)/build"
 . "$(pwd)/toolchain/bootstrap/cmake.sh"
 . "$(pwd)/toolchain/bootstrap/python.sh"
 
+if [ "$1" '==' 'init' ]; then
+    exit 0
+fi
+
 echo
 
 # Run the main.py bootstrap script
