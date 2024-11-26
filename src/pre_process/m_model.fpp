@@ -79,13 +79,14 @@ contains
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
     subroutine s_read_stl_ascii(filepath, model)
-
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
         integer :: i, j, iunit, iostat
+        character(80) :: line, buffered_line
+        logical :: is_buffered
 
-        character(80) :: line
+        is_buffered = .false.
 
         open (newunit=iunit, file=filepath, action='READ', &
               form='FORMATTED', status='OLD', iostat=iostat, &
@@ -93,13 +94,17 @@ contains
 
         if (iostat /= 0) then
             print *, "Error: could not open ASCII STL file ", filepath
-
             call s_mpi_abort()
         end if
 
         model%ntrs = 0
         do
-            if (.not. f_read_line(iunit, line)) exit
+            if (is_buffered) then
+                line = buffered_line
+                is_buffered = .false.
+            else
+                if (.not. f_read_line(iunit, line)) exit
+            end if
 
             if (line(1:6) == "facet ") then
                 model%ntrs = model%ntrs + 1
@@ -112,48 +117,70 @@ contains
 
         i = 1
         do
-            if (.not. f_read_line(iunit, line)) exit
+            if (is_buffered) then
+                line = buffered_line
+                is_buffered = .false.
+            else
+                if (.not. f_read_line(iunit, line)) exit
+            end if
 
             if (line(1:5) == "solid") cycle
             if (line(1:8) == "endsolid") exit
 
             if (line(1:12) /= "facet normal") then
                 print *, "Error: expected facet normal in STL file ", filepath
-
                 call s_mpi_abort()
             end if
 
-            call s_skip_ignored_lines(iunit)
+            call s_skip_ignored_lines(iunit, buffered_line, is_buffered)
             read (line(13:), *) model%trs(i)%n
 
-            call s_skip_ignored_lines(iunit)
-            read (iunit, '(A)') line
+            call s_skip_ignored_lines(iunit, buffered_line, is_buffered)
+            if (is_buffered) then
+                line = buffered_line
+                is_buffered = .false.
+            else
+                read (iunit, '(A)') line
+            end if
 
             do j = 1, 3
-                if (.not. f_read_line(iunit, line)) exit
+                if (is_buffered) then
+                    line = buffered_line
+                    is_buffered = .false.
+                else
+                    if (.not. f_read_line(iunit, line)) exit
+                end if
 
                 if (line(1:6) /= "vertex") then
                     print *, "Error: expected vertex in STL file ", filepath
-
                     call s_mpi_abort()
                 end if
 
-                call s_skip_ignored_lines(iunit)
+                call s_skip_ignored_lines(iunit, buffered_line, is_buffered)
                 read (line(7:), *) model%trs(i)%v(j, :)
             end do
 
-            if (.not. f_read_line(iunit, line)) exit
-            if (.not. f_read_line(iunit, line)) exit
+            if (is_buffered) then
+                line = buffered_line
+                is_buffered = .false.
+            else
+                if (.not. f_read_line(iunit, line)) exit
+            end if
+
+            if (is_buffered) then
+                line = buffered_line
+                is_buffered = .false.
+            else
+                if (.not. f_read_line(iunit, line)) exit
+            end if
 
             if (line(1:8) /= "endfacet") then
                 print *, "Error: expected endfacet in STL file ", filepath
-
                 call s_mpi_abort()
             end if
 
             i = i + 1
         end do
-
     end subroutine s_read_stl_ascii
 
     !> This procedure reads an STL file.
@@ -434,16 +461,22 @@ contains
 
     end function f_read_line
 
-    subroutine s_skip_ignored_lines(iunit)
-
+    subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
+        character(80), intent(inout) :: buffered_line
+        logical, intent(inout) :: is_buffered
 
         character(80) :: line
 
-        if (f_read_line(iunit, line)) then
-            backspace (iunit)
+        if (is_buffered) then
+            line = buffered_line
+            is_buffered = .false.
+        else
+            if (.not. f_read_line(iunit, line)) return
         end if
 
+        buffered_line = line
+        is_buffered = .true.
     end subroutine s_skip_ignored_lines
 
     !> This procedure, recursively, finds whether a point is inside an octree.
