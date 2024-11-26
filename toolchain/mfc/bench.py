@@ -61,7 +61,7 @@ def bench(targets = None):
                 ["--targets"] + [t.name for t in targets] +
                 ["--output-summary", summary_filepath] +
                 case.args +
-                ["--", ARG('mem')],
+                ["--", "--gbpp", ARG('mem')],
                 stdout=log_file,
                 stderr=subprocess.STDOUT)
 
@@ -168,3 +168,4 @@ def diff():
 
     if err != 0:
         raise MFCException("Benchmarking failed")
+    
