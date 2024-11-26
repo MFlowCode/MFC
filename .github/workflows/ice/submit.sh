@@ -19,7 +19,7 @@ sbatch_cpu_opts="\
 
 sbatch_gpu_opts="\
 #SBATCH --ntasks-per-node=20       # Number of cores per node required
-#SBATCH -G V100:2\
+#SBATCH -G H100:2\
 "
 
 if [ "$2" == "cpu" ]; then
