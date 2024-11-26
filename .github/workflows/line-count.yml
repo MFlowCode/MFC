@@ -49,6 +49,6 @@ jobs:
           cd $BASE
           export MFC_PR=$PR
           pwd
-          ./mfc.sh &> tmp.txt || true
+          ./mfc.sh init &> tmp.txt || true
           ./mfc.sh count_diff
 

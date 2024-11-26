@@ -10,8 +10,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Python setup
-      run: ./mfc.sh || true
+    - name: MFC Python setup
+      run: ./mfc.sh init
 
     - name: Spell Check
       run:  ./mfc.sh spelling
