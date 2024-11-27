@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         device: ['cpu', 'gpu']
-        lbl: ['gt', 'ice']
+        lbl: ['gt']
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -51,13 +51,6 @@ jobs:
         run: |
           (cd pr     && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
           (cd master && bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          wait %1 && wait %2
-
-      - name: Bench (Master v. PR)
-        if:   matrix.lbl == 'ice'
-        run: |
-          (cd pr     && bash .github/workflows/ice/submit.sh .github/workflows/ice/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/ice/submit.sh .github/workflows/ice/bench.sh ${{ matrix.device }}) &
           wait %1 && wait %2
 
       - name: Generate & Post Comment

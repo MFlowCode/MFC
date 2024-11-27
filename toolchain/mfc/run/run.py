@@ -14,6 +14,8 @@ from ..common  import format_list_to_string, file_dump_yaml
 
 from . import queues, input
 
+import hunter
+
 
 def __validate_job_options() -> None:
     if not ARG("mpi") and any({ARG("nodes") > 1, ARG("tasks_per_node") > 1}):
@@ -133,6 +135,7 @@ def __execute_job_script(qsystem: queues.QueueSystem):
         raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
+@hunter.wrap(local=True)
 def run(targets = None, case = None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
     case    = case or input.load(ARG("input"), ARG("--"))
