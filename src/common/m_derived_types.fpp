@@ -168,7 +168,6 @@ module m_derived_types
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
 
-
         real(wp) :: epsilon, beta !<
         !! The spherical harmonics eccentricity parameters.
 
@@ -239,7 +238,7 @@ module m_derived_types
         integer :: model_spc !<
         !! Number of samples per cell to use when discretizing the STL object.
 
-        real(kind(0d0)) :: model_threshold !<
+        real(wp) :: model_threshold !<
         !! Threshold to turn on smoothen STL patch.
 
     end type ic_patch_parameters
@@ -277,7 +276,7 @@ module m_derived_types
         integer :: model_spc !<
         !! Number of samples per cell to use when discretizing the STL object.
 
-        real(kind(0d0)) :: model_threshold !<
+        real(wp) :: model_threshold !<
         !! Threshold to turn on smoothen STL patch.
     end type ib_patch_parameters
 

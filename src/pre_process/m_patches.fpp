@@ -968,7 +968,6 @@ contains
 
                             @:analytical()
 
-
                             if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                                 !zero density, reassign according to Tait EOS
                                 q_prim_vf(1)%sf(i, j, 0) = &
@@ -1707,7 +1706,6 @@ contains
                                 call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                                         eta, q_prim_vf, patch_id_fp)
 
-
                                 @:analytical()
 
                                 ! Updating the patch identities bookkeeping variable
@@ -1796,7 +1794,6 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-
                     if ((.not. f_is_default(length_x) .and. &
                          (cart_y - y_centroid)**2 &
                          + (cart_z - z_centroid)**2 <= radius**2 .and. &
@@ -1830,7 +1827,6 @@ contains
                                 ! Updating the patch identities bookkeeping variable
                                 if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
                             end if
-
 
                             if (patch_icpp(patch_id)%smoothen) then
                                 if (.not. f_is_default(length_x)) then

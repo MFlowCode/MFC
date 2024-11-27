@@ -106,9 +106,9 @@ module m_cbc
     !! inflow velocities, pressure, density and void fraction as well as
     !! outflow velocities and pressure
 
-    real(kind(0d0)), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
-    real(kind(0d0)), allocatable, dimension(:, :) :: vel_in, vel_out
-    real(kind(0d0)), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
+    real(wp), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
+    real(wp), allocatable, dimension(:, :) :: vel_in, vel_out
+    real(wp), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
     !$acc declare create(pres_in, pres_out, Del_in, Del_out)
     !$acc declare create(vel_in, vel_out)
     !$acc declare create(alpha_rho_in, alpha_in)

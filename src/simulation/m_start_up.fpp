@@ -97,7 +97,7 @@ module m_start_up
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
 
-    real(kind(0d0)) :: dt_init
+    real(wp) :: dt_init
 
 contains
 
