@@ -16,7 +16,6 @@ module m_kernel_functions
 
     implicit none
 
-    
     integer :: mapCells             !< Number of cells around the bubble where the strength function will have effect
     !$acc declare create(mapCells)
 
@@ -36,8 +35,7 @@ contains
         real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:3, 1:2), intent(in) :: lag_bub_motion_s, lag_bub_motion_pos
         real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:2), intent(in) :: lag_bub_interface_rad, lag_bub_interface_vel
         type(vector_field), intent(inout) :: updatedvar
-        
-        
+
         mapCells = 3    !Number of cells around the bubble where the strength function will have effect (3+1+3)
         !$acc update device(mapCells)
 
@@ -50,7 +48,7 @@ contains
 
     end subroutine s_smoothfunction
 
-     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
+    !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles only affects the cell where the bubble is located.
     subroutine s_deltafunc(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
 
@@ -70,12 +68,12 @@ contains
         !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
         do l = 1, nBubs
 
-            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l,2)**3
+            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l, 2)**3
             s_coord(1:3) = lag_bub_motion_s(l, 1:3, 2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l,2)**2*lag_bub_interface_vel(l,2)
+            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l, 2)**2*lag_bub_interface_vel(l, 2)
 
             if (num_dims == 2) then
                 Vol = dx(cell(1))*dy(cell(2))*lag_charwidth
@@ -85,23 +83,23 @@ contains
             end if
 
             !Update void fraction field
-            addFun1 = strength_vol / Vol
+            addFun1 = strength_vol/Vol
             !$acc atomic update
             updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) + addFun1
 
             !Update time derivative of void fraction
-            addFun2 = strength_vel / Vol
+            addFun2 = strength_vel/Vol
             !$acc atomic update
             updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) + addFun2
 
             !Product of two smeared functions
             !Update void fraction * time derivative of void fraction
-            if (lag_cluster_type >= 4) then 
-                addFun3 = (strength_vol * strength_vel) / Vol
+            if (lag_cluster_type >= 4) then
+                addFun3 = (strength_vol*strength_vel)/Vol
                 !$acc atomic update
                 updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
-            end if                                                              
-        end do  
+            end if
+        end do
 
     end subroutine s_deltafunc
 
@@ -128,7 +126,7 @@ contains
         logical :: celloutside
         integer :: smearGrid, smearGridz
 
-        smearGrid = mapCells - (- mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
+        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
@@ -136,7 +134,7 @@ contains
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0.0d0
-            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l,2)**3
+            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l, 2)**3
             s_coord(1:3) = lag_bub_motion_s(l, 1:3, 2)
             center(1:2) = lag_bub_motion_pos(l, 1:2, 2)
             if (p > 0) center(3) = lag_bub_motion_pos(l, 3, 2)
@@ -144,7 +142,7 @@ contains
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l,2)**2*lag_bub_interface_vel(l,2)
+            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l, 2)**2*lag_bub_interface_vel(l, 2)
 
             !$acc loop collapse(3) private(i, j, k, cellaux, nodecoord)
             do i = 1, smearGrid
@@ -156,15 +154,15 @@ contains
                         if (p == 0) cellaux(3) = 0
 
                         !Check if the cells intended to smear the bubbles in are in the computational domain
-                        !and redefine the cells for symetric boundary
+                        !and redefine the cells for symmetric boundary
                         call s_check_celloutside(cellaux, celloutside)
 
                         if (.not. celloutside) then
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
                             if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
-                                                                    .or. bc_z%beg == -2 .or. bc_z%end == -2) then
-                                call s_shift_cell_symetric_bc(cellaux, cell)
+                                .or. bc_z%beg == -2 .or. bc_z%end == -2) then
+                                call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
 
                             nodecoord(1) = x_cc(cellaux(1))
@@ -182,28 +180,28 @@ contains
                         end if
 
                         !Update void fraction field
-                        addFun1 = func * strength_vol
+                        addFun1 = func*strength_vol
                         !$acc atomic update
                         updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                                                    updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                                                    + addFun1
+                            updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + addFun1
 
                         !Update time derivative of void fraction
-                        addFun2 = func * strength_vel
+                        addFun2 = func*strength_vel
                         !$acc atomic update
                         updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                                                    updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                                                    + addFun2
+                            updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + addFun2
 
                         !Product of two smeared functions
                         !Update void fraction * time derivative of void fraction
-                        if (lag_cluster_type >= 4) then 
-                            addFun3 = func2 * strength_vol * strength_vel
+                        if (lag_cluster_type >= 4) then
+                            addFun3 = func2*strength_vol*strength_vel
                             !$acc atomic update
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                                                    updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                                                    + addFun3
-                        end if                                                              
+                                updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + addFun3
+                        end if
                     end do
                 end do
             end do
@@ -228,11 +226,11 @@ contains
         distance = sqrt((center(1) - nodecoord(1))**2 + (center(2) - nodecoord(2))**2 + (center(3) - nodecoord(3))**2)
 
         if (num_dims == 3) then
-            !< 3D gausian function
+            !< 3D gaussian function
             func = exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
         else
             if (cyl_coord) then
-                !< 2D cylindrical function: 
+                !< 2D cylindrical function:
                 ! We smear particles in the azimuthal direction for given r
                 theta = 0d0
                 Nr = ceiling(2d0*PI*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
@@ -250,10 +248,10 @@ contains
                     distance = DSQRT((center(1) - nodecoord(1))**2d0 + L2)
                     ! nodecoord(2)*dtheta is the azimuthal width of the cell
                     func = func + &
-                             dtheta/2d0/PI*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx+1))
+                           dtheta/2d0/PI*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
                 end do
             else
-                !< 2D cartesian function: 
+                !< 2D cartesian function:
                 ! We smear particles considering a virtual depth (lag_charwidth)
                 theta = 0d0
                 Nr = ceiling(lag_charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
@@ -267,7 +265,7 @@ contains
                     Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_charwidth/2d0))**2d0
                     distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
                     func = func + &
-                            dz/lag_charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx+1))
+                           dz/lag_charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
                 end do
             end if
         end if
@@ -275,7 +273,7 @@ contains
     end subroutine s_applygaussian
 
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! @param cellaux Tested cell to smear the bubble effect in. 
+            !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
         !$acc routine seq
@@ -295,7 +293,7 @@ contains
                 celloutside = .true.
             end if
         else
-            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) ) then
+            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
 
@@ -308,63 +306,63 @@ contains
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current bubble
-            !! @param cellaux Cell to map the bubble effect in. 
-    subroutine s_shift_cell_symetric_bc(cellaux, cell)
+            !! @param cellaux Cell to map the bubble effect in.
+    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
         !$acc routine seq
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
         ! x-dir
-        if (bc_x%beg == -2 .and. (cell(1) .le. mapCells-1) ) then 
-            if (cell(1) .ge. 0) then
+        if (bc_x%beg == -2 .and. (cell(1) <= mapCells - 1)) then
+            if (cell(1) >= 0) then
                 cellaux(1) = abs(cellaux(1)) - 1
             else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_x%beg)."
+                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%beg)."
             end if
         end if
-        if (bc_x%end == -2 .and. (cell(1) .ge. m+1-mapCells)) then
-            if (cell(1) .le. m) then
-                cellaux(1) = cellaux(1) - (2 * (cellaux(1) - m) - 1)
+        if (bc_x%end == -2 .and. (cell(1) >= m + 1 - mapCells)) then
+            if (cell(1) <= m) then
+                cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
             else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_x%end)."
+                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%end)."
             end if
         end if
 
         !y-dir
-        if (bc_y%beg == -2 .and. (cell(2) .le. mapCells-1) ) then 
-            if (cell(2) .ge. 0) then
+        if (bc_y%beg == -2 .and. (cell(2) <= mapCells - 1)) then
+            if (cell(2) >= 0) then
                 cellaux(2) = abs(cellaux(2)) - 1
             else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_y%beg)."
+                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%beg)."
             end if
         end if
-        if (bc_y%end == -2 .and. (cell(2) .ge. n+1-mapCells)) then
-            if (cell(2) .le. n) then
-                cellaux(2) = cellaux(2) - (2 * (cellaux(2) - n) - 1)
+        if (bc_y%end == -2 .and. (cell(2) >= n + 1 - mapCells)) then
+            if (cell(2) <= n) then
+                cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
             else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_y%end)."
+                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%end)."
             end if
         end if
 
         if (p > 0) then
             !z-dir
-            if (bc_z%beg == -2 .and. (cell(3) .le. mapCells-1) ) then 
-                if (cell(3) .ge. 0) then
+            if (bc_z%beg == -2 .and. (cell(3) <= mapCells - 1)) then
+                if (cell(3) >= 0) then
                     cellaux(3) = abs(cellaux(3)) - 1
                 else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_z%beg)."
+                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%beg)."
                 end if
             end if
-            if (bc_z%end == -2 .and. (cell(3) .ge. p+1-mapCells)) then
-                if (cell(3) .le. p) then
-                    cellaux(3) = cellaux(3) - (2 * (cellaux(3) - p) - 1)
+            if (bc_z%end == -2 .and. (cell(3) >= p + 1 - mapCells)) then
+                if (cell(3) <= p) then
+                    cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
                 else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symetric boundary (bc_z%end)."
+                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%end)."
                 end if
             end if
         end if
 
-    end subroutine s_shift_cell_symetric_bc
+    end subroutine s_shift_cell_symmetric_bc
 
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
             !! @param cell Cell where the bubble is located
@@ -372,7 +370,7 @@ contains
             !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
         !$acc routine seq
-        integer, dimension(3), intent(in):: cell
+        integer, dimension(3), intent(in) :: cell
         real(kind(0.d0)), intent(in) :: volpart
         real(kind(0.d0)), intent(out) :: stddsv
 
@@ -427,8 +425,8 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine returns the bilinear interpolation coefficients, based on the 
-            !!      current location fo the bubble.
+    !> This subroutine returns the bilinear interpolation coefficients, based on the
+            !!      current location of the bubble.
             !! @param coord Bubble's spatial lcation
             !! @param psi Bilinear interpolation coefficients
             !! @param cell Bubble's computational coordinate
@@ -483,10 +481,10 @@ contains
 
     end subroutine s_get_psi
 
-    !> This subroutine transforms the computational coordintates of the bubble from
+    !> This subroutine transforms the computational coordinates of the bubble from
             !!      real type into integer.
-            !! @param s Computational coordintates of the bubble, real type
-            !! @param get_cell Computational coordintates of the bubble, integer type
+            !! @param s Computational coordinates of the bubble, real type
+            !! @param get_cell Computational coordinates of the bubble, integer type
     subroutine s_get_cell(s_cell, get_cell)
         !$acc routine seq
         real(kind(0.d0)), dimension(3), intent(in) :: s_cell
@@ -497,7 +495,7 @@ contains
         do i = 1, num_dims
             if (s_cell(i) < 0.0d0) get_cell(i) = get_cell(i) - 1
         end do
-        
+
     end subroutine s_get_cell
 
 end module m_kernel_functions

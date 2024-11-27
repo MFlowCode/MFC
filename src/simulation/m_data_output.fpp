@@ -55,7 +55,7 @@ module m_data_output
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
         !! @param beta Eulerian void fraction from lagrangian bubbles
-    subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step, beta)
+        subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
             import :: scalar_field, sys_size, pres_field
 

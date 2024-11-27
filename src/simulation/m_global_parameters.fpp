@@ -502,10 +502,10 @@ module m_global_parameters
     logical :: lag_write_bubbles            !< Write files to track the bubble evolution each time step
     logical :: lag_write_bubble_stats       !< Write the maximum and minimum radius of each bubble
     integer :: lag_nBubs_glb                !< Global number of bubbles
-    real(kind(0d0)) :: lag_epsilonb         !< Standar deviation scaling for the gaussian function (default: 1.0d0)
+    real(kind(0d0)) :: lag_epsilonb         !< Standard deviation scaling for the gaussian function (default: 1.0d0)
     real(kind(0d0)) :: lag_rkck_tolerance   !< Adaptive RKCK tolerance
     real(kind(0d0)) :: lag_charwidth        !< Domain virtual depth (z direction, for 2D simulations)
-    real(kind(0d0)) :: lag_valmaxvoid       !< Maximum void fraction permitted 
+    real(kind(0d0)) :: lag_valmaxvoid       !< Maximum void fraction permitted
     real(kind(0d0)) :: csonhost             !< Liquid speed of sound
     real(kind(0d0)) :: vischost             !< Liquid viscosity
     real(kind(0d0)) :: Thost                !< Liquid temperature

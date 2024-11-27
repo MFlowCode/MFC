@@ -950,7 +950,7 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file
 
-     !>  Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
+    !>  Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
             !!  @param t_step Current time step
     subroutine s_write_lag_bubbles_results(t_step)
 

@@ -655,7 +655,7 @@ contains
         ! ==================================================================
 
 #ifdef MFC_MPI
-        
+
         if (lag_bubbles) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
@@ -669,7 +669,7 @@ contains
             do i = 1, sys_size
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
-            end do           
+            end do
         end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))

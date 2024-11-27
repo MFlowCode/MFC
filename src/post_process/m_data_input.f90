@@ -815,7 +815,6 @@ contains
 
         ! Populating Buffer Regions in the x-direction =====================
 
-
         ! Ghost-cell extrapolation BC at the beginning
         if (bc_x%beg <= -3) then
 

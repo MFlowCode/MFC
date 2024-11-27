@@ -72,7 +72,7 @@ contains
         type(integer_field), &
             optional, &
             intent(in) :: ib_markers
-        
+
         type(scalar_field), &
             intent(in), optional :: beta
 

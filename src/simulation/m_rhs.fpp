@@ -1062,7 +1062,7 @@ contains
 
         ! END: Additional pphysics and source terms ============================
 
-        if (run_time_info .or. probe_wrt .or. ib) then
+        if (run_time_info .or. probe_wrt .or. ib .or. lag_bubbles) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
             if (n > 0) iy%beg = -buff_size; 

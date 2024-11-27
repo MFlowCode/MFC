@@ -664,9 +664,9 @@ contains
         if (lag_bubbles) then
             !! Void fraction field
             q_sf = 1.0d0 - q_particle(1)%sf( &
-                    -offset_x%beg:m + offset_x%end, &
-                    -offset_y%beg:n + offset_y%end, &
-                    -offset_z%beg:p + offset_z%end)
+                   -offset_x%beg:m + offset_x%end, &
+                   -offset_y%beg:n + offset_y%end, &
+                   -offset_z%beg:p + offset_z%end)
             write (varname, '(A)') 'voidFraction'
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '

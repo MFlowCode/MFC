@@ -693,8 +693,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             for _ in range(6):
                 stack.pop()
-    
+
     def alter_lag_bubbles():
+        # Lagrangian bubbles
         for adap_dt in ['F', 'T']:
             stack.push("lagrangian bubbles", {"lag_bubbles": 'T',
                 'x_domain%beg': 4.9985, 'x_domain%end': 5.0015, 'y_domain%beg': 4.9985, 'y_domain%end': 5.0015,
@@ -719,7 +720,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 'fluid_pp(1)%gamma': 0.5725409366769725, 'fluid_pp(1)%pi_inf': 1245483872.6668956, 'fluid_pp(1)%Re(1)': 166.66666666666666
             })
 
-            if (adap_dt=='F'):
+            if adap_dt=='F':
                 stack.push('',{'lag_adap_dt': 'F',
                         'acoustic(1)%mag': 13200.0, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
             else:
@@ -728,7 +729,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, '', {}))
 
-            stack.pop()        
+            stack.pop()
 
             stack.pop()
 

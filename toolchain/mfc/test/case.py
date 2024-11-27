@@ -337,15 +337,12 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn, rebuild)
 
-# create input file for the lag_bubbles solver
-def create_input_lag_bubbles(path_lag_bubbles):
 
+def create_input_lag_bubbles(path_lag_bubbles):
     folder_path_lag_bubbles = path_lag_bubbles + '/input'
     file_path_lag_bubbles = folder_path_lag_bubbles + '/lag_bubbles.dat'
-
     if not os.path.exists(folder_path_lag_bubbles):
         os.mkdir(folder_path_lag_bubbles)
 
-    file_lag_bubbles = open(file_path_lag_bubbles, "w") 
-    file_lag_bubbles.write('%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e' % (5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 8e-6, 0.0))
-    file_lag_bubbles.close()
+    with open(file_path_lag_bubbles, "w") as file:
+        file.write('5.0\t5.0\t5.0\t0.0\t0.0\t0.0\t8.0e-06\t0.0')

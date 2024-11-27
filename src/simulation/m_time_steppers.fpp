@@ -325,8 +325,8 @@ contains
             do i = 1, 6
                 do j = 1, sys_size
                     @:ALLOCATE(rhs_ts_adapt(i)%vf(j)%sf(ix_t%beg:ix_t%end, &
-                                                        iy_t%beg:iy_t%end, &
-                                                        iz_t%beg:iz_t%end))
+                        iy_t%beg:iy_t%end, &
+                        iz_t%beg:iz_t%end))
                 end do
                 @:ACC_SETUP_SFs(rhs_ts_adapt(i))
             end do
@@ -1084,10 +1084,10 @@ contains
 
     end subroutine s_time_step_cycling
 
-        !> (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (Cash J. and Karp A., 1990)
-        !!      Method for initial value problems with rapidly varying RHS. A maximum error between the 4th and 5th 
-        !!      order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is 
-        !!      smaller than a tolerance, then the algorithm employs the 5th order solution, while if not, both 
+    !> (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm (Cash J. and Karp A., 1990)
+        !!      Method for initial value problems with rapidly varying RHS. A maximum error between the 4th and 5th
+        !!      order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is
+        !!      smaller than a tolerance, then the algorithm employs the 5th order solution, while if not, both
         !!      eulerian/lagrangian variables are re-calculated with a smaller time step size.
         !! @param t_step Current time-step
         !! @param hdid Advanced time increment (adaptive time stepping)
@@ -1102,10 +1102,10 @@ contains
         real(kind(0.d0)) :: RKh, RKh_glb, htemp, SAFETY = 0.9d0, PGROW = -0.2d0, &
                             PSHRNK = -0.25d0, ERRCON = 1.89d-4
         integer :: i, j, k
-        
+
         RKh = min(dt, dt_max)
         RKh = max(Rkh, 1.0d-12)
-        
+
         if (num_procs > 1) then
             call s_mpi_allreduce_min(RKh, RKh_glb)
             RKh = RKh_glb
@@ -1167,7 +1167,7 @@ contains
         call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_adapt, q_prim_vf)
         if (lag_largestep) goto 502
 
-        if (cfl_dt) then 
+        if (cfl_dt) then
             ! Truncation Error
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
@@ -1177,9 +1177,9 @@ contains
 
 502     if (lag_largestep) then ! Encountered negative radius, so reduce dt and restart time step
             if (cfl_dt) then
-                if (RKh .gt. 1.0d-14) then
+                if (RKh > 1.0d-14) then
                     RKh = RKh/2.0d0
-                    if (proc_rank==0) print*, '>>>>> WARNING: Reducing dt and restarting time step, now dt: ', RKh
+                    if (proc_rank == 0) print *, '>>>>> WARNING: Reducing dt and restarting time step, now dt: ', RKh
                     lag_largestep = .false.
                     dt = RKh
                     !$acc update device(lag_largestep, dt)
@@ -1193,30 +1193,30 @@ contains
         end if
 
         if (cfl_dt) then ! Checking truncation error
-            lag_errmax = min(lag_errmax,1.0d0)
+            lag_errmax = min(lag_errmax, 1.0d0)
             if (num_procs > 1) then
                 call s_mpi_allreduce_max(lag_errmax, errmax_glb)
-                lag_errmax=errmax_glb
+                lag_errmax = errmax_glb
             end if
-            lag_errmax=lag_errmax/lag_rkck_tolerance ! Scale relative to user required tolerance.
+            lag_errmax = lag_errmax/lag_rkck_tolerance ! Scale relative to user required tolerance.
 
-            if ((lag_errmax .gt. 1.0d0)) then   ! Truncation error too large, reduce dt and restart time step
-                htemp=SAFETY*RKh*(lag_errmax**PSHRNK)
-                RKh=sign(max(abs(htemp),0.1d0*abs(RKh)),RKh)  ! No more than a factor of 10.
-                if (proc_rank==0) print*, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', RKh
+            if ((lag_errmax > 1.0d0)) then   ! Truncation error too large, reduce dt and restart time step
+                htemp = SAFETY*RKh*(lag_errmax**PSHRNK)
+                RKh = sign(max(abs(htemp), 0.1d0*abs(RKh)), RKh)  ! No more than a factor of 10.
+                if (proc_rank == 0) print *, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', RKh
                 lag_largestep = .false.
                 dt = RKh
                 !$acc update device(lag_largestep, dt)
-                goto 501       
+                goto 501
             else                            ! Step succeeded. Compute size of next step.
-                if (lag_errmax .gt. ERRCON) then
-                    dt=SAFETY*RKh*(lag_errmax**PGROW) ! No more than a factor of 5 increase. 
-                else    
-                    dt=2.0d0*RKh            ! Truncation error too small (< 1.89e-4), increase time step
-                end if    
-            end if 
+                if (lag_errmax > ERRCON) then
+                    dt = SAFETY*RKh*(lag_errmax**PGROW) ! No more than a factor of 5 increase.
+                else
+                    dt = 2.0d0*RKh            ! Truncation error too small (< 1.89e-4), increase time step
+                end if
+            end if
             dt = min(dt, dt_max)
-            
+
         else
             dt = RKh
         end if
@@ -1237,7 +1237,7 @@ contains
         return
 
     end subroutine s_4th_5th_order_rkck
-    
+
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
 
