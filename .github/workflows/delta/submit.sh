@@ -19,7 +19,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -p gpuA100x4,gpuA100x8,gpuA100x4-interactive,gpuA100x8-interactive
+#SBATCH -p gpuA100x4,gpuA100x4-interactive
 #SBATCH --account=bdiy-delta-gpu
 #SBATCH --gpus-per-node=2
 "
