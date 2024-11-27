@@ -16,5 +16,6 @@ if [ "$job_device" == "gpu" ]; then
     n_test_threads=`expr $gpu_count \* 2`
 fi
 
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-24.1/openmpi-4.1.5-zkiklxi/lib/
 ./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c delta
 
