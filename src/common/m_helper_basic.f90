@@ -49,7 +49,7 @@ contains
     logical function f_is_default(var) result(res)
         real(wp), intent(in) :: var
 
-        res = f_approx_equal(var, real(dflt_real, wp))
+        res = f_approx_equal(var, dflt_real)
     end function f_is_default
 
     !> Checks if ALL elements of a real(wp) array are of default value.
