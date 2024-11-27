@@ -20,11 +20,12 @@ module m_compute_levelset
 
     implicit none
 
-    private; public :: s_compute_cylinder_levelset, s_compute_circle_levelset, &
- s_compute_airfoil_levelset, &
- s_compute_3D_airfoil_levelset, &
- s_compute_rectangle_levelset, &
- s_compute_sphere_levelset
+    private; public :: s_cylinder_levelset, s_circle_levelset, &
+ s_airfoil_levelset, &
+ s_3D_airfoil_levelset, &
+ s_rectangle_levelset, &
+ s_cuboid_levelset, &
+ s_sphere_levelset
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -38,7 +39,7 @@ module m_compute_levelset
 
 contains
 
-    subroutine s_compute_circle_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_circle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -72,9 +73,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_circle_levelset
+    end subroutine s_circle_levelset
 
-    subroutine s_compute_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -155,9 +156,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_airfoil_levelset
+    end subroutine s_airfoil_levelset
 
-    subroutine s_compute_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_3D_airfoil_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -256,10 +257,10 @@ contains
             end do
         end do
 
-    end subroutine s_compute_3D_airfoil_levelset
+    end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    subroutine s_compute_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_rectangle_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -270,6 +271,7 @@ contains
         real(wp) :: side_dists(4)
 
         integer :: i, j, k !< Loop index variables
+        integer :: idx !< Shortest path direction indicator
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
@@ -295,13 +297,17 @@ contains
                     side_dists(2) = x - top_right(1)
                     side_dists(3) = bottom_left(2) - y
                     side_dists(4) = y - top_right(2)
+                    min_dist = initial_distance_buffer
+                    idx = 1
 
-                    min_dist = minval(abs(side_dists))
+                    do k = 1, 4
+                        if (abs(side_dists(k)) < abs(min_dist)) then
+                            idx = k
+                            min_dist = side_dists(idx)
+                        end if
+                    end do
 
-                    if (i == 50 .and. j == 0) then
-                    end if
-
-                    if (min_dist == abs(side_dists(1))) then
+                    if (idx == 1) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(1)
                         if (side_dists(1) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
@@ -310,28 +316,32 @@ contains
                                                                         abs(side_dists(1))
                         end if
 
-                    else if (min_dist == abs(side_dists(2))) then
+                    else if (idx == 2) then
                         levelset%sf(i, j, 0, ib_patch_id) = side_dists(2)
                         if (side_dists(2) == 0) then
                             levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
                         else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(2)/ &
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = -side_dists(2)/ &
                                                                         abs(side_dists(2))
                         end if
 
-                    else if (min_dist == abs(side_dists(3))) then
+                    else if (idx == 3) then
+                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(3)
                         if (side_dists(3) == 0) then
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
+
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
                         else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(3)/ &
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = side_dists(3)/ &
                                                                         abs(side_dists(3))
                         end if
 
-                    else if (min_dist == abs(side_dists(4))) then
+                    else if (idx == 4) then
+                        levelset%sf(i, j, 0, ib_patch_id) = side_dists(4)
                         if (side_dists(4) == 0) then
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = 0._wp
+
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = 0._wp
                         else
-                            levelset_norm%sf(i, j, 0, ib_patch_id, 1) = side_dists(4)/ &
+                            levelset_norm%sf(i, j, 0, ib_patch_id, 2) = -side_dists(4)/ &
                                                                         abs(side_dists(4))
                         end if
 
@@ -342,9 +352,123 @@ contains
             end do
         end do
 
-    end subroutine s_compute_rectangle_levelset
+    end subroutine s_rectangle_levelset
 
-    subroutine s_compute_sphere_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_cuboid_levelset(levelset, levelset_norm, ib_patch_id)
+
+        type(levelset_field), intent(INOUT) :: levelset
+        type(levelset_norm_field), intent(INOUT) :: levelset_norm
+
+        integer, intent(IN) :: ib_patch_id
+        real(kind(0d0)) :: Right, Left, Bottom, Top, Front, Back
+        real(kind(0d0)) :: x, y, z, min_dist
+        real(kind(0d0)) :: side_dists(6)
+
+        integer :: i, j, k !< Loop index variables
+
+        length_x = patch_ib(ib_patch_id)%length_x
+        length_y = patch_ib(ib_patch_id)%length_y
+        length_z = patch_ib(ib_patch_id)%length_z
+
+        x_centroid = patch_ib(ib_patch_id)%x_centroid
+        y_centroid = patch_ib(ib_patch_id)%y_centroid
+        z_centroid = patch_ib(ib_patch_id)%z_centroid
+
+        Right = x_centroid + length_x/2
+        Left = x_centroid - length_x/2
+
+        Top = y_centroid + length_y/2
+        Bottom = y_centroid - length_y/2
+
+        Front = z_centroid + length_z/2
+        Back = z_centroid - length_z/2
+
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+
+                    x = x_cc(i)
+                    y = y_cc(j)
+                    z = z_cc(k)
+
+                    if ((x > Left .and. x < Right) .or. &
+                        (y > Bottom .and. y < Top) .or. &
+                        (z > Back .and. z < Front)) then
+
+                        side_dists(1) = Left - x
+                        side_dists(2) = x - Right
+                        side_dists(3) = Bottom - y
+                        side_dists(4) = y - Top
+                        side_dists(5) = Back - z
+                        side_dists(6) = z - Front
+
+                        min_dist = minval(abs(side_dists))
+
+                        if (min_dist == abs(side_dists(1))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
+                            if (side_dists(1) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = side_dists(1)/ &
+                                                                            abs(side_dists(1))
+                            end if
+
+                        else if (min_dist == abs(side_dists(2))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(2)
+                            if (side_dists(2) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 1) = -side_dists(2)/ &
+                                                                            abs(side_dists(2))
+                            end if
+
+                        else if (min_dist == abs(side_dists(3))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(3)
+                            if (side_dists(3) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = side_dists(3)/ &
+                                                                            abs(side_dists(3))
+                            end if
+
+                        else if (min_dist == abs(side_dists(4))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(4)
+                            if (side_dists(4) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 2) = -side_dists(4)/ &
+                                                                            abs(side_dists(4))
+                            end if
+
+                        else if (min_dist == abs(side_dists(5))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(5)
+                            if (side_dists(5) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = side_dists(5)/ &
+                                                                            abs(side_dists(5))
+                            end if
+
+                        else if (min_dist == abs(side_dists(6))) then
+                            levelset%sf(i, j, k, ib_patch_id) = side_dists(6)
+                            if (side_dists(6) == 0) then
+                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = 0d0
+                            else
+                                levelset_norm%sf(i, j, k, ib_patch_id, 3) = -side_dists(6)/ &
+                                                                            abs(side_dists(6))
+                            end if
+
+                        end if
+
+                    end if
+
+                end do
+            end do
+        end do
+
+    end subroutine s_cuboid_levelset
+
+    subroutine s_sphere_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -379,9 +503,9 @@ contains
             end do
         end do
 
-    end subroutine s_compute_sphere_levelset
+    end subroutine s_sphere_levelset
 
-    subroutine s_compute_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
+    subroutine s_cylinder_levelset(levelset, levelset_norm, ib_patch_id)
 
         type(levelset_field), intent(INOUT) :: levelset
         type(levelset_norm_field), intent(INOUT) :: levelset_norm
@@ -452,6 +576,6 @@ contains
             end do
         end do
 
-    end subroutine s_compute_cylinder_levelset
+    end subroutine s_cylinder_levelset
 
 end module m_compute_levelset

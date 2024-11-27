@@ -579,9 +579,9 @@ contains
 
         logical :: file_exists
 
-        inquire (file=patch_icpp(patch_id)%model%filepath, exist=file_exists)
+        inquire (file=patch_icpp(patch_id)%model_filepath, exist=file_exists)
 
-        @:PROHIBIT(.not. file_exists, "Model file "//trim(patch_icpp(patch_id)%model%filepath)// &
+        @:PROHIBIT(.not. file_exists, "Model file "//trim(patch_icpp(patch_id)%model_filepath)// &
             " requested by patch "//trim(iStr)//" does not exist")
 
     end subroutine s_check_model_geometry
