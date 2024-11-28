@@ -1473,11 +1473,11 @@ contains
         if (lag_vol > 0.0d0) lag_voidavg = lag_voidavg/lag_vol
 
         if (proc_rank == 0) then
-            write (12, '(6X,4e24.6)') &
+            write (12, '(6X,4e24.8)') &
                 qtime, &
                 lag_voidavg, &
-                voltot, &
-                lag_voidmax
+                lag_voidmax, &
+                voltot
             close (12)
         end if
 
@@ -1515,6 +1515,8 @@ contains
                 end if
             end do
         end if
+
+        if (.not. parallel_io) return
 
         ! Total number of particles
         call MPI_ALLREDUCE(nparticles, tot_part, 1, MPI_integer, &

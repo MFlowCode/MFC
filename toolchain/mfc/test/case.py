@@ -91,33 +91,33 @@ BASE_CFG = {
     'acoustic(1)%pulse'                 : 1,
     'rdma_mpi'                          : 'F',
 
-    'lag_bubbles'                 : 'F',
-    'lag_nBubs_glb'               : 1,
-    'lag_adap_dt'                 : 'F',
-    'lag_solver_approach'         : 2,
-    'lag_cluster_type'            : 2,
-    'lag_pressure_corrector'      : 'F',
-    'lag_smooth_type'             : 1,
-    'lag_bubble_model'            : 1,
-    'lag_heatTransfer_model'      : 'F',
-    'lag_massTransfer_model'      : 'F',
-    'lag_epsilonb'                : 1.0,
-    'lag_rkck_tolerance'          : 1.0,
-    'lag_valmaxvoid'              : 0.9,
-    'csonhost'                    : 1475.0,
-    'vischost'                    : 0.001,
-    'Thost'                       : 298,
-    'gammagas'                    : 1.4,
-    'gammavapor'                  : 1.33,
-    'pvap'                        : 2500,
-    'cpgas'                       : 1000.0,
-    'cpvapor'                     : 2100.0,
-    'kgas'                        : 0.025,
-    'kvapor'                      : 0.02,
-    'Rgas'                        : 296.92857142857144,
-    'Rvap'                        : 461.8888888888889,
-    'diffcoefvap'                 : 2.5e-05,
-    'sigmabubble'                 : 0.07,
+    'lag_bubbles'                   : 'F',
+    'lag_nBubs_glb'                 : 1,
+    'lag_adap_dt'                   : 'F',
+    'lag_solver_approach'           : 2,
+    'lag_cluster_type'              : 2,
+    'lag_pressure_corrector'        : 'F',
+    'lag_smooth_type'               : 1,
+    'lag_bubble_model'              : 1,
+    'lag_heatTransfer_model'        : 'F',
+    'lag_massTransfer_model'        : 'F',
+    'lag_epsilonb'                  : 1.0,
+    'lag_rkck_tolerance'            : 1.0e-9,
+    'lag_valmaxvoid'                : 0.9,
+    'csonhost'                      : 151.8,
+    'vischost'                      : 0.0099542,
+    'Thost'                         : 1,
+    'gammagas'                      : 1.4,
+    'gammavapor'                    : 1.33,
+    'pvap'                          : 0.24673,
+    'cpgas'                         : 2941.03,
+    'cpvapor'                       : 6176.1658,
+    'kgas'                          : 0.7304,
+    'kvapor'                        : 0.5843,
+    'Rgas'                          : 873.1922,
+    'Rvap'                          : 1358.4624,
+    'diffcoefvap'                   : 0.24836,
+    'sigmabubble'                   : 0.069,
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -193,7 +193,6 @@ class TestCase(case.Case):
         if "lagrangian bubbles" in self.trace:
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
-            common.delete_file(os.path.join(dirpath, f"restart_data"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -364,4 +363,4 @@ def create_input_lag_bubbles(path_lag_bubbles):
         os.mkdir(folder_path_lag_bubbles)
 
     with open(file_path_lag_bubbles, "w") as file:
-        file.write('5.0\t5.0\t5.0\t0.0\t0.0\t0.0\t8.0e-06\t0.0')
+        file.write('0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0')

@@ -1056,42 +1056,6 @@ contains
         call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_adapt, q_prim_vf)
         if (lag_largestep) goto 502
 
-        ! maxDV_rhs = -100.0d0
-        ! maxQcons(1:sys_size) = -100.0d0
-        ! minDV_rhs = 100.0d0
-        ! minQcons(1:sys_size) = 100.0d0
-        ! !$acc parallel loop collapse(4) gang vector default(present) copyin(RKstep)
-        ! do l = 1, sys_size
-        !     do k = 0, p
-        !         do j = 0, n
-        !             do i = 0, m
-        !                 q_cons_ts(2)%vf(l)%sf(i, j, k) = q_cons_ts(1)%vf(l)%sf(i, j, k)
-        !                 !$acc loop seq
-        !                 do q = 1, RKstep
-        !                     q_cons_ts(2)%vf(l)%sf(i, j, k) = &
-        !                         q_cons_ts(2)%vf(l)%sf(i, j, k) + &
-        !                         dt*lag_RKcoef(RKstep, q)*rhs_ts_adapt(q)%vf(l)%sf(i, j, k)
-        !                     if (maxDV_rhs < rhs_ts_adapt(q)%vf(l)%sf(i, j, k)) then
-        !                         cellDV_max(1) = i
-        !                         cellDV_max(1) = j
-        !                         cellDV_max(1) = k
-        !                     end if
-        !                     maxDV_rhs = max(maxDV_rhs, rhs_ts_adapt(q)%vf(l)%sf(i, j, k))
-        !                     minDV_rhs = min(minDV_rhs, rhs_ts_adapt(q)%vf(l)%sf(i, j, k))
-        !                     maxQcons(l) = max(maxQcons(l), q_cons_ts(2)%vf(l)%sf(i, j, k))
-        !                     minQcons(l) = min(minQcons(l), q_cons_ts(2)%vf(l)%sf(i, j, k))
-
-        !                 end do
-        !             end do
-        !         end do
-        !     end do
-        ! end do
-        ! print*,'rhs_1: min max', minDV_rhs, maxDV_rhs, cellDV_max, m, n, p
-
-        ! do l = 1, sys_size
-        !     print*,'qcons_1: min max', maxQcons(l), minQcons(l), l
-        ! end do
-
         ! Second time-stage
         time_tmp = time_prev + 0.2d0*dt
         RKstep = 2
@@ -1186,7 +1150,7 @@ contains
             lag_errmax = lag_errmax/lag_rkck_tolerance ! Scale relative to user required tolerance.
 
             if ((lag_errmax > 1.0d0)) then   ! Truncation error too large, reduce dt and restart time step
-                htemp = SAFETY*RKh*(lag_errmax**PSHRNK)
+                htemp = SAFETY*RKh*((floor(lag_errmax*1.0d05)/1.0d05)**PSHRNK)
                 RKh = sign(max(abs(htemp), 0.1d0*abs(RKh)), RKh)  ! No more than a factor of 10.
                 if (proc_rank == 0) print *, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', RKh
                 lag_largestep = .false.
@@ -1195,7 +1159,7 @@ contains
                 goto 501
             else                            ! Step succeeded. Compute size of next step.
                 if (lag_errmax > ERRCON) then
-                    dt = SAFETY*RKh*(lag_errmax**PGROW) ! No more than a factor of 5 increase.
+                    dt = SAFETY*RKh*((floor(lag_errmax*1.0d05)/1.0d05)**PGROW) ! No more than a factor of 5 increase.
                 else
                     dt = 2.0d0*RKh            ! Truncation error too small (< 1.89e-4), increase time step
                 end if

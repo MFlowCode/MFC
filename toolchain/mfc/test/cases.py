@@ -780,40 +780,43 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_lag_bubbles():
         # Lagrangian bubbles
         for adap_dt in ['F', 'T']:
-            stack.push("lagrangian bubbles", {"lag_bubbles": 'T',
-                'x_domain%beg': 4.9985, 'x_domain%end': 5.0015, 'y_domain%beg': 4.9985, 'y_domain%end': 5.0015,
-                'z_domain%beg': 4.9985, 'z_domain%end': 5.0015, 'stretch_x': 'F', 'stretch_y': 'F', 'stretch_z': 'F', 
-                'm': 30, 'n': 30, 'p': 30, 'dt': 4.e-08, 'format': 1, 'precision': 2, 'viscous':'T',
-                'model_eqns': 2, 'num_fluids': 1, 'weno_order': 5, 'weno_eps': 1.0E-16,
-                'mapped_weno':'T', 'riemann_solver': 2, 'wave_speeds': 1,'avg_state': 2, 'bc_x%beg':-6,
-                'bc_x%end': -6, 'bc_y%beg': -6, 'bc_y%end': -6, 'bc_z%beg': -6, 'bc_z%end': -6, 
-                'patch_icpp(3)%geometry': 9, 'patch_icpp(3)%x_centroid': 5., 'patch_icpp(3)%y_centroid': 5.,
-                'patch_icpp(3)%z_centroid': 5., 'patch_icpp(3)%length_x': 0.1, 'patch_icpp(3)%length_y': 0.1,
-                'patch_icpp(3)%length_z': 0.1, 'patch_icpp(3)%vel(1)': 0., 'patch_icpp(3)%vel(2)': 0.,
-                'patch_icpp(3)%vel(3)': 0., 'patch_icpp(3)%pres': 100000.0, 'patch_icpp(3)%alpha_rho(1)': 1000.0,
-                'patch_icpp(3)%alpha(1)': 1.,
-                'acoustic_source': 'T', 'num_source': 1, 'acoustic(1)%support': 3, 'acoustic(1)%pulse': 1,
-                'acoustic(1)%npulse': 10, 'acoustic(1)%wavelength': 0.0689252336448598,
-                'acoustic(1)%length': 0.1, 'acoustic(1)%height': 0.1, 'acoustic(1)%loc(1)': 4.9995,
-                'acoustic(1)%loc(2)': 4.9995, 'acoustic(1)%loc(3)': 4.9995, 'acoustic(1)%dir': 0., 'acoustic(1)%delay': 0.,
-                'lag_solver_approach': 2, 'lag_cluster_type': 2,
-                'lag_pressure_corrector': 'T', 'lag_smooth_type': 1, 'lag_bubble_model': 1, 'lag_heatTransfer_model': 'T',  
-                'lag_massTransfer_model': 'T', 'lag_rkck_tolerance': 1.0e-08, 
-                'fluid_pp(1)%gamma': 0.5725409366769725, 'fluid_pp(1)%pi_inf': 1245483872.6668956, 'fluid_pp(1)%Re(1)': 166.66666666666666
-            })
+            for couplingMethod in [1, 2]:
+                stack.push("lagrangian bubbles", {"lag_bubbles": 'T',
+                    'dt': 1e-06,
+                    'lag_cluster_type': 2,
+                    'lag_pressure_corrector': 'T', 'lag_smooth_type': 1, 'lag_bubble_model': 1, 'lag_heatTransfer_model': 'T',  
+                    'lag_massTransfer_model': 'T', 
+                    'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
+                    'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
+                    'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
+                    'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,
+                    'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05,
+                    'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)':
+                    4e-02, 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
+                    'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
+                    'patch_icpp(3)%pres': 1.0, 'acoustic_source': 'T', 'acoustic(1)%loc(2)': 0.5,
+                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10,
+                })
+                
+                if couplingMethod==1:
+                    stack.push('One-way coupling',{'lag_solver_approach': 1})
+                else:
+                    stack.push('Two-way coupling',{'lag_solver_approach': 1})
 
-            if adap_dt=='F':
-                stack.push('',{'lag_adap_dt': 'F',
-                        'acoustic(1)%mag': 13200.0, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
-            else:
-                stack.push('lag_adap_dt=T',{'lag_adap_dt': 'T',
-                        'acoustic(1)%mag': 332000.0, 'n_start': 0, 't_save': 1.5e-06, 't_stop': 1.5e-06,})
+                if adap_dt=='F':
+                    stack.push('',{'lag_adap_dt': 'F',
+                            'acoustic(1)%mag': 1e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
+                else:
+                    stack.push('lag_adap_dt=T',{'lag_adap_dt': 'T',
+                            'acoustic(1)%mag': 5e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05})
 
-            cases.append(define_case_d(stack, '', {}))
+                cases.append(define_case_d(stack, '', {}))
 
-            stack.pop()
+                stack.pop()
 
-            stack.pop()
+                stack.pop()
+
+                stack.pop()
 
 
     def foreach_dimension():
