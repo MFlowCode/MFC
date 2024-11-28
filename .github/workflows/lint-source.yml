@@ -29,7 +29,7 @@ jobs:
       run: pip install fortitude-lint ansi2txt
 
     - name: Lint the source code
-      run:  fortitude check --file-extensions=f90,fpp,fypp --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true
+      run:  fortitude check --file-extensions=f90,fpp,fypp --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/** || true
 
     - name: Ensure kind is specified
-      run:  fortitude check --file-extensions=f90,fpp,fypp --select=P001 ./src/*/*
+      run:  fortitude check --file-extensions=f90,fpp,fypp --select=P001 ./src/**
