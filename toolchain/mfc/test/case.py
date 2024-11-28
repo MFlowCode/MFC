@@ -193,6 +193,7 @@ class TestCase(case.Case):
         if "lagrangian bubbles" in self.trace:
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
+            common.delete_file(os.path.join(dirpath, f"restart_data"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))

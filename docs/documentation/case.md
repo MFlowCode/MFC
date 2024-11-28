@@ -838,7 +838,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `lag_bubble_model` [1] Activates the Keller-Miksis equation to model the bubble dynamics.
 
-- `lag_cluster_type` Specifies method to find p_inf (pressure that drives the bubble synamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](references.md#Maeda18), the full model is obtained when 'lag_pressure_corrector' is true.
+- `lag_cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](references.md#Maeda18), the full model is obtained when 'lag_pressure_corrector' is true.
 
 - `lag_adap_dt` Activates the adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm. A maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is smaller than a tolerance ('lag_rkck_tolerance'), then the algorithm employs the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a smaller time step size.
 
