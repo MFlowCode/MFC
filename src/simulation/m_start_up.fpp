@@ -96,28 +96,28 @@ module m_start_up
  s_perform_time_step, s_save_data, &
  s_save_performance_metrics
 
-    abstract interface ! ===================================================
-
-        !! @param q_cons_vf  Conservative variables
-        subroutine s_read_abstract_data_files(q_cons_vf)
-
-            import :: scalar_field, sys_size, pres_field
-
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_cons_vf
-
-        end subroutine s_read_abstract_data_files
-
-    end interface ! ========================================================
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
-
-    procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
     real(kind(0d0)) :: dt_init
 
 contains
+
+   !> Read data files. Dispatch subroutine that replaces procedure pointer.
+        !! @param q_cons_vf Conservative variables
+    subroutine s_read_data_files(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(inout) :: q_cons_vf
+
+        if (.not. parallel_io) then
+            call s_read_serial_data_files(q_cons_vf)
+        else
+            call s_read_parallel_data_files(q_cons_vf)
+        end if
+
+    end subroutine s_read_data_files
 
     !>  The purpose of this procedure is to first verify that an
         !!      input file has been made available by the user. Provided
@@ -167,6 +167,7 @@ contains
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
+            viscous, surface_tension, &
             lag_bubbles, lag_write_bubbles, lag_write_bubble_stats, &
             lag_bubble_model, lag_cluster_type, lag_heatTransfer_model,&
             lag_massTransfer_model, lag_nBubs_glb, csonhost, vischost, &
@@ -224,9 +225,6 @@ contains
 
         ! Logical used to check the existence of the current directory file
         logical :: file_exist
-
-        ! Generic loop iterators
-        integer :: i, j
 
         ! Logistics ========================================================
         file_path = trim(case_dir)//'/.'
@@ -411,23 +409,51 @@ contains
         ! Read IBM Data ====================================================
 
         if (ib) then
+            ! Read IB markers
+            write (file_path, '(A,I0,A)') &
+                trim(t_step_dir)//'/ib.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            ! Read Levelset
+            write (file_path, '(A)') &
+                trim(t_step_dir)//'/levelset.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
+                ! print*, 'check', STL_levelset(106, 50, 0, 1)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
+            ! Read Levelset Norm
+            write (file_path, '(A)') &
+                trim(t_step_dir)//'/levelset_norm.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                        FORM='unformatted', &
+                        ACTION='read', &
+                        STATUS='old')
+                read (2) levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
+            end if
+
             do i = 1, num_ibs
-                write (file_path, '(A,I0,A)') &
-                    trim(t_step_dir)//'/ib.dat'
-                inquire (FILE=trim(file_path), EXIST=file_exist)
-                if (file_exist) then
-                    open (2, FILE=trim(file_path), &
-                          FORM='unformatted', &
-                          ACTION='read', &
-                          STATUS='old')
-                    read (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
-                else
-                    call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
-                end if
-
                 if (patch_ib(i)%c > 0) then
-
-                    print *, "HERE Np", Np
                     allocate (airfoil_grid_u(1:Np))
                     allocate (airfoil_grid_l(1:Np))
 
@@ -576,7 +602,6 @@ contains
                 call s_int_to_str(t_step_start, t_step_start_string)
                 write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
             end if
-
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -586,7 +611,8 @@ contains
                 ! Initialize MPI data I/O
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                        levelset, levelset_norm)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
@@ -635,7 +661,7 @@ contains
                 call MPI_FILE_CLOSE(ifile, ierr)
 
                 if (ib) then
-
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -655,15 +681,56 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
                     end if
 
+                    ! Read Levelset
+                    write (file_loc, '(A)') 'levelset.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset Norm
+                    write (file_loc, '(A)') 'levelset_norm.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
                 end if
 
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         else
+
             ! Open the file to read conservative variables
             if (cfl_dt) then
-                 write (file_loc, '(I0,A)') n_start, '.dat'
+                write (file_loc, '(I0,A)') n_start, '.dat'
             else
                 write (file_loc, '(I0,A)') t_step_start, '.dat'
             end if
@@ -676,7 +743,8 @@ contains
                 ! Initialize MPI data I/O
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                        levelset, levelset_norm)
                 else
 
                     call s_initialize_mpi_data(q_cons_vf)
@@ -743,6 +811,7 @@ contains
 
                 if (ib) then
 
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -757,6 +826,46 @@ contains
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                            MPI_INTEGER, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset
+                    write (file_loc, '(A)') 'levelset.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelset_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
+
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
+                    end if
+
+                    ! Read Levelset Norm
+                    write (file_loc, '(A)') 'levelset_norm.dat'
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                        disp = 0
+
+                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_levelsetnorm_DATA%view, &
+                                               'native', mpi_info_int, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
+                                           MPI_DOUBLE_PRECISION, status, ierr)
 
                     else
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -1060,7 +1169,7 @@ contains
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
         real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: pres
+        real(kind(0d0)) :: pres, T
 
         integer :: i, j, k, l, c
 
@@ -1085,7 +1194,7 @@ contains
                     end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1109,7 +1218,7 @@ contains
         real(kind(0d0)), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-        integer :: i, j, k, l
+        integer :: i
         real(kind(0d0)) :: dtdid, time_prev
 
         if (cfl_dt) then
@@ -1187,10 +1296,6 @@ contains
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
-
-        if (chemistry) then
-            call s_chemistry_normalize_cons(q_cons_ts(1)%vf)
-        end if
 
         ! Time-stepping loop controls
 
@@ -1270,7 +1375,7 @@ contains
         integer :: save_count
 
         call cpu_time(start)
-        !  call nvtxStartRange("I/O")
+        call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
@@ -1306,7 +1411,7 @@ contains
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
         end if
 
-        !  call nvtxEndRange
+        call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
             nt = mytime/t_save
@@ -1323,6 +1428,9 @@ contains
     end subroutine s_save_data
 
     subroutine s_initialize_modules
+
+        integer :: i,j,k,l
+
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
@@ -1360,13 +1468,13 @@ contains
             call s_initialize_acoustic_src()
         end if
 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_initialize_viscous_module()
         end if
 
         call s_initialize_rhs_module()
 
-        if (.not. f_is_default(sigma)) call s_initialize_surface_tension_module()
+        if (surface_tension) call s_initialize_surface_tension_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
@@ -1383,15 +1491,6 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
-
-        ! Associate pointers for serial or parallel I/O
-        if (parallel_io .neqv. .true.) then
-            s_read_data_files => s_read_serial_data_files
-            s_write_data_files => s_write_serial_data_files
-        else
-            s_read_data_files => s_read_parallel_data_files
-            s_write_data_files => s_write_parallel_data_files
-        end if
 
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
@@ -1506,14 +1605,17 @@ contains
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(acoustic_source, num_source)
-        !$acc update device(sigma)
+        !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
-
+   
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
+        !$acc update device(bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out)
+        !$acc update device(bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out)
+        !$acc update device(bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out)
 
         !$acc update device(relax, relax_model)
         if (relax) then
@@ -1527,9 +1629,6 @@ contains
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
-        ! Disassociate pointers for serial and parallel I/O
-        s_read_data_files => null()
-        s_write_data_files => null()
 
         call s_finalize_time_steppers_module()
         call s_finalize_derived_variables_module()
@@ -1544,11 +1643,11 @@ contains
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (lag_bubbles) call s_finalize_lagrangian_solver() 
-        if (any(Re_size > 0)) then
+        if (viscous) then
             call s_finalize_viscous_module()
         end if
 
-        if (.not. f_is_default(sigma)) call s_finalize_surface_tension_module()
+        if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
         ! Terminating MPI execution environment

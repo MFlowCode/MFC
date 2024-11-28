@@ -13,71 +13,17 @@
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     allocate (${', '.join(args)}$)
-#ifndef CRAY_ACC_WAR
-!$acc enter data create(${', '.join(args)}$)
-#endif
+    !$acc enter data create(${', '.join(args)}$)
 #:enddef ALLOCATE
 
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     deallocate (${', '.join(args)}$)
-#ifndef CRAY_ACC_WAR
-!$acc exit data delete(${', '.join(args)}$)
-#endif
+    !$acc exit data delete(${', '.join(args)}$)
 #:enddef DEALLOCATE
 
-#:def ALLOCATE_GLOBAL(*args)
-    @:LOG({'@:ALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-#ifdef CRAY_ACC_WAR
-    allocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
-    #:for arg in args
-        ${re.sub('\\(.*\\)','',arg)}$ => ${ 'p_' + re.sub('\\(.*\\)','',arg.strip()) }$
-    #:endfor
-    !$acc enter data create(${', '.join(('p_' + re.sub('\\(.*\\)','',arg.strip()) for arg in args))}$) &
-    !$acc& attach(${', '.join(map(lambda x: re.sub('\\(.*\\)','',x), args))}$)
-#else
-    allocate (${', '.join(args)}$)
-    !$acc enter data create(${', '.join(args)}$)
-#endif
-
-#:enddef ALLOCATE_GLOBAL
-
-#:def DEALLOCATE_GLOBAL(*args)
-    @:LOG({'@:DEALLOCATE_GLOBAL(${re.sub(' +', ' ', ', '.join(args))}$)'})
-#ifdef CRAY_ACC_WAR
-    !$acc exit data delete(${', '.join(('p_' + arg.strip() for arg in args))}$) &
-    !$acc& detach(${', '.join(args)}$)
-    #:for arg in args
-        nullify (${arg}$)
-    #:endfor
-    deallocate (${', '.join(('p_' + arg.strip() for arg in args))}$)
-#else
-    deallocate (${', '.join(args)}$)
-    !$acc exit data delete(${', '.join(args)}$)
-#endif
-
-#:enddef DEALLOCATE_GLOBAL
-
-#:def CRAY_DECLARE_GLOBAL(intype, dim, *args)
-#ifdef CRAY_ACC_WAR
-    ${intype}$, ${dim}$, allocatable, target :: ${', '.join(('p_' + arg.strip() for arg in args))}$
-    ${intype}$, ${dim}$, pointer :: ${', '.join(args)}$
-#else
-    ${intype}$, ${dim}$, allocatable :: ${', '.join(args)}$
-#endif
-#:enddef CRAY_DECLARE_GLOBAL
-
-#:def CRAY_DECLARE_GLOBAL_SCALAR(intype, *args)
-#ifdef CRAY_ACC_WAR
-    ${intype}$, target :: ${', '.join(('p_' + arg.strip() for arg in args))}$
-    ${intype}$, pointer :: ${', '.join(args)}$
-#else
-    ${intype}$::${', '.join(args)}$
-#endif
-#:enddef CRAY_DECLARE_GLOBAL_SCALAR
-
 #:def ACC_SETUP_VFs(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
         integer :: macros_setup_vfs_i
 
@@ -100,7 +46,7 @@
 #:enddef
 
 #:def ACC_SETUP_SFs(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
 
         @:LOG({'@:ACC_SETUP_SFs(${', '.join(args)}$)'})
@@ -116,7 +62,7 @@
 #:enddef
 
 #:def ACC_SETUP_source_spatials(*args)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
     block
 
         @:LOG({'@:ACC_SETUP_source_spatials(${', '.join(args)}$)'})

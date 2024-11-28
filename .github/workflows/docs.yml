@@ -1,15 +1,16 @@
 name: Documentation
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  schedule:
+    - cron: '0 0 * * *'  # This runs every day at midnight UTC
+  workflow_dispatch:
+  push:
+  pull_request:
 
 jobs:
   docs:
     name:    Build & Publish
     runs-on: ubuntu-latest
-
-    concurrency:
-      group: docs-publish
-      cancel-in-progress: true
 
     steps:
     - uses: actions/checkout@v4
@@ -46,8 +47,14 @@ jobs:
         echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
         echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
 
+    - name: Linkcheck - Lychee
+      uses: lycheeverse/lychee-action@v2
+      with:
+        args: -c .lychee.toml build/install/docs/mfc/
+        fail: false
+
     - name: Publish Documentation
-      if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' && github.event_name == 'push'
+      if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' &&  (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' )
       run:  |
         set +e
         git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q

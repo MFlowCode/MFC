@@ -113,7 +113,6 @@ contains
         ! Generic logical used to test the existence of a particular folder
         logical :: dir_check
 
-        ! Generic loop iterator
         integer :: i
 
         ! Allocating the generic storage for the flow variable(s) that are

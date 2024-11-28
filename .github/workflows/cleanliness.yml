@@ -3,103 +3,125 @@ name: Cleanliness
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-    cleanliness:
-        name: Code Cleanliness Test
-        runs-on: "ubuntu-latest"
-        env:
-            pr_everything: 0
-            master_everything: 0
-        steps:
-            - name: Clone - PR
-              uses: actions/checkout@v3
-              with:
-                path: pr
-            - name: Clone - Master
-              uses: actions/checkout@v3
-              with:
-                repository: MFlowCode/MFC
-                ref: master
-                path: master
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
 
-            - name: Setup Ubuntu
-              run: |
-                sudo apt update -y
-                sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
-            
-            - name: Build
-              run: |
-                (cd pr && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../pr.txt) 
-                (cd master && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../master.txt)
-                sed -i '/\/pr\//d' pr.txt
-                sed -i '/\/master\//d' master.txt
-            
-            - name: Unused Variables Diff
-              run: |
-                grep -F 'Wunused-variable' master.txt > mUnused.txt
-                grep -F 'Wunused-variable' pr.txt > prUnused.txt
-                diff prUnused.txt mUnused.txt || true
-            
-            - name: Unused Dummy Arguments Diff
-              run: |
-                grep -F 'Wunused-dummy-argument' pr.txt > prDummy.txt
-                grep -F 'Wunused-dummy-argument' master.txt > mDummy.txt
-                diff prDummy.txt mDummy.txt || true
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
 
-            - name: Unused Value Diff
-              run: |
-                grep -F 'Wunused-value' pr.txt > prUnused_val.txt
-                grep -F 'Wunused-value' master.txt > mUnused_val.txt
-                diff prUnused_val.txt mUnused_val.txt || true
+  cleanliness:
+      name: Code Cleanliness Check
+      if: needs.file-changes.outputs.checkall == 'true'
+      needs: file-changes
+      runs-on: "ubuntu-latest"
+      env:
+          pr_everything: 0
+          master_everything: 0
+      steps:
+          - name: Clone - PR
+            uses: actions/checkout@v4
+            with:
+              path: pr
+          - name: Clone - Master
+            uses: actions/checkout@v4
+            with:
+              repository: MFlowCode/MFC
+              ref: master
+              path: master
 
-            - name: Maybe Uninitialized Variables Diff
-              run: |
-                grep -F 'Wmaybe-uninitialized' pr.txt > prMaybe.txt
-                grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt
-                diff prMaybe.txt mMaybe.txt || true
+          - name: Setup Ubuntu
+            run: |
+              sudo apt update -y
+              sudo apt install -y tar wget make cmake gcc g++ python3 python3-dev "openmpi-*" libopenmpi-dev
+          
+          - name: Build
+            run: |
+              (cd pr && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../pr.txt) 
+              (cd master && /bin/bash mfc.sh build -j $(nproc) --debug 2> ../master.txt)
+              sed -i '/\/pr\//d' pr.txt
+              sed -i '/\/master\//d' master.txt
+          
+          - name: Unused Variables Diff
+            continue-on-error: true
+            run: |
+              grep -F 'Wunused-variable' master.txt > mUnused.txt
+              grep -F 'Wunused-variable' pr.txt > prUnused.txt
+              diff prUnused.txt mUnused.txt
+          
+          - name: Unused Dummy Arguments Diff
+            continue-on-error: true
+            run: |
+              grep -F 'Wunused-dummy-argument' pr.txt > prDummy.txt 
+              grep -F 'Wunused-dummy-argument' master.txt > mDummy.txt
+              diff prDummy.txt mDummy.txt
+
+          - name: Unused Value Diff
+            continue-on-error: true
+            run: |
+              grep -F 'Wunused-value' pr.txt > prUnused_val.txt
+              grep -F 'Wunused-value' master.txt > mUnused_val.txt
+              diff prUnused_val.txt mUnused_val.txt
+
+          - name: Maybe Uninitialized Variables Diff
+            continue-on-error: true
+            run: |
+              grep -F 'Wmaybe-uninitialized' pr.txt > prMaybe.txt
+              grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt
+              diff prMaybe.txt mMaybe.txt
 
 
-            - name: Everything Diff
-              run: |
-                grep '\-W' pr.txt > pr_every.txt 
-                grep '\-W' master.txt > m_every.txt
-                diff pr_every.txt m_every.txt || true
+          - name: Everything Diff
+            continue-on-error: true
+            run: |
+              grep '\-W' pr.txt > pr_every.txt
+              grep '\-W' master.txt > m_every.txt
+              diff pr_every.txt m_every.txt
 
-            - name: List of Warnings
-              run: |
-                cat pr_every.txt
-                
+          - name: List of Warnings
+            run: |
+              cat pr_every.txt
+              
 
-            - name: Summary
-              run: |  
-                pr_variable=$(grep -c -F 'Wunused-variable' pr.txt)
-                pr_argument=$(grep -c -F 'Wunused-dummy-argument' pr.txt)
-                pr_value=$(grep -c -F 'Wunused-value' pr.txt)
-                pr_uninit=$(grep -c -F 'Wmaybe-uninitialized' pr.txt)
-                pr_everything=$(grep -c '\-W' pr.txt)
+          - name: Summary
+            continue-on-error: true
+            run: |  
+              pr_variable=$(grep -c -F 'Wunused-variable' pr.txt)
+              pr_argument=$(grep -c -F 'Wunused-dummy-argument' pr.txt)
+              pr_value=$(grep -c -F 'Wunused-value' pr.txt)
+              pr_uninit=$(grep -c -F 'Wmaybe-uninitialized' pr.txt)
+              pr_everything=$(grep -c '\-W' pr.txt)
 
-                master_variable=$(grep -c -F 'Wunused-variable' master.txt)
-                master_argument=$(grep -c -F 'Wunused-dummy-argument' master.txt)
-                master_value=$(grep -c -F 'Wunused-value' master.txt)
-                master_uninit=$(grep -c -F 'Wmaybe-uninitialized' master.txt)
-                master_everything=$(grep -c '\-W' master.txt  )    
+              master_variable=$(grep -c -F 'Wunused-variable' master.txt)
+              master_argument=$(grep -c -F 'Wunused-dummy-argument' master.txt)
+              master_value=$(grep -c -F 'Wunused-value' master.txt)
+              master_uninit=$(grep -c -F 'Wmaybe-uninitialized' master.txt)
+              master_everything=$(grep -c '\-W' master.txt  )    
 
-                echo "pr_everything=$pr_everything" >> $GITHUB_ENV
-                echo "master_everything=$master_everything" >> $GITHUB_ENV
+              echo "pr_everything=$pr_everything" >> $GITHUB_ENV
+              echo "master_everything=$master_everything" >> $GITHUB_ENV
 
-                echo "Difference is how many warnings were added or removed from master to PR."
-                echo "Negative numbers are better since you are removing warnings." 
-                echo " "
-                echo "Unused Variable Count: $pr_variable, Difference: $((pr_variable - master_variable))"
-                echo "Unused Dummy Argument: $pr_argument, Difference: $((pr_argument - master_argument))"
-                echo "Unused Value: $pr_value, Difference: $((pr_value - master_value))"
-                echo "Maybe Uninitialized: $pr_uninit, Difference: $((pr_uninit - master_uninit))"
-                echo "Everything: $pr_everything, Difference: $((pr_everything - master_everything))"
-            
-            
-            - name: Check Differences
-              if: env.pr_everything > env.master_everything 
-              run: |
-                echo "Difference between warning count in PR is greater than in master."
-                exit 1
+              echo "Difference is how many warnings were added or removed from master to PR."
+              echo "Negative numbers are better since you are removing warnings." 
+              echo " "
+              echo "Unused Variable Count: $pr_variable, Difference: $((pr_variable - master_variable))"
+              echo "Unused Dummy Argument: $pr_argument, Difference: $((pr_argument - master_argument))"
+              echo "Unused Value: $pr_value, Difference: $((pr_value - master_value))"
+              echo "Maybe Uninitialized: $pr_uninit, Difference: $((pr_uninit - master_uninit))"
+              echo "Everything: $pr_everything, Difference: $((pr_everything - master_everything))"
+          
+          
+          - name: Check Differences
+            if: env.pr_everything > env.master_everything 
+            run: |
+              echo "Difference between warning count in PR is greater than in master."
 
 

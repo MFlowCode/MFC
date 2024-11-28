@@ -28,30 +28,20 @@ module m_surface_tension
  s_get_capilary, &
  s_finalize_surface_tension_module
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), c_divs)
-    !$acc declare link(c_divs)
-#else
     !> @name color function gradient components and magnitude
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
     !> @)
     !$acc declare create(c_divs)
-#endif
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:,:), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
-    !$acc declare link(gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
-#else
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
-#endif
 
-    type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
-    !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
+    type(int_bounds_info) :: is1, is2, is3, iv
+    !$acc declare create(is1, is2, is3, iv)
 
     integer :: j, k, l, i
 
@@ -59,30 +49,22 @@ contains
 
     subroutine s_initialize_surface_tension_module
 
-        ! Configuring Coordinate Direction Indexes =========================
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        ! ==================================================================
-
-        @:ALLOCATE_GLOBAL(c_divs(1:num_dims + 1))
+        @:ALLOCATE(c_divs(1:num_dims + 1))
 
         do j = 1, num_dims + 1
-            @:ALLOCATE(c_divs(j)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(c_divs(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(c_divs(j))
         end do
 
-        @:ALLOCATE_GLOBAL(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE_GLOBAL(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE(gL_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gR_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
 
-        @:ALLOCATE_GLOBAL(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE_GLOBAL(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE(gL_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gR_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
 
         if (p > 0) then
-            @:ALLOCATE_GLOBAL(gL_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
-            @:ALLOCATE_GLOBAL(gR_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
+            @:ALLOCATE(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
+            @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
         end if
     end subroutine s_initialize_surface_tension_module
 
@@ -335,17 +317,17 @@ contains
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
+            is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
             recon_dir = 1; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
+            is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3)
             recon_dir = 2; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
         else
-            is1 = iz; is2 = iy; is3 = ix
+            is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1)
             recon_dir = 3; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
 
@@ -402,13 +384,13 @@ contains
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 
-        @:DEALLOCATE_GLOBAL(c_divs)
+        @:DEALLOCATE(c_divs)
 
-        @:DEALLOCATE_GLOBAL(gL_x, gR_x)
+        @:DEALLOCATE(gL_x, gR_x)
 
-        @:DEALLOCATE_GLOBAL(gL_y, gR_y)
+        @:DEALLOCATE(gL_y, gR_y)
         if (p > 0) then
-            @:DEALLOCATE_GLOBAL(gL_z, gR_z)
+            @:DEALLOCATE(gL_z, gR_z)
         end if
 
     end subroutine s_finalize_surface_tension_module

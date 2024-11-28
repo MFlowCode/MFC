@@ -69,8 +69,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         message(FATAL_ERROR "ERROR: When using NVHPC, v21.7 or newer is required to build MFC.\n${__err_msg}")
     endif()
 
-    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 23.11) AND (CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
-        message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v23.11 or newer.\n${__err_msg}")
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
+        message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v24.5 or newer.\n${__err_msg}")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.\n${__err_msg}")
@@ -127,12 +127,14 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
-            -Wall 
+            -Wall
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             #-ffpe-trap=invalid,zero,denormal,overflow
             -fsignaling-nans
+            -finit-real=snan
+            -finit-integer=-99999999
 	    )
     endif()
 
@@ -140,20 +142,20 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-argument-mismatch>
-            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>            
+            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>
         )
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
-        "SHELL:-h nomessage=296:878:1391:1069"
+        "SHELL:-M 296,878,1391,1069,5025"
         "SHELL:-h static" "SHELL:-h keepfiles"
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
-        "SHELL: -h list=adm" "-DCRAY_ACC_SIMPLIFY" "-DCRAY_ACC_WAR"
+        "SHELL: -h list=adm"
     )
 
     add_link_options("SHELL:-hkeepfiles")
-    
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
@@ -195,7 +197,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
 
     if (DEFINED ENV{MFC_CUDA_CC})
         string(REGEX MATCHALL "[0-9]+" MFC_CUDA_CC $ENV{MFC_CUDA_CC})
-        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for ${MFC_CUDA_CC}.")
+        message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for compute capability(ies) ${MFC_CUDA_CC}.")
     endif()
 endif()
 
@@ -214,7 +216,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # Enable LTO/IPO if supported
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
-            message(STATUS "IPO is not available with NVHPC using Unified Memory")
+            message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
+        elseif(CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "23.11")
+            message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
@@ -227,7 +231,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	    else()
             message(STATUS "IPO / LTO is NOT available")
         endif()
-    endif() 
+    endif()
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -291,7 +295,7 @@ macro(HANDLE_SOURCES target useCommon)
 
     string(TOUPPER ${target} ${target}_UPPER)
 
-    # Gather: 
+    # Gather:
     # *          src/[<target>,(common)]/*.f90
     # * (if any) <build>/modules/<target>/*.f90
     file(GLOB ${target}_F90s CONFIGURE_DEPENDS "${${target}_DIR}/*.f90"
@@ -384,7 +388,7 @@ function(MFC_SETUP_TARGET)
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (NVHPC_USE_TWO_PASS_IPO)
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
-        target_compile_options(${ARGS_TARGET}_lib PRIVATE 
+        target_compile_options(${ARGS_TARGET}_lib PRIVATE
 		    $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)

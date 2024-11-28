@@ -39,6 +39,7 @@ contains
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces
         call s_check_inputs_misc
+        call s_check_inputs_grcbc
 
     end subroutine s_check_inputs
 
@@ -109,6 +110,15 @@ contains
         @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, "6-equation model (model_eqns = 3) requires wave_speeds = 1")
     end subroutine s_check_inputs_model_eqns
 
+    !> Checks constraints for GRCBC
+    subroutine s_check_inputs_grcbc
+        #:for DIR in ['x', 'y', 'z']
+            @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), "Subsonic Inflow requires bc = -7")
+            @:PROHIBIT(bc_${DIR}$%grcbc_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), "Subsonic Outflow requires bc = -8")
+            @:PROHIBIT(bc_${DIR}$%grcbc_vel_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), "Subsonic Outflow requires bc = -8")
+        #:endfor
+    end subroutine s_check_inputs_grcbc
+
     !> Checks constraints on acoustic_source parameters
     subroutine s_check_inputs_acoustic_src
 
@@ -165,8 +175,8 @@ contains
                 "acoustic("//trim(jStr)//")%mag must be specified")
             @:PROHIBIT(acoustic(j)%pulse == dflt_int, &
                 "acoustic("//trim(jStr)//")%pulse must be specified")
-            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3/)), &
-                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, or 3 is allowed")
+            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3, 4/)), &
+                "Only acoustic("//trim(jStr)//")%pulse = 1, 2, 3 or 4 is allowed")
 
             @:PROHIBIT(any(acoustic(j)%pulse == (/1, 3/)) .and. &
                 (f_is_default(acoustic(j)%frequency) .eqv. f_is_default(acoustic(j)%wavelength)), &
@@ -176,6 +186,12 @@ contains
                 (f_is_default(acoustic(j)%gauss_sigma_time) .eqv. f_is_default(acoustic(j)%gauss_sigma_dist)), &
                 "One and only one of acoustic("//trim(jStr)//")%gauss_sigma_time "// &
                 "or acoustic("//trim(jStr)//")%gauss_sigma_dist must be specified for pulse = 2")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. acoustic(j)%bb_num_freq == dflt_int, &
+                "The number of broadband frequencies acoustic("//trim(jStr)//")%bb_num_freq must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_bandwidth), &
+                "The broadband wave band width acoustic("//trim(jStr)//")%bb_bandwidth must be specified for pulse = 4")
+            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_lowest_freq), &
+                "The broadband wave lower frequency bound acoustic("//trim(jStr)//")%bb_lowest_freq must be specified for pulse = 4")
 
             @:PROHIBIT(f_is_default(acoustic(j)%npulse), &
                 "acoustic("//trim(jStr)//")%npulse must be specified")
@@ -276,7 +292,14 @@ contains
                 @:PROHIBIT(weno_order == 1 .and. (.not. weno_avg) .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &
                     "weno_order = 1 without weno_avg does not support fluid_pp("//trim(iStr)//")%"// "Re("//trim(jStr)//")")
             end do
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(1)) .and. .not. viscous, &
+                "Re(1) is specified, but viscous is not set to true")
+            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(2)) .and. .not. viscous, &
+                "Re(2) is specified, but viscous is not set to true")
+            @:PROHIBIT(f_is_default(fluid_pp(i)%Re(1)) .and. viscous, &
+                "Re(1) is not specified, but viscous is set to true")
         end do
+
     end subroutine s_check_inputs_stiffened_eos_viscosity
 
     !> Checks constraints on body forces parameters (bf_x[y,z], etc.)
@@ -291,7 +314,6 @@ contains
 
     !> Checks constraints on lagrangian bubble parameters
     subroutine s_check_inputs_lag_bubbles
-        @:PROHIBIT(lag_bubbles .and. .not. parallel_io, "parallel_io must be true for lag_bubbles")
         @:PROHIBIT(lag_bubbles .and. file_per_process, "file_per_process must be false for lag_bubbles")
         @:PROHIBIT(lag_bubbles .and. n==0, "lag_bubbles accepts 2D and 3D simulations only")
     end subroutine s_check_inputs_lag_bubbles

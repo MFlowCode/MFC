@@ -27,54 +27,12 @@ module m_lag_bubbles
 
     use m_boundary_conditions
 
+    use ieee_arithmetic
+
     ! ==========================================================================
 
     implicit none
 
-#ifdef CRAY_ACC_WAR
-    !> @name Lagrangian bubble variables
-    !> @{
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :), lag_RKcoef)
-    !$acc declare link(lag_RKcoef)
-
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), lag_bub_id)
-    !$acc declare link(lag_bub_id)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_R0)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_Rmax)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_Rmin)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_gas_mg)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_gas_betaT)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_gas_betaC)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:), lag_bub_dphidt)
-    !$acc declare link(lag_bub_R0, lag_bub_Rmax, lag_bub_Rmin, lag_bub_gas_mg, lag_bub_gas_betaT, lag_bub_gas_betaC, lag_bub_dphidt)
-    @:CRAY_DECLARE_GLOBAL(logical, dimension(:) :: lag_bub_equilibrium)
-    !$acc declare link(lag_bub_equilibrium)
-
-    !(nBub, 1 -> actual val or 2 -> temp val)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_gas_p)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_gas_mv)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_interface_rad)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_interface_vel)
-    !$acc declare link(lag_bub_gas_p, lag_bub_gas_mv, lag_bub_interface_rad, lag_bub_interface_vel)
-
-    !(nBub, 1-> x or 2->y or 3 ->z, 1 -> actual or 2 -> temporal val)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_pos)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_posPrev)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_vel)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_s)
-    !$acc declare link(lag_bub_motion_pos, lag_bub_motion_posPrev, lag_bub_motion_vel, lag_bub_motion_s)
-
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_interface_draddt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_interface_dveldt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_gas_dpdt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:), lag_bub_gas_dmvdt)
-    !$acc declare link(lag_bub_interface_draddt, lag_bub_interface_dveldt, lag_bub_gas_dpdt, lag_bub_gas_dmvdt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_dposdt)
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:,:,:), lag_bub_motion_dveldt)
-    !$acc declare link(lag_bub_motion_dposdt, lag_bub_motion_dveldt)
-#else
     real(kind(0d0)), allocatable, dimension(:, :) :: lag_RKcoef    !< RK 4th-5th time stepper coefficients
     !$acc declare create(lag_RKcoef)
 
@@ -116,7 +74,6 @@ module m_lag_bubbles
     real(kind(0d0)), allocatable, dimension(:, :, :) :: lag_bub_motion_dposdt     !< Time derivative of the bubble's position
     real(kind(0d0)), allocatable, dimension(:, :, :) :: lag_bub_motion_dveldt     !< Time derivative of the bubble's velocity
     !$acc declare create(lag_bub_motion_dposdt, lag_bub_motion_dveldt)
-#endif
 
     type(vector_field) :: q_particle    !< Projection of the lagrangian particles in the Eulerian framework
     !$acc declare create(q_particle)
@@ -150,15 +107,6 @@ contains
 
         integer :: i
 
-        ! Configuring Coordinate Direction Indexes =========================
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        ! ==================================================================
-        !$acc update device(ix, iy, iz)
-
         ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
         ! comp 1: one minus the voidfraction (1-beta)
         ! comp 2: Temporal derivative of the void fraction, dbetadt
@@ -168,7 +116,7 @@ contains
             q_particle_idx = 3
         elseif (lag_solver_approach == 2) then ! Two-way coupling
             q_particle_idx = 4
-            if (lag_cluster_type >= 4) q_particle_idx = 10 !Subgrid noise model for 2D approximation
+            if (lag_cluster_type >= 4) q_particle_idx = 6 !Subgrid noise model for 2D approximation
         else
             call s_mpi_abort('Please check the lag_solver_approach input')
         end if
@@ -176,38 +124,40 @@ contains
         @:ALLOCATE(q_particle%vf(1:q_particle_idx))
 
         do i = 1, q_particle_idx
-            @:ALLOCATE(q_particle%vf(i)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            @:ALLOCATE(q_particle%vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         @:ACC_SETUP_VFs(q_particle)
 
         ! Allocating space for lagrangian variables
-        @:ALLOCATE_GLOBAL(lag_bub_id(1:lag_nBubs_glb, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_R0(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_Rmax(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_Rmin(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_equilibrium(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_mg(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_betaT(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_betaC(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_dphidt(1:lag_nBubs_glb))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_p(1:lag_nBubs_glb, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_mv(1:lag_nBubs_glb, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_interface_rad(1:lag_nBubs_glb, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_interface_vel(1:lag_nBubs_glb, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_pos(1:lag_nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_posPrev(1:lag_nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_vel(1:lag_nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_s(1:lag_nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE_GLOBAL(lag_bub_interface_draddt(1:lag_nBubs_glb, 1:6))
-        @:ALLOCATE_GLOBAL(lag_bub_interface_dveldt(1:lag_nBubs_glb, 1:6))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_dpdt(1:lag_nBubs_glb, 1:6))
-        @:ALLOCATE_GLOBAL(lag_bub_gas_dmvdt(1:lag_nBubs_glb, 1:6))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_dposdt(1:lag_nBubs_glb, 1:3, 1:6))
-        @:ALLOCATE_GLOBAL(lag_bub_motion_dveldt(1:lag_nBubs_glb, 1:3, 1:6))
+        @:ALLOCATE(lag_bub_id(1:lag_nBubs_glb, 1:2))
+        @:ALLOCATE(lag_bub_R0(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_Rmax(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_Rmin(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_equilibrium(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_gas_mg(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_gas_betaT(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_gas_betaC(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_dphidt(1:lag_nBubs_glb))
+        @:ALLOCATE(lag_bub_gas_p(1:lag_nBubs_glb, 1:2))
+        @:ALLOCATE(lag_bub_gas_mv(1:lag_nBubs_glb, 1:2))
+        @:ALLOCATE(lag_bub_interface_rad(1:lag_nBubs_glb, 1:2))
+        @:ALLOCATE(lag_bub_interface_vel(1:lag_nBubs_glb, 1:2))
+        @:ALLOCATE(lag_bub_motion_pos(1:lag_nBubs_glb, 1:3, 1:2))
+        @:ALLOCATE(lag_bub_motion_posPrev(1:lag_nBubs_glb, 1:3, 1:2))
+        @:ALLOCATE(lag_bub_motion_vel(1:lag_nBubs_glb, 1:3, 1:2))
+        @:ALLOCATE(lag_bub_motion_s(1:lag_nBubs_glb, 1:3, 1:2))
+        @:ALLOCATE(lag_bub_interface_draddt(1:lag_nBubs_glb, 1:6))
+        @:ALLOCATE(lag_bub_interface_dveldt(1:lag_nBubs_glb, 1:6))
+        @:ALLOCATE(lag_bub_gas_dpdt(1:lag_nBubs_glb, 1:6))
+        @:ALLOCATE(lag_bub_gas_dmvdt(1:lag_nBubs_glb, 1:6))
+        @:ALLOCATE(lag_bub_motion_dposdt(1:lag_nBubs_glb, 1:3, 1:6))
+        @:ALLOCATE(lag_bub_motion_dveldt(1:lag_nBubs_glb, 1:3, 1:6))
 
         !< Allocate space for the RKCK 4th/5th time stepper coefficients
-        @:ALLOCATE_GLOBAL(lag_RKcoef(1:7, 1:6))
+        @:ALLOCATE(lag_RKcoef(1:7, 1:6))
         do i = 1, 6
             lag_RKcoef(1, i) = RKcoef1(i)
             lag_RKcoef(2, i) = RKcoef2(i)
@@ -527,45 +477,16 @@ contains
         !! @param t_step Current global time step
         !! @param qtime Current time from the RKCK stepper
         !! @param step Current step from the RKCK stepper
-    subroutine s_compute_el_coupled_solver(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, qtime, step)
+    subroutine s_compute_el_coupled_solver(q_cons_vf, q_prim_vf, rhs_vf, step)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
-        integer, intent(in) :: step, t_step
-        real(kind(0.d0)), intent(inout) :: time_avg
-        real(kind(0.d0)), intent(in) :: qtime
+        integer, intent(in) :: step
 
         real(kind(0.d0)) :: gammaparticle, vaporflux, heatflux
         integer :: i, j, k, l
         real(kind(0.d0)) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
-
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        !$acc update device(ix, iy, iz)
-
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
-                        rhs_vf(i)%sf(j, k, l) = 0.0d0
-                    end do
-                end do
-            end do
-        end do
-
-        time_tmp = qtime
-        !$acc update device (time_tmp)
-
-        !< Compute eulerian background
-        call s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
-
-        !< Compute lagrangian bubbles
-        call s_populate_variables_buffers(q_prim_vf, pb, mv)
 
         if (lag_pressure_corrector) then ! Subgrid p_inf model from Maeda and Colonius (2018).
 
@@ -640,17 +561,11 @@ contains
 
         integer :: i, j, k, l
 
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; 
-        if (p > 0) iz%beg = -buff_size; 
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-        !$acc update device(ix, iy, iz)
-
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, q_particle_idx
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
                         q_particle%vf(i)%sf(j, k, l) = 0.0d0
                     end do
                 end do
@@ -662,20 +577,12 @@ contains
 
         !Store 1-beta
         !$acc parallel loop collapse(3) gang vector default(present)
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
                     q_particle%vf(1)%sf(j, k, l) = 1.0d0 - q_particle%vf(1)%sf(j, k, l)
-                end do
-            end do
-        end do
-
-        ! Limiting void fraction given max value
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    q_particle%vf(1)%sf(i, j, k) = max(q_particle%vf(1)%sf(i, j, k), 1.d0 - lag_valmaxvoid)
+                    ! Limiting void fraction given max value
+                    q_particle%vf(1)%sf(j, k, l) = max(q_particle%vf(1)%sf(j, k, l), 1.d0 - lag_valmaxvoid)
                 end do
             end do
         end do
@@ -746,9 +653,9 @@ contains
 
             !source in energy
             !$acc parallel loop collapse(3) gang vector default(present)
-            do k = iz%beg, iz%end
-                do j = iy%beg, iy%end
-                    do i = ix%beg, ix%end
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
                         q_particle%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(num_fluids + l)%sf(i, j, k)
                     end do
                 end do
@@ -1111,23 +1018,13 @@ contains
         if (lag_largestep) return
 
         ! Update background fluid variables
-        !$acc parallel loop collapse(4) gang vector default(present)
+        !$acc parallel loop collapse(4) gang vector default(present) copyin(RKstep)
         do l = 1, sys_size
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
                         q_cons_ts(2)%vf(l)%sf(i, j, k) = &
                             q_cons_ts(1)%vf(l)%sf(i, j, k)
-                    end do
-                end do
-            end do
-        end do
-
-        !$acc parallel loop collapse(4) gang vector default(present) copyin(RKstep)
-        do l = 1, sys_size
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
                         !$acc loop seq
                         do q = 1, RKstep
                             q_cons_ts(2)%vf(l)%sf(i, j, k) = &
@@ -1817,30 +1714,30 @@ contains
         @:DEALLOCATE(q_particle%vf)
 
         !Deallocating space
-        @:DEALLOCATE_GLOBAL(lag_RKcoef)
-        @:DEALLOCATE_GLOBAL(lag_bub_id)
-        @:DEALLOCATE_GLOBAL(lag_bub_R0)
-        @:DEALLOCATE_GLOBAL(lag_bub_Rmax)
-        @:DEALLOCATE_GLOBAL(lag_bub_Rmin)
-        @:DEALLOCATE_GLOBAL(lag_bub_equilibrium)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_mg)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_betaT)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_betaC)
-        @:DEALLOCATE_GLOBAL(lag_bub_dphidt)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_p)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_mv)
-        @:DEALLOCATE_GLOBAL(lag_bub_interface_rad)
-        @:DEALLOCATE_GLOBAL(lag_bub_interface_vel)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_pos)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_posPrev)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_vel)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_s)
-        @:DEALLOCATE_GLOBAL(lag_bub_interface_draddt)
-        @:DEALLOCATE_GLOBAL(lag_bub_interface_dveldt)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_dpdt)
-        @:DEALLOCATE_GLOBAL(lag_bub_gas_dmvdt)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_dposdt)
-        @:DEALLOCATE_GLOBAL(lag_bub_motion_dveldt)
+        @:DEALLOCATE(lag_RKcoef)
+        @:DEALLOCATE(lag_bub_id)
+        @:DEALLOCATE(lag_bub_R0)
+        @:DEALLOCATE(lag_bub_Rmax)
+        @:DEALLOCATE(lag_bub_Rmin)
+        @:DEALLOCATE(lag_bub_equilibrium)
+        @:DEALLOCATE(lag_bub_gas_mg)
+        @:DEALLOCATE(lag_bub_gas_betaT)
+        @:DEALLOCATE(lag_bub_gas_betaC)
+        @:DEALLOCATE(lag_bub_dphidt)
+        @:DEALLOCATE(lag_bub_gas_p)
+        @:DEALLOCATE(lag_bub_gas_mv)
+        @:DEALLOCATE(lag_bub_interface_rad)
+        @:DEALLOCATE(lag_bub_interface_vel)
+        @:DEALLOCATE(lag_bub_motion_pos)
+        @:DEALLOCATE(lag_bub_motion_posPrev)
+        @:DEALLOCATE(lag_bub_motion_vel)
+        @:DEALLOCATE(lag_bub_motion_s)
+        @:DEALLOCATE(lag_bub_interface_draddt)
+        @:DEALLOCATE(lag_bub_interface_dveldt)
+        @:DEALLOCATE(lag_bub_gas_dpdt)
+        @:DEALLOCATE(lag_bub_gas_dmvdt)
+        @:DEALLOCATE(lag_bub_motion_dposdt)
+        @:DEALLOCATE(lag_bub_motion_dveldt)
 
     end subroutine s_finalize_lagrangian_solver
 

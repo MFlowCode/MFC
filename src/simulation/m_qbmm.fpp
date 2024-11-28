@@ -28,13 +28,9 @@ module m_qbmm
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), momrhs)
-    !$acc declare link(momrhs)
-#else
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: momrhs
     !$acc declare create(momrhs)
-#endif
+
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nterms = ${nterms}$
     #:else
@@ -43,17 +39,11 @@ module m_qbmm
     #:endif
 
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
-!$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
+    !$acc declare create(is1_qbmm, is2_qbmm, is3_qbmm)
 
-#ifdef CRAY_ACC_WAR
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:), bubrs)
-    @:CRAY_DECLARE_GLOBAL(integer, dimension(:, :), bubmoms)
-    !$acc declare link(bubrs, bubmoms)
-#else
     integer, allocatable, dimension(:) :: bubrs
     integer, allocatable, dimension(:, :) :: bubmoms
     !$acc declare create(bubrs, bubmoms)
-#endif
 
 contains
 
@@ -76,7 +66,7 @@ contains
 
         #:endif
 
-        @:ALLOCATE_GLOBAL(momrhs(3, 0:2, 0:2, nterms, nb))
+        @:ALLOCATE(momrhs(1:3, 0:2, 0:2, 1:nterms, 1:nb))
         momrhs = 0d0
 
         ! Assigns the required RHS moments for moment transport equations
@@ -408,8 +398,8 @@ contains
 
         !$acc update device(momrhs)
 
-        @:ALLOCATE_GLOBAL(bubrs(1:nb))
-        @:ALLOCATE_GLOBAL(bubmoms(1:nb, 1:nmom))
+        @:ALLOCATE(bubrs(1:nb))
+        @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
             bubrs(i) = bub_idx%rs(i)
@@ -694,7 +684,7 @@ contains
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff_nonpoly
 #else
         !$acc routine seq
@@ -702,7 +692,7 @@ contains
         real(kind(0.d0)), intent(in) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
 
-        integer :: i1, i2, q
+        integer :: i1, i2
 
         coeffs = 0d0
 
@@ -767,7 +757,7 @@ contains
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
     subroutine s_coeff(pres, rho, c, coeffs)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_coeff
 #else
         !$acc routine seq
@@ -776,7 +766,7 @@ contains
         real(kind(0.d0)), intent(inout) :: pres, rho, c
         real(kind(0.d0)), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
 
-        integer :: i1, i2, q
+        integer :: i1, i2
 
         coeffs = 0d0
 
@@ -841,20 +831,19 @@ contains
 
         real(kind(0d0)), dimension(nmom) :: moms, msum
         real(kind(0d0)), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: mom3d_terms, coeff
-        real(kind(0d0)) :: pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
-        real(kind(0d0)) :: start, finish
+        real(kind(0d0)), dimension(nterms, 0:2, 0:2) :: coeff
+        real(kind(0d0)) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
         real(kind(0d0)) :: n_tait, B_tait
 
-        integer :: j, k, l, q, r, s !< Loop variables
         integer :: id1, id2, id3
         integer :: i1, i2
+        integer :: j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
 
         !$acc update device(is1_qbmm, is2_qbmm, is3_qbmm)
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, R3, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T)
+        !$acc parallel loop collapse(3) gang vector default(present) private(moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T)
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -1046,7 +1035,7 @@ contains
     end subroutine s_mom_inv
 
     subroutine s_chyqmom(momin, wght, abscX, abscY)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_chyqmom
 #else
         !$acc routine seq
@@ -1113,7 +1102,7 @@ contains
     end subroutine s_chyqmom
 
     subroutine s_hyqmom(frho, fup, fmom)
-#ifdef CRAY_ACC_WAR
+#ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_hyqmom
 #else
         !$acc routine seq
