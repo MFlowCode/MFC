@@ -528,18 +528,18 @@ contains
         length_z = patch_ib(ib_patch_id)%length_z
 
         if (length_x /= 0._wp) then
-            boundary%beg = x_centroid - 0.5*length_x
-            boundary%end = x_centroid + 0.5*length_x
+            boundary%beg = x_centroid - 0.5_wp*length_x
+            boundary%end = x_centroid + 0.5_wp*length_x
             dist_sides_vec = (/1, 0, 0/)
             dist_surface_vec = (/0, 1, 1/)
         else if (length_y /= 0._wp) then
-            boundary%beg = y_centroid - 0.5*length_y
-            boundary%end = y_centroid + 0.5*length_y
+            boundary%beg = y_centroid - 0.5_wp*length_y
+            boundary%end = y_centroid + 0.5_wp*length_y
             dist_sides_vec = (/0, 1, 0/)
             dist_surface_vec = (/1, 0, 1/)
         else if (length_z /= 0._wp) then
-            boundary%beg = z_centroid - 0.5*length_z
-            boundary%end = z_centroid + 0.5*length_z
+            boundary%beg = z_centroid - 0.5_wp*length_z
+            boundary%end = z_centroid + 0.5_wp*length_z
             dist_sides_vec = (/0, 0, 1/)
             dist_surface_vec = (/1, 1, 0/)
         end if

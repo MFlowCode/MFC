@@ -225,7 +225,7 @@ contains
         B_tait = B_tait*(n_tait - 1._wp)/n_tait
 
         if (j < 177) then
-            q_prim_vf(E_idx)%sf(j, k, l) = 0.5*q_prim_vf(E_idx)%sf(j, k, l)
+            q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
         end if
 
         if (qbmm) then

@@ -695,7 +695,7 @@ contains
             else
 
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0))
+                    write (dbfile) real(x_cb, wp)
                 else
                     write (dbfile) x_cb
                 end if
@@ -708,7 +708,7 @@ contains
 
                 if (proc_rank == 0) then
                     if (precision == 1) then
-                        write (dbroot) real(x_root_cb, kind(0.0))
+                        write (dbroot) real(x_root_cb, wp)
                     else
                         write (dbroot) x_root_cb
                     end if
@@ -953,7 +953,7 @@ contains
             ! Writing the name of the flow variable and its data, associated
             ! with the local processor, to the formatted database slave file
             if (precision == 1) then
-                write (dbfile) varname, real(q_sf, kind(0.0))
+                write (dbfile) varname, real(q_sf, wp)
             else
                 write (dbfile) varname, q_sf
             end if
@@ -971,7 +971,7 @@ contains
 
                 if (proc_rank == 0) then
                     if (precision == 1) then
-                        write (dbroot) varname, real(q_root_sf, kind(0.0))
+                        write (dbroot) varname, real(q_root_sf, wp)
                     else
                         write (dbroot) varname, q_root_sf
                     end if

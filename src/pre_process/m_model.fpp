@@ -501,10 +501,10 @@ contains
 
         do i = 1, spc
             call random_number(ray_origins(i, :))
-            ray_origins(i, :) = point + (ray_origins(i, :) - 0.5)*spacing(:)
+            ray_origins(i, :) = point + (ray_origins(i, :) - 0.5_wp)*spacing(:)
 
             call random_number(ray_dirs(i, :))
-            ray_dirs(i, :) = ray_dirs(i, :) - 0.5
+            ray_dirs(i, :) = ray_dirs(i, :) - 0.5_wp
             ray_dirs(i, :) = ray_dirs(i, :)/sqrt(sum(ray_dirs(i, :)*ray_dirs(i, :)))
         end do
 
@@ -549,7 +549,7 @@ contains
 
         NdotRayDirection = sum(N(:)*ray%d(:))
 
-        if (abs(NdotRayDirection) < 0.0000001) then
+        if (abs(NdotRayDirection) < 0.0000001_wp) then
             return
         end if
 

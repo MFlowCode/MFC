@@ -230,7 +230,7 @@ contains
         real(wp), intent(out) :: Re_trans, Im_trans
 
         complex :: trans, c1, c2, c3
-        complex :: imag = (0., 1.)
+        complex :: imag = (0._wp, 1._wp)
         real(wp) :: f_transcoeff
 
         c1 = imag*omega*peclet

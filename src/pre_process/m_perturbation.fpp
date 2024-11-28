@@ -128,29 +128,29 @@ contains
         wave2 = 0._wp
 
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Ldomain, 0._wp, wave_tmp, 0._wp)
+        call s_instability_wave(2*pi*4.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Ldomain, 0._wp, wave_tmp, 0._wp)
+        call s_instability_wave(2*pi*2.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Ldomain, 0._wp, wave_tmp, 0._wp)
+        call s_instability_wave(2*pi*1.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        wave = wave1*0.05
+        wave = wave1*0.05_wp
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, 2*pi*11._wp/31._wp)
+            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0_wp/Ldomain, wave_tmp, 2*pi*11._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, 2*pi*13._wp/31._wp)
+            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0_wp/Ldomain, wave_tmp, 2*pi*13._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, 2*pi*17._wp/31._wp)
+            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0_wp/Ldomain, wave_tmp, 2*pi*17._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, 2*pi*19._wp/31._wp)
+            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0_wp/Ldomain, wave_tmp, 2*pi*19._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, 2*pi*23._wp/31._wp)
+            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0_wp/Ldomain, wave_tmp, 2*pi*23._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, 2*pi*29._wp/31._wp)
+            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0_wp/Ldomain, wave_tmp, 2*pi*29._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            wave = wave + 0.15*wave2
+            wave = wave + 0.15_wp*wave2
         end if
 
         ! Superpose velocity perturbuations (instability waves) to the velocity field
