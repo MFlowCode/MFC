@@ -30,3 +30,6 @@ jobs:
 
     - name: Lint the source code
       run:  fortitude check --ignore=E001,S001,S101,M011,F001,S041,T001 ./src/*/* || true
+
+    - name: Ensure kind is specified
+      run:  fortitude check --select=P001 ./src/*/*
