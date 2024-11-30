@@ -1,0 +1,86 @@
+solid Pyramid2_IBM
+   facet normal 1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.000001e-01
+         vertex 1.000001e-01 1.005828e-07 1.000001e-01
+         vertex 1.000001e-01 1.000001e-01 1.005828e-07
+      endloop
+   endfacet
+   facet normal 1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.005828e-07
+         vertex 1.000001e-01 1.005828e-07 1.000001e-01
+         vertex 1.000001e-01 1.005828e-07 1.005828e-07
+      endloop
+   endfacet
+   facet normal -1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.685755e-08 4.500010e-02 5.500010e-02
+         vertex 9.685755e-08 5.500010e-02 5.500010e-02
+         vertex 9.685755e-08 4.500010e-02 4.500010e-02
+      endloop
+   endfacet
+   facet normal -1.000000e+00 0.000000e+00 0.000000e+00
+      outer loop
+         vertex 9.685755e-08 4.500010e-02 4.500010e-02
+         vertex 9.685755e-08 5.500010e-02 5.500010e-02
+         vertex 9.685755e-08 5.500010e-02 4.500010e-02
+      endloop
+   endfacet
+   facet normal -4.103647e-01 9.119215e-01 0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.005828e-07
+         vertex 9.685755e-08 5.500010e-02 4.500010e-02
+         vertex 1.000001e-01 1.000001e-01 1.000001e-01
+      endloop
+   endfacet
+   facet normal -4.103647e-01 9.119215e-01 0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.000001e-01
+         vertex 9.685755e-08 5.500010e-02 4.500010e-02
+         vertex 9.685755e-08 5.500010e-02 5.500010e-02
+      endloop
+   endfacet
+   facet normal -4.103647e-01 0.000000e+00 -9.119215e-01
+      outer loop
+         vertex 1.000001e-01 1.005828e-07 1.005828e-07
+         vertex 9.685755e-08 4.500010e-02 4.500010e-02
+         vertex 1.000001e-01 1.000001e-01 1.005828e-07
+      endloop
+   endfacet
+   facet normal -4.103647e-01 0.000000e+00 -9.119215e-01
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.005828e-07
+         vertex 9.685755e-08 4.500010e-02 4.500010e-02
+         vertex 9.685755e-08 5.500010e-02 4.500010e-02
+      endloop
+   endfacet
+   facet normal -4.103647e-01 0.000000e+00 9.119215e-01
+      outer loop
+         vertex 1.000001e-01 1.000001e-01 1.000001e-01
+         vertex 9.685755e-08 5.500010e-02 5.500010e-02
+         vertex 1.000001e-01 1.005828e-07 1.000001e-01
+      endloop
+   endfacet
+   facet normal -4.103647e-01 0.000000e+00 9.119215e-01
+      outer loop
+         vertex 1.000001e-01 1.005828e-07 1.000001e-01
+         vertex 9.685755e-08 5.500010e-02 5.500010e-02
+         vertex 9.685755e-08 4.500010e-02 5.500010e-02
+      endloop
+   endfacet
+   facet normal -4.103647e-01 -9.119215e-01 -0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.005828e-07 1.000001e-01
+         vertex 9.685755e-08 4.500010e-02 5.500010e-02
+         vertex 1.000001e-01 1.005828e-07 1.005828e-07
+      endloop
+   endfacet
+   facet normal -4.103647e-01 -9.119215e-01 0.000000e+00
+      outer loop
+         vertex 1.000001e-01 1.005828e-07 1.005828e-07
+         vertex 9.685755e-08 4.500010e-02 5.500010e-02
+         vertex 9.685755e-08 4.500010e-02 4.500010e-02
+      endloop
+   endfacet
+endsolid Pyramid2_IBM

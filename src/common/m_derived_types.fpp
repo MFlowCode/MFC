@@ -104,7 +104,7 @@ module m_derived_types
     end type bub_bounds_info
 
     !> Defines parameters for a Model Patch
-    type :: ic_model_parameters
+    type ic_model_parameters
         character(LEN=pathlen_max) :: filepath !<
         !! Path the STL file relative to case_dir.
 
@@ -165,8 +165,6 @@ module m_derived_types
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
 
-        type(ic_model_parameters) :: model !< Model parameters
-
         real(kind(0d0)) :: epsilon, beta !<
         !! The spherical harmonics eccentricity parameters.
 
@@ -220,6 +218,26 @@ module m_derived_types
         real(kind(0d0)) :: cf_val !! color function value
         real(kind(0d0)) :: Y(1:num_species)
 
+        !! STL or OBJ model input parameter
+        character(LEN=pathlen_max) :: model_filepath !<
+        !! Path the STL file relative to case_dir.
+
+        t_vec3 :: model_translate !<
+        !! Translation of the STL object.
+
+        t_vec3 :: model_scale !<
+        !! Scale factor for the STL object.
+
+        t_vec3 :: model_rotate !<
+        !! Angle to rotate the STL object along each cartesian coordinate axis,
+        !! in radians.
+
+        integer :: model_spc !<
+        !! Number of samples per cell to use when discretizing the STL object.
+
+        real(kind(0d0)) :: model_threshold !<
+        !! Threshold to turn on smoothen STL patch.
+
     end type ic_patch_parameters
 
     type ib_patch_parameters
@@ -238,6 +256,25 @@ module m_derived_types
 
         logical :: slip
 
+        !! STL or OBJ model input parameter
+        character(LEN=pathlen_max) :: model_filepath !<
+        !! Path the STL file relative to case_dir.
+
+        t_vec3 :: model_translate !<
+        !! Translation of the STL object.
+
+        t_vec3 :: model_scale !<
+        !! Scale factor for the STL object.
+
+        t_vec3 :: model_rotate !<
+        !! Angle to rotate the STL object along each cartesian coordinate axis,
+        !! in radians.
+
+        integer :: model_spc !<
+        !! Number of samples per cell to use when discretizing the STL object.
+
+        real(kind(0d0)) :: model_threshold !<
+        !! Threshold to turn on smoothen STL patch.
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These
