@@ -525,6 +525,8 @@ contains
         hyperelasticity = .false.
         elasticity = .false.
         hyper_model = dflt_int
+        b_size = dflt_int
+        tensor_size = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -1071,7 +1073,6 @@ contains
         end if
 
         if (elasticity) then
-            fd_order = 4
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
         end if

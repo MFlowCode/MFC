@@ -795,7 +795,7 @@ contains
                                      ((y_cc(j) - y_centroid)/b)**2) &
                                 - 1d0))*(-0.5d0) + 0.5d0
                 end if
-                print *, "a :", a, "b :", b
+
                 if ((((x_cc(i) - x_centroid)/a)**2 + &
                      ((y_cc(j) - y_centroid)/b)**2 <= 1d0 &
                      .and. &

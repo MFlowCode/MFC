@@ -136,15 +136,19 @@ contains
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_hypoelasticity
         @:PROHIBIT(hypoelasticity .and. model_eqns /= 2)
+#ifdef MFC_SIMULATION
+        @:PROHIBIT(elasticity .and. fd_order /= 4)
+#endif
     end subroutine s_check_inputs_hypoelasticity
 
     !> Checks constraints on the hyperelasticity parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     subroutine s_check_inputs_hyperelasticity
-        if (model_eqns == 1 .or. model_eqns > 3) then
-            call s_mpi_abort('hyperelasticity requires '// &
-                             '6-equation model (model_eqns = 2 or 3). Exiting ...')
-        end if
+        @:PROHIBIT(hyperelasticity .and. model_eqns == 1)
+        @:PROHIBIT(hyperelasticity .and. model_eqns > 3)
+#ifdef MFC_SIMULATION
+        @:PROHIBIT(elasticity .and. fd_order /= 4)
+#endif
     end subroutine s_check_inputs_hyperelasticity
 
     !> Checks constraints on the phase change parameters.
