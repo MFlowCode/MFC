@@ -19,9 +19,12 @@ from ..packer import packer
 nFAIL = 0
 nPASS = 0
 nSKIP = 0
+errors = []
 
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
+    selected_cases = []
+    skipped_cases  = []
 
     # Check "--from" and "--to" exist and are in the right order
     bFoundFrom, bFoundTo = (False, False)
@@ -51,16 +54,20 @@ def __filter(cases_) -> typing.List[TestCase]:
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
+            skipped_cases.append(case)
 
     if ARG("percent") == 100:
-        return cases
+        return cases, skipped_cases
 
-    return sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    skipped_cases = [item for item in cases if item not in selected_cases]
 
+    return selected_cases, skipped_cases
 
 def test():
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     cases = list_cases()
 
@@ -75,7 +82,8 @@ def test():
 
         return
 
-    cases = [ _.to_case() for _ in __filter(cases) ]
+    cases, skipped_cases = __filter(cases)
+    cases = [ _.to_case() for _ in cases ]
 
     if ARG("list"):
         table = rich.table.Table(title="MFC Test Cases", box=rich.table.box.SIMPLE)
@@ -125,9 +133,23 @@ def test():
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
+    nSKIP = len(skipped_cases)
     cons.print()
     cons.unindent()
-    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.")
+    cons.print(f"\nTest Summary: [bold green]{nPASS}[/bold green] passed, [bold red]{nFAIL}[/bold red] failed, [bold yellow]{nSKIP}[/bold yellow] skipped.\n")
+
+    # Print a summary of all errors at the end if errors exist
+    if len(errors) != 0:
+        cons.print(f"[bold red]Failed Cases[/bold red]\n")
+        for e in errors:
+            cons.print(e)
+
+    # Print the list of skipped cases
+    if len(skipped_cases) != 0:
+        cons.print("[bold yellow]Skipped Cases[/bold yellow]\n")
+        for c in skipped_cases:
+            cons.print(f"[bold yellow]{c.trace}[/bold yellow]")
+
     exit(nFAIL)
 
 
@@ -216,6 +238,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 def handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
+    global errors
 
     nAttempts = 0
 
@@ -228,9 +251,11 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
+                errors.append(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
-            cons.print(f"{exc}")
+            errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
+            errors.append(f"{exc}")
 
         return
