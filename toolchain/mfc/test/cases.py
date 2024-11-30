@@ -328,16 +328,48 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         })
 
         if len(dimInfo[0]) == 3:
-            cases.append(define_case_d(stack, f'', {
+            cases.append(define_case_d(stack, f'Sphere', {
                 'patch_ib(1)%z_centroid': 0.5,
                 'patch_ib(1)%geometry': 8,
             }))
+
+            cases.append(define_case_d(stack, f'Cuboid', {
+                'patch_ib(1)%z_centroid': 0.5,
+                'patch_ib(1)%length_x': 0.1,
+                'patch_ib(1)%length_y': 0.1,
+                'patch_ib(1)%length_z': 0.1,
+                'patch_ib(1)%geometry': 9,
+            }))
+
+            cases.append(define_case_d(stack, f'Cylinder', {
+                'patch_ib(1)%z_centroid': 0.5,
+                'patch_ib(1)%length_x': 0.1,
+                'patch_ib(1)%geometry': 10,
+            }))
+
         elif len(dimInfo[0]) == 2:
-            cases.append(define_case_d(stack, f'', {'patch_ib(1)%geometry': 2 }))
+            cases.append(define_case_d(stack, f'Rectangle', {
+                'patch_ib(1)%length_x': 0.05,
+                'patch_ib(1)%length_y': 0.05,
+                'patch_ib(1)%geometry': 3 }))
+            cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
             if six_eqn_model:
                 cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
+
+    def ibm_stl():
+        common_mods = {
+        't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(2, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> IBM -> STL',
+                f'examples/{ndim}D_ibm_stl_test/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+    ibm_stl()
 
     def alter_acoustic_src(dimInfo):
         stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1, 'dt': 1e-3, 't_step_stop': 50, 't_step_save': 50})

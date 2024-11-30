@@ -212,9 +212,7 @@ contains
 
             ! Calculate velocity of ghost cell
             if (gp%slip) then
-                norm = gp%ip_loc - physical_loc !
-                buf = sqrt(sum(norm**2))
-                norm = norm/buf
+                norm = levelset_norm%sf(j, k, l, patch_id, :)
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
             else
