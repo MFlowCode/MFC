@@ -1,4 +1,4 @@
 #!/bin/bash
 
 . ./mfc.sh load -c f -m g
-./mfc.sh build -j 8 --gpu
+./mfc.sh test --dry-run -j 8 --gpu

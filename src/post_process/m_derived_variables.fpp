@@ -410,6 +410,7 @@ contains
                                      - fd_coeff_z(r, l)* &
                                      q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l))
                             else
+
                                 q_sf(j, k, l) = &
                                     q_sf(j, k, l) + fd_coeff_y(r, k)* &
                                     q_prim_vf(mom_idx%end)%sf(j, r + k, l) &

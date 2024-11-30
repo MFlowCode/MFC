@@ -23,7 +23,7 @@ module m_variables_conversion
     use m_helper
 
     use m_thermochem, only: &
-        num_species, get_temperature, get_pressure, &
+        num_species, get_temperature, get_pressure, gas_constant, &
         get_mixture_molecular_weight, get_mixture_energy_mass
 
     ! ==========================================================================
@@ -1114,7 +1114,7 @@ contains
                         end do
 
                         call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                        T = q_prim_vf(T_idx)%sf(j, k, l)
+                        T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
                         call get_mixture_energy_mass(T, Ys, e_mix)
 
                         q_cons_vf(E_idx)%sf(j, k, l) = &

@@ -670,7 +670,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_prim_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -948,6 +948,7 @@ contains
         type(vector_field), intent(inout) :: flux_src_n_vf
 
         integer :: i, j, k, l, q
+        integer :: iter_loc
 
         if (alt_soundspeed) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -973,18 +974,14 @@ contains
             end do
         end if
 
+        do iter_loc = -1, 1, 2
+            if (any(bc_id_has_bc(idir, iter_loc, cbc_range_beg:cbc_range_end))) then
+                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
+                           flux_src_n(idir)%vf, idir, iter_loc, irx, iry, irz)
+            end if
+        end do
+
         if (idir == 1) then
-
-            if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
-            end if
-
-            if (bc_x%end <= -5 .and. bc_x%end >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
-            end if
-
             !$acc parallel loop collapse(4) gang vector default(present)
             do j = 1, sys_size
                 do q = 0, p
@@ -1083,16 +1080,6 @@ contains
         elseif (idir == 2) then
             ! RHS Contribution in y-direction ===============================
             ! Applying the Riemann fluxes
-
-            if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
-            end if
-
-            if (bc_y%end <= -5 .and. bc_y%end >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
-            end if
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do j = 1, sys_size
@@ -1255,18 +1242,7 @@ contains
 
         elseif (idir == 3) then
             ! RHS Contribution in z-direction ===============================
-
             ! Applying the Riemann fluxes
-
-            if (bc_z%beg <= -5 .and. bc_z%beg >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, -1, irx, iry, irz)
-            end if
-
-            if (bc_z%end <= -5 .and. bc_z%end >= -13) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, &
-                           flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
-            end if
 
             if (grid_geometry == 3) then ! Cylindrical Coordinates
                 !$acc parallel loop collapse(4) gang vector default(present)

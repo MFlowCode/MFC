@@ -16,6 +16,8 @@ module m_viscous
     use m_helper
 
     use m_finite_differences
+
+    use m_boundary_conditions_common
     ! ==========================================================================
 
     private; public s_get_viscous, &
@@ -1303,7 +1305,8 @@ contains
         type(scalar_field), intent(inout) :: grad_z
         type(int_bounds_info) :: ix, iy, iz
 
-        integer :: j, k, l !< Generic loop iterators
+        @:BOUNDARY_CONDITION_INTEGER_DECLARATIONS()
+        integer :: iter_loc
 
         ix%beg = 1 - buff_size; ix%end = m + buff_size - 1
         if (n > 0) then
@@ -1397,66 +1400,31 @@ contains
             end if
         end if
 
-        if (bc_x%beg <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    grad_x%sf(0, k, l) = (-3d0*var%sf(0, k, l) + 4d0*var%sf(1, k, l) - var%sf(2, k, l))/ &
-                                         (x_cc(2) - x_cc(0))
-                end do
-            end do
-        end if
-        if (bc_x%end <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    grad_x%sf(m, k, l) = (3d0*var%sf(m, k, l) - 4d0*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
-                                         (x_cc(m) - x_cc(m - 2))
-                end do
-            end do
-        end if
-        if (n > 0) then
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        grad_y%sf(j, 0, l) = (-3d0*var%sf(j, 0, l) + 4d0*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
-                                             (y_cc(2) - y_cc(0))
-                    end do
-                end do
+        #:for dir, cmp in zip([1, 2, 3], ['x', 'y', 'z'])
+            if (${dir}$ <= num_dims .and. any(bc_id_has_bc(${dir}$, -1, :-3))) then
+                #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir=dir, loc="-1", thickness=1, pack_v_size=1)
+                    if (bc_id_sfs(${dir}$, -1)%sf(exlhs, eylhs, ezlhs)%type <= -13 .and. bc_id_sfs(${dir}$, -1)%sf(exlhs, eylhs, ezlhs)%type /= -13) then
+                        grad_${cmp}$%sf(ex, ey, ez) = &
+                            (iter_loc*3d0*var%sf(ex, ey, ez) - &
+                             iter_loc*4d0*var%sf(ex - locx, ey - locy, ez - locz) + &
+                             iter_loc*var%sf(ex - 2*locx, ey - 2*locy, ez - 2*locz))/ &
+                            (${cmp}$_cc(2) - ${cmp}$_cc(0))
+                    end if
+                #:endblock
             end if
-            if (bc_y%end <= -3) then
-                !$acc parallel loop collapse(2) gang vector default(present)
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        grad_y%sf(j, n, l) = (3d0*var%sf(j, n, l) - 4d0*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
-                                             (y_cc(n) - y_cc(n - 2))
-                    end do
-                end do
+
+            if (${dir}$ <= num_dims .and. any(bc_id_has_bc(${dir}$, +1, :-3))) then
+                #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir=dir, loc="+1", thickness=1, pack_v_size=1)
+                    if (bc_id_sfs(${dir}$, +1)%sf(exlhs, eylhs, ezlhs)%type <= -13 .and. bc_id_sfs(${dir}$, -1)%sf(exlhs, eylhs, ezlhs)%type /= -13) then
+                        grad_${cmp}$%sf(ex, ey, ez) = &
+                            (-iter_loc*3d0*var%sf(ex, ey, ez) + &
+                             iter_loc*4d0*var%sf(ex - locx, ey - locy, ez - locz) - &
+                             iter_loc*var%sf(ex - 2*locx, ey - 2*locy, ez - 2*locz))/ &
+                            (${cmp}$_cc(e${cmp}$) - ${cmp}$_cc(e${cmp}$-2))
+                    end if
+                #:endblock
             end if
-            if (p > 0) then
-                if (bc_z%beg <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            grad_z%sf(j, k, 0) = &
-                                (-3d0*var%sf(j, k, 0) + 4d0*var%sf(j, k, 1) - var%sf(j, k, 2))/ &
-                                (z_cc(2) - z_cc(0))
-                        end do
-                    end do
-                end if
-                if (bc_z%end <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            grad_z%sf(j, k, p) = &
-                                (3d0*var%sf(j, k, p) - 4d0*var%sf(j, k, p - 1) + var%sf(j, k, p - 2))/ &
-                                (z_cc(p) - z_cc(p - 2))
-                        end do
-                    end do
-                end if
-            end if
-        end if
+        #:endfor
 
     end subroutine s_compute_fd_gradient
 

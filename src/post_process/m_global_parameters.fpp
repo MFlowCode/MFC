@@ -20,6 +20,8 @@ module m_global_parameters
 
     use m_thermochem, only: num_species, species_names
 
+    use m_global_parameters_common
+
     ! ==========================================================================
 
     implicit none
@@ -109,6 +111,7 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
+    logical :: rdma_mpi        !< Turn on RDMA for MPI
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
@@ -144,13 +147,19 @@ module m_global_parameters
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    integer :: num_bc_patches
+    type(bc_patch_parameters) :: patch_bc(num_bc_patches_max)
+    type(bounds_info) :: x_domain, y_domain, z_domain
     !> @}
 
     logical :: parallel_io    !< Format of the data files
     logical :: file_per_process !< output format
 
-    integer, allocatable, dimension(:) :: proc_coords !<
+    integer, dimension(1:3) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    integer, dimension(1:3) :: proc_nums !<
+    !! Processor dimensions in MPI_CART_COMM
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -331,17 +340,18 @@ contains
         relax = .false.
         relax_model = dflt_int
         hypoelasticity = .false.
+        rdma_mpi = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
-            #:endfor
+            bc_${DIM}$%vel_beg = 0d0
+            bc_${DIM}$%vel_end = 0d0
         #:endfor
+
+        call s_bc_assign_default_values_to_user_inputs(num_bc_patches, patch_bc)
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -772,8 +782,6 @@ contains
 
         num_dims = 1 + min(1, n) + min(1, p)
 
-        allocate (proc_coords(1:num_dims))
-
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -817,8 +825,6 @@ contains
             deallocate (x_root_cb, x_root_cc)
 
         end if
-
-        deallocate (proc_coords)
 
         deallocate (adv)
 

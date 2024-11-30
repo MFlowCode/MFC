@@ -20,8 +20,12 @@ module m_constants
     integer, parameter :: num_fluids_max = 10   !< Maximum number of fluids in the simulation
     integer, parameter :: num_probes_max = 10   !< Maximum number of flow probes in the simulation
     integer, parameter :: num_patches_max = 10
+    integer, parameter :: num_bc_patches_max = 20
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
+    integer, parameter :: gp_layers = 3 !< Number of ghost point layers
+    integer, parameter :: num_bcs_max = 100 !< Maximum number of boundary condition types.
+
     real(kind(0d0)), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
     real(kind(0d0)), parameter :: acoustic_spatial_support_width = 2.5d0 !< Spatial support width of acoustic source, used in s_source_spatial
     real(kind(0d0)), parameter :: dflt_vcfl_dt = 100d0 !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
@@ -38,5 +42,9 @@ module m_constants
     real(kind(0d0)), parameter :: threshold_edge_zero = 1d-10 !< Threshold to treat two edges to be overlapped
     real(kind(0d0)), parameter :: threshold_bary = 1d-1 !< Threshold to interpolate a barycentric facet
     real(kind(0d0)), parameter :: initial_distance_buffer = 1d12 !< Initialized levelset distance for the shortest path pair algorithm
+
+    ! Characteristic Boundary Conditions
+    integer, parameter :: cbc_range_beg = -13
+    integer, parameter :: cbc_range_end =  -5
 
 end module m_constants

@@ -2,6 +2,8 @@
 !! @file m_data_input.f90
 !> @brief Contains module m_data_input
 
+#:include 'macros.fpp'
+
 !> @brief This module features procedures, which for a specific time-step,
 !!             read in the raw simulation data for the grid and the conservative
 !!             variables and fill out their buffer regions.
@@ -21,6 +23,8 @@ module m_data_input
     use m_compile_specific
 
     use m_helper
+
+    use m_boundary_conditions_common
     ! ==========================================================================
 
     implicit none
@@ -29,8 +33,6 @@ module m_data_input
  s_read_data_files, &
  s_read_serial_data_files, &
  s_read_parallel_data_files, &
- s_populate_grid_variables_buffer_regions, &
- s_populate_conservative_variables_buffer_regions, &
  s_finalize_data_input_module
 
     abstract interface ! ===================================================
@@ -88,6 +90,8 @@ contains
 
         logical :: file_check  !<
             !! Generic logical used to test the existence of a particular file
+
+        integer :: iter_dir, iter_loc
 
         integer :: i !< Generic loop iterator
 
@@ -226,6 +230,10 @@ contains
 
         end do
 
+        if (t_step == 0) then
+            call s_read_boundary_condition_files(t_step_dir)
+        end if
+
         if (ib) then
             write (file_loc_ib, '(A,I0,A)') &
                 trim(t_step_ib_dir)//'/ib.dat'
@@ -235,7 +243,8 @@ contains
                       FORM='unformatted', &
                       ACTION='read', &
                       STATUS='old')
-                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+            else
+                call s_mpi_abort(trim(file_loc_ib)//' is missing. Exiting ...')
             end if
         end if
 
@@ -338,6 +347,10 @@ contains
                 ! Computing the cell center location
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
             end if
+        end if
+
+        if (t_step == 0) then
+            call s_read_boundary_condition_files(trim(trim(case_dir)//'/restart_data'))
         end if
 
         if (file_per_process) then
@@ -505,635 +518,6 @@ contains
 #endif
 
     end subroutine s_read_parallel_data_files
-
-    !>  The following subroutine populates the buffer regions of
-        !!      the cell-width spacings, the cell-boundary locations and
-        !!      the cell-center locations. Note that the buffer regions
-        !!      of the last two variables should be interpreted slightly
-        !!      differently than usual. They are really ghost zones that
-        !!      are used in aiding the multidimensional visualization of
-        !!      Silo database files, in VisIt, when processor boundary
-        !!      conditions are present.
-    subroutine s_populate_grid_variables_buffer_regions
-
-        integer :: i !< Generic loop iterator
-
-        ! Populating Buffer Regions in the x-direction =====================
-
-        ! Ghost-cell extrapolation BC at the beginning
-        if (bc_x%beg <= -3) then
-
-            do i = 1, buff_size
-                dx(-i) = dx(0)
-            end do
-
-            ! Symmetry BC at the beginning
-        elseif (bc_x%beg == -2) then
-
-            do i = 1, buff_size
-                dx(-i) = dx(i - 1)
-            end do
-
-            ! Periodic BC at the beginning
-        elseif (bc_x%beg == -1) then
-
-            do i = 1, buff_size
-                dx(-i) = dx((m + 1) - i)
-            end do
-
-            ! Processor BC at the beginning
-        else
-
-            call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'x')
-
-        end if
-
-        do i = 1, offset_x%beg
-            x_cb(-1 - i) = x_cb(-i) - dx(-i)
-        end do
-
-        do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
-        end do
-
-        ! Ghost-cell extrapolation BC at the end
-        if (bc_x%end <= -3) then
-
-            do i = 1, buff_size
-                dx(m + i) = dx(m)
-            end do
-
-            ! Symmetry BC at the end
-        elseif (bc_x%end == -2) then
-
-            do i = 1, buff_size
-                dx(m + i) = dx((m + 1) - i)
-            end do
-
-            ! Periodic BC at the end
-        elseif (bc_x%end == -1) then
-
-            do i = 1, buff_size
-                dx(m + i) = dx(i - 1)
-            end do
-
-            ! Processor BC at the end
-        else
-
-            call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'x')
-
-        end if
-
-        do i = 1, offset_x%end
-            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-        end do
-
-        do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
-        end do
-
-        ! END: Populating Buffer Regions in the x-direction ================
-
-        ! Populating Buffer Regions in the y-direction =====================
-
-        if (n > 0) then
-
-            ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
-
-                do i = 1, buff_size
-                    dy(-i) = dy(0)
-                end do
-
-                ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2 .or. bc_y%beg == -14) then
-
-                do i = 1, buff_size
-                    dy(-i) = dy(i - 1)
-                end do
-
-                ! Periodic BC at the beginning
-            elseif (bc_y%beg == -1) then
-
-                do i = 1, buff_size
-                    dy(-i) = dy((n + 1) - i)
-                end do
-
-                ! Processor BC at the beginning
-            else
-
-                call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'y')
-
-            end if
-
-            do i = 1, offset_y%beg
-                y_cb(-1 - i) = y_cb(-i) - dy(-i)
-            end do
-
-            do i = 1, buff_size
-                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
-            end do
-
-            ! Ghost-cell extrapolation BC at the end
-            if (bc_y%end <= -3) then
-
-                do i = 1, buff_size
-                    dy(n + i) = dy(n)
-                end do
-
-                ! Symmetry BC at the end
-            elseif (bc_y%end == -2) then
-
-                do i = 1, buff_size
-                    dy(n + i) = dy((n + 1) - i)
-                end do
-
-                ! Periodic BC at the end
-            elseif (bc_y%end == -1) then
-
-                do i = 1, buff_size
-                    dy(n + i) = dy(i - 1)
-                end do
-
-                ! Processor BC at the end
-            else
-
-                call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'y')
-
-            end if
-
-            do i = 1, offset_y%end
-                y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-            end do
-
-            do i = 1, buff_size
-                y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
-            end do
-
-            ! END: Populating Buffer Regions in the y-direction ================
-
-            ! Populating Buffer Regions in the z-direction =====================
-
-            if (p > 0) then
-
-                ! Ghost-cell extrapolation BC at the beginning
-                if (bc_z%beg <= -3) then
-
-                    do i = 1, buff_size
-                        dz(-i) = dz(0)
-                    end do
-
-                    ! Symmetry BC at the beginning
-                elseif (bc_z%beg == -2) then
-
-                    do i = 1, buff_size
-                        dz(-i) = dz(i - 1)
-                    end do
-
-                    ! Periodic BC at the beginning
-                elseif (bc_z%beg == -1) then
-
-                    do i = 1, buff_size
-                        dz(-i) = dz((p + 1) - i)
-                    end do
-
-                    ! Processor BC at the beginning
-                else
-
-                    call s_mpi_sendrecv_grid_vars_buffer_regions('beg', 'z')
-
-                end if
-
-                do i = 1, offset_z%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
-                end do
-
-                ! Ghost-cell extrapolation BC at the end
-                if (bc_z%end <= -3) then
-
-                    do i = 1, buff_size
-                        dz(p + i) = dz(p)
-                    end do
-
-                    ! Symmetry BC at the end
-                elseif (bc_z%end == -2) then
-
-                    do i = 1, buff_size
-                        dz(p + i) = dz((p + 1) - i)
-                    end do
-
-                    ! Periodic BC at the end
-                elseif (bc_z%end == -1) then
-
-                    do i = 1, buff_size
-                        dz(p + i) = dz(i - 1)
-                    end do
-
-                    ! Processor BC at the end
-                else
-
-                    call s_mpi_sendrecv_grid_vars_buffer_regions('end', 'z')
-
-                end if
-
-                do i = 1, offset_z%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
-                end do
-
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the z-direction ================
-
-    end subroutine s_populate_grid_variables_buffer_regions
-
-    !>  The purpose of this procedure is to populate the buffers
-        !!      of the cell-average conservative variables, depending on
-        !!      the boundary conditions.
-    subroutine s_populate_conservative_variables_buffer_regions
-
-        integer :: i, j, k !< Generic loop iterators
-
-        ! Populating Buffer Regions in the x-direction =====================
-
-        ! Ghost-cell extrapolation BC at the beginning
-        if (bc_x%beg <= -3) then
-
-            do j = 1, buff_size
-                do i = 1, sys_size
-                    q_cons_vf(i)%sf(-j, 0:n, 0:p) = q_cons_vf(i)%sf(0, 0:n, 0:p)
-                end do
-            end do
-
-            ! Symmetry BC at the beginning
-        elseif (bc_x%beg == -2) then
-
-            do j = 1, buff_size
-
-                ! Density or partial densities
-                do i = 1, cont_idx%end
-                    q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-
-                ! x-component of momentum
-                q_cons_vf(mom_idx%beg)%sf(-j, 0:n, 0:p) = &
-                    -q_cons_vf(mom_idx%beg)%sf(j - 1, 0:n, 0:p)
-
-                ! Remaining momentum component(s), if any, as well as the
-                ! energy and the variable(s) from advection equation(s)
-                do i = mom_idx%beg + 1, sys_size
-                    q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-
-            end do
-
-            ! Periodic BC at the beginning
-        elseif (bc_x%beg == -1) then
-
-            do j = 1, buff_size
-                do i = 1, sys_size
-                    q_cons_vf(i)%sf(-j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                end do
-            end do
-
-            ! Processor BC at the beginning
-        else
-
-            call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                         'beg', 'x')
-
-        end if
-
-        ! Ghost-cell extrapolation BC at the end
-        if (bc_x%end <= -3) then
-
-            do j = 1, buff_size
-                do i = 1, sys_size
-                    q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf(m, 0:n, 0:p)
-                end do
-            end do
-
-            ! Symmetry BC at the end
-        elseif (bc_x%end == -2) then
-
-            do j = 1, buff_size
-
-                ! Density or partial densities
-                do i = 1, cont_idx%end
-                    q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                end do
-
-                ! x-component of momentum
-                q_cons_vf(mom_idx%beg)%sf(m + j, 0:n, 0:p) = &
-                    -q_cons_vf(mom_idx%beg)%sf((m + 1) - j, 0:n, 0:p)
-
-                ! Remaining momentum component(s), if any, as well as the
-                ! energy and the variable(s) from advection equation(s)
-                do i = mom_idx%beg + 1, sys_size
-                    q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf((m + 1) - j, 0:n, 0:p)
-                end do
-
-            end do
-
-            ! Perodic BC at the end
-        elseif (bc_x%end == -1) then
-
-            do j = 1, buff_size
-                do i = 1, sys_size
-                    q_cons_vf(i)%sf(m + j, 0:n, 0:p) = &
-                        q_cons_vf(i)%sf(j - 1, 0:n, 0:p)
-                end do
-            end do
-
-            ! Processor BC at the end
-        else
-
-            call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                         'end', 'x')
-
-        end if
-
-        ! END: Populating Buffer Regions in the x-direction ================
-
-        ! Populating Buffer Regions in the y-direction =====================
-
-        if (n > 0) then
-
-            ! Ghost-cell extrapolation BC at the beginning
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
-
-                do j = 1, buff_size
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(:, -j, 0:p) = q_cons_vf(i)%sf(:, 0, 0:p)
-                    end do
-                end do
-
-                ! Axis BC at the beginning
-            elseif (bc_y%beg == -14) then
-
-                do j = 1, buff_size
-                    do k = 0, p
-                        if (z_cc(k) < pi) then
-                            do i = 1, mom_idx%beg
-                                q_cons_vf(i)%sf(:, -j, k) = &
-                                    q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                            end do
-
-                            q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k + ((p + 1)/2))
-
-                            q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, j - 1, k + ((p + 1)/2))
-
-                            do i = E_idx, sys_size
-                                q_cons_vf(i)%sf(:, -j, k) = &
-                                    q_cons_vf(i)%sf(:, j - 1, k + ((p + 1)/2))
-                            end do
-                        else
-                            do i = 1, mom_idx%beg
-                                q_cons_vf(i)%sf(:, -j, k) = &
-                                    q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                            end do
-
-                            q_cons_vf(mom_idx%beg + 1)%sf(:, -j, k) = &
-                                -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, k - ((p + 1)/2))
-
-                            q_cons_vf(mom_idx%end)%sf(:, -j, k) = &
-                                -q_cons_vf(mom_idx%end)%sf(:, j - 1, k - ((p + 1)/2))
-
-                            do i = E_idx, sys_size
-                                q_cons_vf(i)%sf(:, -j, k) = &
-                                    q_cons_vf(i)%sf(:, j - 1, k - ((p + 1)/2))
-                            end do
-                        end if
-                    end do
-                end do
-
-                ! Symmetry BC at the beginning
-            elseif (bc_y%beg == -2) then
-
-                do j = 1, buff_size
-
-                    ! Density or partial densities and x-momentum component
-                    do i = 1, mom_idx%beg
-                        q_cons_vf(i)%sf(:, -j, 0:p) = &
-                            q_cons_vf(i)%sf(:, j - 1, 0:p)
-                    end do
-
-                    ! y-component of momentum
-                    q_cons_vf(mom_idx%beg + 1)%sf(:, -j, 0:p) = &
-                        -q_cons_vf(mom_idx%beg + 1)%sf(:, j - 1, 0:p)
-
-                    ! Remaining z-momentum component, if any, as well as the
-                    ! energy and variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 2, sys_size
-                        q_cons_vf(i)%sf(:, -j, 0:p) = &
-                            q_cons_vf(i)%sf(:, j - 1, 0:p)
-                    end do
-
-                end do
-
-                ! Periodic BC at the beginning
-            elseif (bc_y%beg == -1) then
-
-                do j = 1, buff_size
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(:, -j, 0:p) = &
-                            q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                    end do
-                end do
-
-                ! Processor BC at the beginning
-            else
-
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'beg', 'y')
-
-            end if
-
-            ! Ghost-cell extrapolation BC at the end
-            if (bc_y%end <= -3) then
-
-                do j = 1, buff_size
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                            q_cons_vf(i)%sf(:, n, 0:p)
-                    end do
-                end do
-
-                ! Symmetry BC at the end
-            elseif (bc_y%end == -2) then
-
-                do j = 1, buff_size
-
-                    ! Density or partial densities and x-momentum component
-                    do i = 1, mom_idx%beg
-                        q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                            q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                    end do
-
-                    ! y-component of momentum
-                    q_cons_vf(mom_idx%beg + 1)%sf(:, n + j, 0:p) = &
-                        -q_cons_vf(mom_idx%beg + 1)%sf(:, (n + 1) - j, 0:p)
-
-                    ! Remaining z-momentum component, if any, as well as the
-                    ! energy and variable(s) from advection equation(s)
-                    do i = mom_idx%beg + 2, sys_size
-                        q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                            q_cons_vf(i)%sf(:, (n + 1) - j, 0:p)
-                    end do
-
-                end do
-
-                ! Perodic BC at the end
-            elseif (bc_y%end == -1) then
-
-                do j = 1, buff_size
-                    do i = 1, sys_size
-                        q_cons_vf(i)%sf(:, n + j, 0:p) = &
-                            q_cons_vf(i)%sf(:, j - 1, 0:p)
-                    end do
-                end do
-
-                ! Processor BC at the end
-            else
-
-                call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                             'end', 'y')
-
-            end if
-
-            ! END: Populating Buffer Regions in the y-direction ================
-
-            ! Populating Buffer Regions in the z-direction =====================
-
-            if (p > 0) then
-
-                ! Ghost-cell extrapolation BC at the beginning
-                if (bc_z%beg <= -3) then
-
-                    do j = 1, buff_size
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, :, -j) = q_cons_vf(i)%sf(:, :, 0)
-                        end do
-                    end do
-
-                    ! Symmetry BC at the beginning
-                elseif (bc_z%beg == -2) then
-
-                    do j = 1, buff_size
-
-                        ! Density or the partial densities and the momentum
-                        ! components in x- and y-directions
-                        do i = 1, mom_idx%beg + 1
-                            q_cons_vf(i)%sf(:, :, -j) = &
-                                q_cons_vf(i)%sf(:, :, j - 1)
-                        end do
-
-                        ! z-component of momentum
-                        q_cons_vf(mom_idx%end)%sf(:, :, -j) = &
-                            -q_cons_vf(mom_idx%end)%sf(:, :, j - 1)
-
-                        ! Energy and advection equation(s) variable(s)
-                        do i = E_idx, sys_size
-                            q_cons_vf(i)%sf(:, :, -j) = &
-                                q_cons_vf(i)%sf(:, :, j - 1)
-                        end do
-
-                    end do
-
-                    ! Periodic BC at the beginning
-                elseif (bc_z%beg == -1) then
-
-                    do j = 1, buff_size
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, :, -j) = &
-                                q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                        end do
-                    end do
-
-                    ! Processor BC at the beginning
-                else
-
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'beg', 'z')
-
-                end if
-
-                ! Ghost-cell extrapolation BC at the end
-                if (bc_z%end <= -3) then
-
-                    do j = 1, buff_size
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, :, p + j) = &
-                                q_cons_vf(i)%sf(:, :, p)
-                        end do
-                    end do
-
-                    ! Symmetry BC at the end
-                elseif (bc_z%end == -2) then
-
-                    do j = 1, buff_size
-
-                        ! Density or the partial densities and the momentum
-                        ! components in x- and y-directions
-                        do i = 1, mom_idx%beg + 1
-                            q_cons_vf(i)%sf(:, :, p + j) = &
-                                q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                        end do
-
-                        ! z-component of momentum
-                        q_cons_vf(mom_idx%end)%sf(:, :, p + j) = &
-                            -q_cons_vf(mom_idx%end)%sf(:, :, (p + 1) - j)
-
-                        ! Energy and advection equation(s) variable(s)
-                        do i = E_idx, sys_size
-                            q_cons_vf(i)%sf(:, :, p + j) = &
-                                q_cons_vf(i)%sf(:, :, (p + 1) - j)
-                        end do
-
-                    end do
-
-                    ! Perodic BC at the end
-                elseif (bc_z%end == -1) then
-
-                    do j = 1, buff_size
-                        do i = 1, sys_size
-                            q_cons_vf(i)%sf(:, :, p + j) = &
-                                q_cons_vf(i)%sf(:, :, j - 1)
-                        end do
-                    end do
-
-                    ! Processor BC at the end
-                else
-
-                    call s_mpi_sendrecv_cons_vars_buffer_regions(q_cons_vf, &
-                                                                 'end', 'z')
-
-                end if
-
-            end if
-
-        end if
-
-        ! END: Populating Buffer Regions in the z-direction ================
-
-    end subroutine s_populate_conservative_variables_buffer_regions
 
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module

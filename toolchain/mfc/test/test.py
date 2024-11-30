@@ -1,5 +1,5 @@
 import os, typing, shutil, time, itertools
-from random import sample
+from random import sample, seed
 
 import rich, rich.table
 
@@ -59,8 +59,10 @@ def __filter(cases_) -> typing.List[TestCase]:
     if ARG("percent") == 100:
         return cases, skipped_cases
 
+    seed(time.time())
+
     selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
-    skipped_cases = [item for item in cases if item not in selected_cases]
+    skipped_cases  = [item for item in cases if item not in selected_cases]
 
     return selected_cases, skipped_cases
 
@@ -162,6 +164,10 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     case.delete_output()
     case.create_directory()
 
+    if ARG("dry_run"):
+        cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
+        return
+
     cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
 
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
@@ -247,7 +253,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
         try:
             _handle_case(case, devices)
-            nPASS += 1
+            if ARG("dry_run"):
+                nSKIP += 1
+            else:
+                nPASS += 1
         except Exception as exc:
             if nAttempts < ARG("max_attempts"):
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")

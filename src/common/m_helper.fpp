@@ -11,8 +11,6 @@ module m_helper
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_mpi_common           !< MPI modules
-
     use ieee_arithmetic        !< For checking NaN
 
     ! ==========================================================================
@@ -36,7 +34,7 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              s_prohibit_abort
+              f_clamp
 
 contains
 
@@ -69,9 +67,6 @@ contains
 
         nR3 = dot_product(weights, nRtmp**3.d0)
         ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        !ntmp = (3.d0/(4.d0*pi))*0.00001
-
-        !print *, "nbub", ntmp
 
     end subroutine s_comp_n_from_cons
 
@@ -466,20 +461,26 @@ contains
         end if
     end function f_logical_to_int
 
-    subroutine s_prohibit_abort(condition, message)
-        character(len=*), intent(in) :: condition, message
+    function f_clamp(x, xmin, xmax) result(y)
 
-        print *, ""
-        print *, "===================================================================================================="
-        print *, "                                          CASE FILE ERROR                                           "
-        print *, "----------------------------------------------------------------------------------------------------"
-        print *, "Prohibited condition: ", trim(condition)
-        if (len_trim(message) > 0) then
-            print *, "Note: ", trim(message)
-        end if
-        print *, "===================================================================================================="
-        print *, ""
-        call s_mpi_abort
-    end subroutine s_prohibit_abort
+        !$acc routine seq
+
+        integer, intent(in) :: x, xmin, xmax
+        integer :: y
+
+        y = max(xmin, min(x, xmax))
+
+    end function f_clamp
+
+    function f_is_cbc(number) result(result)
+
+        !$acc routine seq
+
+        integer, intent(in) :: number
+        logical :: result
+
+        result = (number <= -5 .and. number >= -13)
+
+    end function f_is_cbc
 
 end module m_helper

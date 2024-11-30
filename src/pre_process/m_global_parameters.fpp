@@ -20,6 +20,8 @@ module m_global_parameters
 
     use m_thermochem, only: num_species
 
+    use m_global_parameters_common
+
     ! ==========================================================================
 
     implicit none
@@ -92,6 +94,8 @@ module m_global_parameters
     logical :: hypoelasticity        !< activate hypoelasticity
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
+    logical :: rdma_mpi              !< Use RDMA for MPI communication
+
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
@@ -118,6 +122,8 @@ module m_global_parameters
     type(int_bounds_info) :: idwbuff(1:3)
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
+    integer :: num_bc_patches
+    type(bc_patch_parameters) :: patch_bc(num_bc_patches_max)
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
     logical :: parallel_io !< Format of the data files
@@ -139,8 +145,11 @@ module m_global_parameters
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
     real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
 
-    integer, allocatable, dimension(:) :: proc_coords !<
+    integer, dimension(1:3) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    integer, dimension(1:3) :: proc_nums
+    !! Processor dimensions in MPI_CART_COMM
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -309,16 +318,15 @@ contains
         weno_order = dflt_int
 
         hypoelasticity = .false.
+        rdma_mpi = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
 
         #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
-            #:endfor
+            bc_${DIM}$%vel_beg = 0d0
+            bc_${DIM}$%vel_end = 0d0
         #:endfor
 
         parallel_io = .false.
@@ -385,6 +393,8 @@ contains
                 patch_icpp(i)%Y(:) = 0d0
             end if
         end do
+
+        call s_bc_assign_default_values_to_user_inputs(num_bc_patches, patch_bc)
 
         ! Tait EOS
         rhoref = dflt_real
@@ -801,8 +811,6 @@ contains
 
         num_dims = 1 + min(1, n) + min(1, p)
 
-        allocate (proc_coords(1:num_dims))
-
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -837,8 +845,6 @@ contains
                 deallocate (z_cc, z_cb)
             end if
         end if
-
-        deallocate (proc_coords)
 
 #ifdef MFC_MPI
 

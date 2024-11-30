@@ -39,6 +39,8 @@ module m_start_up
 
     use m_finite_differences
 
+    use m_boundary_conditions_common
+
     ! ==========================================================================
 
     implicit none
@@ -66,9 +68,12 @@ contains
         namelist /user_inputs/ case_dir, m, n, p, t_step_start, &
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, &
-            weno_order, bc_x, &
-            bc_y, bc_z, fluid_pp, format, precision, &
-            hypoelasticity, G, &
+            weno_order, &
+            bc_x, bc_y, bc_z, &
+            num_bc_patches, patch_bc, &
+            fluid_pp, format, precision, &
+            x_domain, y_domain, z_domain, &
+            hypoelasticity, rdma_mpi, G, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
@@ -170,12 +175,12 @@ contains
         call s_read_data_files(t_step)
         ! Populating the buffer regions of the grid variables
         if (buff_size > 0) then
-            call s_populate_grid_variables_buffer_regions()
+            call s_mpi_sendrecv_grid_spacing_buffers(bc_id_sfs)
         end if
 
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
-            call s_populate_conservative_variables_buffer_regions()
+            call s_populate_cons_buffers(q_cons_vf)
         end if
 
         ! Converting the conservative variables to the primitive ones
@@ -679,13 +684,17 @@ contains
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
+        call s_initialize_boundary_conditions_module()
         if (bubbles .and. nb > 1) then
             call s_simpson
         end if
         if (bubbles .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
-        if (num_procs > 1) call s_initialize_mpi_proxy_module()
+        if (num_procs > 1) then
+            call s_initialize_mpi_common_module()
+            call s_initialize_mpi_proxy_module()
+        end if
         call s_initialize_variables_conversion_module()
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
@@ -733,7 +742,10 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
         call s_finalize_variables_conversion_module()
-        if (num_procs > 1) call s_finalize_mpi_proxy_module()
+        if (num_procs > 1) then
+            call s_finalize_mpi_proxy_module()
+            call s_finalize_mpi_common_module()
+        end if
         call s_finalize_global_parameters_module()
 
         ! Finalizing the MPI environment

@@ -222,7 +222,7 @@ contains
                 #:endif
 
                 if (.not. skip_check) then
-                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -16), &
+                    @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. (bc_${X}$%${BOUND}$ > -1 .or. bc_${X}$%${BOUND}$ < -17), &
                         "bc_${X}$%${BOUND}$ must be between -1 and -16")
 
                     @:PROHIBIT(bc_${X}$%${BOUND}$ /= dflt_int .and. bc_${X}$%${BOUND}$ == -14, &
@@ -320,35 +320,23 @@ contains
     !> Checks constraints on the inputs for moving boundaries.
         !! Called by s_check_inputs_common for all three stages
     subroutine s_check_inputs_moving_bc
-        #:for X, VB2, VB3 in [('x', 'vb2', 'vb3'), ('y', 'vb3', 'vb1'), ('z', 'vb1', 'vb2')]
-            if (any((/bc_${X}$%vb1, bc_${X}$%vb2, bc_${X}$%vb3/) /= 0d0)) then
-                if (bc_${X}$%beg == -15) then
-                    if (any((/bc_${X}$%${VB2}$, bc_${X}$%${VB3}$/) /= 0d0)) then
-                        call s_mpi_abort("bc_${X}$%beg must be -15 if "// &
-                                         "bc_${X}$%${VB2}$ or bc_${X}$%${VB3}$ "// &
-                                         "is set. Exiting ...")
+
+        #:for DIR in ['x', 'y', 'z']
+            #:for LOC in ['beg', 'end']
+                if (any(bc_${DIR}$%vel_${LOC}$ /= 0d0)) then
+                    if (bc_${DIR}$%${LOC}$ == -15) then
+                        if (any((/bc_${DIR}$%vel_${LOC}$ (2), bc_${DIR}$%vel_${LOC}$ (3)/) /= 0d0)) then
+                            call s_mpi_abort("bc_${DIR}$%${LOC}$ must be -15 if "// &
+                                             "bc_${DIR}$%vel_${LOC}$[2,3] is set. Exiting ...")
+                        end if
+                    elseif (bc_${DIR}$%${LOC}$ /= -16) then
+                        call s_mpi_abort("bc_${DIR}$%${LOC}$ must be -15 or -16 if "// &
+                                         "bc_${DIR}$%vel_${LOC}$ is set. Exiting ...")
                     end if
-                elseif (bc_${X}$%beg /= -16) then
-                    call s_mpi_abort("bc_${X}$%beg must be -15 or -16 if "// &
-                                     "bc_${X}$%vb[1,2,3] is set. Exiting ...")
                 end if
-            end if
+            #:endfor
         #:endfor
 
-        #:for X, VE2, VE3 in [('x', 've2', 've3'), ('y', 've3', 've1'), ('z', 've1', 've2')]
-            if (any((/bc_${X}$%ve1, bc_${X}$%ve2, bc_${X}$%ve3/) /= 0d0)) then
-                if (bc_${X}$%end == -15) then
-                    if (any((/bc_${X}$%${VE2}$, bc_${X}$%${VE3}$/) /= 0d0)) then
-                        call s_mpi_abort("bc_${X}$%end must be -15 if "// &
-                                         "bc_${X}$%${VE2}$ or bc_${X}$%${VE3}$ "// &
-                                         "is set. Exiting ...")
-                    end if
-                elseif (bc_${X}$%end /= -16) then
-                    call s_mpi_abort("bc_${X}$%end must be -15 or -16 if "// &
-                                     "bc_${X}$%ve[1,2,3] is set. Exiting ...")
-                end if
-            end if
-        #:endfor
     end subroutine s_check_inputs_moving_bc
 
 end module m_checker_common

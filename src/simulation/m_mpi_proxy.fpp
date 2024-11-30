@@ -30,19 +30,12 @@ module m_mpi_proxy
     use m_nvtx
 
     use ieee_arithmetic
+
+    use m_constants
+
     ! ==========================================================================
 
     implicit none
-
-    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_send !<
-    !! This variable is utilized to pack and send the buffer of the cell-average
-    !! conservative variables, for a single computational domain boundary at the
-    !! time, to the relevant neighboring processor.
-
-    real(kind(0d0)), private, allocatable, dimension(:), target :: q_cons_buff_recv !<
-    !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
-    !! average conservative variables, for a single computational domain boundary
-    !! at the time, from the relevant neighboring processor.
 
     real(kind(0d0)), private, allocatable, dimension(:), target :: c_divs_buff_send !<
     !! c_divs_buff_send is utilized to send and unpack the buffer of the cell-
@@ -64,15 +57,13 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
-    !$acc declare create(q_cons_buff_send, q_cons_buff_recv)
-    !$acc declare create( ib_buff_send, ib_buff_recv)
+    !$acc declare create(ib_buff_send, ib_buff_recv)
     !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
 
     !> @name Generic flags used to identify and report MPI errors
     !> @{
-    integer, private :: err_code, ierr, v_size
+    integer, private :: err_code, ierr
     !> @}
-    !$acc declare create(v_size)
 
     !real :: s_time, e_time
     !real :: compress_time, mpi_time, decompress_time
@@ -89,50 +80,6 @@ contains
     subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
-
-        ! Allocating q_cons_buff_send/recv and ib_buff_send/recv. Please note that
-        ! for the sake of simplicity, both variables are provided sufficient
-        ! storage to hold the largest buffer in the computational domain.
-
-        if (qbmm .and. .not. polytropic) then
-            if (n > 0) then
-                if (p > 0) then
-                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
-                                             & (m + 2*buff_size + 1)* &
-                                             & (n + 2*buff_size + 1)* &
-                                             & (p + 2*buff_size + 1)/ &
-                                             & (min(m, n, p) + 2*buff_size + 1)))
-                else
-                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)* &
-                                             & (max(m, n) + 2*buff_size + 1)))
-                end if
-            else
-                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*(sys_size + 2*nb*4)))
-            end if
-
-            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
-
-            v_size = sys_size + 2*nb*4
-        else
-            if (n > 0) then
-                if (p > 0) then
-                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                             & (m + 2*buff_size + 1)* &
-                                             & (n + 2*buff_size + 1)* &
-                                             & (p + 2*buff_size + 1)/ &
-                                             & (min(m, n, p) + 2*buff_size + 1)))
-                else
-                    @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size* &
-                                             & (max(m, n) + 2*buff_size + 1)))
-                end if
-            else
-                @:ALLOCATE(q_cons_buff_send(0:-1 + buff_size*sys_size))
-            end if
-
-            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
-
-            v_size = sys_size
-        end if
 
         if (surface_tension) then
             nVars = num_dims + 1
@@ -153,7 +100,26 @@ contains
 
             @:ALLOCATE(c_divs_buff_recv(0:ubound(c_divs_buff_send, 1)))
         end if
-        !$acc update device(v_size, nVars)
+        !$acc update device(nVars)
+
+        if (ib) then
+            if (n > 0) then
+                if (p > 0) then
+                    @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
+                                            & (m + 2*gp_layers + 1)* &
+                                            & (n + 2*gp_layers + 1)* &
+                                            & (p + 2*gp_layers + 1)/ &
+                                            & (min(m, n, p) + 2*gp_layers + 1)))
+                else
+                    @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
+                                            & (max(m, n) + 2*gp_layers + 1)))
+                end if
+            else
+                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
+            end if
+
+            @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
+        end if
 
 #endif
 
@@ -214,9 +180,6 @@ contains
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
-            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
-            & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
-            & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
             & 'z_domain%beg', 'z_domain%end', 't_stop',  't_save', 'cfl_target']
@@ -294,1857 +257,97 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !>  The purpose of this procedure is to optimally decompose
-        !!      the computational domain among the available processors.
-        !!      This is performed by attempting to award each processor,
-        !!      in each of the coordinate directions, approximately the
-        !!      same number of cells, and then recomputing the affected
-        !!      global parameters.
-    subroutine s_mpi_decompose_computational_domain
-
-#ifdef MFC_MPI
-
-        integer :: num_procs_x, num_procs_y, num_procs_z !<
-            !! Optimal number of processors in the x-, y- and z-directions
-
-        real(kind(0d0)) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
-            !! Non-optimal number of processors in the x-, y- and z-directions
-
-        real(kind(0d0)) :: fct_min !<
-            !! Processor factorization (fct) minimization parameter
-
-        integer :: MPI_COMM_CART !<
-            !! Cartesian processor topology communicator
-
-        integer :: rem_cells !<
-            !! Remaining number of cells, in a particular coordinate direction,
-            !! after the majority is divided up among the available processors
-
-        integer :: i, j !< Generic loop iterators
-
-        if (num_procs == 1 .and. parallel_io) then
-            do i = 1, num_dims
-                start_idx(i) = 0
-            end do
-            return
-        end if
-
-        ! 3D Cartesian Processor Topology ==================================
-        if (n > 0) then
-
-            if (p > 0) then
-
-                if (cyl_coord .and. p > 0) then
-                    ! Implement pencil processor blocking if using cylindrical coordinates so
-                    ! that all cells in azimuthal direction are stored on a single processor.
-                    ! This is necessary for efficient application of Fourier filter near axis.
-
-                    ! Initial values of the processor factorization optimization
-                    num_procs_x = 1
-                    num_procs_y = num_procs
-                    num_procs_z = 1
-                    ierr = -1
-
-                    ! Computing minimization variable for these initial values
-                    tmp_num_procs_x = num_procs_x
-                    tmp_num_procs_y = num_procs_y
-                    tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y)
-
-                    ! Searching for optimal computational domain distribution
-                    do i = 1, num_procs
-
-                        if (mod(num_procs, i) == 0 &
-                            .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
-
-                            tmp_num_procs_x = i
-                            tmp_num_procs_y = num_procs/i
-
-                            if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                               - (n + 1)/tmp_num_procs_y) &
-                                .and. &
-                                (n + 1)/tmp_num_procs_y &
-                                >= &
-                                num_stcls_min*weno_order) then
-
-                                num_procs_x = i
-                                num_procs_y = num_procs/i
-                                fct_min = abs((m + 1)/tmp_num_procs_x &
-                                              - (n + 1)/tmp_num_procs_y)
-                                ierr = 0
-
-                            end if
-
-                        end if
-
-                    end do
-
-                else
-
-                    ! Initial estimate of optimal processor topology
-                    num_procs_x = 1
-                    num_procs_y = 1
-                    num_procs_z = num_procs
-                    ierr = -1
-
-                    ! Benchmarking the quality of this initial guess
-                    tmp_num_procs_x = num_procs_x
-                    tmp_num_procs_y = num_procs_y
-                    tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y) &
-                              + 10d0*abs((n + 1)/tmp_num_procs_y &
-                                         - (p + 1)/tmp_num_procs_z)
-
-                    ! Optimization of the initial processor topology
-                    do i = 1, num_procs
-
-                        if (mod(num_procs, i) == 0 &
-                            .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
-
-                            do j = 1, num_procs/i
-
-                                if (mod(num_procs/i, j) == 0 &
-                                    .and. &
-                                    (n + 1)/j >= num_stcls_min*weno_order) then
-
-                                    tmp_num_procs_x = i
-                                    tmp_num_procs_y = j
-                                    tmp_num_procs_z = num_procs/(i*j)
-
-                                    if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                                       - (n + 1)/tmp_num_procs_y) &
-                                        + abs((n + 1)/tmp_num_procs_y &
-                                              - (p + 1)/tmp_num_procs_z) &
-                                        .and. &
-                                        (p + 1)/tmp_num_procs_z &
-                                        >= &
-                                        num_stcls_min*weno_order) &
-                                        then
-
-                                        num_procs_x = i
-                                        num_procs_y = j
-                                        num_procs_z = num_procs/(i*j)
-                                        fct_min = abs((m + 1)/tmp_num_procs_x &
-                                                      - (n + 1)/tmp_num_procs_y) &
-                                                  + abs((n + 1)/tmp_num_procs_y &
-                                                        - (p + 1)/tmp_num_procs_z)
-                                        ierr = 0
-
-                                    end if
-
-                                end if
-
-                            end do
-
-                        end if
-
-                    end do
-
-                end if
-
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
-                if (proc_rank == 0 .and. ierr == -1) then
-                    call s_mpi_abort('Unsupported combination of values '// &
-                                     'of num_procs, m, n, p and '// &
-                                     'weno_order. Exiting ...')
-                end if
-
-                ! Creating new communicator using the Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
-                                                          num_procs_y, num_procs_z/), &
-                                     (/.true., .true., .true./), &
-                                     .false., MPI_COMM_CART, ierr)
-
-                ! Finding the Cartesian coordinates of the local process
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
-                                     proc_coords, ierr)
-                ! END: 3D Cartesian Processor Topology =============================
-
-                ! Global Parameters for z-direction ================================
-
-                ! Number of remaining cells
-                rem_cells = mod(p + 1, num_procs_z)
-
-                ! Optimal number of cells per processor
-                p = (p + 1)/num_procs_z - 1
-
-                ! Distributing the remaining cells
-                do i = 1, rem_cells
-                    if (proc_coords(3) == i - 1) then
-                        p = p + 1; exit
-                    end if
-                end do
-
-                ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. bc_z%beg == -1) then
-                    proc_coords(3) = proc_coords(3) - 1
-                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                       bc_z%beg, ierr)
-                    proc_coords(3) = proc_coords(3) + 1
-                end if
-
-                ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. bc_z%end == -1) then
-                    proc_coords(3) = proc_coords(3) + 1
-                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                       bc_z%end, ierr)
-                    proc_coords(3) = proc_coords(3) - 1
-                end if
-
-                if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
-                    else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                    end if
-                end if
-                ! ==================================================================
-
-                ! 2D Cartesian Processor Topology ==================================
-            else
-
-                ! Initial estimate of optimal processor topology
-                num_procs_x = 1
-                num_procs_y = num_procs
-                ierr = -1
-
-                ! Benchmarking the quality of this initial guess
-                tmp_num_procs_x = num_procs_x
-                tmp_num_procs_y = num_procs_y
-                fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                   - (n + 1)/tmp_num_procs_y)
-
-                ! Optimization of the initial processor topology
-                do i = 1, num_procs
-
-                    if (mod(num_procs, i) == 0 &
-                        .and. &
-                        (m + 1)/i >= num_stcls_min*weno_order) then
-
-                        tmp_num_procs_x = i
-                        tmp_num_procs_y = num_procs/i
-
-                        if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                           - (n + 1)/tmp_num_procs_y) &
-                            .and. &
-                            (n + 1)/tmp_num_procs_y &
-                            >= &
-                            num_stcls_min*weno_order) then
-
-                            num_procs_x = i
-                            num_procs_y = num_procs/i
-                            fct_min = abs((m + 1)/tmp_num_procs_x &
-                                          - (n + 1)/tmp_num_procs_y)
-                            ierr = 0
-
-                        end if
-
-                    end if
-
-                end do
-
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
-                if (proc_rank == 0 .and. ierr == -1) then
-                    call s_mpi_abort('Unsupported combination of values '// &
-                                     'of num_procs, m, n and '// &
-                                     'weno_order. Exiting ...')
-                end if
-
-                ! Creating new communicator using the Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, &
-                                                          num_procs_y/), (/.true., &
-                                                                           .true./), .false., MPI_COMM_CART, &
-                                     ierr)
-
-                ! Finding the Cartesian coordinates of the local process
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
-                                     proc_coords, ierr)
-
-            end if
-            ! END: 2D Cartesian Processor Topology =============================
-
-            ! Global Parameters for y-direction ================================
-
-            ! Number of remaining cells
-            rem_cells = mod(n + 1, num_procs_y)
-
-            ! Optimal number of cells per processor
-            n = (n + 1)/num_procs_y - 1
-
-            ! Distributing the remaining cells
-            do i = 1, rem_cells
-                if (proc_coords(2) == i - 1) then
-                    n = n + 1; exit
-                end if
-            end do
-
-            ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. bc_y%beg == -1) then
-                proc_coords(2) = proc_coords(2) - 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                   bc_y%beg, ierr)
-                proc_coords(2) = proc_coords(2) + 1
-            end if
-
-            ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. bc_y%end == -1) then
-                proc_coords(2) = proc_coords(2) + 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                   bc_y%end, ierr)
-                proc_coords(2) = proc_coords(2) - 1
-            end if
-
-            if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
-                else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-                end if
-            end if
-
-            ! ==================================================================
-
-            ! 1D Cartesian Processor Topology ==================================
-        else
-
-            ! Optimal processor topology
-            num_procs_x = num_procs
-
-            ! Creating new communicator using the Cartesian topology
-            call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), &
-                                 (/.true./), .false., MPI_COMM_CART, &
-                                 ierr)
-
-            ! Finding the Cartesian coordinates of the local process
-            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, &
-                                 proc_coords, ierr)
-
-        end if
-        ! ==================================================================
-
-        ! Global Parameters for x-direction ================================
-
-        ! Number of remaining cells
-        rem_cells = mod(m + 1, num_procs_x)
-
-        ! Optimal number of cells per processor
-        m = (m + 1)/num_procs_x - 1
-
-        ! Distributing the remaining cells
-        do i = 1, rem_cells
-            if (proc_coords(1) == i - 1) then
-                m = m + 1; exit
-            end if
-        end do
-
-        ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. bc_x%beg == -1) then
-            proc_coords(1) = proc_coords(1) - 1
-            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
-            proc_coords(1) = proc_coords(1) + 1
-        end if
-
-        ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
-            proc_coords(1) = proc_coords(1) + 1
-            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
-            proc_coords(1) = proc_coords(1) - 1
-        end if
-
-        if (parallel_io) then
-            if (proc_coords(1) < rem_cells) then
-                start_idx(1) = (m + 1)*proc_coords(1)
-            else
-                start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
-            end if
-        end if
-        ! ==================================================================
-
-#endif
-
-    end subroutine s_mpi_decompose_computational_domain
-
-    !>  The goal of this procedure is to populate the buffers of
-        !!      the grid variables by communicating with the neighboring
-        !!      processors. Note that only the buffers of the cell-width
-        !!      distributions are handled in such a way. This is because
-        !!      the buffers of cell-boundary locations may be calculated
-        !!      directly from those of the cell-width distributions.
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
-
-        integer, intent(in) :: mpi_dir
-        integer, intent(in) :: pbc_loc
-
-        integer :: dst_proc(1:3)
-
-#ifdef MFC_MPI
-
-        ! MPI Communication in x-direction =================================
-        if (mpi_dir == 1) then
-
-            if (pbc_loc == -1) then      ! PBC at the beginning
-
-                if (bc_x%end >= 0) then      ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        dx(m - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
-                        dx(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the beginning only
-
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%beg
-                    call MPI_SENDRECV( &
-                        dx(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
-                        dx(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            else                        ! PBC at the end
-
-                if (bc_x%beg >= 0) then      ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%end
-                    call MPI_SENDRECV( &
-                        dx(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
-                        dx(m + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the end only
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%end
-                    call MPI_SENDRECV( &
-                        dx(m - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
-                        dx(m + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            end if
-            ! END: MPI Communication in x-direction ============================
-
-            ! MPI Communication in y-direction =================================
-        elseif (mpi_dir == 2) then
-
-            if (pbc_loc == -1) then      ! PBC at the beginning
-
-                if (bc_y%end >= 0) then      ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_y%end/bc_y%beg
-                    call MPI_SENDRECV( &
-                        dy(n - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
-                        dy(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the beginning only
-
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%beg
-                    call MPI_SENDRECV( &
-                        dy(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
-                        dy(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            else                        ! PBC at the end
-
-                if (bc_y%beg >= 0) then      ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%end
-                    call MPI_SENDRECV( &
-                        dy(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
-                        dy(n + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the end only
-
-                    ! Send/receive buffer to/from bc_y%end/bc_y%end
-                    call MPI_SENDRECV( &
-                        dy(n - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
-                        dy(n + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            end if
-            ! END: MPI Communication in y-direction ============================
-
-            ! MPI Communication in z-direction =================================
-        else
-
-            if (pbc_loc == -1) then      ! PBC at the beginning
-
-                if (bc_z%end >= 0) then      ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_z%end/bc_z%beg
-                    call MPI_SENDRECV( &
-                        dz(p - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
-                        dz(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the beginning only
-
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%beg
-                    call MPI_SENDRECV( &
-                        dz(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
-                        dz(-buff_size), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            else                        ! PBC at the end
-
-                if (bc_z%beg >= 0) then      ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%end
-                    call MPI_SENDRECV( &
-                        dz(0), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
-                        dz(p + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                else                        ! PBC at the end only
-
-                    ! Send/receive buffer to/from bc_z%end/bc_z%end
-                    call MPI_SENDRECV( &
-                        dz(p - buff_size + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
-                        dz(p + 1), buff_size, &
-                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                end if
-
-            end if
-
-        end if
-        ! END: MPI Communication in z-direction ============================
-
-#endif
-
-    end subroutine s_mpi_sendrecv_grid_variables_buffers
-
-    !>  The goal of this procedure is to populate the buffers of
-        !!      the cell-average conservative variables by communicating
-        !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
-    subroutine s_mpi_sendrecv_variables_buffers(q_cons_vf, &
-                                                pb, mv, &
-                                                mpi_dir, &
-                                                pbc_loc)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
-        integer, intent(in) :: mpi_dir, pbc_loc
-
-        integer :: i, j, k, l, r, q !< Generic loop iterators
-
-        integer :: buffer_counts(1:3), buffer_count
-
-        type(int_bounds_info) :: boundary_conditions(1:3)
-        integer :: beg_end(1:2), grid_dims(1:3)
-        integer :: dst_proc, src_proc, recv_tag, send_tag
-
-        logical :: beg_end_geq_0
-
-        integer :: pack_offset, unpack_offset
-        real(kind(0d0)), pointer :: p_send, p_recv
-
-#ifdef MFC_MPI
-
-        call nvtxStartRange("RHS-COMM-PACKBUF")
-        !$acc update device(v_size)
-
-        if (qbmm .and. .not. polytropic) then
-            buffer_counts = (/ &
-                            buff_size*(sys_size + 2*nb*4)*(n + 1)*(p + 1), &
-                            buff_size*(sys_size + 2*nb*4)*(m + 2*buff_size + 1)*(p + 1), &
-                            buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
-                            /)
-        else
-            buffer_counts = (/ &
-                            buff_size*sys_size*(n + 1)*(p + 1), &
-                            buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
-                            buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
-                            /)
-        end if
-
-        buffer_count = buffer_counts(mpi_dir)
-        boundary_conditions = (/bc_x, bc_y, bc_z/)
-        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
-        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
-
-        ! Implements:
-        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
-
-        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
-        recv_tag = f_logical_to_int(pbc_loc == 1)
-
-        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
-        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
-
-        grid_dims = (/m, n, p/)
-
-        pack_offset = 0
-        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - buff_size + 1
-        end if
-
-        unpack_offset = 0
-        if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
-        end if
-
-        ! Pack Buffer to Send
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, buff_size - 1
-                                do i = 1, sys_size
-                                    r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j + pack_offset, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, buff_size - 1
-                                    do i = sys_size + 1, sys_size + 4
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                (j + buff_size*(k + (n + 1)*l))
-                                            q_cons_buff_send(r) = pb(j + pack_offset, k, l, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, buff_size - 1
-                                    do i = sys_size + 1, sys_size + 4
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                (j + buff_size*(k + (n + 1)*l))
-                                            q_cons_buff_send(r) = mv(j + pack_offset, k, l, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = 0, buff_size - 1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         (k + buff_size*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k + pack_offset, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, p
-                                do k = 0, buff_size - 1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 (k + buff_size*l))
-                                            q_cons_buff_send(r) = pb(j, k + pack_offset, l, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, p
-                                do k = 0, buff_size - 1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 (k + buff_size*l))
-                                            q_cons_buff_send(r) = mv(j, k + pack_offset, l, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, sys_size
-                        do l = 0, buff_size - 1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l + pack_offset)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, buff_size - 1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            q_cons_buff_send(r) = pb(j, k, l + pack_offset, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, buff_size - 1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            q_cons_buff_send(r) = mv(j, k, l + pack_offset, i - sys_size, q)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:endif
-            end if
-        #:endfor
-        call nvtxEndRange ! Packbuf
-
-        ! Send/Recv
-        #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                p_send => q_cons_buff_send(0)
-                p_recv => q_cons_buff_recv(0)
-                #:if rdma_mpi
-                    !$acc data attach(p_send, p_recv)
-                    !$acc host_data use_device(p_send, p_recv)
-                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
-                #:else
-                    call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    !$acc update host(q_cons_buff_send, ib_buff_send)
-                    call nvtxEndRange
-                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
-                #:endif
-
-                call MPI_SENDRECV( &
-                    p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
-                    p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
-
-                #:if rdma_mpi
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                #:else
-                    call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    !$acc update device(q_cons_buff_recv)
-                    call nvtxEndRange
-                #:endif
-            end if
-        #:endfor
-
-        ! Unpack Received Buffer
-        call nvtxStartRange("RHS-COMM-UNPACKBUF")
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = -buff_size, -1
-                                do i = 1, sys_size
-                                    r = (i - 1) + v_size* &
-                                        (j + buff_size*((k + 1) + (n + 1)*l))
-                                    q_cons_vf(i)%sf(j + unpack_offset, k, l) = q_cons_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    do i = sys_size + 1, sys_size + 4
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                (j + buff_size*((k + 1) + (n + 1)*l))
-                                            pb(j + unpack_offset, k, l, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    do i = sys_size + 1, sys_size + 4
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                (j + buff_size*((k + 1) + (n + 1)*l))
-                                            mv(j + unpack_offset, k, l, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, sys_size
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + buff_size*l))
-                                    q_cons_vf(i)%sf(j, k + unpack_offset, l) = q_cons_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, p
-                                do k = -buff_size, -1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + buff_size*l))
-                                            pb(j, k + unpack_offset, l, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = 0, p
-                                do k = -buff_size, -1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + buff_size*l))
-                                            mv(j, k + unpack_offset, l, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:else
-                    ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, sys_size
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                          (l + buff_size)))
-                                    q_cons_vf(i)%sf(j, k, l + unpack_offset) = q_cons_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                    if (qbmm .and. .not. polytropic) then
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = -buff_size, -1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                                  (l + buff_size)))
-                                            pb(j, k, l + unpack_offset, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-
-                        !$acc parallel loop collapse(5) gang vector default(present) private(r)
-                        do i = sys_size + 1, sys_size + 4
-                            do l = -buff_size, -1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                 ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                                  (l + buff_size)))
-                                            mv(j, k, l + unpack_offset, i - sys_size, q) = q_cons_buff_recv(r)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                #:endif
-            end if
-        #:endfor
-        call nvtxEndRange
-
-#endif
-
-    end subroutine s_mpi_sendrecv_variables_buffers
-
-    !>  The goal of this procedure is to populate the buffers of
-        !!      the cell-average conservative variables by communicating
-        !!      with the neighboring processors.
-    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
+    subroutine s_mpi_sendrecv_ib_buffers(ib_markers, bc_id_sfs)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in) :: gp_layers
+        type(t_bc_id_sf), dimension(1:3, -1:1), intent(in) :: bc_id_sfs
 
-        integer :: i, j, k, l, r !< Generic loop iterators
-        integer, pointer, dimension(:) :: p_i_send, p_i_recv
+        @:BOUNDARY_CONDITION_INTEGER_DECLARATIONS()
+
+        integer :: buffer_counts(1:3)
+        integer :: iter_dir, iter_loc
+        integer, pointer :: p_send, p_recv
 
 #ifdef MFC_MPI
 
-        if (n > 0) then
-            if (p > 0) then
-                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers * &
-                                        & (m + 2*gp_layers + 1)* &
-                                        & (n + 2*gp_layers + 1)* &
-                                        & (p + 2*gp_layers + 1)/ &
-                                        & (min(m, n, p) + 2*gp_layers + 1)))
-            else
-                @:ALLOCATE(ib_buff_send(0:-1 + gp_layers* &
-                                        & (max(m, n) + 2*gp_layers + 1)))
-            end if
-        else
-            @:ALLOCATE(ib_buff_send(0:-1 + gp_layers))
-        end if
-        @:ALLOCATE(ib_buff_recv(0:ubound(ib_buff_send, 1)))
-
-        !nCalls_time = nCalls_time + 1
-
-        ! MPI Communication in x-direction =================================
-        if (bc_x%beg >= 0) then      ! PBC at the beginning
-
-            if (bc_x%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = m - gp_layers + 1, m
-                            r = ((j - m - 1) + gp_layers*((k + 1) + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
+        buffer_counts = (/ &
                         gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
+                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1) &
+                        /)
 
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
+        do iter_dir = 1, num_dims
 
-                    !$acc update host(ib_buff_send, ib_buff_send)
+            do iter_loc = -1, 1, 2
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxStartRange("RHS-COMM-PACKBUF")
 
-#if defined(MFC_OpenACC)
-                end if
-#endif
+                #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir="iter_dir", loc="-iter_loc", pack_v_size='1', thickness='gp_layers', inner_loops=[("i", 1, 1)])
+                    ib_buff_send(pack_idr) = ib_markers%sf(sx, sy, sz)
+                #:endblock
 
-            else                        ! PBC at the beginning only
+                call nvtxEndRange ! Packbuf
 
-                ! Packing buffer to be sent to bc_x%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, gp_layers - 1
-                            r = (j + gp_layers*(k + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
+                p_send => ib_buff_send(0)
+                p_recv => ib_buff_recv(0)
+                #:for rdma_mpi in [False, True]
+                    if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                        #:if rdma_mpi
+                            !$acc data attach(p_send, p_recv)
+                            !$acc host_data use_device(p_send, p_recv)
 
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
+                            call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
+                        #:else
+                            call nvtxStartRange("RHS-COMM-DEV2HOST")
+                            !$acc update host(ib_buff_send)
+                            call nvtxEndRange ! Dev2Host
 
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
+                            call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
+                        #:endif
 
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
+                        call MPI_SENDRECV( &
+                            p_send, buffer_counts(iter_dir), MPI_INTEGER, neighbor_procs(iter_dir, -iter_loc), 0, &
+                            p_recv, buffer_counts(iter_dir), MPI_INTEGER, neighbor_procs(iter_dir, +iter_loc), 0, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
+                        #:if rdma_mpi
+                            !$acc end host_data
+                            !$acc end data
+                            !$acc wait
+                        #:else
+                            call nvtxStartRange("RHS-COMM-HOST2DEV")
+                            !$acc update device(ib_buff_recv)
+                            call nvtxEndRange ! Host2Dev
+                        #:endif
+                    end if
+                #:endfor
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call nvtxStartRange("RHS-COMM-UNPACKBUF")
 
-#if defined(MFC_OpenACC)
-                end if
-#endif
+                #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir="iter_dir", loc="iter_loc", pack_v_size='1', thickness='gp_layers', inner_loops=[("i", 1, 1)])
+                    if (bc_id_sfs(iter_dir, iter_loc)%sf(exlhs, eylhs, ezlhs)%type >= 0) then
+                        ib_markers%sf(x, y, z) = ib_buff_recv(pack_idr)
+                    end if
+                #:endblock
 
-            end if
+                call nvtxEndRange ! Unpackbuf
 
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_x%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = 0, n
-                    do j = -gp_layers, -1
-                        r = (j + gp_layers*((k + 1) + (n + 1)*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
             end do
 
-        end if
-
-        if (bc_x%end >= 0) then                ! PBC at the end
-
-            if (bc_x%beg >= 0) then      ! PBC at the end and beginning
-
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                ! Packing buffer to be sent to bc_x%beg
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, gp_layers - 1
-                            r = (j + gp_layers*(k + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_x%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, n
-                        do j = m - gp_layers + 1, m
-                            r = ((j - m - 1) + gp_layers*((k + 1) + (n + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(n + 1)*(p + 1), &
-                        MPI_INTEGER, bc_x%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-
-            ! Unpacking buffer received from bc_x%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = 0, n
-                    do j = m + 1, m + gp_layers
-                        r = ((j - m - 1) + gp_layers*(k + (n + 1)*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-        ! END: MPI Communication in x-direction ============================
-
-        ! MPI Communication in y-direction =================================
-
-        if (bc_y%beg >= 0) then      ! PBC at the beginning
-
-            if (bc_y%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = n - gp_layers + 1, n
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k - n + gp_layers - 1) + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the beginning only
-
-                ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, gp_layers - 1
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 (k + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_y%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = -gp_layers, -1
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + gp_layers*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-
-        if (bc_y%end >= 0) then                   ! PBC at the end
-
-            if (bc_y%beg >= 0) then      ! PBC at the end and beginning
-
-                ! Packing buffer to be sent to bc_y%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = 0, gp_layers - 1
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 (k + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_y%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, p
-                    do k = n - gp_layers + 1, n
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k - n + gp_layers - 1) + gp_layers*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(p + 1), &
-                        MPI_INTEGER, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received form bc_y%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = 0, p
-                do k = n + 1, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k - n - 1) + gp_layers*l))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-        ! END: MPI Communication in y-direction ============================
-
-        ! MPI Communication in z-direction =================================
-        if (bc_z%beg >= 0) then      ! PBC at the beginning
-
-            if (bc_z%end >= 0) then      ! PBC at the beginning and end
-
-                ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = p - gp_layers + 1, p
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                  (l - p + gp_layers - 1)))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the beginning only
-
-                ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, gp_layers - 1
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer from bc_z%beg
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = -gp_layers, -1
-                do k = -gp_layers, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                              (l + gp_layers)))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-
-        if (bc_z%end >= 0) then                       ! PBC at the end
-
-            if (bc_z%beg >= 0) then      ! PBC at the end and beginning
-
-                ! Packing buffer to be sent to bc_z%beg
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = 0, gp_layers - 1
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)*l))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%beg, 1, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            else                        ! PBC at the end only
-
-                ! Packing buffer to be sent to bc_z%end
-                !$acc parallel loop collapse(3) gang vector default(present) private(r)
-                do l = p - gp_layers + 1, p
-                    do k = -gp_layers, n + gp_layers
-                        do j = -gp_layers, m + gp_layers
-                            r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                                 ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                                  (l - p + gp_layers - 1)))
-                            ib_buff_send(r) = ib_markers%sf(j, k, l)
-                        end do
-                    end do
-                end do
-
-                !call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-#if defined(MFC_OpenACC)
-                if (rdma_mpi) then
-                    p_i_send => ib_buff_send
-                    p_i_recv => ib_buff_recv
-
-                    !$acc data attach(p_i_send, p_i_recv)
-                    !$acc host_data use_device(p_i_send, p_i_recv)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        p_i_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        p_i_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc end data
-                    !$acc wait
-                else
-#endif
-                    !$acc update host(ib_buff_send)
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
-                    call MPI_SENDRECV( &
-                        ib_buff_send(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 0, &
-                        ib_buff_recv(0), &
-                        gp_layers*(m + 2*gp_layers + 1)*(n + 2*gp_layers + 1), &
-                        MPI_INTEGER, bc_z%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-#if defined(MFC_OpenACC)
-                end if
-#endif
-
-            end if
-
-#if defined(MFC_OpenACC)
-            if (rdma_mpi .eqv. .false.) then
-                !$acc update device(ib_buff_recv)
-            end if
-#endif
-
-            ! Unpacking buffer received from bc_z%end
-            !$acc parallel loop collapse(3) gang vector default(present) private(r)
-            do l = p + 1, p + gp_layers
-                do k = -gp_layers, n + gp_layers
-                    do j = -gp_layers, m + gp_layers
-                        r = ((j + gp_layers) + (m + 2*gp_layers + 1)* &
-                             ((k + gp_layers) + (n + 2*gp_layers + 1)* &
-                              (l - p - 1)))
-                        ib_markers%sf(j, k, l) = ib_buff_recv(r)
-                    end do
-                end do
-            end do
-
-        end if
-
-        ! END: MPI Communication in z-direction ============================
+        end do
 
 #endif
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-    subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
+    subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, bc_id_sfs, mpi_dir, pbc_loc)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs_vf
-        integer, intent(in) :: mpi_dir, pbc_loc
+        type(t_bc_id_sf), dimension(1:3, -1:1), intent(in) :: bc_id_sfs
 
-        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: buffer_counts(1:3), buffer_count
 
@@ -2152,10 +355,10 @@ contains
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
 
-        logical :: beg_end_geq_0
-
         integer :: pack_offset, unpack_offset
         real(kind(0d0)), pointer :: p_send, p_recv
+
+        @:BOUNDARY_CONDITION_INTEGER_DECLARATIONS()
 
 #ifdef MFC_MPI
 
@@ -2168,183 +371,51 @@ contains
                         buff_size*nVars*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                         /)
 
-        buffer_count = buffer_counts(mpi_dir)
-        boundary_conditions = (/bc_x, bc_y, bc_z/)
-        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
-        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
+        #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir="mpi_dir", loc="-pbc_loc", inner_loops=[("i", 1, "nVars")], pack_v_size="nVars")
+            c_divs_buff_send(pack_idr) = c_divs_vf(i)%sf(sx, sy, sz)
+        #:endblock
 
-        ! Implements:
-        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
-
-        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
-        recv_tag = f_logical_to_int(pbc_loc == 1)
-
-        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
-        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
-
-        grid_dims = (/m, n, p/)
-
-        pack_offset = 0
-        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - buff_size + 1
-        end if
-
-        unpack_offset = 0
-        if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
-        end if
-
-        ! Pack Buffer to Send
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, buff_size - 1
-                                do i = 1, nVars
-                                    r = (i - 1) + nVars*(j + buff_size*(k + (n + 1)*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j + pack_offset, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, p
-                            do k = 0, buff_size - 1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         (k + buff_size*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k + pack_offset, l)
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:else
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, buff_size - 1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    c_divs_buff_send(r) = c_divs_vf(i)%sf(j, k, l + pack_offset)
-                                end do
-                            end do
-                        end do
-                    end do
-                #:endif
-            end if
-        #:endfor
-
-        ! Send/Recv
+        p_send => c_divs_buff_send(0)
+        p_recv => c_divs_buff_recv(0)
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
-                p_send => c_divs_buff_send(0)
-                p_recv => c_divs_buff_recv(0)
-
                 #:if rdma_mpi
                     !$acc data attach(p_send, p_recv)
                     !$acc host_data use_device(p_send, p_recv)
+
+                    call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
                 #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
                     !$acc update host(c_divs_buff_send)
+                    call nvtxEndRange
+
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
                 #:endif
 
                 call MPI_SENDRECV( &
-                    p_send, buffer_count, MPI_DOUBLE_PRECISION, dst_proc, send_tag, &
-                    p_recv, buffer_count, MPI_DOUBLE_PRECISION, src_proc, recv_tag, &
+                    p_send, buffer_counts(mpi_dir), MPI_DOUBLE_PRECISION, neighbor_procs(mpi_dir, -pbc_loc), 0, &
+                    p_recv, buffer_counts(mpi_dir), MPI_DOUBLE_PRECISION, neighbor_procs(mpi_dir, +pbc_loc), 0, &
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                 #:if rdma_mpi
                     !$acc end host_data
                     !$acc end data
                     !$acc wait
                 #:else
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
                     !$acc update device(c_divs_buff_recv)
+                    call nvtxEndRange
                 #:endif
             end if
         #:endfor
 
-        ! Unpack Received Buffer
-        #:for mpi_dir in [1, 2, 3]
-            if (mpi_dir == ${mpi_dir}$) then
-                #:if mpi_dir == 1
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = -buff_size, -1
-                                do i = 1, nVars
-                                    r = (i - 1) + nVars* &
-                                        (j + buff_size*((k + 1) + (n + 1)*l))
-                                    c_divs_vf(i)%sf(j + unpack_offset, k, l) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:elif mpi_dir == 2
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + buff_size*l))
-                                    c_divs_vf(i)%sf(j, k + unpack_offset, l) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:else
-                    ! Unpacking buffer from bc_z%beg
-                    !$acc parallel loop collapse(4) gang vector default(present) private(r)
-                    do i = 1, nVars
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + nVars* &
-                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                          (l + buff_size)))
-                                    c_divs_vf(i)%sf(j, k, l + unpack_offset) = c_divs_buff_recv(r)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(c_divs_vf(i)%sf(j, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-
-                #:endif
+        #:block ITERATE_OVER_BUFFER_REGION_SIDED(dir="mpi_dir", loc="pbc_loc", inner_loops=[("i", 1, "nVars")], pack_v_size="nVars")
+            if (bc_id_sfs(mpi_dir, pbc_loc)%sf(exlhs, eylhs, ezlhs)%type >= 0) then
+                c_divs_vf(i)%sf(x, y, z) = c_divs_buff_recv(pack_idr)
             end if
-        #:endfor
+        #:endblock
 
 #endif
 
@@ -2363,8 +434,6 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Deallocating q_cons_buff_send and q_cons_buff_recv
-        @:DEALLOCATE(q_cons_buff_send, q_cons_buff_recv)
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if

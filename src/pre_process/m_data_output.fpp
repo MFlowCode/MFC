@@ -32,6 +32,8 @@ module m_data_output
 
     use m_thermochem, only: species_names
 
+    use m_boundary_conditions_common
+
     ! ==========================================================================
 
     implicit none
@@ -124,6 +126,8 @@ contains
         integer :: i, j, k, l, r, c, dir !< Generic loop iterator
         integer :: t_step
 
+        integer :: iter_dir, iter_loc
+
         real(kind(0d0)), dimension(nb) :: nRtmp         !< Temporary bubble concentration
         real(kind(0d0)) :: nbub                         !< Temporary bubble number density
         real(kind(0d0)) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
@@ -144,6 +148,9 @@ contains
         else
             status = 'new'
         end if
+
+        ! Boundary Conditions
+        call s_write_boundary_condition_files(t_step_dir)
 
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
@@ -560,6 +567,8 @@ contains
 
         ! Generic loop iterator
         integer :: i
+
+        call s_write_boundary_condition_files(trim(case_dir)//'/restart_data')
 
         if (file_per_process) then
             if (proc_rank == 0) then

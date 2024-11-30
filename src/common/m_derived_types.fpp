@@ -73,12 +73,8 @@ module m_derived_types
     type int_bounds_info
         integer :: beg
         integer :: end
-        real(kind(0d0)) :: vb1
-        real(kind(0d0)) :: vb2
-        real(kind(0d0)) :: vb3
-        real(kind(0d0)) :: ve1
-        real(kind(0d0)) :: ve2
-        real(kind(0d0)) :: ve3
+        real(kind(0d0)) :: vel_beg(1:3)
+        real(kind(0d0)) :: vel_end(1:3)
         real(kind(0d0)) :: pres_in, pres_out
         real(kind(0d0)), dimension(3) :: vel_in, vel_out
         real(kind(0d0)), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
@@ -357,7 +353,7 @@ module m_derived_types
     !> Ghost Point for Immersed Boundaries
     type ghost_point
 
-        real(kind(0d0)), dimension(3) :: loc !< Physical location of the ghost point
+        integer, dimension(3) :: loc !< Physical location of the ghost point
         real(kind(0d0)), dimension(3) :: ip_loc !< Physical location of the image point
         integer, dimension(3) :: ip_grid !< Top left grid point of IP
         real(kind(0d0)), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
@@ -384,5 +380,28 @@ module m_derived_types
         !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
         integer :: gamma_method
     end type chemistry_parameters
+
+    type bc_patch_parameters
+        ! User inputs
+        integer :: type
+        integer :: dir   !  [x,y,z]  => [1,2,3]
+        integer :: loc   ! [beg,end] => [-1,+1]
+        integer :: geometry
+
+        real(kind(0d0)) :: centroid(1:3)
+        real(kind(0d0)) :: length(1:3)
+        real(kind(0d0)) :: radius
+
+        real(kind(0d0)) :: vel(1:3)
+    end type bc_patch_parameters
+
+    type t_bc_id
+        integer :: type
+        real(kind(0d0)) :: vel(1:3)
+    end type t_bc_id
+
+    type t_bc_id_sf
+        type(t_bc_id), dimension(:, :, :), allocatable :: sf
+    end type t_bc_id_sf
 
 end module m_derived_types
