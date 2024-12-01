@@ -260,7 +260,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             _handle_case(case, devices)
             nPASS += 1
         except Exception as exc:
-            if nAttempts < ARG("max_attempts"):
+            if nAttempts < max_attempts:
                 cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 errors.append(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue

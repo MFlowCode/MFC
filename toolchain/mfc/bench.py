@@ -168,4 +168,3 @@ def diff():
 
     if err != 0:
         raise MFCException("Benchmarking failed")
-    

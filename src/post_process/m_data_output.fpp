@@ -168,7 +168,7 @@ contains
 
         ! The size of the ghost zone layer in each of the active coordinate
         ! directions was set in the module m_mpi_proxy.f90. The results are
-        ! now transfered to the local variables of this module when they are
+        ! now transferred to the local variables of this module when they are
         ! required by the Silo-HDF5 format, for multidimensional data sets.
         ! With the same, latter, requirements, the variables bookkeeping the
         ! number of cell-boundaries in each active coordinate direction are
