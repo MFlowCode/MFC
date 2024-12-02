@@ -6,12 +6,14 @@ usage() {
     echo "Usage: $0 [script.sh] [cpu|gpu]"
 }
 
-if [ ! -z "$1" ]; then
-    sbatch_script_contents=`cat $1`
-else
+if [ -z "$1" ] || [ -z "$2" ]; then
     usage
     exit 1
 fi
+
+sbatch_script_contents=`cat $1`
+
+precision="${3:-}"
 
 sbatch_cpu_opts="\
 #SBATCH -p cpu-small               # partition
@@ -20,7 +22,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -CV100-16GB
+#SBATCH -C V100-16GB
 #SBATCH -G2\
 "
 
@@ -35,25 +37,30 @@ fi
 
 job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
 
+if [ -n "$precision" ]; then
+    job_slug="$job_slug-$precision"
+fi
+
 sbatch <<EOT
 #!/bin/bash
 #SBATCH -Jshb-$job_slug            # Job name
 #SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 02:00:00                # Duration of the job (Ex: 2 hours)
 #SBATCH -q embers                  # QOS Name
-#SBATCH -o$job_slug.out            # Combined output and error messages file
+#SBATCH -o $job_slug.out           # Combined output and error messages file
 #SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
 
 cd "\$SLURM_SUBMIT_DIR"
-echo "Running in $(pwd):"
+echo "Running in \$(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
+precision="$precision"
 
 . ./mfc.sh load -c p -m $2
 

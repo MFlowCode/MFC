@@ -36,6 +36,13 @@ jobs:
         include:
           - os:    ubuntu
             mpi:   no-mpi
+            precision: 
+            debug: no-debug
+            intel: false
+
+        include:
+          - os:    ubuntu
+            mpi:   mpi
             precision: single
             debug: no-debug
             intel: false
@@ -106,9 +113,14 @@ jobs:
       matrix:
         device: ['cpu', 'gpu']
         lbl: ['gt', 'frontier']
+        precision: ['']
         exclude:
           - device:   cpu
             lbl: frontier
+        include:
+          - device: gpu
+            lbl: gt
+            precision: single
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -121,7 +133,7 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.precision }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
@@ -129,15 +141,15 @@ jobs:
 
       - name: Test
         if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}}
+        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.precision }}
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}.out
+        run:  cat test-${{ matrix.device }}-${{ matrix.precision }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   always()
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
-          path: test-${{ matrix.device }}.out
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.precision }}
+          path: test-${{ matrix.device }}-${{ matrix.precision }}.out
