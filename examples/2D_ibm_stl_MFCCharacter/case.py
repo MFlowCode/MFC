@@ -80,7 +80,7 @@ print(json.dumps({
     'patch_ib(1)%model_filepath'        : 'Character_IBM.stl',
     'patch_ib(1)%model_translate(1)'    : -0.0469828735,
     'patch_ib(1)%model_translate(2)'    : -0.0094892600,
-    'patch_ib(1)%model_model_spc'       : 200,
+    'patch_ib(1)%model_spc'             : 200,
     'patch_ib(1)%model_threshold'       : 0.99,
     'patch_ib(1)%slip'                  : 'F',
     # # ========================================================================
