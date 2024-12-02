@@ -249,7 +249,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
     nAttempts = 0
     if ARG('single'):
-        max_attempts = max(ARG('max_attempts'), 20)
+        max_attempts = max(ARG('max_attempts'), 3)
     else:
         max_attempts = ARG('max_attempts')
 
@@ -261,8 +261,6 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             nPASS += 1
         except Exception as exc:
             if nAttempts < max_attempts:
-                cons.print(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
-                errors.append(f"[bold yellow] Attempt {nAttempts}: Failed test {case.get_uuid()}. Retrying...[/bold yellow]")
                 continue
             nFAIL += 1
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")

@@ -1,7 +1,7 @@
 name: 'Test Suite'
 
 on: [push, pull_request, workflow_dispatch]
-    
+
 jobs:
   file-changes:
     name: Detect File Changes
@@ -40,7 +40,7 @@ jobs:
             precision: 
             debug: no-debug
             intel: false
-          - os:    ubuntu
+          - os:    macos
             mpi:   mpi
             precision: single
             debug: no-debug
@@ -153,11 +153,13 @@ jobs:
 
       - name: Print Logs
         if: always()
-        run: cat test-${{ matrix.device }}-${{ matrix.precision }}.out
+        run: |
+          PRECISION=${{ matrix.precision || 'default' }}
+          cat test-${{ matrix.device }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.precision }}
-          path: test-${{ matrix.device }}-${{ matrix.precision }}.out
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
+          path: test-${{ matrix.device }}.out
