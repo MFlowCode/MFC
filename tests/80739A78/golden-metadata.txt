@@ -1,49 +1,16 @@
-This file was created on 2024-11-22 02:58:54.116751.
+This file was created on 2024-12-02 15:25:08.223061.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -o Example
+    Invocation: test -j 8 --generate -o mixing_artificial_Ma
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        eb1524b7e9585bed8b4fff63f7a65061881ab20d on exampleCI2 (dirty)
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.31.0 on bok
-    
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        31f4f59e278ff0516bd1988d93d1b697b0c9ec53 on exampleCI2 (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v3.31.1 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -76,7 +43,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v3.31.1 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -109,7 +76,7 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v3.31.1 on bok
     
         C       : GNU v14.2.1 (/usr/bin/cc)
         Fortran : GNU v14.2.1 (/usr/bin/gfortran)
@@ -118,6 +85,39 @@ post_process:
         SIMULATION    : OFF
         POST_PROCESS  : ON
         SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.31.1 on bok
+    
+        C       : GNU v14.2.1 (/usr/bin/cc)
+        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -156,7 +156,7 @@ CPU:
     Core(s) per socket:                   4
     Socket(s):                            1
     Stepping:                             1
-    CPU(s) scaling MHz:                   64%
+    CPU(s) scaling MHz:                   37%
     CPU max MHz:                          4700.0000
     CPU min MHz:                          400.0000
     BogoMIPS:                             5608.00
