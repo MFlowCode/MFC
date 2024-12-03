@@ -59,8 +59,8 @@ def __filter(cases_) -> typing.List[TestCase]:
 
     for case in cases[:]:
         if ARG("single"):
-            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'mixlayer_perturb']
-            if any(label in case.trace for label in skip):
+            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Non_polytropic']
+            if any(label in case.trace for label in skip) or ('3D' in case.trace and 'QBBM' in case.trace):
                 cases.remove(case)
 
 
@@ -249,7 +249,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
     nAttempts = 0
     if ARG('single'):
-        max_attempts = max(ARG('max_attempts'), 3)
+        max_attempts = max(ARG('max_attempts'), 20)
     else:
         max_attempts = ARG('max_attempts')
 

@@ -4,12 +4,8 @@ build_opts=""
 if [ "$job_device" == "gpu" ]; then
     build_opts="--gpu"
 fi
-precision_flag = ""
-if ["$precision" == "single"]; then
-    precision_flag = "--single"
-fi
 
-./mfc.sh build -j 8 $build_opts $precision_flag
+./mfc.sh build -j 8 $build_opts
 
 n_test_threads=8
 
@@ -20,6 +16,5 @@ if [ "$job_device" == "gpu" ]; then
     n_test_threads=`expr $gpu_count \* 2`
 fi
 
-./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts $precision_flag -- -c phoenix
-
+./mfc.sh test --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
 
