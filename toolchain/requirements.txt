@@ -1,0 +1,28 @@
+# General
+rich
+wheel
+typos
+typing
+PyYAML
+argparse
+dataclasses
+fastjsonschema
+
+# Build System
+fypp
+
+# Running Cases
+mako
+
+# Code Health
+typos
+pylint
+fprettify
+
+# Profiling
+numpy
+pandas
+
+# Chemistry
+cantera
+pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git@mfc
