@@ -44,9 +44,16 @@ program p_main
 
     ! Time-Marching Loop =======================================================
     do
+        ! If not all time-steps are ready to be post-processed, if one process
+        ! is faster than another, a slower processor processing the last available
+        ! step might be killed if a faster one failing to load the next. Therefore,
+        ! we force synchronization here.
+        call s_mpi_barrier()
+
         call s_perform_time_step(t_step)
 
         call s_save_data(t_step, varname, pres, c, H)
+    print*, proc_rank, "c"
 
         if (cfl_dt) then
             if (t_step == n_save - 1) then
@@ -61,6 +68,7 @@ program p_main
             if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
                 t_step = t_step_stop - t_step_save
             elseif (t_step == t_step_stop) then
+                print*, proc_rank, "is don"
                 exit
             end if
         end if

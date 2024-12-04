@@ -191,12 +191,15 @@ contains
 
         integer :: i, j, k, l
 
+        print*, proc_rank, "open"
         ! Opening a new formatted database file
         call s_open_formatted_database_file(t_step)
 
         ! Adding the grid to the formatted database file
+        print*, proc_rank, "wrt 1"
         call s_write_grid_to_formatted_database_file(t_step)
 
+        print*, proc_rank, "wrt 2"
         ! Computing centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
             call s_compute_finite_difference_coefficients(m, x_cc, &
@@ -296,6 +299,7 @@ contains
 
         ! Adding the species' concentrations to the formatted database file ----
         if (chemistry) then
+            print*, proc_rank, "hi 4"
             do i = 1, num_species
                 if (chem_wrt_Y(i) .or. prim_vars_wrt) then
                     q_sf = q_prim_vf(chemxb + i - 1)%sf(-offset_x%beg:m + offset_x%end, &
@@ -309,7 +313,7 @@ contains
 
                 end if
             end do
-
+            print*, proc_rank, "hi 3"
             if (chem_wrt_T) then
                 q_sf = q_prim_vf(T_idx)%sf(-offset_x%beg:m + offset_x%end, &
                                            -offset_y%beg:n + offset_y%end, &
@@ -382,7 +386,7 @@ contains
 
         end if
         ! ----------------------------------------------------------------------
-
+        print*, proc_rank, "hi 2"
         ! Adding the volume fraction(s) to the formatted database file ---------
         if (((model_eqns == 2) .and. (bubbles .neqv. .true.)) &
             .or. (model_eqns == 3) &
@@ -482,6 +486,8 @@ contains
 
         end if
         ! ----------------------------------------------------------------------
+
+        print*, proc_rank, "hi"
 
         ! Adding the sound speed to the formatted database file ----------------
         if (c_wrt) then
@@ -671,6 +677,8 @@ contains
             end if
         end if
 
+
+        print*, proc_rank, "clos 1"
         ! Closing the formatted database file
         call s_close_formatted_database_file()
     end subroutine s_save_data

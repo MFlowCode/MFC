@@ -862,7 +862,7 @@ contains
 
         if (chemistry) then
             call nvtxStartRange("RHS-CHEM-ADVECTION")
-            call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
+            !call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
             call nvtxEndRange
         end if
 

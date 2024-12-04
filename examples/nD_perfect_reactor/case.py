@@ -26,10 +26,10 @@ sol     = ct.Solution(ctfile)
 
 sol.TPX = 1_600, ct.one_atm, 'H2:0.04, O2:0.02, AR:0.94'
 
-Nx   = 25 * args.scale
+Nx   = int(25 * args.scale)
 Tend = 1e-4
 s    = 1e-2
-dt   = 1e-7
+dt   = 1e-8
 
 NT         = int(Tend / dt)
 SAVE_COUNT = 20
@@ -52,9 +52,9 @@ case = {
     'p'                            : Nx,
     'dt'                           : float(dt),
     't_step_start'                 : 0,
-    't_step_stop'                  : NT,
-    't_step_save'                  : NS,
-    't_step_print'                 : NS,
+    't_step_stop'                  : 100,
+    't_step_save'                  : 100,
+    't_step_print'                 : 1,
     'parallel_io'                  : 'T' if args.ndim > 1 and args.mfc.get("mpi", True) else 'F',
 
     # Simulation Algorithm Parameters ==========================================
