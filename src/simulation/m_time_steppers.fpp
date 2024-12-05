@@ -326,8 +326,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(1)
+            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lag_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -432,8 +432,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(1)
+            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lag_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -508,8 +508,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(2)
+            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+            call s_update_lag_tdv_rk(stage=2)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -621,8 +621,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(1)
+            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lag_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -697,8 +697,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(2)
+            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+            call s_update_lag_tdv_rk(stage=2)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -774,8 +774,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf)
-            call s_update_lag_tdv_rk(3)
+            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
+            call s_update_lag_tdv_rk(stage=3)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)

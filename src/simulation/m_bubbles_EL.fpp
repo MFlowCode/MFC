@@ -94,7 +94,7 @@ contains
         integer :: nBubs_glb, i
 
         ! Setting number of time-stages for selected time-stepping scheme
-        lag_num_ts = 1
+        lag_num_ts = time_stepper
         if (time_stepper == 4) lag_num_ts = num_ts_rkck
 
         ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
@@ -463,25 +463,19 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param rhs_vf Calculated change of conservative variables
-        !! @param step_rkck Current step in the RKCK algorithm
-    subroutine s_compute_el_coupled_solver(q_cons_vf, q_prim_vf, rhs_vf, step_rkck)
+        !! @param stage Current stage in the time-stepper algorithm
+    subroutine s_compute_el_coupled_solver(q_cons_vf, q_prim_vf, rhs_vf, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer, intent(in), optional :: step_rkck
+        integer, intent(in) :: stage
 
         real(kind(0.d0)) :: gammaparticle, vaporflux, heatflux
-        integer :: i, j, k, l, step
+        integer :: i, j, k, l
         real(kind(0.d0)) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
 
         call nvtxStartRange("DYNAMICS-LAGRANGE-BUBBLES")
-
-        if (present(step_rkck)) then
-            step = step_rkck
-        else
-            step = 1
-        end if
 
         !< BUBBLE DYNAMICS
 
@@ -506,36 +500,36 @@ contains
         end if
 
         ! Gaseous core evolution
-        !$acc parallel loop gang vector default(present) private(k) copyin(step)
+        !$acc parallel loop gang vector default(present) private(k) copyin(stage)
         do k = 1, nBubs
             call s_compute_interface_fluxes(k, vaporflux, heatflux, gammaparticle)
-            gas_dpdt(k, step) = -3.0d0*gammaparticle/intfc_rad(k, 2)* &
-                                (gas_p(k, 2)*intfc_vel(k, 2) - &
-                                 heatflux - (lag_params%Rvapor*lag_params%Thost)*vaporflux)
-            gas_dmvdt(k, step) = 4.0d0*pi*intfc_rad(k, 2)**2*vaporflux
+            gas_dpdt(k, stage) = -3.0d0*gammaparticle/intfc_rad(k, 2)* &
+                                 (gas_p(k, 2)*intfc_vel(k, 2) - &
+                                  heatflux - (lag_params%Rvapor*lag_params%Thost)*vaporflux)
+            gas_dmvdt(k, stage) = 4.0d0*pi*intfc_rad(k, 2)**2*vaporflux
         end do
 
         ! Radial motion model
         if (lag_params%bubble_model == 1) then
-            !$acc parallel loop gang vector default(present) private(k) copyin(step)
+            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
             do k = 1, nBubs
-                call s_compute_KM(k, step, q_prim_vf)
-                intfc_draddt(k, step) = intfc_vel(k, 2)
+                call s_compute_KM(k, stage, q_prim_vf)
+                intfc_draddt(k, stage) = intfc_vel(k, 2)
             end do
         else
-            !$acc parallel loop gang vector default(present) private(k) copyin(step)
+            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
             do k = 1, nBubs
-                intfc_dveldt(k, step) = 0.0d0
-                intfc_draddt(k, step) = 0.0d0
+                intfc_dveldt(k, stage) = 0.0d0
+                intfc_draddt(k, stage) = 0.0d0
             end do
         end if
 
         ! Bubbles remain in a fixed position
-        !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(step)
+        !$acc parallel loop collapse(2) gang vector default(present) private(k) copyin(stage)
         do k = 1, nBubs
             do l = 1, 3
-                mtn_dposdt(k, l, step) = 0.0d0
-                mtn_dveldt(k, l, step) = 0.0d0
+                mtn_dposdt(k, l, stage) = 0.0d0
+                mtn_dveldt(k, l, stage) = 0.0d0
             end do
         end do
 
@@ -933,6 +927,7 @@ contains
         if (time_stepper == 1) then ! 1st order TVD RK
             !$acc parallel loop gang vector default(present) private(k)
             do k = 1, nBubs
+                !u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                 intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
                 mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
@@ -955,6 +950,7 @@ contains
             if (stage == 1) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
+                    !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
                     mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
@@ -967,12 +963,13 @@ contains
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
-                    intfc_rad(k, 1) = (intfc_rad(k, 1) + intfc_rad(k, 2) + dt*intfc_draddt(k, 1))/2d0
-                    intfc_vel(k, 1) = (intfc_vel(k, 1) + intfc_vel(k, 2) + dt*intfc_dveldt(k, 1))/2d0
-                    mtn_pos(k, 1:3, 1) = (mtn_pos(k, 1:3, 1) + mtn_pos(k, 1:3, 2) + dt*mtn_dposdt(k, 1:3, 1))/2d0
-                    mtn_vel(k, 1:3, 1) = (mtn_vel(k, 1:3, 1) + mtn_vel(k, 1:3, 2) + dt*mtn_dveldt(k, 1:3, 1))/2d0
-                    gas_p(k, 1) = (gas_p(k, 1) + gas_p(k, 2) + dt*gas_dpdt(k, 1))/2d0
-                    gas_mv(k, 1) = (gas_mv(k, 1) + gas_mv(k, 2) + dt*gas_dmvdt(k, 1))/2d0
+                    !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
+                    intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2d0
+                    intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2d0
+                    mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2d0
+                    mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2d0
+                    gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2d0
+                    gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2d0
                     if (intfc_rad(k, 1) <= 0.0d0) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
@@ -991,35 +988,38 @@ contains
             if (stage == 1) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
-                    intfc_rad(k, 2) = intfc_rad(k, 2) + dt*intfc_draddt(k, 1)
-                    intfc_vel(k, 2) = intfc_vel(k, 2) + dt*intfc_dveldt(k, 1)
-                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 2) + dt*mtn_dposdt(k, 1:3, 1)
-                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 2) + dt*mtn_dveldt(k, 1:3, 1)
-                    gas_p(k, 2) = gas_p(k, 2) + dt*gas_dpdt(k, 1)
-                    gas_mv(k, 2) = gas_mv(k, 2) + dt*gas_dmvdt(k, 1)
+                    !u{1} = u{n} +  dt * RHS{n}
+                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
+                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
+                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
+                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                    gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
+                    gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                     if (intfc_rad(k, 2) <= 0.0d0) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
             elseif (stage == 2) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
-                    intfc_rad(k, 2) = (3d0*intfc_rad(k, 1) + intfc_rad(k, 2) + dt*intfc_draddt(k, 1))/4d0
-                    intfc_vel(k, 2) = (3d0*intfc_vel(k, 1) + intfc_vel(k, 2) + dt*intfc_dveldt(k, 1))/4d0
-                    mtn_pos(k, 1:3, 2) = (3d0*mtn_pos(k, 1:3, 1) + mtn_pos(k, 1:3, 2) + dt*mtn_dposdt(k, 1:3, 1))/4d0
-                    mtn_vel(k, 1:3, 2) = (3d0*mtn_vel(k, 1:3, 1) + mtn_vel(k, 1:3, 2) + dt*mtn_dveldt(k, 1:3, 1))/4d0
-                    gas_p(k, 2) = (3d0*gas_p(k, 1) + gas_p(k, 2) + dt*gas_dpdt(k, 1))/4d0
-                    gas_mv(k, 2) = (3d0*gas_mv(k, 1) + dt*gas_dmvdt(k, 1))/4d0
+                    !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
+                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4d0
+                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4d0
+                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4d0
+                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4d0
+                    gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4d0
+                    gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4d0
                     if (intfc_rad(k, 2) <= 0.0d0) stop "Negative bubble radius encountered, please reduce dt"
                 end do
             elseif (stage == 3) then
                 !$acc parallel loop gang vector default(present) private(k)
                 do k = 1, nBubs
-                    intfc_rad(k, 1) = (intfc_rad(k, 1) + 2d0*intfc_rad(k, 2) + 2d0*dt*intfc_draddt(k, 1))/3d0
-                    intfc_vel(k, 1) = (intfc_vel(k, 1) + 2d0*intfc_vel(k, 2) + 2d0*dt*intfc_dveldt(k, 1))/3d0
-                    mtn_pos(k, 1:3, 1) = (mtn_pos(k, 1:3, 1) + 2d0*mtn_pos(k, 1:3, 2) + 2d0*dt*mtn_dposdt(k, 1:3, 1))/3d0
-                    mtn_vel(k, 1:3, 1) = (mtn_vel(k, 1:3, 1) + 2d0*mtn_vel(k, 1:3, 2) + 2d0*dt*mtn_dveldt(k, 1:3, 1))/3d0
-                    gas_p(k, 1) = (gas_p(k, 1) + 2d0*gas_p(k, 2) + 2d0*dt*gas_dpdt(k, 1))/3d0
-                    gas_mv(k, 1) = (gas_mv(k, 1) + 2d0*gas_mv(k, 2) + 2d0*dt*gas_dmvdt(k, 1))/3d0
+                    !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
+                    intfc_rad(k, 1) = intfc_rad(k, 1) + (2d0/3d0)*dt*(intfc_draddt(k, 1)/4d0 + intfc_draddt(k, 2)/4d0 + intfc_draddt(k, 3))
+                    intfc_vel(k, 1) = intfc_vel(k, 1) + (2d0/3d0)*dt*(intfc_dveldt(k, 1)/4d0 + intfc_dveldt(k, 2)/4d0 + intfc_dveldt(k, 3))
+                    mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2d0/3d0)*dt*(mtn_dposdt(k, 1:3, 1)/4d0 + mtn_dposdt(k, 1:3, 2)/4d0 + mtn_dposdt(k, 1:3, 3))
+                    mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2d0/3d0)*dt*(mtn_dveldt(k, 1:3, 1)/4d0 + mtn_dveldt(k, 1:3, 2)/4d0 + mtn_dveldt(k, 1:3, 3))
+                    gas_p(k, 1) = gas_p(k, 1) + (2d0/3d0)*dt*(gas_dpdt(k, 1)/4d0 + gas_dpdt(k, 2)/4d0 + gas_dpdt(k, 3))
+                    gas_mv(k, 1) = gas_mv(k, 1) + (2d0/3d0)*dt*(gas_dmvdt(k, 1)/4d0 + gas_dmvdt(k, 2)/4d0 + gas_dmvdt(k, 3))
                     if (intfc_rad(k, 1) <= 0.0d0) stop "Negative bubble radius encountered, please reduce dt"
                 end do
 
