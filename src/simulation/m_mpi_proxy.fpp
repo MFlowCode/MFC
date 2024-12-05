@@ -200,7 +200,8 @@ contains
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',        &
-            & 'viscous', 'shear_stress', 'bulk_stress', 'lag_bubbles' ]
+            & 'viscous', 'shear_stress', 'bulk_stress', 'bubbles_lagrange',     &
+            & 'rkck_adap_dt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -214,22 +215,22 @@ contains
             #:endfor
         end if
 
-        if (lag_bubbles) then
-            #:for VAR in [ 'lag_write_bubbles', 'lag_write_bubble_stats', 'lag_pressure_corrector', &
-                & 'lag_heatTransfer_model', 'lag_massTransfer_model', 'lag_adap_dt']
-                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        if (bubbles_lagrange) then
+            #:for VAR in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector', &
+                & 'write_bubbles', 'write_bubbles_stats']
+                call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['lag_bubble_model', 'lag_cluster_type', 'lag_smooth_type',     &
-                & 'lag_solver_approach', 'lag_nBubs_glb']
-                call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in ['solver_approach', 'bubble_model', 'cluster_type', 'smooth_type', &
+                & 'nBubs_glb']
+                call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'csonhost', 'vischost', 'Thost', 'gammagas', 'gammavapor',&
-                & 'pvap', 'cpgas', 'cpvapor', 'kgas', 'kvapor', 'Rgas', 'Rvap',    &
-                & 'diffcoefvap', 'sigmabubble', 'lag_rkck_tolerance', 'lag_epsilonb',    &
-                & 'lag_charwidth', 'lag_valmaxvoid']
-                call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in [ 'csonhost', 'vischost', 'Thost', 'gammagas', 'gammavapor', &
+                & 'pvap', 'cpgas', 'cpvapor', 'kgas', 'kvapor', 'Rgas', 'Rvapor',     &
+                & 'diffcoefvap', 'sigmabubble', 'rkck_tolerance', 'epsilonb',         &
+                & 'charwidth', 'valmaxvoid']
+                call MPI_BCAST(lag_params%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
 

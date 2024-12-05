@@ -913,7 +913,7 @@ contains
 
         ! END: Additional pphysics and source terms ============================
 
-        if (run_time_info .or. probe_wrt .or. ib .or. lag_bubbles) then
+        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end

@@ -79,7 +79,7 @@ module m_start_up
 
     use m_body_forces
 
-    use m_lag_bubbles           !< Lagrangian bubbles routines
+    use m_bubbles_EL            !< Lagrangian bubbles routines
     ! ==========================================================================
 
     implicit none
@@ -168,14 +168,7 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             viscous, surface_tension, &
-            lag_bubbles, lag_write_bubbles, lag_write_bubble_stats, &
-            lag_bubble_model, lag_cluster_type, lag_heatTransfer_model,&
-            lag_massTransfer_model, lag_nBubs_glb, csonhost, vischost, &
-            Thost, gammagas, gammavapor, pvap, cpgas, cpvapor, &
-            kgas, kvapor, Rgas, Rvap, diffcoefvap, sigmabubble, &
-            lag_rkck_tolerance, lag_smooth_type, lag_epsilonb, &
-            lag_solver_approach, lag_pressure_corrector, &
-            lag_charwidth, lag_valmaxvoid, lag_adap_dt
+            bubbles_lagrange, lag_params, rkck_adap_dt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -207,7 +200,7 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. lag_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1219,16 +1212,15 @@ contains
         integer, intent(inout) :: nt
 
         integer :: i
-        real(kind(0d0)) :: dtdid, time_prev
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0 .and. .not. lag_bubbles) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
 
-            if (cfl_adap_dt .and. .not. lag_bubbles) call s_compute_dt()
+            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. lag_bubbles) then
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1266,33 +1258,25 @@ contains
 
         call s_compute_derived_variables(t_step)
 
+
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
 
-        time_prev = mytime
         mytime = mytime + dt
 
-        if(lag_bubbles) then 
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)          
-            call s_4th_5th_order_rkck(t_step, dtdid, time_prev, time_avg)
-            mytime = time_prev + dtdid
-            if(lag_write_bubbles) then
-                !$acc update host(lag_bub_gas_p, lag_bub_gas_mv, lag_bub_interface_rad, lag_bub_interface_vel)
-                call s_write_lag_particles(mytime)
-            end if
-
-        else
-            ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-            if (time_stepper == 1) then
-                call s_1st_order_tvd_rk(t_step, time_avg)
-            elseif (time_stepper == 2) then
-                call s_2nd_order_tvd_rk(t_step, time_avg)
-            elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-                call s_3rd_order_tvd_rk(t_step, time_avg)
-            elseif (time_stepper == 3 .and. adap_dt) then
-                call s_strang_splitting(t_step, time_avg)
-            end if
+        ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
+        if (time_stepper == 1) then
+            call s_1st_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 2) then
+            call s_2nd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3 .and. (.not. adap_dt)) then
+            call s_3rd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3 .and. adap_dt) then
+            call s_strang_splitting(t_step, time_avg)
+        elseif (time_stepper == 4) then
+            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)         
+            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1401,12 +1385,12 @@ contains
             save_count = t_step
         end if
 
-        if (lag_bubbles) then
-            !$acc update host(q_particle%vf(1)%sf)
-            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count, q_particle%vf(1))
-            !$acc update host(lag_bub_Rmax, lag_bub_Rmin, lag_bub_gas_p, lag_bub_gas_mv, lag_bub_interface_rad, lag_bub_interface_vel)
+        if (bubbles_lagrange) then
+            !$acc update host(q_beta%vf(1)%sf)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count, q_beta%vf(1))
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
             call s_write_restart_lag_bubbles(save_count) !parallel 
-            if (lag_write_bubble_stats) call s_write_lag_bubble_stats()
+            if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
         end if
@@ -1428,8 +1412,6 @@ contains
     end subroutine s_save_data
 
     subroutine s_initialize_modules
-
-        integer :: i,j,k,l
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
@@ -1516,7 +1498,7 @@ contains
         call s_initialize_cbc_module()
 
         call s_initialize_derived_variables()
-        if (lag_bubbles) call s_initialize_lag_bubbles(q_cons_ts(1)%vf)
+        if (bubbles_lagrange) call s_initialize_lag_bubbles(q_cons_ts(1)%vf)
 
     end subroutine s_initialize_modules
 
@@ -1642,7 +1624,7 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (lag_bubbles) call s_finalize_lagrangian_solver() 
+        if (bubbles_lagrange) call s_finalize_lagrangian_solver() 
         if (viscous) then
             call s_finalize_viscous_module()
         end if

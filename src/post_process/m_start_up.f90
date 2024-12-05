@@ -82,7 +82,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, lag_bubbles, lag_adap_dt
+            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -111,7 +111,7 @@ contains
 
             nGlobal = (m_glb + 1)*(n_glb + 1)*(p_glb + 1)
 
-            if (cfl_adap_dt .or. cfl_const_dt .or. lag_adap_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting ...')
@@ -176,7 +176,7 @@ contains
         ! Populating the buffer regions of the conservative variables
         if (buff_size > 0) then
             call s_populate_conservative_variables_buffer_regions()
-            if (lag_bubbles) call s_populate_conservative_variables_buffer_regions(q_particle(1))
+            if (bubbles_lagrange) call s_populate_conservative_variables_buffer_regions(q_particle(1))
         end if
 
         ! Converting the conservative variables to the primitive ones
@@ -673,7 +673,7 @@ contains
         end if
 
         ! Adding the lagrangian subgrid variables  to the formatted database file ---------
-        if (lag_bubbles) then
+        if (bubbles_lagrange) then
             !! Void fraction field
             q_sf = 1.0d0 - q_particle(1)%sf( &
                    -offset_x%beg:m + offset_x%end, &

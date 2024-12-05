@@ -55,6 +55,7 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
+    'rkck_adap_dt': ParamType.LOG, 
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -89,7 +90,6 @@ PRE_PROCESS.update({
     'n_start': ParamType.INT,
     'n_start_old': ParamType.INT,
     'surface_tension': ParamType.LOG,
-    'lag_adap_dt': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -237,37 +237,22 @@ SIMULATION.update({
     'low_Mach': ParamType.INT,
     'surface_tension': ParamType.LOG,
     'viscous': ParamType.LOG,
-    'lag_bubbles': ParamType.LOG,
-    'lag_nBubs_glb': ParamType.INT,
-    'lag_bubble_model': ParamType.INT,
-    'lag_cluster_type': ParamType.INT,
-    'lag_heatTransfer_model': ParamType.LOG,
-    'lag_massTransfer_model': ParamType.LOG,
-    'lag_rkck_tolerance': ParamType.REAL,
-    'lag_smooth_type': ParamType.INT,
-    'lag_epsilonb': ParamType.REAL,
-    'lag_solver_approach': ParamType.INT,
-    'lag_pressure_corrector': ParamType.LOG,
-    'lag_charwidth': ParamType.REAL,
-    'lag_valmaxvoid': ParamType.REAL,
-    'lag_adap_dt': ParamType.LOG,
-    'lag_write_bubbles': ParamType.LOG,
-    'lag_write_bubble_stats': ParamType.LOG,
-    'csonhost': ParamType.REAL,
-    'vischost': ParamType.REAL,
-    'Thost': ParamType.REAL,
-    'sigmabubble': ParamType.REAL,
-    'gammagas': ParamType.REAL,
-    'gammavapor': ParamType.REAL,
-    'pvap': ParamType.REAL,
-    'cpgas': ParamType.REAL,
-    'cpvapor': ParamType.REAL,
-    'kgas': ParamType.REAL,
-    'kvapor': ParamType.REAL,
-    'Rgas': ParamType.REAL,
-    'Rvap': ParamType.REAL,
-    'diffcoefvap': ParamType.REAL,
+    'bubbles_lagrange': ParamType.LOG,
 })
+
+for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
+             'write_bubbles', 'write_bubbles_stats' ]:
+    SIMULATION[f'lag_params%{var}'] = ParamType.LOG
+
+for var in [ 'solver_approach', 'bubble_model', 'cluster_type', 'smooth_type',
+             'nBubs_glb']:
+    SIMULATION[f'lag_params%{var}'] = ParamType.INT
+
+for var in [ 'csonhost', 'vischost', 'Thost', 'gammagas', 'gammavapor',
+             'pvap', 'cpgas', 'cpvapor', 'kgas', 'kvapor', 'Rgas', 'Rvapor',
+             'diffcoefvap', 'sigmabubble', 'rkck_tolerance', 'epsilonb',
+             'charwidth', 'valmaxvoid' ]:
+    SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
@@ -393,8 +378,7 @@ POST_PROCESS.update({
     't_stop': ParamType.REAL,
     'n_start': ParamType.INT,
     'surface_tension': ParamType.LOG,
-    'lag_bubbles': ParamType.LOG,
-    'lag_adap_dt': ParamType.LOG,
+    'bubbles_lagrange': ParamType.LOG,
 })
 
 for cmp_id in range(1,3+1):

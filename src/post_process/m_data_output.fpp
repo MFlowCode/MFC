@@ -288,7 +288,7 @@ contains
 
         end if
 
-        if (lag_bubbles) then !Lagrangian solver
+        if (bubbles_lagrange) then !Lagrangian solver
             dbdir = trim(case_dir)//'/lag_bubbles_post_process'
             file_loc = trim(dbdir)//'/.'
             call my_inquire(file_loc, dir_check)

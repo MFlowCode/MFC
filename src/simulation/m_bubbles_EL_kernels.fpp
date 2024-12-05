@@ -1,12 +1,12 @@
 !>
-!! @file m_kernel_functions.f90
-!! @brief Contains module m_kernel_functions
+!! @file m_bubbles_EL_kernels.f90
+!! @brief Contains module m_bubbles_EL_kernels
 
 #:include 'macros.fpp'
 
 !> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
 !!        in the Eulerian framework.
-module m_kernel_functions
+module m_bubbles_EL_kernels
 
     ! Dependencies =============================================================
 
@@ -16,45 +16,39 @@ module m_kernel_functions
 
     implicit none
 
-    integer :: mapCells             !< Number of cells around the bubble where the strength function will have effect
-    !$acc declare create(mapCells)
-
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
             !!      bubbles into the Eulerian framework using different approaches.
             !! @param nBubs Number of lagrangian bubbles in the current domain
-            !! @param lag_bub_interface_rad Radius of the bubbles
-            !! @param lag_bub_interface_vel Interface velocity of the bubbles
-            !! @param lag_bub_motion_s Computational coordinates of the bubbles
-            !! @param lag_bub_motion_pos Spatial coordinates of the bubbles
+            !! @param lbk_rad Radius of the bubbles
+            !! @param lbk_vel Interface velocity of the bubbles
+            !! @param lbk_s Computational coordinates of the bubbles
+            !! @param lbk_pos Spatial coordinates of the bubbles
             !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
+    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:3, 1:2), intent(in) :: lag_bub_motion_s, lag_bub_motion_pos
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:2), intent(in) :: lag_bub_interface_rad, lag_bub_interface_vel
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
-        mapCells = 3    !Number of cells around the bubble where the strength function will have effect (3+1+3)
-        !$acc update device(mapCells)
-
-        smoothfunc:select case(lag_smooth_type)
+        smoothfunc:select case(lag_params%smooth_type)
         case (1)
-        call s_gaussian(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
+        call s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
         case (2)
-        call s_deltafunc(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
+        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
         end select smoothfunc
 
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles only affects the cell where the bubble is located.
-    subroutine s_deltafunc(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
+    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:3, 1:2), intent(in) :: lag_bub_motion_s, lag_bub_motion_pos
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:2), intent(in) :: lag_bub_interface_rad, lag_bub_interface_vel
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
@@ -68,15 +62,15 @@ contains
         !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
         do l = 1, nBubs
 
-            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l, 2)**3
-            s_coord(1:3) = lag_bub_motion_s(l, 1:3, 2)
+            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l, 2)**2*lag_bub_interface_vel(l, 2)
+            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2*lbk_vel(l, 2)
 
             if (num_dims == 2) then
-                Vol = dx(cell(1))*dy(cell(2))*lag_charwidth
+                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
                 if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2d0*pi
             else
                 Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
@@ -94,7 +88,7 @@ contains
 
             !Product of two smeared functions
             !Update void fraction * time derivative of void fraction
-            if (lag_cluster_type >= 4) then
+            if (lag_params%cluster_type >= 4) then
                 addFun3 = (strength_vol*strength_vel)/Vol
                 !$acc atomic update
                 updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
@@ -105,11 +99,11 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
-    subroutine s_gaussian(nBubs, lag_bub_interface_rad, lag_bub_interface_vel, lag_bub_motion_s, lag_bub_motion_pos, updatedvar)
+    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:3, 1:2), intent(in) :: lag_bub_motion_s, lag_bub_motion_pos
-        real(kind(0d0)), dimension(1:lag_nBubs_glb, 1:2), intent(in) :: lag_bub_interface_rad, lag_bub_interface_vel
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
         real(kind(0.d0)), dimension(3) :: center
@@ -134,15 +128,15 @@ contains
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0.0d0
-            volpart = 4.0d0/3.0d0*pi*lag_bub_interface_rad(l, 2)**3
-            s_coord(1:3) = lag_bub_motion_s(l, 1:3, 2)
-            center(1:2) = lag_bub_motion_pos(l, 1:2, 2)
-            if (p > 0) center(3) = lag_bub_motion_pos(l, 3, 2)
+            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            center(1:2) = lbk_pos(l, 1:2, 2)
+            if (p > 0) center(3) = lbk_pos(l, 3, 2)
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lag_bub_interface_rad(l, 2)**2*lag_bub_interface_vel(l, 2)
+            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2*lbk_vel(l, 2)
 
             !$acc loop collapse(3) private(i, j, k, cellaux, nodecoord)
             do i = 1, smearGrid
@@ -159,17 +153,17 @@ contains
 
                         if (.not. celloutside) then
 
+                            nodecoord(1) = x_cc(cellaux(1))
+                            nodecoord(2) = y_cc(cellaux(2))
+                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
+                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0, func)
+                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1, func2)
+
                             ! Relocate cells for bubbles intersecting symmetric boundaries
                             if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
                                 .or. bc_z%beg == -2 .or. bc_z%end == -2) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
-
-                            nodecoord(1) = x_cc(cellaux(1))
-                            nodecoord(2) = y_cc(cellaux(2))
-                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0, func)
-                            if (lag_cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1, func2)
                         else
                             func = 0.0d0
                             func2 = 0.0d0
@@ -195,7 +189,7 @@ contains
 
                         !Product of two smeared functions
                         !Update void fraction * time derivative of void fraction
-                        if (lag_cluster_type >= 4) then
+                        if (lag_params%cluster_type >= 4) then
                             addFun3 = func2*strength_vol*strength_vel
                             !$acc atomic update
                             updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
@@ -251,21 +245,22 @@ contains
                            dtheta/2d0/PI*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
                 end do
             else
+
                 !< 2D cartesian function:
-                ! We smear particles considering a virtual depth (lag_charwidth)
+                ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0d0
-                Nr = ceiling(lag_charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1 - mapCells
                 dz = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
-                Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_charwidth/2d0))**2d0
+                Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
                 distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
-                func = dz/lag_charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
+                func = dz/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
                 do while (Nr_count < Nr - 1 + (mapCells - 1))
                     Nr_count = Nr_count + 1
-                    Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_charwidth/2d0))**2d0
+                    Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
                     distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
                     func = func + &
-                           dz/lag_charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
+                           dz/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
                 end do
             end if
         end if
@@ -380,9 +375,9 @@ contains
         call s_get_char_dist(cell(1), cell(2), cell(3), chardist)
         call s_get_char_vol(cell(1), cell(2), cell(3), charvol)
 
-        if (((volpart/charvol) > 0.5d0*lag_valmaxvoid) .or. (lag_smooth_type == 1)) then
+        if (((volpart/charvol) > 0.5d0*lag_params%valmaxvoid) .or. (lag_params%smooth_type == 1)) then
             rad = (3.0d0*volpart/(4.0d0*pi))**(1.0d0/3.0d0)
-            stddsv = 1.0d0*lag_epsilonb*max(chardist, rad)
+            stddsv = 1.0d0*lag_params%epsilonb*max(chardist, rad)
         else
             stddsv = 0.0d0
         end if
@@ -419,7 +414,7 @@ contains
             if (cyl_coord) then
                 Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2.0d0*pi
             else
-                Charvol = dx(cellx)*dy(celly)*lag_charwidth
+                Charvol = dx(cellx)*dy(celly)*lag_params%charwidth
             end if
         end if
 
@@ -498,4 +493,4 @@ contains
 
     end subroutine s_get_cell
 
-end module m_kernel_functions
+end module m_bubbles_EL_kernels

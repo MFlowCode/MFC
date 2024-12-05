@@ -781,11 +781,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Lagrangian bubbles
         for adap_dt in ['F', 'T']:
             for couplingMethod in [1, 2]:
-                stack.push("lagrangian bubbles", {"lag_bubbles": 'T',
-                    'dt': 1e-06,
-                    'lag_cluster_type': 2,
-                    'lag_pressure_corrector': 'T', 'lag_smooth_type': 1, 'lag_bubble_model': 1, 'lag_heatTransfer_model': 'T',  
-                    'lag_massTransfer_model': 'T', 
+                stack.push("lagrangian bubbles", {"bubbles_lagrange": 'T',
+                    'dt': 1e-06, 'lag_params%cluster_type': 2,'lag_params%pressure_corrector': 'T', 
+                    'lag_params%smooth_type': 1, 'lag_params%bubble_model': 1, 
+                    'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
                     'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
                     'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
@@ -798,16 +797,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10
                 })
                 if couplingMethod==1:
-                    stack.push('One-way coupling',{'lag_solver_approach': 1})
+                    stack.push('One-way coupling',{'lag_params%solver_approach': 1})
                 else:
-                    stack.push('Two-way coupling',{'lag_solver_approach': 1})
+                    stack.push('Two-way coupling',{'lag_params%solver_approach': 2})
 
                 if adap_dt=='F':
-                    stack.push('',{'lag_adap_dt': 'F',
+                    stack.push('',{'rkck_adap_dt': 'F',
                             'acoustic(1)%mag': 1e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
                 else:
-                    stack.push('lag_adap_dt=T',{'lag_adap_dt': 'T',
-                            'acoustic(1)%mag': 5e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05})
+                    stack.push('rkck_adap_dt=T',{'rkck_adap_dt': 'T',
+                            'acoustic(1)%mag': 5e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05, 'time_stepper': 4})
 
                 cases.append(define_case_d(stack, '', {}))
 

@@ -245,7 +245,7 @@ module m_global_parameters
     !> @}
 
     !> @ lagrangian solver parameters
-    logical :: lag_adap_dt
+    logical :: rkck_adap_dt
     !> @}
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
@@ -477,7 +477,7 @@ contains
         end do
 
         ! Lagrangian solver
-        lag_adap_dt = .false.
+        rkck_adap_dt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

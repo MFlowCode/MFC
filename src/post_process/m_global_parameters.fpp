@@ -296,7 +296,7 @@ module m_global_parameters
 
     !> @name Lagrangian bubbles
     !> @{
-    logical :: lag_bubbles, lag_adap_dt
+    logical :: bubbles_lagrange, rkck_adap_dt
     !> @}
 
 contains
@@ -412,8 +412,8 @@ contains
         adv_n = .false.
 
         ! Lagrangian bubbles modeling
-        lag_bubbles = .false.
-        lag_adap_dt = .false.
+        bubbles_lagrange = .false.
+        rkck_adap_dt = .false.
 
         ! IBM
         num_ibs = dflt_int
@@ -669,7 +669,7 @@ contains
 
 #ifdef MFC_MPI
 
-        if (lag_bubbles) then
+        if (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
             do i = 1, sys_size + 1
@@ -849,7 +849,7 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
 
-            if (lag_bubbles) MPI_IO_DATA%var(sys_size + 1)%sf => null()
+            if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

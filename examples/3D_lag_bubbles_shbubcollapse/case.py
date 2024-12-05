@@ -58,7 +58,7 @@ Nz = 60        # number of elements into z direction
 
 dt  = 4.e-08        # time-step - sec
 stopTime  = 60.e-06 # stop time - sec
-saveTime  = 30.e-6   # save time - sec
+saveTime  = 30.e-06 # save time - sec
 
 # Configuring case dictionary
 print(json.dumps({
@@ -91,6 +91,7 @@ print(json.dumps({
     'num_patches'                  : 1,
     'mpp_lim'                      : 'F',
     'viscous'                      : 'T',
+    'time_stepper'                 : 4, # 4th/5th RKCK
     'weno_order'                   : 5,
     'weno_eps'                     : 1.0E-16,
     'mapped_weno'                  :'T',
@@ -146,35 +147,35 @@ print(json.dumps({
     # ==========================================================
 
     # Lagrangian Particles (bubbles) ===========================
-     'lag_bubbles'                 : 'T',
-     'lag_nBubs_glb'               : 1,
-     'lag_adap_dt'                 : 'T', #Uses adaptive time stepper
-     'lag_solver_approach'         : 2,
-     'lag_cluster_type'            : 2,
-     'lag_pressure_corrector'      : 'T',
-     'lag_smooth_type'             : 1,
-     'lag_bubble_model'            : 1,
-     'lag_heatTransfer_model'      : 'T',
-     'lag_massTransfer_model'      : 'T',
-     'lag_epsilonb'                : 1.0,
-     'lag_rkck_tolerance'          : 1.0e-05,
-     'lag_valmaxvoid'              : 0.9,
-     'lag_write_bubbles'           : 'F',
-     'lag_write_bubble_stats'      : 'F',
-     'csonhost'                    : c_host/c0,
-     'vischost'                    : mu_host/(rho0*x0*c0),
-     'Thost'                       : T_host/T0,
-     'gammagas'                    : gamma_g,
-     'gammavapor'                  : gamma_v,
-     'pvap'                        : pv/p0,
-     'cpgas'                       : cp_g*(T0/(c0*c0)),
-     'cpvapor'                     : cp_v*(T0/(c0*c0)),
-     'kgas'                        : k_g*(T0/(x0*rho0*c0*c0*c0)),
-     'kvapor'                      : k_v*(T0/(x0*rho0*c0*c0*c0)),
-     'Rgas'                        : (R_uni/MW_g)*(T0/(c0*c0)),
-     'Rvap'                        : (R_uni/MW_v)*(T0/(c0*c0)),
-     'diffcoefvap'                 : diffVapor/(x0*c0),
-     'sigmabubble'                 : sigBubble/(rho0*x0*c0*c0),
+     'bubbles_lagrange'                 : 'T',
+     'rkck_adap_dt'                     : 'T', #Uses adaptive time stepper
+     'lag_params%nBubs_glb'             : 1,
+     'lag_params%solver_approach'       : 2,
+     'lag_params%cluster_type'          : 2,
+     'lag_params%pressure_corrector'    : 'T',
+     'lag_params%smooth_type'           : 1,
+     'lag_params%bubble_model'          : 1,
+     'lag_params%heatTransfer_model'    : 'T',
+     'lag_params%massTransfer_model'    : 'F',
+     'lag_params%epsilonb'              : 1.0,
+     'lag_params%rkck_tolerance'        : 1.0e-05,
+     'lag_params%valmaxvoid'            : 0.9,
+     'lag_params%write_bubbles'         : 'F',
+     'lag_params%write_bubbles_stats'   : 'F',
+     'lag_params%csonhost'              : c_host/c0,
+     'lag_params%vischost'              : mu_host/(rho0*x0*c0),
+     'lag_params%Thost'                 : T_host/T0,
+     'lag_params%gammagas'              : gamma_g,
+     'lag_params%gammavapor'            : gamma_v,
+     'lag_params%pvap'                  : pv/p0,
+     'lag_params%cpgas'                 : cp_g*(T0/(c0*c0)),
+     'lag_params%cpvapor'               : cp_v*(T0/(c0*c0)),
+     'lag_params%kgas'                  : k_g*(T0/(x0*rho0*c0*c0*c0)),
+     'lag_params%kvapor'                : k_v*(T0/(x0*rho0*c0*c0*c0)),
+     'lag_params%Rgas'                  : (R_uni/MW_g)*(T0/(c0*c0)),
+     'lag_params%Rvapor'                : (R_uni/MW_v)*(T0/(c0*c0)),
+     'lag_params%diffcoefvap'           : diffVapor/(x0*c0),
+     'lag_params%sigmabubble'           : sigBubble/(rho0*x0*c0*c0),
     # ==========================================================
 
     # Fluids Physical Parameters ===============================

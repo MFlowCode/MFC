@@ -242,7 +242,7 @@ contains
             end if
         end if
 
-        if (lag_bubbles) then !Lagrangian solver
+        if (bubbles_lagrange) then !Lagrangian solver
 
             ! Checking whether the data file associated with the variable
             ! position of currently manipulated conservative variable exists
@@ -300,7 +300,7 @@ contains
 
         integer :: alt_sys !Altered sys_size for lagrangian solver
 
-        if (lag_bubbles) then
+        if (bubbles_lagrange) then
             alt_sys = sys_size + 1
         else
             alt_sys = sys_size
@@ -461,7 +461,7 @@ contains
                 ! Initialize MPI data I/O
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
-                elseif (lag_bubbles) then
+                elseif (bubbles_lagrange) then
                     call s_initialize_mpi_data(q_cons_vf, beta=q_particle(1))
                 else
                     call s_initialize_mpi_data(q_cons_vf)
@@ -506,7 +506,7 @@ contains
                     end do
                 end if
 
-                if (lag_bubbles) then !Lagrangian solver
+                if (bubbles_lagrange) then !Lagrangian solver
                     var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -1319,7 +1319,7 @@ contains
         ! the simulation
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
-        if (lag_bubbles) allocate (q_particle(1))
+        if (bubbles_lagrange) allocate (q_particle(1))
 
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of the
@@ -1346,7 +1346,7 @@ contains
                                             -buff_size:p + buff_size))
                 end if
 
-                if (lag_bubbles) then
+                if (bubbles_lagrange) then
                     allocate (q_particle(1)%sf(-buff_size:m + buff_size, &
                                                -buff_size:n + buff_size, &
                                                -buff_size:p + buff_size))
@@ -1370,7 +1370,7 @@ contains
                                             0:0))
                 end if
 
-                if (lag_bubbles) then
+                if (bubbles_lagrange) then
                     allocate (q_particle(1)%sf(-buff_size:m + buff_size, &
                                                -buff_size:n + buff_size, &
                                                0:0))
@@ -1394,7 +1394,7 @@ contains
                 allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
             end if
 
-            if (lag_bubbles) then
+            if (bubbles_lagrange) then
                 allocate (q_particle(1)%sf(-buff_size:m + buff_size, 0:0, 0:0))
             end if
 
@@ -1426,7 +1426,7 @@ contains
             deallocate (ib_markers%sf)
         end if
 
-        if (lag_bubbles) then
+        if (bubbles_lagrange) then
             deallocate (q_particle(1)%sf)
             deallocate (q_particle)
         end if

@@ -33,7 +33,7 @@ contains
         call s_check_inputs_acoustic_src
         call s_check_inputs_hypoelasticity
         call s_check_inputs_bubbles
-        call s_check_inputs_lag_bubbles
+        call s_check_inputs_bubbles_lagrange
         call s_check_inputs_adapt_dt
         call s_check_inputs_alt_soundspeed
         call s_check_inputs_stiffened_eos_viscosity
@@ -101,7 +101,7 @@ contains
         if (.not. cfl_dt) then
             @:PROHIBIT(dt <= 0)
         end if
-        @:PROHIBIT((time_stepper < 1 .or. time_stepper > 5) .and. .not. lag_bubbles)
+        @:PROHIBIT(time_stepper < 1 .or. time_stepper > 5)
     end subroutine s_check_inputs_time_stepping
 
     !> Checks constraints on parameters related to 6-equation model
@@ -313,10 +313,10 @@ contains
     end subroutine s_check_inputs_body_forces
 
     !> Checks constraints on lagrangian bubble parameters
-    subroutine s_check_inputs_lag_bubbles
-        @:PROHIBIT(lag_bubbles .and. file_per_process, "file_per_process must be false for lag_bubbles")
-        @:PROHIBIT(lag_bubbles .and. n==0, "lag_bubbles accepts 2D and 3D simulations only")
-    end subroutine s_check_inputs_lag_bubbles
+    subroutine s_check_inputs_bubbles_lagrange
+        @:PROHIBIT(bubbles_lagrange .and. file_per_process, "file_per_process must be false for bubbles_lagrange")
+        @:PROHIBIT(bubbles_lagrange .and. n==0, "bubbles_lagrange accepts 2D and 3D simulations only")
+    end subroutine s_check_inputs_bubbles_lagrange
 
     !> Checks miscellaneous constraints,
         !! including constraints on probe_wrt and integral_wrt

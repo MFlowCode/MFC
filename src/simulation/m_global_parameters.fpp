@@ -454,42 +454,11 @@ module m_global_parameters
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
-    logical :: lag_bubbles                  !< Lagrangian subgrid bubble model switch
-    integer :: lag_solver_approach          !< 1: One-way coupling, 2: two-way coupling
-    integer :: lag_bubble_model             !< Bubble dynamics model. 1: Keller-Miksis equation
-    integer :: lag_cluster_type             !< Cluster model to find p_inf
-    logical :: lag_pressure_corrector       !< Cell pressure correction term
-    logical :: lag_adap_dt                  !< Activates the adaptive rkck time stepping algorithm
-    integer :: lag_smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3
-    logical :: lag_heatTransfer_model       !< Activate HEAT transfer model at the bubble-liquid interface
-    logical :: lag_massTransfer_model       !< Activate MASS transfer model at the bubble-liquid interface
-    logical :: lag_write_bubbles            !< Write files to track the bubble evolution each time step
-    logical :: lag_write_bubble_stats       !< Write the maximum and minimum radius of each bubble
-    integer :: lag_nBubs_glb                !< Global number of bubbles
-    real(kind(0d0)) :: lag_epsilonb         !< Standard deviation scaling for the gaussian function (default: 1.0d0)
-    real(kind(0d0)) :: lag_rkck_tolerance   !< Adaptive RKCK tolerance
-    real(kind(0d0)) :: lag_charwidth        !< Domain virtual depth (z direction, for 2D simulations)
-    real(kind(0d0)) :: lag_valmaxvoid       !< Maximum void fraction permitted
-    real(kind(0d0)) :: csonhost             !< Liquid speed of sound
-    real(kind(0d0)) :: vischost             !< Liquid viscosity
-    real(kind(0d0)) :: Thost                !< Liquid temperature
-    real(kind(0d0)) :: gammagas, gammavapor !< Gas and vapour gamma
-    real(kind(0d0)) :: pvap                 !< Vapour pressure at the reference temperature
-    real(kind(0d0)) :: cpgas, cpvapor       !< Gas and vapor specific heat capacity
-    real(kind(0d0)) :: kgas, kvapor         !< Gas and vapor thermal conductivity
-    real(kind(0d0)) :: Rgas, Rvap           !< Gas and vapour specific gas constant
-    real(kind(0d0)) :: diffcoefvap          !< Vapor diffusivity in the gas
-    real(kind(0d0)) :: sigmabubble          !< Surface tension
-    logical :: lag_largestep                !< Gets activated when the time step is too large
-    real(kind(0d0)) :: lag_errmax           !< Truncation error (adaptive rkck algorithm)
-    real(kind(0d0)) :: dt_max, time_tmp     !< Maximum time step size and temporal time (in rkck stepper)
-
-    !$acc declare create(lag_bubbles, lag_solver_approach, lag_bubble_model, lag_cluster_type, lag_pressure_corrector, &
-    !$acc lag_adap_dt, lag_smooth_type, lag_heatTransfer_model, lag_massTransfer_model, lag_write_bubbles, lag_write_bubble_stats, &
-    !$acc lag_nBubs_glb, lag_epsilonb, lag_rkck_tolerance, lag_charwidth, lag_valmaxvoid, csonhost, vischost, Thost, gammagas, &
-    !$acc gammavapor, pvap, cpgas, cpvapor, kgas, kvapor, Rgas, Rvap, diffcoefvap, sigmabubble, lag_largestep, lag_errmax, &
-    !$acc dt_max, time_tmp)
-
+    logical :: bubbles_lagrange              !< Lagrangian subgrid bubble model switch
+    type(bubbles_lagrange_parameters) :: lag_params !< Lagrange bubbles' parameters
+    logical :: rkck_adap_dt          !< Activates the adaptive rkck time stepping algorithm
+    real(kind(0d0)) :: dt_max, rkck_time_tmp !< Maximum time step size and temporal time (in rkck stepper)
+    !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp)
     !> @}
     ! ======================================================================
 
@@ -710,37 +679,46 @@ contains
             integral(i)%ymax = dflt_real
         end do
 
+        ! GRCBC flags
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%grcbc_in = .false.
+            bc_${dir}$%grcbc_out = .false.
+            bc_${dir}$%grcbc_vel_out = .false.
+        #:endfor
+
         ! Lagrangian subgrid bubble model
-        lag_bubbles = .false.
-        lag_write_bubbles = .false.
-        lag_write_bubble_stats = .false.
-        lag_bubble_model = dflt_int
-        lag_cluster_type = dflt_int
-        lag_heatTransfer_model = .false.
-        lag_massTransfer_model = .false.
-        lag_adap_dt = .false.
-        lag_rkck_tolerance = dflt_real
-        lag_smooth_type = dflt_int
-        lag_epsilonb = dflt_real
-        lag_solver_approach = dflt_int
-        lag_pressure_corrector = .false.
-        lag_charwidth = dflt_real
-        lag_valmaxvoid = dflt_real
-        lag_nBubs_glb = dflt_int
-        csonhost = dflt_real
-        vischost = dflt_real
-        Thost = dflt_real
-        gammagas = dflt_real
-        gammavapor = dflt_real
-        pvap = dflt_real
-        cpgas = dflt_real
-        cpvapor = dflt_real
-        kgas = dflt_real
-        kvapor = dflt_real
-        Rgas = dflt_real
-        Rvap = dflt_real
-        diffcoefvap = dflt_real
-        sigmabubble = dflt_real
+        bubbles_lagrange = .false.
+        lag_params%solver_approach = dflt_int
+        lag_params%bubble_model = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%epsilonb = dflt_real
+        lag_params%rkck_tolerance = dflt_real
+        lag_params%charwidth = dflt_real
+        lag_params%valmaxvoid = dflt_real
+        lag_params%csonhost = dflt_real
+        lag_params%vischost = dflt_real
+        lag_params%Thost = dflt_real
+        lag_params%gammagas = dflt_real
+        lag_params%gammavapor = dflt_real
+        lag_params%pvap = dflt_real
+        lag_params%cpgas = dflt_real
+        lag_params%cpvapor = dflt_real
+        lag_params%kgas = dflt_real
+        lag_params%kvapor = dflt_real
+        lag_params%Rgas = dflt_real
+        lag_params%Rvapor = dflt_real
+        lag_params%diffcoefvap = dflt_real
+        lag_params%sigmabubble = dflt_real
+        rkck_adap_dt = .false.
+        rkck_time_tmp = dflt_real
+        dt_max = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1047,7 +1025,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
-        elseif (lag_bubbles) then
+        elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
@@ -1064,7 +1042,7 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-        elseif (lag_bubbles) then
+        elseif (bubbles_lagrange) then
             do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
@@ -1105,7 +1083,7 @@ contains
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
-        if (lag_bubbles) then
+        if (bubbles_lagrange) then
             buff_size = max(buff_size, 6)
         end if
 
@@ -1248,7 +1226,7 @@ contains
         if (parallel_io) then
             deallocate (start_idx)
 
-            if (lag_bubbles) then
+            if (bubbles_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
