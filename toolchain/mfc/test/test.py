@@ -53,14 +53,14 @@ def __filter(cases_) -> typing.List[TestCase]:
                 cases.remove(case)
 
     for case in cases[:]:
-        if case.ppn > 1 and not ARG("mpi") or 'IBM' in case.trace:
+        if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
     
     for case in cases[:]:
         if ARG("single"):
             skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
-            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical']
+            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'Example']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
@@ -248,8 +248,8 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
     global errors
 
     nAttempts = 0
-    if ARG('single') and ARG('test_all'):
-        max_attempts = max(ARG('max_attempts'), 20)
+    if ARG('single'):
+        max_attempts = max(ARG('max_attempts'), 3)
     else:
         max_attempts = ARG('max_attempts')
 

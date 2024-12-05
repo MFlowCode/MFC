@@ -1055,8 +1055,8 @@ contains
         t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
-        dist_min = 1e-12
-        dist_min_normal = 1e-12
+        dist_min = 1e12
+        dist_min_normal = 1e12
         distance = 0._wp
 
         tri_idx = 0
@@ -1221,7 +1221,7 @@ contains
         cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
         cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
         cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
-        tri_area = 0.5d0*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
+        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
 
     end function f_tri_area
 
