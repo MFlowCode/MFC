@@ -276,7 +276,7 @@ contains
                          .and. &
                          patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         .or. &
-                        (.not. ib .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
+                        (.not. present(ib) .and. patch_id_fp(i, j, 0) == smooth_patch_id)) &
                         then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &

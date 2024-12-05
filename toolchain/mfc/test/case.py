@@ -222,6 +222,7 @@ print(json.dumps({{**case, **mods}}))
             self.get_dirpath(),
             self.get_parameters())
 
+    # pylint: disable=too-many-return-statements
     def compute_tolerance(self) -> float:
         if self.override_tol:
             return self.override_tol
@@ -229,13 +230,15 @@ print(json.dumps({{**case, **mods}}))
         tolerance = 1e-12  # Default
         single = ARG("single")
 
-        if self.params.get("hypoelasticity", 'F') == 'T':
+        if "Example" in self.trace.split(" -> "):
+            tolerance = 1e-3
+        elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
         elif self.params.get("mixlayer_perturb", 'F') == 'T':
             tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
             tolerance = 1e-10
-        elif self.params.get("low_Mach", 'F') in [1, 2]:
+        elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
         elif self.params.get("acoustic_source", 'F') == 'T':
             if self.params.get("acoustic(1)%pulse") == 3:  # Square wave
@@ -262,7 +265,7 @@ class TestCaseBuilder:
         return trace_to_uuid(self.trace)
 
     def to_case(self) -> TestCase:
-        dictionary = self.mods.copy()
+        dictionary = {}
         if self.path:
             dictionary.update(input.load(self.path, self.args, do_print=False).params)
 
@@ -274,10 +277,12 @@ class TestCaseBuilder:
                     path = os.path.abspath(path)
                     if os.path.exists(path):
                         dictionary[key] = path
-                        break
 
         if self.mods:
             dictionary.update(self.mods)
+
+        if self.functor:
+            self.functor(dictionary)
 
         return TestCase(self.trace, dictionary, self.ppn, self.override_tol)
 

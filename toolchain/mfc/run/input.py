@@ -93,7 +93,6 @@ class MFCInputFile(Case):
         cons.print()
         self.generate_fpp(target)
 
-
     def clean(self, _targets) -> None:
         targets = [build.get_target(target) for target in _targets]
 
