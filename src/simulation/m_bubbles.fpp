@@ -21,9 +21,9 @@ module m_bubbles
 
     implicit none
 
-    real(kind(0._wp)) :: chi_vw  !< Bubble wall properties (Ando 2010)
-    real(kind(0._wp)) :: k_mw    !< Bubble wall properties (Ando 2010)
-    real(kind(0._wp)) :: rho_mw  !< Bubble wall properties (Ando 2010)
+    real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
+    real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
+    real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
     !$acc declare create(chi_vw, k_mw, rho_mw)
 
     real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
@@ -887,9 +887,9 @@ contains
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
 
-        real(kind(0._wp)) :: T_bar
-        real(kind(0._wp)) :: grad_T
-        real(kind(0._wp)) :: f_bpres_dot
+        real(wp) :: T_bar
+        real(wp) :: grad_T
+        real(wp) :: f_bpres_dot
 
         if (thermal == 3) then
             T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &

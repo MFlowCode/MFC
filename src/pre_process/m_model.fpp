@@ -680,12 +680,12 @@ contains
             edgetan = boundary_edge(1)/boundary_edge(2)
 
             if (abs(boundary_edge(2)) < threshold_vector_zero) then
-                if (edgetan > 0d0) then
+                if (edgetan > 0._wp) then
                     ynormal = -1
-                    xnormal = 0d0
+                    xnormal = 0._wp
                 else
                     ynormal = 1
-                    xnormal = 0d0
+                    xnormal = 0._wp
                 end if
             else
                 initial = boundary_edge(2)
@@ -860,13 +860,13 @@ contains
                 edge_del(2) = (edge_y(2) - edge_y(1))/num_segments
             else
                 num_segments = 1
-                edge_del(1) = 0d0
-                edge_del(2) = 0d0
+                edge_del(1) = 0._wp
+                edge_del(2) = 0._wp
             end if
 
             interpolated_boundary_v(1, 1) = edge_x(1)
             interpolated_boundary_v(1, 2) = edge_y(1)
-            interpolated_boundary_v(1, 3) = 0d0
+            interpolated_boundary_v(1, 3) = 0._wp
 
             ! Add original and interpolated vertices to the output array
             do j = 1, num_segments - 1
@@ -987,7 +987,7 @@ contains
                     edge_del(3) = (tri(2, 3) - tri(1, 3))/num_segments
                 else
                     num_segments = 1
-                    edge_del = 0d0
+                    edge_del = 0._wp
                 end if
 
                 ! Add original and interpolated vertices to the output array
@@ -1020,11 +1020,11 @@ contains
                     call random_number(bary_coord(1))
                     call random_number(bary_coord(2))
 
-                    if ((bary_coord(1) + bary_coord(2)) >= 1.0d0) then
-                        bary_coord(1) = 1d0 - bary_coord(1)
-                        bary_coord(2) = 1d0 - bary_coord(2)
+                    if ((bary_coord(1) + bary_coord(2)) >= 1._wp) then
+                        bary_coord(1) = 1._wp - bary_coord(1)
+                        bary_coord(2) = 1._wp - bary_coord(2)
                     end if
-                    bary_coord(3) = 1d0 - bary_coord(1) - bary_coord(2)
+                    bary_coord(3) = 1._wp - bary_coord(1) - bary_coord(2)
 
                     total_vertices = total_vertices + 1
                     interpolated_boundary_v(total_vertices, 1) = dot_product(bary_coord, tri(1:3, 1))
@@ -1055,9 +1055,9 @@ contains
         t_vec3 :: dist_buffer !< Distance between the cell center and the vertices
         integer :: i, j, tri_idx !< Iterator
 
-        dist_min = 1d12
-        dist_min_normal = 1d12
-        distance = 0d0
+        dist_min = 1e-12
+        dist_min_normal = 1e-12
+        distance = 0._wp
 
         tri_idx = 0
         do i = 1, model%ntrs
@@ -1115,7 +1115,7 @@ contains
         real(wp), dimension(1:boundary_edge_count) :: dist_buffer
         real(wp) :: distance
 
-        distance = 0d0
+        distance = 0._wp
         do i = 1, boundary_edge_count
             dist_buffer1 = sqrt((point(1) - boundary_v(i, 1, 1))**2 + &
                                 & (point(2) - boundary_v(i, 1, 2))**2)
@@ -1148,14 +1148,14 @@ contains
         real(wp) :: dist_min, dist_buffer
         real(wp) :: midp(1:3)
 
-        dist_buffer = 0d0
+        dist_buffer = 0._wp
         dist_min = initial_distance_buffer
         idx_buffer = 0
 
         do i = 1, boundary_edge_count
             midp(1) = (boundary_v(i, 2, 1) + boundary_v(i, 1, 1))/2
             midp(2) = (boundary_v(i, 2, 2) + boundary_v(i, 1, 2))/2
-            midp(3) = 0d0
+            midp(3) = 0._wp
 
             dist_buffer = sqrt((point(1) - midp(1))**2 + &
                                 & (point(2) - midp(2))**2)
@@ -1168,7 +1168,7 @@ contains
 
         normals(1) = boundary_v(idx_buffer, 3, 1)
         normals(2) = boundary_v(idx_buffer, 3, 2)
-        normals(3) = 0d0
+        normals(3) = 0._wp
 
     end subroutine f_normals
 

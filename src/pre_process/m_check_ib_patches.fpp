@@ -209,11 +209,11 @@ contains
             .or. &
             f_is_default(patch_ib(patch_id)%z_centroid) &
             .or. &
-            patch_ib(patch_id)%length_x <= 0d0 &
+            patch_ib(patch_id)%length_x <= 0._wp &
             .or. &
-            patch_ib(patch_id)%length_y <= 0d0 &
+            patch_ib(patch_id)%length_y <= 0._wp &
             .or. &
-            patch_ib(patch_id)%length_z <= 0d0, &
+            patch_ib(patch_id)%length_z <= 0._wp, &
             'in cuboid IB patch '//trim(iStr))
 
     end subroutine s_check_cuboid_ib_patch_geometry
@@ -272,11 +272,11 @@ contains
         @:PROHIBIT(patch_ib(patch_id)%model_filepath == dflt_char, &
             'Empty model file path for patch '//trim(iStr))
 
-        @:PROHIBIT(patch_ib(patch_id)%model_scale(1) <= 0d0 &
+        @:PROHIBIT(patch_ib(patch_id)%model_scale(1) <= 0._wp &
             .or. &
-            patch_ib(patch_id)%model_scale(2) <= 0d0 &
+            patch_ib(patch_id)%model_scale(2) <= 0._wp &
             .or. &
-            patch_ib(patch_id)%model_scale(3) <= 0d0, &
+            patch_ib(patch_id)%model_scale(3) <= 0._wp, &
             'Negative scale in model IB patch '//trim(iStr))
 
     end subroutine s_check_model_ib_patch_geometry

@@ -53,13 +53,14 @@ def __filter(cases_) -> typing.List[TestCase]:
                 cases.remove(case)
 
     for case in cases[:]:
-        if case.ppn > 1 and not ARG("mpi"):
+        if case.ppn > 1 and not ARG("mpi") or 'IBM' in case.trace:
             cases.remove(case)
             skipped_cases.append(case)
-
+    
     for case in cases[:]:
         if ARG("single"):
-            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6']
+            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
+            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical']
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 

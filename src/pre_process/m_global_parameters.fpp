@@ -447,9 +447,9 @@ contains
             patch_ib(i)%slip = .false.
 
             ! Proper default values for translating STL models
-            patch_ib(i)%model_scale(:) = 1d0
-            patch_ib(i)%model_translate(:) = 0d0
-            patch_ib(i)%model_rotate(:) = 0d0
+            patch_ib(i)%model_scale(:) = 1._wp
+            patch_ib(i)%model_translate(:) = 0._wp
+            patch_ib(i)%model_rotate(:) = 0._wp
             patch_ib(i)%model_filepath(:) = dflt_char
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold

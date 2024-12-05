@@ -883,7 +883,7 @@ contains
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
                                 do i = 2, momxb
-                                    L(2) = c**3d0*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    L(2) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
                                     L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
@@ -895,17 +895,17 @@ contains
                                 do i = E_idx, advxe - 1
                                     L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(advxe) = rho*c**2d0*(1d0 + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1d0 + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
-                                L(advxe) = c*(1d0 - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
+                                L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
 
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(advxe) = L(advxe) + rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
@@ -1112,7 +1112,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsx_vf(j, k, r, momxb) = &
                             q_prim_vf(momxb)%sf(dj*(m - 2*j) + j, k, r)* &
-                            sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1124,7 +1124,7 @@ contains
                         do j = -1, buff_size
                             flux_rsx_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1159,7 +1159,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsx_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1188,7 +1188,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsy_vf(j, k, r, momxb + 1) = &
                             q_prim_vf(momxb + 1)%sf(k, dj*(n - 2*j) + j, r)* &
-                            sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1200,7 +1200,7 @@ contains
                         do j = -1, buff_size
                             flux_rsy_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1235,7 +1235,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsy_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1264,7 +1264,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsz_vf(j, k, r, momxe) = &
                             q_prim_vf(momxe)%sf(r, k, dj*(p - 2*j) + j)* &
-                            sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1276,7 +1276,7 @@ contains
                         do j = -1, buff_size
                             flux_rsz_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1311,7 +1311,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsz_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1361,7 +1361,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_rsx_vf_l(j, k, r, i)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1395,7 +1395,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_src_rsx_vf_l(j, k, r, advxb)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1412,7 +1412,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_rsy_vf_l(j, k, r, i)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1447,7 +1447,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_src_rsy_vf_l(j, k, r, advxb)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1465,7 +1465,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_rsz_vf_l(j, k, r, i)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1500,7 +1500,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_src_rsz_vf_l(j, k, r, advxb)* &
-                                sign(1._wp, -real(cbc_loc, kind(0._wp)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do

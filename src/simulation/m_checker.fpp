@@ -39,6 +39,7 @@ contains
         call s_check_inputs_body_forces
         call s_check_inputs_misc
         call s_check_inputs_grcbc
+        call s_check_inputs_geometry_precision
 
     end subroutine s_check_inputs
 
@@ -51,6 +52,7 @@ contains
 #ifndef MFC_cuTENSOR
         @:PROHIBIT(cu_tensor, "MFC was not built with the NVIDIA cuTENSOR library")
 #endif
+
     end subroutine s_check_inputs_compilers
 
     !> Checks constraints on WENO scheme parameters
@@ -96,6 +98,14 @@ contains
         @:PROHIBIT(riemann_solver /= 2 .and. low_Mach /= 0, "low_Mach = 1 or 2 requires riemann_solver = 2")
         @:PROHIBIT(low_Mach /= 0 .and. model_eqns /= 2, "low_Mach = 1 or 2 requires model_eqns = 2")
     end subroutine s_check_inputs_riemann_solver
+
+    !> Checks constraints on geometry and precision
+    subroutine s_check_inputs_geometry_precision
+        ! Prevent spherical geometry in single precision
+#ifdef MFC_SINGLE_PRECISION
+        @:PROHIBIT(.not. (cyl_coord .neqv. .true. .or. (cyl_coord .and. p == 0)), "Fully 3D cylindrical grid (geometry = 3) is not supported in single precision.")
+#endif
+    end subroutine s_check_inputs_geometry_precision
 
     !> Checks constraints on time stepping parameters
     subroutine s_check_inputs_time_stepping
