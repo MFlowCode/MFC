@@ -41,20 +41,20 @@ module m_data_output
     ! database file(s). Note that for 1D simulations, q_root_sf is employed to
     ! gather the flow variable(s) from all sub-domains on to the root process.
     ! If the run is not parallel, but serial, then q_root_sf is equal to q_sf.
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: q_sf
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: q_root_sf
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: cyl_q_sf
+    real(wp), allocatable, dimension(:, :, :), public :: q_sf
+    real(wp), allocatable, dimension(:, :, :) :: q_root_sf
+    real(wp), allocatable, dimension(:, :, :) :: cyl_q_sf
     ! Single precision storage for flow variables
-    real(kind(0.0)), allocatable, dimension(:, :, :), public :: q_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: q_root_sf_s
-    real(kind(0.0)), allocatable, dimension(:, :, :) :: cyl_q_sf_s
+    real(sp), allocatable, dimension(:, :, :), public :: q_sf_s
+    real(sp), allocatable, dimension(:, :, :) :: q_root_sf_s
+    real(sp), allocatable, dimension(:, :, :) :: cyl_q_sf_s
 
     ! The spatial and data extents array variables contain information about the
     ! minimum and maximum values of the grid and flow variable(s), respectively.
     ! The purpose of bookkeeping this information is to boost the visualization
     ! of the Silo-HDF5 database file(s) in VisIt.
-    real(kind(0d0)), allocatable, dimension(:, :) :: spatial_extents
-    real(kind(0d0)), allocatable, dimension(:, :) :: data_extents
+    real(wp), allocatable, dimension(:, :) :: spatial_extents
+    real(wp), allocatable, dimension(:, :) :: data_extents
 
     ! The size of the ghost zone layer at beginning of each coordinate direction
     ! (lo) and at end of each coordinate direction (hi). Adding this information
@@ -102,7 +102,7 @@ module m_data_output
 
 contains
 
-    subroutine s_initialize_data_output_module
+    subroutine s_initialize_data_output_module() ! ----------------------------
         ! Description: Computation of parameters, allocation procedures, and/or
         !              any other tasks needed to properly setup the module
 
@@ -409,9 +409,9 @@ contains
 
         ! END: Querying Number of Flow Variable(s) in Binary Output ========
 
-    end subroutine s_initialize_data_output_module
+    end subroutine s_initialize_data_output_module ! --------------------------
 
-    subroutine s_open_formatted_database_file(t_step)
+    subroutine s_open_formatted_database_file(t_step) ! --------------------
         ! Description: This subroutine opens a new formatted database file, or
         !              replaces an old one, and readies it for the data storage
         !              of the grid and the flow variable(s) associated with the
@@ -424,7 +424,7 @@ contains
         !              not performed in multidimensions.
 
         ! Time-step that is currently being post-processed
-        integer, intent(in) :: t_step
+        integer, intent(IN) :: t_step
 
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
@@ -441,7 +441,7 @@ contains
             ! Creating formatted database slave file at the above location
             ! and setting up the structure of the file and its header info
             ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                            DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
+                            DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
                             DB_HDF5, dbfile)
 
             ! Verifying that the creation and setup process of the formatted
@@ -462,7 +462,7 @@ contains
                 file_loc = trim(rootdir)//trim(file_loc)
 
                 ierr = DBCREATE(trim(file_loc), len_trim(file_loc), &
-                                DB_CLOBBER, DB_LOCAL, 'MFC', 8, &
+                                DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, &
                                 DB_HDF5, dbroot)
 
                 if (dbroot == -1) then
@@ -528,9 +528,9 @@ contains
 
         ! END: Binary Database Format ======================================
 
-    end subroutine s_open_formatted_database_file
+    end subroutine s_open_formatted_database_file ! ------------------------
 
-    subroutine s_write_grid_to_formatted_database_file(t_step)
+    subroutine s_write_grid_to_formatted_database_file(t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
         !              the current time-step, t_step. The local processor will
@@ -551,7 +551,7 @@ contains
         !              subroutine s_write_variable_to_formatted_database_file.
 
         ! Time-step that is currently being post-processed
-        integer, intent(in) :: t_step
+        integer, intent(IN) :: t_step
 
         ! Bookkeeping variables storing the name and type of mesh that is
         ! handled by the local processor(s). Note that due to an internal
@@ -623,18 +623,10 @@ contains
 
             if (precision == 1) then
                 if (p > 0) then
-                    do i = -1 - offset_z%beg, p + offset_z%end
-                        z_cb_s(i) = real(z_cb(i))
-                    end do
-                else
-                    do i = -1 - offset_x%beg, m + offset_x%end
-                        x_cb_s(i) = real(x_cb(i))
-                    end do
-
-                    do i = -1 - offset_y%beg, n + offset_y%end
-                        y_cb_s(i) = real(y_cb(i))
-                    end do
+                    z_cb_s = real(z_cb, sp)
                 end if
+                x_cb_s = real(x_cb, sp)
+                y_cb_s = real(y_cb, sp)
             end if
 
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
@@ -670,6 +662,7 @@ contains
                     end if
                 end if
             #:endfor
+
             ! END: Silo-HDF5 Database Format ===================================
 
             ! Binary Database Format ===========================================
@@ -681,17 +674,17 @@ contains
             ! in multidimensions.
             if (p > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0)), &
-                        real(y_cb, kind(0.0)), &
-                        real(z_cb, kind(0.0))
+                    write (dbfile) real(x_cb, sp), &
+                        real(y_cb, sp), &
+                        real(z_cb, sp)
                 else
                     write (dbfile) x_cb, y_cb, z_cb
                 end if
 
             elseif (n > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0)), &
-                        real(y_cb, kind(0.0))
+                    write (dbfile) real(x_cb, sp), &
+                        real(y_cb, sp)
                 else
                     write (dbfile) x_cb, y_cb
                 end if
@@ -702,7 +695,7 @@ contains
             else
 
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, kind(0.0))
+                    write (dbfile) real(x_cb, wp)
                 else
                     write (dbfile) x_cb
                 end if
@@ -715,7 +708,7 @@ contains
 
                 if (proc_rank == 0) then
                     if (precision == 1) then
-                        write (dbroot) real(x_root_cb, kind(0.0))
+                        write (dbroot) real(x_root_cb, wp)
                     else
                         write (dbroot) x_root_cb
                     end if
@@ -727,7 +720,7 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_write_grid_to_formatted_database_file
+    end subroutine s_write_grid_to_formatted_database_file ! ---------------
 
     subroutine s_write_variable_to_formatted_database_file(varname, t_step)
         ! Description: The goal of this subroutine is to write to the formatted
@@ -748,10 +741,10 @@ contains
 
         ! Name of the flow variable, which will be written to the formatted
         ! database file at the current time-step, t_step
-        character(LEN=*), intent(in) :: varname
+        character(LEN=*), intent(IN) :: varname
 
         ! Time-step that is currently being post-processed
-        integer, intent(in) :: t_step
+        integer, intent(IN) :: t_step
 
         ! Bookkeeping variables storing the name and type of flow variable
         ! that is about to be handled by the local processor(s). Note that
@@ -762,7 +755,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Silo-HDF5 Database Format ========================================
 
@@ -775,30 +768,57 @@ contains
             ! and write it to the formatted database master file.
             if (n == 0) then
 
+                if (precision == 1 .and. wp == dp) then
+                    x_cc_s = real(x_cc, sp)
+                    q_sf_s = real(q_sf, sp)
+                elseif (precision == 1 .and. wp == sp) then
+                    x_cc_s = x_cc
+                    q_sf_s = q_sf
+                end if
+
                 ! Writing the curve object associated with the local process
                 ! to the formatted database slave file
-                err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
-                                 x_cc(0:m), q_sf, DB_DOUBLE, m + 1, &
-                                 DB_F77NULL, ierr)
+                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                    if (precision == ${PRECISION}$) then
+                        err = DBPUTCURVE(dbfile, trim(varname), len_trim(varname), &
+                                         x_cc${SFX}$ (0:m), q_sf${SFX}$, ${DBT}$, m + 1, &
+                                         DB_F77NULL, ierr)
+                    end if
+                #:endfor
 
                 ! Assembling the local grid and flow variable data for the
                 ! entire computational domain on to the root process
+
                 if (num_procs > 1) then
                     call s_mpi_defragment_1d_grid_variable()
                     call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
+
+                    if (precision == 1) then
+                        x_root_cc_s = real(x_root_cc, sp)
+                        q_root_sf_s = real(q_root_sf, sp)
+                    end if
                 else
-                    x_root_cc = x_cc(0:m)
-                    q_root_sf = q_sf
+                    if (precision == 1) then
+                        x_root_cc_s = real(x_cc, sp)
+                        q_root_sf_s = real(q_sf, sp)
+                    else
+                        x_root_cc = x_cc
+                        q_root_sf = q_sf
+                    end if
                 end if
 
                 ! Writing the curve object associated with the root process
                 ! to the formatted database master file
                 if (proc_rank == 0) then
-                    err = DBPUTCURVE(dbroot, trim(varname), &
-                                     len_trim(varname), &
-                                     x_root_cc, q_root_sf, &
-                                     DB_DOUBLE, m_root + 1, &
-                                     DB_F77NULL, ierr)
+                    #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                        if (precision == ${PRECISION}$) then
+                            err = DBPUTCURVE(dbroot, trim(varname), &
+                                             len_trim(varname), &
+                                             x_root_cc${SFX}$, q_root_sf${SFX}$, &
+                                             ${DBT}$, m_root + 1, &
+                                             DB_F77NULL, ierr)
+                        end if
+                    #:endfor
                 end if
 
                 return
@@ -845,25 +865,52 @@ contains
                 ! Finally, each of the local processor(s) proceeds to write
                 ! the flow variable data that it is responsible for to the
                 ! formatted database slave file.
-
-                if (precision == 1) then
+                if (wp == dp) then
+                    if (precision == 1) then
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
+                                end do
+                            end do
+                        end do
+                        if (grid_geometry == 3) then
+                            do i = -offset_x%beg, m + offset_x%end
+                                do j = -offset_y%beg, n + offset_y%end
+                                    do k = -offset_z%beg, p + offset_z%end
+                                        cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                    end do
+                                end do
+                            end do
+                        end if
+                    else
+                        if (grid_geometry == 3) then
+                            do i = -offset_x%beg, m + offset_x%end
+                                do j = -offset_y%beg, n + offset_y%end
+                                    do k = -offset_z%beg, p + offset_z%end
+                                        cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                    end do
+                                end do
+                            end do
+                        end if
+                    end if
+                elseif (wp == dp) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i, j, k) = real(q_sf(i, j, k))
+                                q_sf_s(i, j, k) = q_sf(i, j, k)
                             end do
                         end do
                     end do
-                end if
-
-                if (grid_geometry == 3) then
-                    do i = -offset_x%beg, m + offset_x%end
-                        do j = -offset_y%beg, n + offset_y%end
-                            do k = -offset_z%beg, p + offset_z%end
-                                cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                    if (grid_geometry == 3) then
+                        do i = -offset_x%beg, m + offset_x%end
+                            do j = -offset_y%beg, n + offset_y%end
+                                do k = -offset_z%beg, p + offset_z%end
+                                    cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                end do
                             end do
                         end do
-                    end do
+                    end if
                 end if
 
                 #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
@@ -906,7 +953,7 @@ contains
             ! Writing the name of the flow variable and its data, associated
             ! with the local processor, to the formatted database slave file
             if (precision == 1) then
-                write (dbfile) varname, real(q_sf, kind(0.0))
+                write (dbfile) varname, real(q_sf, wp)
             else
                 write (dbfile) varname, q_sf
             end if
@@ -924,7 +971,7 @@ contains
 
                 if (proc_rank == 0) then
                     if (precision == 1) then
-                        write (dbroot) varname, real(q_root_sf, kind(0.0))
+                        write (dbroot) varname, real(q_root_sf, wp)
                     else
                         write (dbroot) varname, q_root_sf
                     end if
@@ -936,9 +983,9 @@ contains
 
         ! ==================================================================
 
-    end subroutine s_write_variable_to_formatted_database_file
+    end subroutine s_write_variable_to_formatted_database_file ! -----------
 
-    subroutine s_close_formatted_database_file
+    subroutine s_close_formatted_database_file() ! -------------------------
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
         !              is currently being post-processed. The root process must
@@ -963,9 +1010,9 @@ contains
 
         end if
 
-    end subroutine s_close_formatted_database_file
+    end subroutine s_close_formatted_database_file ! -----------------------
 
-    subroutine s_finalize_data_output_module
+    subroutine s_finalize_data_output_module() ! -------------------------
         ! Description: Deallocation procedures for the module
 
         ! Deallocating the generic storage employed for the flow variable(s)
@@ -989,6 +1036,6 @@ contains
             deallocate (dims)
         end if
 
-    end subroutine s_finalize_data_output_module
+    end subroutine s_finalize_data_output_module ! -----------------------
 
 end module m_data_output

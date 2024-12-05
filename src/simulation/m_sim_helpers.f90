@@ -38,11 +38,11 @@ contains
 #endif
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho
-        real(kind(0d0)), dimension(num_fluids) :: alpha
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
-        real(kind(0d0)), dimension(2) :: Re
+        real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp), dimension(num_fluids) :: alpha
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
+        real(wp), dimension(2) :: Re
         integer :: i, j, k, l
 
         do i = 1, num_fluids
@@ -60,14 +60,14 @@ contains
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
-        vel_sum = 0d0
+        vel_sum = 0._wp
         do i = 1, num_dims
-            vel_sum = vel_sum + vel(i)**2d0
+            vel_sum = vel_sum + vel(i)**2._wp
         end do
 
         pres = q_prim_vf(E_idx)%sf(j, k, l)
 
-        E = gamma*pres + pi_inf + 5d-1*rho*vel_sum + qv
+        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
 
         H = (E + pres)/rho
 
@@ -85,22 +85,22 @@ contains
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         !$acc routine seq
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, rho
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: icfl_sf
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
-        real(kind(0d0)) :: fltr_dtheta   !<
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: c, rho
+        real(wp), dimension(0:m, 0:n, 0:p) :: icfl_sf
+        real(wp), dimension(0:m, 0:n, 0:p), optional :: vcfl_sf, Rc_sf
+        real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
         integer :: j, k, l
         integer :: Nfq
-        real(kind(0d0)), dimension(2) :: Re_l
+        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
-                fltr_dtheta = 2d0*pi*y_cb(0)/3d0
+                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
+                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if
@@ -122,20 +122,20 @@ contains
 
                 if (grid_geometry == 3) then
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), fltr_dtheta)**2d0
+                                       /min(dx(j), dy(k), fltr_dtheta)**2._wp
 
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          fltr_dtheta*(abs(vel(3)) + c)) &
-                                     /maxval(1d0/Re_l)
+                                     /maxval(1._wp/Re_l)
                 else
                     vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), dz(l))**2d0
+                                       /min(dx(j), dy(k), dz(l))**2._wp
 
                     Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                          dy(k)*(abs(vel(2)) + c), &
                                          dz(l)*(abs(vel(3)) + c)) &
-                                     /maxval(1d0/Re_l)
+                                     /maxval(1._wp/Re_l)
                 end if
 
             end if
@@ -147,11 +147,11 @@ contains
 
             if (viscous) then
 
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2d0
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
 
                 Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
                                      dy(k)*(abs(vel(2)) + c)) &
-                                 /maxval(1d0/Re_l)
+                                 /maxval(1._wp/Re_l)
 
             end if
 
@@ -161,9 +161,9 @@ contains
 
             if (viscous) then
 
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2d0
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
 
-                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1d0/Re_l)
+                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
 
             end if
 
@@ -181,21 +181,21 @@ contains
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         !$acc routine seq
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)) :: c, icfl_dt, vcfl_dt, rho
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: max_dt
-        real(kind(0d0)) :: fltr_dtheta   !<
+        real(wp), dimension(num_dims) :: vel
+        real(wp) :: c, icfl_dt, vcfl_dt, rho
+        real(wp), dimension(0:m, 0:n, 0:p) :: max_dt
+        real(wp) :: fltr_dtheta   !<
              !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
         integer :: j, k, l
         integer :: Nfq
-        real(kind(0d0)), dimension(2) :: Re_l
+        real(wp), dimension(2) :: Re_l
 
         if (grid_geometry == 3) then
             if (k == 0) then
-                fltr_dtheta = 2d0*pi*y_cb(0)/3d0
+                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
             elseif (k <= fourier_rings) then
-                Nfq = min(floor(2d0*real(k, kind(0d0))*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2d0*pi*y_cb(k - 1)/real(Nfq, kind(0d0))
+                Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
+                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
             else
                 fltr_dtheta = y_cb(k - 1)*dz(l)
             end if
@@ -215,10 +215,10 @@ contains
 
             if (viscous) then
                 if (grid_geometry == 3) then
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2d0) &
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
                               /minval(1/(rho*Re_l))
                 else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2d0) &
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
                               /minval(1/(rho*Re_l))
                 end if
             end if
@@ -229,7 +229,7 @@ contains
                                      dy(k)/(abs(vel(2)) + c))
 
             if (viscous) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2d0)/maxval((1/Re_l)/rho)
+                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             end if
 
         else
@@ -237,7 +237,7 @@ contains
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
 
             if (viscous) then
-                vcfl_dt = cfl_target*(dx(j)**2d0)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
             end if
 
         end if

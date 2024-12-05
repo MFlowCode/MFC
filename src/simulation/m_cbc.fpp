@@ -40,18 +40,18 @@ module m_cbc
     !! q_prim_vf in the coordinate direction normal to the domain boundary along
     !! which the CBC is applied.
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
 
     type(scalar_field), allocatable, dimension(:) :: F_rs_vf, F_src_rs_vf !<
 
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
+    real(wp), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
 
     !! There is a CCE bug that is causing some subset of these variables to interfere
     !! with variables of the same name in m_riemann_solvers.fpp, and giving this versions
@@ -59,34 +59,34 @@ module m_cbc
     !! in `acc declare create` clauses don't have this problem, so we still need to
     !! isolate this bug.
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
+    real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
 
-    real(kind(0d0)) :: c           !< Cell averaged speed of sound
-    real(kind(0d0)), dimension(2) :: Re          !< Cell averaged Reynolds numbers
+    real(wp) :: c           !< Cell averaged speed of sound
+    real(wp), dimension(2) :: Re          !< Cell averaged Reynolds numbers
     !$acc declare create(c, Re)
 
-    real(kind(0d0)) :: dpres_ds !< Spatial derivatives in s-dir of pressure
+    real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
     !$acc declare create(dpres_ds)
 
-    real(kind(0d0)), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
+    real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
     ! CBC Coefficients =========================================================
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
+    real(wp), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
 
     !! The first dimension identifies the location of a coefficient in the FD
     !! formula, while the last dimension denotes the location of the CBC.
 
     ! Bug with NVHPC when using nullified pointers in a declare create
-    !    real(kind(0d0)), pointer, dimension(:, :) :: fd_coef => null()
+    !    real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
+    real(wp), allocatable, dimension(:, :, :) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
 
     !! The first dimension of the array identifies the polynomial, the
     !! second dimension identifies the position of its coefficients and the last
@@ -106,9 +106,9 @@ module m_cbc
     !! inflow velocities, pressure, density and void fraction as well as
     !! outflow velocities and pressure
 
-    real(kind(0d0)), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
-    real(kind(0d0)), allocatable, dimension(:, :) :: vel_in, vel_out
-    real(kind(0d0)), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
+    real(wp), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
+    real(wp), allocatable, dimension(:, :) :: vel_in, vel_out
+    real(wp), allocatable, dimension(:, :) :: alpha_rho_in, alpha_in
     !$acc declare create(pres_in, pres_out, Del_in, Del_out)
     !$acc declare create(vel_in, vel_out)
     !$acc declare create(alpha_rho_in, alpha_in)
@@ -448,7 +448,7 @@ contains
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         ! Cell-boundary locations in the s-direction
-        real(kind(0d0)), dimension(0:buff_size + 1) :: s_cb
+        real(wp), dimension(0:buff_size + 1) :: s_cb
 
         ! Generic loop iterator
         integer :: i
@@ -457,7 +457,7 @@ contains
         call s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         ! Determining the cell-boundary locations in the s-direction
-        s_cb(0) = 0d0
+        s_cb(0) = 0._wp
 
         do i = 0, buff_size
             s_cb(i + 1) = s_cb(i) + ds(i)
@@ -468,8 +468,8 @@ contains
             if (cbc_dir_in == ${CBC_DIR}$) then
                 if (weno_order == 1) then
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -2d0/(ds(0) + ds(1))
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
                     ! ==================================================================
@@ -477,10 +477,10 @@ contains
                     ! Computing CBC2 Coefficients ======================================
                 elseif (weno_order == 3) then
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -6d0/(3d0*ds(0) + 2d0*ds(1) - ds(2))
-                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -4d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/3d0
-                    fd_coef_${XYZ}$ (2, cbc_loc_in) = fd_coef_${XYZ}$ (0, cbc_loc_in)/3d0
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -6._wp/(3._wp*ds(0) + 2._wp*ds(1) - ds(2))
+                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -4._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
+                    fd_coef_${XYZ}$ (2, cbc_loc_in) = fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
@@ -489,14 +489,14 @@ contains
                     ! Computing CBC4 Coefficients ======================================
                 else
 
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0d0
-                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -50d0/(25d0*ds(0) + 2d0*ds(1) &
-                                                             - 1d1*ds(2) + 1d1*ds(3) &
-                                                             - 3d0*ds(4))
-                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -48d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (2, cbc_loc_in) = 36d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (3, cbc_loc_in) = -16d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
-                    fd_coef_${XYZ}$ (4, cbc_loc_in) = 3d0*fd_coef_${XYZ}$ (0, cbc_loc_in)/25d0
+                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (0, cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) &
+                                                               - 1e1_wp*ds(2) + 1e1_wp*ds(3) &
+                                                               - 3._wp*ds(4))
+                    fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (3, cbc_loc_in) = -16._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
+                    fd_coef_${XYZ}$ (4, cbc_loc_in) = 3._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = &
                         ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))* &
@@ -640,37 +640,38 @@ contains
         ! First-order time derivatives of the partial densities, density,
         ! velocity, pressure, advection variables, and the specific heat
         ! ratio and liquid stiffness functions
-        real(kind(0d0)), dimension(num_fluids) :: dalpha_rho_dt
-        real(kind(0d0)) :: drho_dt
-        real(kind(0d0)), dimension(num_dims) :: dvel_dt
-        real(kind(0d0)) :: dpres_dt
-        real(kind(0d0)), dimension(num_fluids) :: dadv_dt
-        real(kind(0d0)) :: dgamma_dt
-        real(kind(0d0)) :: dpi_inf_dt
-        real(kind(0d0)) :: dqv_dt
-        real(kind(0d0)), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
-        real(kind(0d0)), dimension(2) :: Re_cbc
-        real(kind(0d0)), dimension(num_dims) :: vel, dvel_ds
-        real(kind(0d0)), dimension(num_fluids) :: adv, dadv_ds
-        real(kind(0d0)), dimension(sys_size) :: L
-        real(kind(0d0)), dimension(3) :: lambda
-        real(kind(0d0)), dimension(num_species) :: Y_s
 
-        real(kind(0d0)) :: rho         !< Cell averaged density
-        real(kind(0d0)) :: pres        !< Cell averaged pressure
-        real(kind(0d0)) :: E           !< Cell averaged energy
-        real(kind(0d0)) :: H           !< Cell averaged enthalpy
-        real(kind(0d0)) :: gamma       !< Cell averaged specific heat ratio
-        real(kind(0d0)) :: pi_inf      !< Cell averaged liquid stiffness
-        real(kind(0d0)) :: qv          !< Cell averaged fluid reference energy
-        real(kind(0d0)) :: c
-        real(kind(0d0)) :: Ma
+        real(wp), dimension(num_fluids) :: dalpha_rho_dt
+        real(wp) :: drho_dt
+        real(wp), dimension(num_dims) :: dvel_dt
+        real(wp) :: dpres_dt
+        real(wp), dimension(num_fluids) :: dadv_dt
+        real(wp) :: dgamma_dt
+        real(wp) :: dpi_inf_dt
+        real(wp) :: dqv_dt
+        real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
+        real(wp), dimension(2) :: Re_cbc
+        real(wp), dimension(num_dims) :: vel, dvel_ds
+        real(wp), dimension(num_fluids) :: adv, dadv_ds
+        real(wp), dimension(sys_size) :: L
+        real(wp), dimension(3) :: lambda
+        real(wp), dimension(num_species) :: Y_s
 
-        real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
+        real(wp) :: rho         !< Cell averaged density
+        real(wp) :: pres        !< Cell averaged pressure
+        real(wp) :: E           !< Cell averaged energy
+        real(wp) :: H           !< Cell averaged enthalpy
+        real(wp) :: gamma       !< Cell averaged specific heat ratio
+        real(wp) :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp) :: qv          !< Cell averaged fluid reference energy
+        real(wp) :: c
+        real(wp) :: Ma
+
+        real(wp) :: vel_K_sum, vel_dv_dt_sum
 
         integer :: i, j, k, r, q !< Generic loop iterators
 
-        real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
+        real(wp) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
 
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
@@ -788,10 +789,10 @@ contains
                             vel(i) = q_prim_rs${XYZ}$_vf(0, k, r, contxe + i)
                         end do
 
-                        vel_K_sum = 0d0
+                        vel_K_sum = 0._wp
                         !$acc loop seq
                         do i = 1, num_dims
-                            vel_K_sum = vel_K_sum + vel(i)**2d0
+                            vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
                         pres = q_prim_rs${XYZ}$_vf(0, k, r, E_idx)
@@ -812,29 +813,29 @@ contains
                             mf(i) = alpha_rho(i)/rho
                         end do
 
-                        E = gamma*pres + pi_inf + 5d-1*rho*vel_K_sum
+                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_K_sum
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0d0, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, 0._wp, c)
                         ! ============================================================
 
                         ! First-Order Spatial Derivatives of Primitive Variables =====
 
                         !$acc loop seq
                         do i = 1, contxe
-                            dalpha_rho_ds(i) = 0d0
+                            dalpha_rho_ds(i) = 0._wp
                         end do
 
                         !$acc loop seq
                         do i = 1, num_dims
-                            dvel_ds(i) = 0d0
+                            dvel_ds(i) = 0._wp
                         end do
 
-                        dpres_ds = 0d0
+                        dpres_ds = 0._wp
                         !$acc loop seq
                         do i = 1, advxe - E_idx
-                            dadv_ds(i) = 0d0
+                            dadv_ds(i) = 0._wp
                         end do
 
                         !$acc loop seq
@@ -882,7 +883,7 @@ contains
                             if (bc_${XYZ}$%grcbc_in) then
                                 !$acc loop seq
                                 do i = 2, momxb
-                                    L(2) = c**3d0*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    L(2) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
                                     L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
@@ -894,17 +895,17 @@ contains
                                 do i = E_idx, advxe - 1
                                     L(i) = c*Ma*(adv(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(advxe) = rho*c**2d0*(1d0 + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1d0 + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -8) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -8)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
-                                L(advxe) = c*(1d0 - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
+                                L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
 
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(advxe) = L(advxe) + rho*c**2d0*(1d0 - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                    L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -9) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -9)) then
@@ -919,10 +920,10 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5d-1*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
                                        /y_cc(n)
                         else
-                            dpres_dt = -5d-1*(L(advxe) + L(1))
+                            dpres_dt = -5e-1_wp*(L(advxe) + L(1))
                         end if
 
                         !$acc loop seq
@@ -934,12 +935,12 @@ contains
                         !$acc loop seq
                         do i = 1, num_dims
                             dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
-                                                  (L(1) - L(advxe))/(2d0*rho*c) + &
-                                                  (dir_flg(dir_idx(i)) - 1d0)* &
+                                                  (L(1) - L(advxe))/(2._wp*rho*c) + &
+                                                  (dir_flg(dir_idx(i)) - 1._wp)* &
                                                   L(momxb + i - 1)
                         end do
 
-                        vel_dv_dt_sum = 0d0
+                        vel_dv_dt_sum = 0._wp
                         !$acc loop seq
                         do i = 1, num_dims
                             vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
@@ -958,7 +959,7 @@ contains
                             end do
                         end if
 
-                        drho_dt = 0d0; dgamma_dt = 0d0; dpi_inf_dt = 0d0; dqv_dt = 0d0
+                        drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
                         if (model_eqns == 1) then
                             drho_dt = dalpha_rho_dt(1)
@@ -995,19 +996,19 @@ contains
                                                                         + dpi_inf_dt &
                                                                         + dqv_dt &
                                                                         + rho*vel_dv_dt_sum &
-                                                                        + 5d-1*drho_dt*vel_K_sum)
+                                                                        + 5e-1_wp*drho_dt*vel_K_sum)
 
                         if (riemann_solver == 1) then
                             !$acc loop seq
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0d0
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0._wp
                             end do
 
                             !$acc loop seq
                             do i = advxb, advxe
                                 flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = &
-                                    1d0/max(abs(vel(dir_idx(1))), sgm_eps) &
-                                    *sign(1d0, vel(dir_idx(1))) &
+                                    1._wp/max(abs(vel(dir_idx(1))), sgm_eps) &
+                                    *sign(1._wp, vel(dir_idx(1))) &
                                     *(flux_rs${XYZ}$_vf_l(0, k, r, i) &
                                       + vel(dir_idx(1)) &
                                       *flux_src_rs${XYZ}$_vf_l(0, k, r, i) &
@@ -1077,13 +1078,13 @@ contains
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
-            dir_idx = (/1, 2, 3/); dir_flg = (/1d0, 0d0, 0d0/)
+            dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
         elseif (cbc_dir == 2) then
             is1%beg = 0; is1%end = buff_size; is2 = ix; is3 = iz
-            dir_idx = (/2, 1, 3/); dir_flg = (/0d0, 1d0, 0d0/)
+            dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
         else
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = ix
-            dir_idx = (/3, 1, 2/); dir_flg = (/0d0, 0d0, 1d0/)
+            dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
         dj = max(0, cbc_loc)
@@ -1111,7 +1112,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsx_vf(j, k, r, momxb) = &
                             q_prim_vf(momxb)%sf(dj*(m - 2*j) + j, k, r)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1123,7 +1124,7 @@ contains
                         do j = -1, buff_size
                             flux_rsx_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1158,7 +1159,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsx_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1187,7 +1188,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsy_vf(j, k, r, momxb + 1) = &
                             q_prim_vf(momxb + 1)%sf(k, dj*(n - 2*j) + j, r)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1199,7 +1200,7 @@ contains
                         do j = -1, buff_size
                             flux_rsy_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1234,7 +1235,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsy_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1263,7 +1264,7 @@ contains
                     do j = 0, buff_size
                         q_prim_rsz_vf(j, k, r, momxe) = &
                             q_prim_vf(momxe)%sf(r, k, dj*(p - 2*j) + j)* &
-                            sign(1d0, -real(cbc_loc, kind(0d0)))
+                            sign(1._wp, -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1275,7 +1276,7 @@ contains
                         do j = -1, buff_size
                             flux_rsz_vf_l(j, k, r, i) = &
                                 flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1310,7 +1311,7 @@ contains
                         do j = -1, buff_size
                             flux_src_rsz_vf_l(j, k, r, advxb) = &
                                 flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1360,7 +1361,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_rsx_vf_l(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1394,7 +1395,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = &
                                 flux_src_rsx_vf_l(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1411,7 +1412,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_rsy_vf_l(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1446,7 +1447,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = &
                                 flux_src_rsy_vf_l(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1464,7 +1465,7 @@ contains
                         do j = -1, buff_size
                             flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_rsz_vf_l(j, k, r, i)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1499,7 +1500,7 @@ contains
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = &
                                 flux_src_rsz_vf_l(j, k, r, advxb)* &
-                                sign(1d0, -real(cbc_loc, kind(0d0)))
+                                sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do

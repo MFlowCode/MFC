@@ -60,4 +60,3 @@ job_device="$2"
 $sbatch_script_contents
 
 EOT
-

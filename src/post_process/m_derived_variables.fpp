@@ -33,7 +33,7 @@ module m_derived_variables
  s_compute_speed_of_sound, &
  s_finalize_derived_variables_module
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: gm_rho_sf !<
+    real(wp), allocatable, dimension(:, :, :) :: gm_rho_sf !<
     !! Gradient magnitude (gm) of the density for each cell of the computational
     !! sub-domain. This variable is employed in the calculation of the numerical
     !! Schlieren function.
@@ -43,9 +43,9 @@ module m_derived_variables
     !! active coordinate directions, the centered family of the finite-difference
     !! schemes is used.
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_x
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_y
-    real(kind(0d0)), allocatable, dimension(:, :), public :: fd_coeff_z
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_x
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_y
+    real(wp), allocatable, dimension(:, :), public :: fd_coeff_z
     !> @}
 
     integer, private :: flg  !<
@@ -119,7 +119,7 @@ contains
         !!  @param q_sf Specific heat ratio
     subroutine s_derive_specific_heat_ratio(q_sf)
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -131,7 +131,7 @@ contains
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    q_sf(i, j, k) = 1d0 + 1d0/gamma_sf(i, j, k)
+                    q_sf(i, j, k) = 1._wp + 1._wp/gamma_sf(i, j, k)
                 end do
             end do
         end do
@@ -146,7 +146,7 @@ contains
         !!  @param q_sf Liquid stiffness
     subroutine s_derive_liquid_stiffness(q_sf)
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -159,7 +159,7 @@ contains
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    q_sf(i, j, k) = pi_inf_sf(i, j, k)/(gamma_sf(i, j, k) + 1d0)
+                    q_sf(i, j, k) = pi_inf_sf(i, j, k)/(gamma_sf(i, j, k) + 1._wp)
                 end do
             end do
         end do
@@ -179,7 +179,7 @@ contains
             dimension(sys_size), &
             intent(in) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -188,7 +188,7 @@ contains
         integer :: i, j, k !< Generic loop iterators
 
         ! Fluid bulk modulus for alternate sound speed
-        real(kind(0d0)) :: blkmod1, blkmod2
+        real(wp) :: blkmod1, blkmod2
 
         ! Computing speed of sound values from those of pressure, density,
         ! specific heat ratio function and the liquid stiffness function
@@ -198,21 +198,21 @@ contains
 
                     ! Compute mixture sound speed
                     if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1d0)* &
+                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)* &
                                           q_prim_vf(E_idx)%sf(i, j, k) + &
                                           pi_inf_sf(i, j, k))/(gamma_sf(i, j, k)* &
                                                                rho_sf(i, j, k)))
                     else
-                        blkmod1 = ((fluid_pp(1)%gamma + 1d0)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                        blkmod1 = ((fluid_pp(1)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
                                    fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                        blkmod2 = ((fluid_pp(2)%gamma + 1d0)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                        blkmod2 = ((fluid_pp(2)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
                                    fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
-                        q_sf(i, j, k) = (1d0/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
-                                                               (1d0 - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
+                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
+                                                                 (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
-                    if (mixture_err .and. q_sf(i, j, k) < 0d0) then
-                        q_sf(i, j, k) = 1d-16
+                    if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
+                        q_sf(i, j, k) = 1e-16_wp
                     else
                         q_sf(i, j, k) = sqrt(q_sf(i, j, k))
                     end if
@@ -236,19 +236,19 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        real(kind(0d0)), dimension(-offset_x%beg:m + offset_x%end, &
-                                   -offset_y%beg:n + offset_y%end, &
-                                   -offset_z%beg:p + offset_z%end), &
+        real(wp), dimension(-offset_x%beg:m + offset_x%end, &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end), &
             intent(inout) :: q_sf
 
-        real(kind(0d0)) :: top, bottom, slope !< Flux limiter calcs
+        real(wp) :: top, bottom, slope !< Flux limiter calcs
         integer :: j, k, l !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
                     if (i == 1) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
+                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
                             top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
                                   q_prim_vf(adv_idx%beg)%sf(j - 1, k, l)
                             bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - &
@@ -260,7 +260,7 @@ contains
                                      q_prim_vf(adv_idx%beg)%sf(j, k, l)
                         end if
                     elseif (i == 2) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
+                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
                             top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
                                   q_prim_vf(adv_idx%beg)%sf(j, k - 1, l)
                             bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - &
@@ -272,7 +272,7 @@ contains
                                      q_prim_vf(adv_idx%beg)%sf(j, k, l)
                         end if
                     else
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
+                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
                             top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
                                   q_prim_vf(adv_idx%beg)%sf(j, k, l - 1)
                             bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - &
@@ -285,34 +285,34 @@ contains
                         end if
                     end if
 
-                    if (abs(top) < 1d-8) top = 0d0
-                    if (abs(bottom) < 1d-8) bottom = 0d0
+                    if (abs(top) < 1e-8_wp) top = 0._wp
+                    if (abs(bottom) < 1e-8_wp) bottom = 0._wp
 
                     if (top == bottom) then
-                        slope = 1d0
-                        !       ELSEIF((top == 0d0 .AND. bottom /= 0d0) &
+                        slope = 1._wp
+                        !       ELSEIF((top == 0._wp .AND. bottom /= 0._wp) &
                         !               .OR.            &
-                        !           (bottom == 0d0 .AND. top /= 0d0)) THEN
-                        !           slope = 0d0
+                        !           (bottom == 0._wp .AND. top /= 0._wp)) THEN
+                        !           slope = 0._wp
                     else
-                        slope = (top*bottom)/(bottom**2d0 + 1d-16)
+                        slope = (top*bottom)/(bottom**2._wp + 1e-16_wp)
                     end if
 
                     ! Flux limiter function
                     if (flux_lim == 1) then ! MINMOD (MM)
-                        q_sf(j, k, l) = max(0d0, min(1d0, slope))
+                        q_sf(j, k, l) = max(0._wp, min(1._wp, slope))
                     elseif (flux_lim == 2) then ! MUSCL (MC)
-                        q_sf(j, k, l) = max(0d0, min(2d0*slope, 5d-1*(1d0 + slope), 2d0))
+                        q_sf(j, k, l) = max(0._wp, min(2._wp*slope, 5e-1_wp*(1._wp + slope), 2._wp))
                     elseif (flux_lim == 3) then ! OSPRE (OP)
-                        q_sf(j, k, l) = (15d-1*(slope**2d0 + slope))/(slope**2d0 + slope + 1d0)
+                        q_sf(j, k, l) = (15e-1_wp*(slope**2._wp + slope))/(slope**2._wp + slope + 1._wp)
                     elseif (flux_lim == 4) then ! SUPERBEE (SB)
-                        q_sf(j, k, l) = max(0d0, min(1d0, 2d0*slope), min(slope, 2d0))
+                        q_sf(j, k, l) = max(0._wp, min(1._wp, 2._wp*slope), min(slope, 2._wp))
                     elseif (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
-                        q_sf(j, k, l) = max(0d0, min(15d-1*slope, 1d0), min(slope, 15d-1))
+                        q_sf(j, k, l) = max(0._wp, min(15e-1_wp*slope, 1._wp), min(slope, 15e-1_wp))
                     elseif (flux_lim == 6) then ! VAN ALBADA (VA)
-                        q_sf(j, k, l) = (slope**2d0 + slope)/(slope**2d0 + 1d0)
+                        q_sf(j, k, l) = (slope**2._wp + slope)/(slope**2._wp + 1._wp)
                     elseif (flux_lim == 7) then ! VAN LEER (VL)
-                        q_sf(j, k, l) = (abs(slope) + slope)/(1d0 + abs(slope))
+                        q_sf(j, k, l) = (abs(slope) + slope)/(1._wp + abs(slope))
                     end if
                 end do
             end do
@@ -321,15 +321,15 @@ contains
 
     !>  Computes the solution to the linear system Ax=b w/ sol = x
         !!  @param A Input matrix
-        !!  @param b right-hand-side
+        !!  @param b right-hane-side
         !!  @param sol Solution
         !!  @param ndim Problem size
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in) :: ndim
-        real(kind(0d0)), dimension(ndim, ndim), intent(inout) :: A
-        real(kind(0d0)), dimension(ndim), intent(inout) :: b
-        real(kind(0d0)), dimension(ndim), intent(out) :: sol
+        real(wp), dimension(ndim, ndim), intent(inout) :: A
+        real(wp), dimension(ndim), intent(inout) :: b
+        real(wp), dimension(ndim), intent(out) :: sol
 
         integer, dimension(ndim) :: ipiv
 
@@ -385,7 +385,7 @@ contains
             dimension(sys_size), &
             intent(in) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
@@ -399,12 +399,12 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
 
-                        q_sf(j, k, l) = 0d0
+                        q_sf(j, k, l) = 0._wp
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = &
-                                    q_sf(j, k, l) + 1d0/y_cc(k)* &
+                                    q_sf(j, k, l) + 1._wp/y_cc(k)* &
                                     (fd_coeff_y(r, k)*y_cc(r + k)* &
                                      q_prim_vf(mom_idx%end)%sf(j, r + k, l) &
                                      - fd_coeff_z(r, l)* &
@@ -428,7 +428,7 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
 
-                        q_sf(j, k, l) = 0d0
+                        q_sf(j, k, l) = 0._wp
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
@@ -456,7 +456,7 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
 
-                        q_sf(j, k, l) = 0d0
+                        q_sf(j, k, l) = 0._wp
 
                         do r = -fd_number, fd_number
                             q_sf(j, k, l) = &
@@ -484,16 +484,16 @@ contains
             dimension(sys_size), &
             intent(in) :: q_prim_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
             intent(inout) :: q_sf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
 
-        real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
+        real(wp) :: trS, trS2, trO2, Q, IIS
         integer :: j, k, l, r, jj, kk !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
@@ -501,7 +501,7 @@ contains
                 do j = -offset_x%beg, m + offset_x%end
 
                     ! Get velocity gradient tensor
-                    q_jacobian_sf(:, :) = 0d0
+                    q_jacobian_sf(:, :) = 0._wp
 
                     do r = -fd_number, fd_number
                         do jj = 1, 3
@@ -526,9 +526,9 @@ contains
                     ! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
                     do jj = 1, 3
                         do kk = 1, 3
-                            S(jj, kk) = 0.5d0* &
+                            S(jj, kk) = 0.5_wp* &
                                         (q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
-                            O(jj, kk) = 0.5d0* &
+                            O(jj, kk) = 0.5_wp* &
                                         (q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
                         end do
                     end do
@@ -546,11 +546,11 @@ contains
                     end do
 
                     ! Compute Q
-                    Q = 0.5*((O2(1, 1) + O2(2, 2) + O2(3, 3)) - &
-                             (S2(1, 1) + S2(2, 2) + S2(3, 3)))
+                    Q = 0.5_wp*((O2(1, 1) + O2(2, 2) + O2(3, 3)) - &
+                                (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     trS = S(1, 1) + S(2, 2) + S(3, 3)
-                    IIS = 0.5*((S(1, 1) + S(2, 2) + S(3, 3))**2 - &
-                               (S2(1, 1) + S2(2, 2) + S2(3, 3)))
+                    IIS = 0.5_wp*((S(1, 1) + S(2, 2) + S(3, 3))**2 - &
+                                  (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     q_sf(j, k, l) = Q + IIS
 
                 end do
@@ -572,22 +572,22 @@ contains
             dimension(sys_size), &
             intent(in) :: q_cons_vf
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
             intent(inout) :: q_sf
 
-        real(kind(0d0)) :: drho_dx, drho_dy, drho_dz !<
+        real(wp) :: drho_dx, drho_dy, drho_dz !<
             !! Spatial derivatives of the density in the x-, y- and z-directions
 
-        real(kind(0d0)), dimension(2) :: gm_rho_max !<
+        real(wp), dimension(2) :: gm_rho_max !<
             !! Maximum value of the gradient magnitude (gm) of the density field
             !! in entire computational domain and not just the local sub-domain.
             !! The first position in the variable contains the maximum value and
             !! the second contains the rank of the processor on which it occurred.
 
-        real(kind(0d0)) :: alpha_unadv !< Unadvected volume fraction
+        real(wp) :: alpha_unadv !< Unadvected volume fraction
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -598,8 +598,8 @@ contains
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
 
-                    drho_dx = 0d0
-                    drho_dy = 0d0
+                    drho_dx = 0._wp
+                    drho_dy = 0._wp
 
                     do i = -fd_number, fd_number
                         drho_dx = drho_dx + fd_coeff_x(i, j)*rho_sf(i + j, k, l)
@@ -618,7 +618,7 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
 
-                        drho_dz = 0d0
+                        drho_dz = 0._wp
 
                         do i = -fd_number, fd_number
                             if (grid_geometry == 3) then
@@ -648,7 +648,7 @@ contains
 
         ! Determining the local maximum of the gradient magnitude of density
         ! and bookkeeping the result, along with rank of the local processor
-        gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, kind(0d0))/)
+        gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
 
         ! Comparing the local maximum gradient magnitude of the density on
         ! this processor to the those computed on the remaining processors.
@@ -674,7 +674,7 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
 
-                        q_sf(j, k, l) = 0d0
+                        q_sf(j, k, l) = 0._wp
 
                         do i = 1, adv_idx%end - E_idx
                             q_sf(j, k, l) = &

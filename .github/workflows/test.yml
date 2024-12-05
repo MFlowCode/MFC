@@ -26,6 +26,7 @@ jobs:
       matrix:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi']
+        precision: ['']
         debug: ['debug', 'no-debug']
         intel: [true, false]
         exclude:
@@ -35,6 +36,7 @@ jobs:
         include:
           - os:    ubuntu
             mpi:   no-mpi
+            precision: single
             debug: no-debug
             intel: false
 
@@ -86,7 +88,7 @@ jobs:
       - name: Build
         run:  |
           if [ '${{ matrix.intel }}' == 'true' ]; then . /opt/intel/oneapi/setvars.sh; fi
-          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} 
+          /bin/bash mfc.sh build -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
 
       - name: Test
         run:  |

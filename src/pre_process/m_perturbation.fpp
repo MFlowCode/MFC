@@ -54,9 +54,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: alpha_unadv
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: alpha_unadv
+        real(wp) :: rand_real
         call random_seed()
 
         do k = 0, p
@@ -67,8 +67,8 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25d-2) .AND. (perturb_alpha <= 75d-2)) THEN
-                    if ((perturb_alpha /= 0d0) .and. (perturb_alpha /= 1d0)) then
+                    !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
+                    if ((perturb_alpha /= 0._wp) .and. (perturb_alpha /= 1._wp)) then
 
                         ! Derive new partial densities
                         do l = 1, num_fluids
@@ -86,8 +86,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !<  generic loop iterators
 
-        real(kind(0d0)) :: perturb_alpha
-        real(kind(0d0)) :: rand_real
+        real(wp) :: perturb_alpha
+        real(wp) :: rand_real
         call random_seed()
 
         ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
@@ -97,10 +97,10 @@ contains
                     perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -116,41 +116,41 @@ contains
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
-        real(kind(0d0)) :: uratio, Ldomain
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
+        real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
 
-        uratio = 1d0/patch_icpp(1)%vel(1)
+        uratio = 1._wp/patch_icpp(1)%vel(1)
         Ldomain = mixlayer_domain*patch_icpp(1)%length_y
 
-        wave = 0d0
-        wave1 = 0d0
-        wave2 = 0d0
+        wave = 0._wp
+        wave1 = 0._wp
+        wave2 = 0._wp
 
         ! Compute 2D waves
-        call s_instability_wave(2*pi*4.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*4.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*2.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*2.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(2*pi*1.0/Ldomain, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*1.0_wp/Ldomain, 0._wp, wave_tmp, 0._wp)
         wave1 = wave1 + wave_tmp
-        wave = wave1*0.05
+        wave = wave1*0.05_wp
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Ldomain, 2*pi*4.0/Ldomain, wave_tmp, 2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0_wp/Ldomain, 2*pi*4.0_wp/Ldomain, wave_tmp, 2*pi*11._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, 2*pi*2.0/Ldomain, wave_tmp, 2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0_wp/Ldomain, 2*pi*2.0_wp/Ldomain, wave_tmp, 2*pi*13._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, 2*pi*1.0/Ldomain, wave_tmp, 2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0_wp/Ldomain, 2*pi*1.0_wp/Ldomain, wave_tmp, 2*pi*17._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Ldomain, -2*pi*4.0/Ldomain, wave_tmp, 2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0_wp/Ldomain, -2*pi*4.0_wp/Ldomain, wave_tmp, 2*pi*19._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Ldomain, -2*pi*2.0/Ldomain, wave_tmp, 2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0_wp/Ldomain, -2*pi*2.0_wp/Ldomain, wave_tmp, 2*pi*23._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Ldomain, -2*pi*1.0/Ldomain, wave_tmp, 2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0_wp/Ldomain, -2*pi*1.0_wp/Ldomain, wave_tmp, 2*pi*29._wp/31._wp)
             wave2 = wave2 + wave_tmp
-            wave = wave + 0.15*wave2
+            wave = wave + 0.15_wp*wave2
         end if
 
         ! Superpose velocity perturbuations (instability waves) to the velocity field
@@ -178,22 +178,22 @@ contains
 
     !>  This subroutine computes equilibrium bubble radius of the perturbed pressure field
     subroutine s_compute_equilibrium_state(fP, fR0, fR)
-        real(kind(0d0)), intent(in) :: fP, fR0
-        real(kind(0d0)), intent(inout) :: fR
-        real(kind(0d0)) :: f0, f1
-        real(kind(0d0)) :: gam_b
+        real(wp), intent(in) :: fP, fR0
+        real(wp), intent(inout) :: fR
+        real(wp) :: f0, f1
+        real(wp) :: gam_b
         integer :: ii, jj
 
-        gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
+        gam_b = 1._wp + 1._wp/fluid_pp(num_fluids + 1)%gamma
 
         ! Loop
         ii = 1
         do while (.true.)
 
-            f0 = (Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b) - 2d0/(Web*fR) + 1d0 - Ca - fP
-            f1 = -3d0*gam_b*(Ca + 2d0/Web)*(fR0/fR)**(3d0*gam_b + 1d0) + 2d0/(Web*fR**2d0)
+            f0 = (Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b) - 2._wp/(Web*fR) + 1._wp - Ca - fP
+            f1 = -3._wp*gam_b*(Ca + 2._wp/Web)*(fR0/fR)**(3._wp*gam_b + 1._wp) + 2._wp/(Web*fR**2._wp)
 
-            if (abs(f0) <= 1e-10) then
+            if (abs(f0) <= 1e-10_wp) then
                 ! Converged
                 exit
             else
@@ -205,7 +205,7 @@ contains
             if (ieee_is_nan(f0) .or. &
                 ieee_is_nan(f1) .or. &
                 ii > 1000 .or. &
-                fR < 0d0) then
+                fR < 0._wp) then
 
                 print *, "Failed to compute equilibrium radius"
 
@@ -224,31 +224,31 @@ contains
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
     subroutine s_instability_wave(alpha, beta, wave, shift)
-        real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
-        real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)), dimension(0:nbp - 1) :: u_mean !<  mean density and velocity profiles
-        real(kind(0d0)) :: rho_mean, p_mean !< mean density and pressure
-        real(kind(0d0)), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir
-        real(kind(0d0)) :: gam, pi_inf, mach, c1, adv
-        real(kind(0d0)) :: xratio, uratio
+        real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
+        real(wp) :: shift !< phase shift
+        real(wp), dimension(0:nbp - 1) :: u_mean !<  mean density and velocity profiles
+        real(wp) :: rho_mean, p_mean !< mean density and pressure
+        real(wp), dimension(0:nbp - 1, 0:nbp - 1) :: d !< differential operator in y dir
+        real(wp) :: gam, pi_inf, mach, c1, adv
+        real(wp) :: xratio, uratio
         integer :: i, j !<  generic loop iterators
 
         xratio = mixlayer_vel_coef
-        uratio = 1d0/patch_icpp(1)%vel(1)
+        uratio = 1._wp/patch_icpp(1)%vel(1)
 
         ! Set fluid flow properties
         if (bubbles) then
             adv = patch_icpp(1)%alpha(num_fluids)
         else
-            adv = 0d0
+            adv = 0._wp
         end if
-        gam = 1d0 + 1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam*uratio**2
+        gam = 1._wp + 1._wp/fluid_pp(1)%gamma
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1._wp)/gam*uratio**2
         rho_mean = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
-        c1 = sqrt((gam*(p_mean + pi_inf))/(rho_mean*(1d0 - adv)))
-        mach = 1d0/c1
+        c1 = sqrt((gam*(p_mean + pi_inf))/(rho_mean*(1._wp - adv)))
+        mach = 1._wp/c1
 
         ! Assign mean profiles
         do j = 0, n + 1
@@ -257,15 +257,15 @@ contains
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
-        d = 0d0
-        d(0, 0) = -1d0/((y_cb(0) - y_cb(-1))*xratio)
-        d(0, 1) = 1d0/((y_cb(0) - y_cb(-1))*xratio)
+        d = 0._wp
+        d(0, 0) = -1._wp/((y_cb(0) - y_cb(-1))*xratio)
+        d(0, 1) = 1._wp/((y_cb(0) - y_cb(-1))*xratio)
         do j = 1, n
-            d(j, j - 1) = -1d0/((y_cb(j) - y_cb(j - 2))*xratio)
-            d(j, j + 1) = 1d0/((y_cb(j) - y_cb(j - 2))*xratio)
+            d(j, j - 1) = -1._wp/((y_cb(j) - y_cb(j - 2))*xratio)
+            d(j, j + 1) = 1._wp/((y_cb(j) - y_cb(j - 2))*xratio)
         end do
-        d(n + 1, n) = -1d0/((y_cb(n) - y_cb(n - 1))*xratio)
-        d(n + 1, n + 1) = 1d0/((y_cb(n) - y_cb(n - 1))*xratio)
+        d(n + 1, n) = -1._wp/((y_cb(n) - y_cb(n - 1))*xratio)
+        d(n + 1, n + 1) = 1._wp/((y_cb(n) - y_cb(n - 1))*xratio)
 
         ! Compute
         call s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
@@ -276,21 +276,21 @@ contains
         !!              generate instability waves for the given set of spatial
         !!              wave numbers and phase shift.
     subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, d, gam, pi_inf, mach, wave, shift)
-        real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(0:nbp - 1), intent(in) :: u_mean !<  mean velocity profiles
-        real(kind(0d0)), intent(in) :: rho_mean, p_mean !< mean density and pressure
-        real(kind(0d0)), dimension(0:nbp - 1, 0:nbp - 1), intent(in) :: d !< differential operator in y dir
-        real(kind(0d0)), intent(in) :: gam, pi_inf, mach, shift
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(wp), intent(in) :: alpha, beta !<  spatial wavenumbers
+        real(wp), dimension(0:nbp - 1), intent(in) :: u_mean !<  mean velocity profiles
+        real(wp), intent(in) :: rho_mean, p_mean !< mean density and pressure
+        real(wp), dimension(0:nbp - 1, 0:nbp - 1), intent(in) :: d !< differential operator in y dir
+        real(wp), intent(in) :: gam, pi_inf, mach, shift
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
 
-        real(kind(0d0)), dimension(0:nbp - 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: br, bi, ci !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: hr, hi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:nbp - 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: ar, ai    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1) :: br, bi, ci !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: hr, hi    !< matrices for eigenvalue problem
 
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: zr, zi !< eigenvectors
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: fv1, fv2, fv3 !< temporary memory
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1) :: zr, zi !< eigenvectors
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: wr, wi !< eigenvalues
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: fv1, fv2, fv3 !< temporary memory
 
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -301,7 +301,7 @@ contains
             drho_mean(j) = 0
             du_mean(j) = 0
             do k = 0, nbp - 1
-                drho_mean(j) = 0d0
+                drho_mean(j) = 0._wp
                 du_mean(j) = du_mean(j) + d(j, k)*u_mean(k)
             end do
         end do
@@ -310,9 +310,9 @@ contains
         ! systems of equation (i.e. we are going to solve x for Ax = lambda x).
         ! Here, B includes components of A without differential operator, and
         ! C includes components of A with differential operator.
-        br = 0d0
-        bi = 0d0
-        ci = 0d0
+        br = 0._wp
+        bi = 0._wp
+        ci = 0._wp
         do j = 0, nbp - 1
             ii = mixlayer_var(1); jj = mixlayer_var(1); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
             ii = mixlayer_var(1); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*rho_mean; 
@@ -353,12 +353,12 @@ contains
     !> This subroutine applies non-reflecting subsonic buffer boundary condition
         !!              to the linear system of equations (i.e. matrix A).
     subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(out) :: hr, hi    !< matrices for eigenvalue problem
-        real(kind(0d0)), intent(in) :: rho_mean !<  mean density profiles
-        real(kind(0d0)), intent(in) :: mach
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - 1, 0:mixlayer_nvar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1, 0:mixlayer_nvar*nbp - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(out) :: hr, hi    !< matrices for eigenvalue problem
+        real(wp), intent(in) :: rho_mean !<  mean density profiles
+        real(wp), intent(in) :: mach
+        real(wp), dimension(0:mixlayer_nvar*n - 1, 0:mixlayer_nvar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
         integer :: i, j, k, l, ii, jj
 
         ! Condition 1: v = 0 at BC - no action required here
@@ -424,8 +424,8 @@ contains
         end do
 
         ! Remove unnecessary rows of the matrix A (rho, u, v, w, p at the boundaries)
-        fr = 0d0
-        fi = 0d0
+        fr = 0._wp
+        fi = 0._wp
         do ii = 1, mixlayer_nvar
             do jj = 1, mixlayer_nvar
                 do k = 0, n - 1
@@ -437,8 +437,8 @@ contains
             end do
         end do
 
-        gr = 0d0
-        gi = 0d0
+        gr = 0._wp
+        gi = 0._wp
         do ii = 1, mixlayer_nvar
             do j = 0, mixlayer_nvar*n - 1
                 if (ii <= mixlayer_var(2)) then
@@ -460,8 +460,8 @@ contains
             end do
         end do
 
-        hr = 0d0
-        hi = 0d0
+        hr = 0._wp
+        hi = 0._wp
         do i = 0, mixlayer_nvar*n - n_bc_skip - 1
             do jj = 1, mixlayer_nvar
                 if (jj <= mixlayer_var(2)) then
@@ -489,17 +489,17 @@ contains
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
     subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
-        real(kind(0d0)), intent(in) :: rho_mean
-        real(kind(0d0)), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
-        real(kind(0d0)), intent(in) :: alpha, beta, mach, shift
-        real(kind(0d0)), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(0:mixlayer_nvar*nbp - 1) :: xbr, xbi !< eigenvectors
-        real(kind(0d0)), dimension(0:mixlayer_nvar*(nbp - 1) - 1) :: xcr, xci !< eigenvectors
-        real(kind(0d0)) :: ang, norm
-        real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
-        real(kind(0d0)) :: xratio
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: wr, wi !< eigenvalues
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1, 0:mixlayer_nvar*n - n_bc_skip - 1), intent(in) :: zr, zi !< eigenvectors
+        real(wp), intent(in) :: rho_mean
+        real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p), intent(inout) :: wave
+        real(wp), intent(in) :: alpha, beta, mach, shift
+        real(wp), dimension(0:mixlayer_nvar*n - n_bc_skip - 1) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(wp), dimension(0:mixlayer_nvar*nbp - 1) :: xbr, xbi !< eigenvectors
+        real(wp), dimension(0:mixlayer_nvar*(nbp - 1) - 1) :: xcr, xci !< eigenvectors
+        real(wp) :: ang, norm
+        real(wp) :: tr, ti, cr, ci !< temporary memory
+        real(wp) :: xratio
         integer idx
         integer i, j, k
 
@@ -516,11 +516,11 @@ contains
         vi = zi(:, k)
 
         ! Normalize the eigenvector by its component with the largest modulus.
-        norm = 0d0
+        norm = 0._wp
         do i = 0, mixlayer_nvar*n - n_bc_skip - 1
-            if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
+            if (sqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
-                norm = dsqrt(vr(i)**2 + vi(i)**2)
+                norm = sqrt(vr(i)**2 + vi(i)**2)
             end if
         end do
 
@@ -533,8 +533,8 @@ contains
         end do
 
         ! Reassign missing values at boundaries based on the boundary condition
-        xbr = 0d0
-        xbi = 0d0
+        xbr = 0._wp
+        xbi = 0._wp
         do i = 1, mixlayer_nvar
             if (i <= mixlayer_var(2)) then
                 do k = 0, n - 1
@@ -579,12 +579,12 @@ contains
         xbi(mixlayer_var(4)*nbp + nbp - 1) = xbi(mixlayer_var(4)*nbp + n) - xbi(mixlayer_var(2)*nbp + n)*rho_mean/mach
 
         ! Compute average to get cell-centered values
-        xcr = 0d0
-        xci = 0d0
+        xcr = 0._wp
+        xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
-                xcr((i - 1)*(nbp - 1) + k) = 5d-1*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
-                xci((i - 1)*(nbp - 1) + k) = 5d-1*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
+                xcr((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbr((i - 1)*nbp + k) + xbr((i - 1)*nbp + k + 1))
+                xci((i - 1)*(nbp - 1) + k) = 5e-1_wp*(xbi((i - 1)*nbp + k) + xbi((i - 1)*nbp + k + 1))
             end do
         end do
 

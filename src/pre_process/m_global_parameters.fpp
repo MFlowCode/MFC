@@ -53,13 +53,13 @@ module m_global_parameters
     logical :: cyl_coord
     integer :: grid_geometry !< Cylindrical coordinates (either axisymmetric or full 3D)
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
+    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
     !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
+    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
     !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
 
-    real(kind(0d0)) :: dx, dy, dz !<
+    real(wp) :: dx, dy, dz !<
     !! Minimum cell-widths in the x-, y- and z-coordinate directions
 
     type(bounds_info) :: x_domain, y_domain, z_domain !<
@@ -72,10 +72,10 @@ module m_global_parameters
     ! directions. The "a" parameters are a measure of the rate at which the grid
     ! is stretched while the remaining parameters are indicative of the location
     ! on the grid at which the stretching begins.
-    real(kind(0d0)) :: a_x, a_y, a_z
+    real(wp) :: a_x, a_y, a_z
     integer :: loops_x, loops_y, loops_z
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     ! ==========================================================================
 
@@ -83,8 +83,8 @@ module m_global_parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
-    real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
@@ -125,19 +125,19 @@ module m_global_parameters
     integer :: precision !< Precision of output files
 
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    real(kind(0d0)) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
+    real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    real(wp) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
 
-    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    real(wp) :: pi_fac !< Factor for artificial pi_inf
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
-    real(kind(0d0)) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
+    real(wp) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
     logical :: perturb_sph
     integer :: perturb_sph_fluid    !< Fluid to be perturbed with perturb_sph flag
-    real(kind(0d0)), dimension(num_fluids_max) :: fluid_rho
+    real(wp), dimension(num_fluids_max) :: fluid_rho
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
@@ -180,18 +180,18 @@ module m_global_parameters
 
     ! ==========================================================================
 
-    real(kind(0d0)) :: rhoref, pref !< Reference parameters for Tait EOS
+    real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
     !> @name Bubble modeling
     !> @{
     integer :: nb
-    real(kind(0d0)) :: R0ref
-    real(kind(0d0)) :: Ca, Web, Re_inv
-    real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
+    real(wp) :: R0ref
+    real(wp) :: Ca, Web, Re_inv
+    real(wp), dimension(:), allocatable :: weight, R0, V0
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
-    real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
+    real(wp) :: sigR, sigV, rhoRV !< standard deviations in R/V
     logical :: adv_n !< Solve the number density equation and compute alpha from number density
     !> @}
 
@@ -217,19 +217,19 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     integer :: thermal  !1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(kind(0d0)) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
-    real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
-    real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
-    real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: poly_sigma
+    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v
+    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
+    real(wp) :: mul0, ss, gamma_v, mu_v
+    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
     !> @}
 
     !> @name Surface Tension Modeling
     !> @{
-    real(kind(0d0)) :: sigma
+    real(wp) :: sigma
     logical :: surface_tension
     !> @}
 
@@ -316,8 +316,8 @@ contains
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0d0
-                bc_${DIM}$%ve${DIR}$ = 0d0
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
 
@@ -325,8 +325,8 @@ contains
         file_per_process = .false.
         precision = 2
         mixlayer_vel_profile = .false.
-        mixlayer_vel_coef = 1d0
-        mixlayer_domain = 1d0
+        mixlayer_vel_coef = 1._wp
+        mixlayer_domain = 1._wp
         mixlayer_perturb = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
@@ -340,8 +340,8 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model_scale(:) = 1d0
-            patch_icpp(i)%model_translate(:) = 0d0
+            patch_icpp(i)%model_scale(:) = 1._wp
+            patch_icpp(i)%model_translate(:) = 0._wp
             patch_icpp(i)%model_filepath(:) = dflt_char
             patch_icpp(i)%model_spc = num_ray
             patch_icpp(i)%model_threshold = ray_tracing_threshold
@@ -368,10 +368,10 @@ contains
             patch_icpp(i)%alpha = dflt_real
             patch_icpp(i)%gamma = dflt_real
             patch_icpp(i)%pi_inf = dflt_real
-            patch_icpp(i)%cv = 0d0
-            patch_icpp(i)%qv = 0d0
-            patch_icpp(i)%qvp = 0d0
-            patch_icpp(i)%tau_e = 0d0
+            patch_icpp(i)%cv = 0._wp
+            patch_icpp(i)%qv = 0._wp
+            patch_icpp(i)%qvp = 0._wp
+            patch_icpp(i)%tau_e = 0._wp
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
@@ -382,7 +382,7 @@ contains
             patch_icpp(i)%hcid = dflt_int
 
             if (chemistry) then
-                patch_icpp(i)%Y(:) = 0d0
+                patch_icpp(i)%Y(:) = 0._wp
             end if
         end do
 
@@ -411,7 +411,7 @@ contains
         nmom = 1
         sigR = dflt_real
         sigV = dflt_real
-        rhoRV = 0d0
+        rhoRV = 0._wp
         dist_type = dflt_int
         R0_type = dflt_int
 
@@ -424,7 +424,7 @@ contains
 
         ! surface tension modeling
         sigma = dflt_real
-        pi_fac = 1d0
+        pi_fac = 1._wp
 
         ! Immersed Boundaries
         ib = .false.
@@ -447,9 +447,9 @@ contains
             patch_ib(i)%slip = .false.
 
             ! Proper default values for translating STL models
-            patch_ib(i)%model_scale(:) = 1d0
-            patch_ib(i)%model_translate(:) = 0d0
-            patch_ib(i)%model_rotate(:) = 0d0
+            patch_ib(i)%model_scale(:) = 1._wp
+            patch_ib(i)%model_translate(:) = 0._wp
+            patch_ib(i)%model_rotate(:) = 0._wp
             patch_ib(i)%model_filepath(:) = dflt_char
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
@@ -466,10 +466,10 @@ contains
             fluid_pp(i)%M_v = dflt_real
             fluid_pp(i)%mu_v = dflt_real
             fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%cv = 0d0
-            fluid_pp(i)%qv = 0d0
-            fluid_pp(i)%qvp = 0d0
-            fluid_pp(i)%G = 0d0
+            fluid_pp(i)%cv = 0._wp
+            fluid_pp(i)%qv = 0._wp
+            fluid_pp(i)%qvp = 0._wp
+            fluid_pp(i)%G = 0._wp
         end do
 
     end subroutine s_assign_default_values_to_user_inputs
@@ -588,11 +588,11 @@ contains
                 end if
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 1d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 1._wp
                 else if (nb > 1) then
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                     !R0 and weight initialized in s_simpson
                 else
                     stop 'Invalid value of nb'
@@ -601,8 +601,8 @@ contains
                 !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
                 if (.not. qbmm) then
                     if (polytropic) then
-                        rhoref = 1.d0
-                        pref = 1.d0
+                        rhoref = 1._wp
+                        pref = 1._wp
                     end if
                 end if
 
@@ -613,9 +613,9 @@ contains
                         if ((f_is_default(Web))) then
                             pb0 = pref
                             pb0 = pb0/pref
-                            pref = 1d0
+                            pref = 1._wp
                         end if
-                        rhoref = 1d0
+                        rhoref = 1._wp
                     end if
                 end if
             end if
@@ -698,18 +698,18 @@ contains
                 end do
 
                 if (nb == 1) then
-                    weight(:) = 1d0
-                    R0(:) = 1d0
-                    V0(:) = 0d0
+                    weight(:) = 1._wp
+                    R0(:) = 1._wp
+                    V0(:) = 0._wp
                 else if (nb > 1) then
-                    V0(:) = 1d0
+                    V0(:) = 1._wp
                 else
                     stop 'Invalid value of nb'
                 end if
 
                 if (polytropic) then
-                    rhoref = 1.d0
-                    pref = 1.d0
+                    rhoref = 1._wp
+                    pref = 1._wp
                 end if
 
             end if
