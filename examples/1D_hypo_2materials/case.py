@@ -19,13 +19,13 @@ print(json.dumps({
                     # Computational Domain Parameters ==========================
                     'x_domain%beg'                 : 0.E+00,                    
                     'x_domain%end'                 : 1.E+00,                    
-                    'm'                            : Nx,                        
+                    'm'                            : 25,                        
                     'n'                            : 0,                         
                     'p'                            : 0,                         
                     'dt'                           : mydt,                      
                     't_step_start'                 : 0,                         
-                    't_step_stop'                  : int(Nt),                        
-                    't_step_save'                  : int(math.ceil(Nt/1.)),    
+                    't_step_stop'                  : 50,                   
+                    't_step_save'                  : 50,    
 		    # ==========================================================
                                                                                 
                     # Simulation Algorithm Parameters ==========================
@@ -33,17 +33,17 @@ print(json.dumps({
                     'model_eqns'                   : 2,                        
                     'alt_soundspeed'               : 'F',                      
                     'num_fluids'                   : 2,                        
-		    'mpp_lim'                      : 'F',                      
-		    'mixture_err'                  : 'F',                      
-		    'time_stepper'                 : 3,                                              
+                    'mpp_lim'                      : 'F',                      
+                    'mixture_err'                  : 'F',                      
+                    'time_stepper'                 : 3,                                              
                     'weno_order'                   : 3,                        
                     'weno_eps'                     : 1.E-16,
-		    'weno_Re_flux'                 : 'F',  
+                    'weno_Re_flux'                 : 'F',  
                     'weno_avg'                     : 'F',
                     'mapped_weno'                  : 'F',                      
                     'null_weights'                 : 'F',                      
                     'mp_weno'                      : 'F',                      
-		    'riemann_solver'               : 1,                        
+                    'riemann_solver'               : 1,                        
                     'wave_speeds'                  : 1,                        
                     'avg_state'                    : 2,                        
                     'bc_x%beg'                     : -3,                       
@@ -58,7 +58,7 @@ print(json.dumps({
                     'format'                       : 1,                        
                     'precision'                    : 2,                        
                     'prim_vars_wrt'                :'T',                       
-		    'parallel_io'                  :'F',                       
+                    'parallel_io'                  :'F',                       
 		    # ==========================================================
                                                                                 
 		    # Patch 1 L ================================================
