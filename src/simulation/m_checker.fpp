@@ -316,6 +316,7 @@ contains
     subroutine s_check_inputs_bubbles_lagrange
         @:PROHIBIT(bubbles_lagrange .and. file_per_process, "file_per_process must be false for bubbles_lagrange")
         @:PROHIBIT(bubbles_lagrange .and. n==0, "bubbles_lagrange accepts 2D and 3D simulations only")
+        @:PROHIBIT(bubbles_lagrange .and. model_eqns==3, "The 6-equation flow model does not support bubbles_lagrange")
     end subroutine s_check_inputs_bubbles_lagrange
 
     !> Checks miscellaneous constraints,

@@ -389,7 +389,6 @@ module m_derived_types
     type bubbles_lagrange_parameters
 
         integer :: solver_approach          !< 1: One-way coupling, 2: two-way coupling
-        integer :: bubble_model             !< Bubble dynamics model. 1: Keller-Miksis equation
         integer :: cluster_type             !< Cluster model to find p_inf
         logical :: pressure_corrector       !< Cell pressure correction term
         integer :: smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3

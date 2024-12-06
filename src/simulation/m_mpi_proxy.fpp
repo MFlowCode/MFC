@@ -221,7 +221,7 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['solver_approach', 'bubble_model', 'cluster_type', 'smooth_type', &
+            #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', &
                 & 'nBubs_glb']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor

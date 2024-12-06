@@ -98,7 +98,6 @@ BASE_CFG = {
     'lag_params%cluster_type'              : 2,
     'lag_params%pressure_corrector'        : 'F',
     'lag_params%smooth_type'               : 1,
-    'lag_params%bubble_model'              : 1,
     'lag_params%heatTransfer_model'        : 'F',
     'lag_params%massTransfer_model'        : 'F',
     'lag_params%epsilonb'                  : 1.0,

@@ -60,6 +60,11 @@ dt  = 4.e-08        # time-step - sec
 stopTime  = 60.e-06 # stop time - sec
 saveTime  = 30.e-06 # save time - sec
 
+## Adding parameters extra to use KM from bubble EE
+
+We = rho0*x0*c0*c0/sigBubble
+Re_inv = mu_host/(rho0*x0*c0)
+
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================
@@ -148,20 +153,20 @@ print(json.dumps({
 
     # Lagrangian Particles (bubbles) ===========================
      'bubbles_lagrange'                 : 'T',
+     'bubble_model'                     : 2, # Keller-Miksis model
      'rkck_adap_dt'                     : 'T', #Uses adaptive time stepper
      'lag_params%nBubs_glb'             : 1,
      'lag_params%solver_approach'       : 2,
      'lag_params%cluster_type'          : 2,
      'lag_params%pressure_corrector'    : 'T',
      'lag_params%smooth_type'           : 1,
-     'lag_params%bubble_model'          : 1,
      'lag_params%heatTransfer_model'    : 'T',
      'lag_params%massTransfer_model'    : 'F',
      'lag_params%epsilonb'              : 1.0,
      'lag_params%rkck_tolerance'        : 1.0e-05,
      'lag_params%valmaxvoid'            : 0.9,
-     'lag_params%write_bubbles'         : 'F',
-     'lag_params%write_bubbles_stats'   : 'F',
+     'lag_params%write_bubbles'         : 'T',
+     'lag_params%write_bubbles_stats'   : 'T',
      'lag_params%csonhost'              : c_host/c0,
      'lag_params%vischost'              : mu_host/(rho0*x0*c0),
      'lag_params%Thost'                 : T_host/T0,

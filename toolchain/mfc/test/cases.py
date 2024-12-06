@@ -783,7 +783,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for couplingMethod in [1, 2]:
                 stack.push("lagrangian bubbles", {"bubbles_lagrange": 'T',
                     'dt': 1e-06, 'lag_params%cluster_type': 2,'lag_params%pressure_corrector': 'T', 
-                    'lag_params%smooth_type': 1, 'lag_params%bubble_model': 1, 
+                    'lag_params%smooth_type': 1, 'bubble_model': 2, 
                     'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
                     'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
                     'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,

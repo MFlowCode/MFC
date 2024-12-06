@@ -689,7 +689,6 @@ contains
         ! Lagrangian subgrid bubble model
         bubbles_lagrange = .false.
         lag_params%solver_approach = dflt_int
-        lag_params%bubble_model = dflt_int
         lag_params%cluster_type = dflt_int
         lag_params%pressure_corrector = .false.
         lag_params%smooth_type = dflt_int

@@ -55,7 +55,9 @@ module m_start_up
 
     use m_viscous
 
-    use m_bubbles
+    use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
+
+    use m_bubbles_EL            !< Lagrange bubble dynamics routines
 
     use ieee_arithmetic
 
@@ -79,7 +81,6 @@ module m_start_up
 
     use m_body_forces
 
-    use m_bubbles_EL            !< Lagrangian bubbles routines
     ! ==========================================================================
 
     implicit none
@@ -1438,7 +1439,7 @@ contains
         if (grid_geometry == 3) call s_initialize_fftw_module()
         call s_initialize_riemann_solvers_module()
 
-        if(bubbles) call s_initialize_bubbles_module()
+        if(bubbles) call s_initialize_bubbles_EE_module()
         if (ib) call s_initialize_ibm_module()
         if (qbmm) call s_initialize_qbmm_module()
 
@@ -1498,7 +1499,7 @@ contains
         call s_initialize_cbc_module()
 
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_lag_bubbles(q_cons_ts(1)%vf)
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
     end subroutine s_initialize_modules
 

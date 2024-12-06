@@ -35,6 +35,8 @@ module m_riemann_solvers
 
     use m_bubbles              !< To get the bubble wall pressure function
 
+    use m_bubbles_EE
+
     use m_surface_tension      !< To get the capilary fluxes
 
     use m_chemistry

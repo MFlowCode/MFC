@@ -34,7 +34,7 @@ module m_rhs
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
-    use m_bubbles              !< Bubble dynamic routines
+    use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
 
     use m_qbmm                 !< Moment inversion
 
@@ -836,7 +836,7 @@ contains
             ! RHS additions for sub-grid bubbles
             if (bubbles) then
                 call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                call s_compute_bubbles_rhs(id, q_prim_qp%vf)
+                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf)
                 call nvtxEndRange
             end if
 
@@ -895,7 +895,7 @@ contains
         ! Add bubles source term
         if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
-            call s_compute_bubble_source( &
+            call s_compute_bubble_EE_source( &
                 q_cons_qp%vf(1:sys_size), &
                 q_prim_qp%vf(1:sys_size), &
                 t_step, &

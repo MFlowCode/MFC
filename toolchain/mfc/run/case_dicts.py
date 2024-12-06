@@ -244,7 +244,7 @@ for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
              'write_bubbles', 'write_bubbles_stats' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.LOG
 
-for var in [ 'solver_approach', 'bubble_model', 'cluster_type', 'smooth_type',
+for var in [ 'solver_approach', 'cluster_type', 'smooth_type',
              'nBubs_glb']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 

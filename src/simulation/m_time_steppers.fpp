@@ -21,7 +21,9 @@ module m_time_steppers
 
     use m_data_output          !< Run-time info & solution data output procedures
 
-    use m_bubbles              !< Bubble dynamics routines
+    use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
+
+    use m_bubbles_EL           !< Lagrange bubble dynamics routines
 
     use m_ibm
 
@@ -40,8 +42,6 @@ module m_time_steppers
     use m_thermochem, only: num_species
 
     use m_body_forces
-
-    use m_bubbles_EL            !< Lagrangian bubbles routines
     ! ==========================================================================
 
     implicit none
@@ -326,8 +326,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lag_tdv_rk(stage=1)
+            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lagrange_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -432,8 +432,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lag_tdv_rk(stage=1)
+            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lagrange_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -508,8 +508,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lag_tdv_rk(stage=2)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+            call s_update_lagrange_tdv_rk(stage=2)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -621,8 +621,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lag_tdv_rk(stage=1)
+            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+            call s_update_lagrange_tdv_rk(stage=1)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -697,8 +697,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lag_tdv_rk(stage=2)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+            call s_update_lagrange_tdv_rk(stage=2)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -774,8 +774,8 @@ contains
         call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
-            call s_update_lag_tdv_rk(stage=3)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
+            call s_update_lagrange_tdv_rk(stage=3)
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -904,7 +904,7 @@ contains
             idwint, &
             gm_alpha_qp%vf)
 
-        call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
@@ -1047,8 +1047,8 @@ contains
                            c4 = 0.6d0, c5 = 1.0d0, c6 = 0.875d0
 
         logical :: restart_rkck_step, start_rkck_step
-        real(kind(0.d0)) :: newtime, errmax_glb, aux_glb, lag_largestep, rkck_errmax, dt_did
-        integer :: i, j, k, l, q, RKstep
+        real(kind(0.d0)) :: lag_largestep, rkck_errmax, dt_did
+        integer :: RKstep
 
         mytime = mytime - dt
 
@@ -1069,8 +1069,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
+            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1083,8 +1083,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
+            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1097,8 +1097,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
+            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1111,8 +1111,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 4th time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
+            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1125,8 +1125,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 5th time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
-            call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
+            call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1139,8 +1139,8 @@ contains
             if (proc_rank == 0) print *, 'RKCK 6th time-stage at', rkck_time_tmp
 #endif
             call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_el_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
-            call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, q_prim_vf, lag_largestep)
+            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
+            call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
             if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
@@ -1160,7 +1160,7 @@ contains
 
         !> Update values
         mytime = mytime + dt_did
-        call s_update_rkck(q_cons_ts, q_prim_vf)
+        call s_update_rkck(q_cons_ts)
 
         call s_write_void_evol(mytime)
         if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
