@@ -21,7 +21,7 @@ sbatch_cpu_opts="\
 sbatch_gpu_opts="\
 #SBATCH -p gpuA100x4,gpuA100x4-interactive
 #SBATCH --account=bdiy-delta-gpu
-#SBATCH --gpus-per-node=2
+#SBATCH --gpus-per-node=4
 "
 
 if [ "$2" == "cpu" ]; then
@@ -43,8 +43,8 @@ $sbatch_device_opts
 #SBATCH -t 01:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -n 20
 #SBATCH -o$job_slug.out            # Combined output and error messages file
-#SBATCH -W                         # Do not exit until the submitted job terminates.
 #SBATCH --constraint="scratch"
+#SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
