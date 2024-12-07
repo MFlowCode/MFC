@@ -107,6 +107,8 @@ jobs:
         exclude:
           - device:   cpu
             lbl: frontier
+          - device:   gpu
+            lbl: delta
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
