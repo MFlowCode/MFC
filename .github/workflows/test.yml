@@ -49,6 +49,8 @@ jobs:
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
+          brew update
+          brew upgrade
           brew install coreutils python cmake fftw hdf5 gcc@14 boost open-mpi
           echo "FC=gfortran-14" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
