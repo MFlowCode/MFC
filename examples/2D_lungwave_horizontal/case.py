@@ -138,6 +138,7 @@ print(json.dumps({
     'acoustic(1)%mag'                   : 100.0*patmos_n,# magnitude
     'acoustic(1)%length'                : 45.0*dlengy,   # pulse length
     'acoustic(1)%support'               : 2,             # 2D semi infinite plane (x: -inf,inf; y:-len/2, len/2)
+    'acoustic(1)%wavelength'            : dlengy,           # wavelength
     'acoustic(1)%loc(1)'                : 0.7*dlengy,    # x_center of the domain
     'acoustic(1)%loc(2)'                : dlengy/2,      # upper boundary of the domain
     'acoustic(1)%dir'                   : -math.pi,      # direction: -pi/2

@@ -973,6 +973,7 @@ contains
                 end do
             end if
         end if
+
     end subroutine s_write_com_files ! -------------------------------------
 
     !>  This writes a formatted data file for the flow probe information
@@ -1674,6 +1675,10 @@ contains
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0d0
 
+        if (probe_wrt) then
+            @:ALLOCATE(c_mass(num_fluids,5))
+        end if
+
         if (viscous) then
             @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
@@ -1687,7 +1692,10 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
 
-        !deallocate (c_mass)
+        if (probe_wrt) then
+            @:DEALLOCATE(c_mass)
+        end if
+
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE(icfl_sf)
         if (viscous) then

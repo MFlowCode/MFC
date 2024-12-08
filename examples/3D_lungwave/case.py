@@ -104,7 +104,6 @@ print(json.dumps({
     'a_x'                          : 4.0E+00,
     'x_a'                          : -5.,
     'x_b'                          : 5.,
-    'loops_x'                      : 0,
     'dt'                           : dt,
     't_step_start'                 : tstart,
     't_step_stop'                  : tstop,

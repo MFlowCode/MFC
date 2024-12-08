@@ -91,6 +91,7 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     subroutine s_initialize_derived_variables
 
+        print*, "fd_order", fd_order
         if (probe_wrt) then
             ! Opening and writing header of flow probe files
             if (proc_rank == 0) then

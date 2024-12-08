@@ -137,8 +137,10 @@ print(json.dumps({
     # Monopole setting =========================================================
     'acoustic_source'               : 'T',             # creating an acoustic wave
     'num_source'                    : 1,               # place in the middle and expand
-    'acoustic(1)%pulse'             : 3,               # sine  wave
+    'acoustic(1)%support'           : 2,
+    'acoustic(1)%pulse'             : 1,               # sine  wave
     'acoustic(1)%npulse'            : 1,               # 1 pulse
+    'acoustic(1)%wavelength'        : dlengx,
     'acoustic(1)%mag'               : 10.0*patmos_n,   # magnitude
     'acoustic(1)%length'            : 1*dlengx,        # impulse length
     'acoustic(1)%loc(1)'            : dlengx/2,        # x_center of the domain
