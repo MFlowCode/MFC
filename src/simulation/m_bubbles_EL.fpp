@@ -471,6 +471,17 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer, intent(in) :: stage
 
+        ! manual inline of s_compute_KM
+        real(kind(0.d0)) :: pliqint, pbubble, deltaP, pinf, termI, aux1
+        real(kind(0.d0)) :: aux2, velint, rhol, cson, E, H, qv, gamma, pi_inf
+        real(kind(0d0)), dimension(num_fluids) :: alpha_rho, alpha
+        integer, dimension(3) :: cell
+        real(kind(0.0d0)), dimension(3) :: scoord
+
+        real(kind(0.d0)), dimension(num_dims) :: vel
+        real(kind(0.d0)), dimension(2) :: Re
+        ! end inline
+
         real(kind(0.d0)) :: gammaparticle, vaporflux, heatflux
         integer :: i, j, k, l
         real(kind(0.d0)) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
@@ -511,9 +522,43 @@ contains
 
         ! Radial motion model
         if (lag_params%bubble_model == 1) then
-            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
+            !$acc parallel loop gang vector default(present) private(scoord,alpha,alpha_rho,cell,Re,vel) copyin(stage)
             do k = 1, nBubs
-                call s_compute_KM(k, stage, q_prim_vf)
+                !call s_compute_KM(k, stage, q_prim_vf)
+
+                ! Manual inline of s_compute_KM
+                pliqint = f_pressureliq_int(k) ! pressure at the bubble wall
+
+                scoord = mtn_s(k, 1:3, 2)
+                call s_get_cell(scoord, cell)
+                pinf = f_pressure_inf(k, q_prim_vf, 1, aux1, aux2) ! getting p_inf
+
+                do i = 1, num_fluids
+                    alpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))*q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
+                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
+                end do
+
+                call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, alpha, alpha_rho, Re, cell(1), cell(2), cell(3))
+
+                ! Computing speed of sound
+                do i = 1, num_dims
+                    vel(i) = q_prim_vf(i + num_fluids)%sf(cell(1), cell(2), cell(3))
+                end do
+                E = gamma*pinf + pi_inf + 0.5d0*rhol*dot_product(vel, vel)
+                H = (E + pinf)/rhol
+                cson = sqrt((H - 0.5d0*dot_product(vel, vel))/gamma)
+
+                deltaP = pliqint - pinf
+                termI = 0.0d0
+                velint = intfc_vel(k, 2) - gas_dmvdt(k,stage)/(4.0d0*pi*intfc_rad(k, 2)**2*rhol)
+
+                intfc_dveldt(k, stage) = ((1.0d0 + velint/cson)*deltaP/rhol &
+                                                  + termI &
+                                                  + gas_dpdt(k,stage)*intfc_rad(k, 2)/rhol/cson &
+                                                  - velint**2*3.0d0/2.0d0*(1.0d0 - velint/3.0d0/cson)) &
+                                                 /(intfc_rad(k, 2)*(1.0d0 - velint/cson))
+                ! end of manual inline
+
                 intfc_draddt(k, stage) = intfc_vel(k, 2)
             end do
         else
@@ -674,8 +719,11 @@ contains
         !! @param step Current time-stage in RKCK stepper, otherwise step = 1
         !! @param q_prim_vf Primitive variables
     subroutine s_compute_KM(nparticles, step, q_prim_vf)
-        !$acc routine seq
-
+!#ifdef _CRAYFTN
+        !!DIR$ INLINEALWAYS s_compute_KM
+!#else
+        !!$acc routine seq
+!#endif
         integer, intent(in) :: nparticles, step
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
@@ -689,36 +737,36 @@ contains
         real(kind(0.d0)), dimension(2) :: Re
         integer :: i
 
-        pliqint = f_pressureliq_int(nparticles) ! pressure at the bubble wall
+        !pliqint = f_pressureliq_int(nparticles) ! pressure at the bubble wall
 
-        scoord = mtn_s(nparticles, 1:3, 2)
-        call s_get_cell(scoord, cell)
-        pinf = f_pressure_inf(nparticles, q_prim_vf, 1, aux1, aux2) ! getting p_inf
+        !scoord = mtn_s(nparticles, 1:3, 2)
+        !call s_get_cell(scoord, cell)
+        !pinf = f_pressure_inf(nparticles, q_prim_vf, 1, aux1, aux2) ! getting p_inf
 
-        do i = 1, num_fluids
-            alpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))*q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-            alpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
-        end do
+        !do i = 1, num_fluids
+            !alpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))*q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
+            !alpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
+        !end do
 
-        call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, alpha, alpha_rho, Re, cell(1), cell(2), cell(3))
+        !call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, alpha, alpha_rho, Re, cell(1), cell(2), cell(3))
 
-        ! Computing speed of sound
-        do i = 1, num_dims
-            vel(i) = q_prim_vf(i + num_fluids)%sf(cell(1), cell(2), cell(3))
-        end do
-        E = gamma*pinf + pi_inf + 0.5d0*rhol*dot_product(vel, vel)
-        H = (E + pinf)/rhol
-        cson = sqrt((H - 0.5d0*dot_product(vel, vel))/gamma)
+        !! Computing speed of sound
+        !do i = 1, num_dims
+            !vel(i) = q_prim_vf(i + num_fluids)%sf(cell(1), cell(2), cell(3))
+        !end do
+        !E = gamma*pinf + pi_inf + 0.5d0*rhol*dot_product(vel, vel)
+        !H = (E + pinf)/rhol
+        !cson = sqrt((H - 0.5d0*dot_product(vel, vel))/gamma)
 
-        deltaP = pliqint - pinf
-        termI = 0.0d0
-        velint = intfc_vel(nparticles, 2) - gas_dmvdt(nparticles, step)/(4.0d0*pi*intfc_rad(nparticles, 2)**2*rhol)
+        !deltaP = pliqint - pinf
+        !termI = 0.0d0
+        !velint = intfc_vel(nparticles, 2) - gas_dmvdt(nparticles, step)/(4.0d0*pi*intfc_rad(nparticles, 2)**2*rhol)
 
-        intfc_dveldt(nparticles, step) = ((1.0d0 + velint/cson)*deltaP/rhol &
-                                          + termI &
-                                          + gas_dpdt(nparticles, step)*intfc_rad(nparticles, 2)/rhol/cson &
-                                          - velint**2*3.0d0/2.0d0*(1.0d0 - velint/3.0d0/cson)) &
-                                         /(intfc_rad(nparticles, 2)*(1.0d0 - velint/cson))
+        !intfc_dveldt(nparticles, step) = ((1.0d0 + velint/cson)*deltaP/rhol &
+                                          !+ termI &
+                                          !+ gas_dpdt(nparticles, step)*intfc_rad(nparticles, 2)/rhol/cson &
+                                          !- velint**2*3.0d0/2.0d0*(1.0d0 - velint/3.0d0/cson)) &
+                                         !/(intfc_rad(nparticles, 2)*(1.0d0 - velint/cson))
 
     end subroutine s_compute_KM
 

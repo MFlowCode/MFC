@@ -266,7 +266,7 @@ contains
                 do j = 1, sys_size
                     @:ALLOCATE(rhs_ts_rkck(i)%vf(j)%sf(0:m, 0:n, 0:p))
                 end do
-                @:ACC_SETUP_SFs(rhs_ts_rkck(i))
+                @:ACC_SETUP_VFs(rhs_ts_rkck(i))
             end do
         else
             ! Allocating the cell-average RHS variables

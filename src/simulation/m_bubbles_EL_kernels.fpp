@@ -124,7 +124,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        !$acc parallel loop gang vector default(present) private(l, s_coord, cell, center) copyin(smearGrid, smearGridz)
+        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0.0d0
@@ -138,7 +138,7 @@ contains
             strength_vol = volpart
             strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2*lbk_vel(l, 2)
 
-            !$acc loop collapse(3) private(i, j, k, cellaux, nodecoord)
+            !$acc loop collapse(3) private(cellaux, nodecoord)
             do i = 1, smearGrid
                 do j = 1, smearGrid
                     do k = 1, smearGridz
