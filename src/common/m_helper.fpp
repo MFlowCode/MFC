@@ -19,7 +19,7 @@ module m_helper
 
     implicit none
 
-    private; 
+    private;
     public :: s_comp_n_from_prim, &
               s_comp_n_from_cons, &
               s_initialize_nonpoly, &
@@ -487,9 +487,12 @@ contains
         call s_mpi_abort
     end subroutine s_prohibit_abort
 
-    !! This function generates the unassociated legendre poynomials with input
-    ! mode number and evaluates them at input x
+    !> This function generates the unassociated legendre poynomials
+    !! @param x is the input value
+    !! @param l is the degree
+    !! @return P is the unassociated legendre polynomial evaluated at x
     recursive function unassociated_legendre(x, l) result(P)
+
         integer, intent(in) :: l
         real(kind(0d0)), intent(in) :: x
         real(kind(0d0)) :: P
@@ -504,50 +507,61 @@ contains
 
     end function unassociated_legendre
 
-        !! This function generated the spherical harmonic function valu, Y,
-    !based on inputs of x, phi, l and m
-
+    !> This function calculates the spherical harmonic function evaluated at x and phi
+    !! @param x is the x coordinate
+    !! @param phi is the phi coordinate
+    !! @param l is the degree
+    !! @param m is the order
+    !! @return Y is the spherical harmonic function evaluated at x and phi
     recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
+
         integer, intent(in) :: l, m
         real(kind(0d0)), intent(in) :: x, phi
         real(kind(0d0)) :: Y, prefactor, pi
 
         pi = acos(-1d0)
-        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
+        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m));
         if (m == 0) then
-            Y = prefactor*associated_legendre(x, l, m); 
+            Y = prefactor*associated_legendre(x, l, m);
         elseif (m > 0) then
-            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi);
         end if
+
     end function spherical_harmonic_func
 
-        !! This function generates the associated legendre polynomials evaluated
-    !at x with inputs l and m
-
+    !> This function generates the associated legendre polynomials evaluated
+    !! at x with inputs l and m
+    !! @param x is the input value
+    !! @param l is the degree
+    !! @param m is the order
+    !! @return P is the associated legendre polynomial evaluated at x
     recursive function associated_legendre(x, l, m) result(P)
+
         integer, intent(in) :: l, m
         real(kind(0d0)), intent(in) :: x
         real(kind(0d0)) :: P
 
         if (m <= 0 .and. l <= 0) then
-            P = 1; 
+            P = 1;
         elseif (l == 1 .and. m <= 0) then
-            P = x; 
+            P = x;
         elseif (l == 1 .and. m == 1) then
-            P = -(1 - x**2)**(1/2); 
+            P = -(1 - x**2)**(1/2);
         elseif (m == l) then
-            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2);
         elseif (m == l - 1) then
-            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1);
         else
-            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m); 
+            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m);
         end if
 
     end function associated_legendre
 
-        !! This function calculates the double factorial value of an integer
-
+    !> This function calculates the double factorial value of an integer
+    !! @param n is the input integer
+    !! @return R is the double factorial value of n
     recursive function double_factorial(n) result(R)
+
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
@@ -562,9 +576,11 @@ contains
 
     end function double_factorial
 
-        !! The following function calculates the factorial value of an integer
-
+    !> The following function calculates the factorial value of an integer
+    !! @paaram n is the input integer
+    !! @return R is the factorial value of n
     recursive function factorial(n) result(R)
+
         integer, intent(in) :: n
         integer, parameter :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R
