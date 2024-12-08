@@ -1,13 +1,8 @@
-!>
-!! @file m_phase_change.fpp
-!! @brief Contains module m_phasechange
+!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
+!> procedure.
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to relax the model equations (6-eqn model)
-!> towards pressure and temperature (6-eqn to 4-eqn), and (if wanted) Gibbs free
-!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
-!> procedure.
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
@@ -352,8 +347,9 @@ contains
 
         ! Newton Solver for the pT-equilibrium
         ns = 0
-        ! change this relative error metric. 1E4 is just arbitrary
-        do while ((DABS(pS - pO) > palpha_eps) .and. (DABS((pS - pO)/pO) > palpha_eps/1e4) .or. (ns == 0))
+        ! change this relative error metric. 1E4 is arbitrary
+        do while ((DABS(pS - pO) > palpha_eps) .and. &
+                  (DABS((pS - pO)/pO) > palpha_eps/1d4) .or. (ns == 0))
 
             ! increasing counter
             ns = ns + 1
