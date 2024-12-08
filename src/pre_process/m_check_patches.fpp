@@ -129,7 +129,8 @@ contains
                              patch_icpp(i)%geometry == 9 .or. &
                              patch_icpp(i)%geometry == 10 .or. &
                              patch_icpp(i)%geometry == 11 .or. &
-                             patch_icpp(i)%geometry == 12)) then
+                             patch_icpp(i)%geometry == 12 .or. &
+                             patch_icpp(i)%geometry == 14)) then
                 call s_check_supported_patch_smoothing(i)
             else
                 call s_check_unsupported_patch_smoothing(i)

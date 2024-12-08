@@ -70,7 +70,8 @@ module m_patches
     !! is to act as a pseudo volume fraction to indicate the contribution of each
     !! patch toward the composition of a cell's fluid state.
 
-    real(kind(0d0)) :: cart_y, cart_z
+    real(kind(0d0)) :: r_cyl, theta_cyl, x_cart, y_cart, z_cart
+    real(kind(0d0)) :: cart_x, cart_y, cart_z
     real(kind(0d0)) :: sph_phi !<
     !! Variables to be used to hold cell locations in Cartesian coordinates if
     !! 3D simulation is using cylindrical coordinates
@@ -1407,125 +1408,140 @@ contains
         !! @param q_prim_vf Array of primitive variables
     subroutine s_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
-        integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(IN) :: patch_id
+        integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+
+        real(kind(0d0)) :: r, x_p, eps, phi
+        real(kind(0d0)), dimension(2:9) :: as, Ps
+        real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid, eta, smooth_coeff
+        logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
-        real(kind(0d0)) :: radius, epsilon, beta
-        complex(kind(0d0)) :: cmplx_i = (0d0, 1d0)
-        complex(kind(0d0)) :: H
 
         ! Transferring the patch's centroid and radius information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         radius = patch_icpp(patch_id)%radius
-        epsilon = patch_icpp(patch_id)%epsilon
-        beta = patch_icpp(patch_id)%beta
+        as(2) = patch_icpp(patch_id)%a(2)
+        as(3) = patch_icpp(patch_id)%a(3)
+        as(4) = patch_icpp(patch_id)%a(4)
+        as(5) = patch_icpp(patch_id)%a(5)
+        as(6) = patch_icpp(patch_id)%a(6)
+        as(7) = patch_icpp(patch_id)%a(7)
+        as(8) = patch_icpp(patch_id)%a(8)
+        as(9) = patch_icpp(patch_id)%a(9)
+        non_axis_sym = patch_icpp(patch_id)%non_axis_sym
 
         ! Since the analytical patch does not allow for its boundaries to get
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
         ! that only the current patch contributes to the fluid state in the
         ! cells that this patch covers.
         eta = 1d0
+        eps = 1.d-32
 
         ! Checking whether the patch covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        do k = 0, p
+        if (p > 0 .and. .not. non_axis_sym) then
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        if (grid_geometry == 3) then
+                            call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        else
+                            cart_y = y_cc(j)
+                            cart_z = z_cc(k)
+                        end if
+
+                        r = dsqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) + eps
+                        if (x_cc(i) - x_centroid <= 0) then
+                            x_p = -dabs(x_cc(i) - x_centroid + eps)/r
+                        else
+                            x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        end if
+
+                        Ps(2) = unassociated_legendre(x_p, 2)
+                        Ps(3) = unassociated_legendre(x_p, 3)
+                        Ps(4) = unassociated_legendre(x_p, 4)
+                        Ps(5) = unassociated_legendre(x_p, 5)
+                        Ps(6) = unassociated_legendre(x_p, 6)
+                        Ps(7) = unassociated_legendre(x_p, 7)
+                        if ((x_cc(i) - x_centroid >= 0 &
+                             .and. &
+                             r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) <= radius &
+                             .and. &
+                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
+                            (patch_id_fp(i, j, k) == smooth_patch_id)) &
+                            then
+                            if (patch_icpp(patch_id)%smoothen) then
+                                eta = tanh(smooth_coeff/min(dx, dy, dz)* &
+                                           ((r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7)) &
+                                            - radius))*(-0.5d0) + 0.5d0
+                            end if
+
+                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                    eta, q_prim_vf, patch_id_fp)
+                        end if
+
+                    end do
+                end do
+            end do
+
+        else if (p == 0) then
             do j = 0, n
                 do i = 0, m
 
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                    if (non_axis_sym) then
+                        phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
+                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        x_p = (eps)/r
+                        Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
+                        Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
+                        Ps(4) = spherical_harmonic_func(x_p, phi, 4, 4)
+                        Ps(5) = spherical_harmonic_func(x_p, phi, 5, 5)
+                        Ps(6) = spherical_harmonic_func(x_p, phi, 6, 6)
+                        Ps(7) = spherical_harmonic_func(x_p, phi, 7, 7)
+                        Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
+                        Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        Ps(2) = unassociated_legendre(x_p, 2)
+                        Ps(3) = unassociated_legendre(x_p, 3)
+                        Ps(4) = unassociated_legendre(x_p, 4)
+                        Ps(5) = unassociated_legendre(x_p, 5)
+                        Ps(6) = unassociated_legendre(x_p, 6)
+                        Ps(7) = unassociated_legendre(x_p, 7)
+                        Ps(8) = unassociated_legendre(x_p, 8)
+                        Ps(9) = unassociated_legendre(x_p, 9)
                     end if
 
-                    if (((x_cc(i) - x_centroid)**2 &
-                         + (cart_y - y_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= radius**2 &
-                         .and. &
-                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k)))) &
+                    if (x_cc(i) - x_centroid >= 0 &
+                        .and. &
+                        r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) - as(8)*Ps(8) - as(9)*Ps(9) <= radius .and. &
+                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
 
-                        call s_convert_cylindrical_to_spherical_coord(x_cc(i), y_cc(j))
-
-                        if (epsilon == 1d0) then
-                            if (beta == 0d0) then
-                                H = 5d-1*sqrt(3d0/pi)*cos(sph_phi)
-                            elseif (beta == 1d0) then
-                                H = -5d-1*sqrt(3d0/(2d0*pi))*exp(cmplx_i*z_cc(k))*sin(sph_phi)
-                            end if
-                        elseif (epsilon == 2d0) then
-                            if (beta == 0d0) then
-                                H = 25d-2*sqrt(5d0/pi)*(3d0*cos(sph_phi)**2 - 1d0)
-                            elseif (beta == 1d0) then
-                                H = -5d-1*sqrt(15d0/(2d0*pi))*exp(cmplx_i*z_cc(k))*sin(sph_phi)*cos(sph_phi)
-                            elseif (beta == 2d0) then
-                                H = 25d-2*sqrt(15d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))*sin(sph_phi)**2
-                            end if
-                        elseif (epsilon == 3d0) then
-                            if (beta == 0d0) then
-                                H = 25d-2*sqrt(7d0/pi)*(5d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
-                            elseif (beta == 1d0) then
-                                H = -125d-3*sqrt(21d0/pi)*exp(cmplx_i*z_cc(k))*sin(sph_phi)* &
-                                    (5d0*cos(sph_phi)**2 - 1d0)
-                            elseif (beta == 2d0) then
-                                H = 25d-2*sqrt(105d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2*cos(sph_phi)
-                            elseif (beta == 3d0) then
-                                H = -125d-3*sqrt(35d0/pi)*exp(3d0*cmplx_i*z_cc(k))*sin(sph_phi)**3d0
-                            end if
-                        elseif (epsilon == 4d0) then
-                            if (beta == 0d0) then
-                                H = 3d0/16d0*sqrt(1d0/pi)*(35d0*cos(sph_phi)**4d0 - &
-                                                           3d1*cos(sph_phi)**2 + 3d0)
-                            elseif (beta == 1d0) then
-                                H = -3d0/8d0*sqrt(5d0/pi)*exp(cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)*(7d0*cos(sph_phi)**3d0 - 3d0*cos(sph_phi))
-                            elseif (beta == 2d0) then
-                                H = 3d0/8d0*sqrt(5d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2*(7d0*cos(sph_phi)**2 - 1d0)
-                            elseif (beta == 3d0) then
-                                H = -3d0/8d0*sqrt(35d0/pi)*exp(3d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**3d0*cos(sph_phi)
-                            elseif (beta == 4d0) then
-                                H = 3d0/16d0*sqrt(35d0/(2d0*pi))*exp(4d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**4d0
-                            end if
-                        elseif (epsilon == 5d0) then
-                            if (beta == 0d0) then
-                                H = 1d0/16d0*sqrt(11d0/pi)*(63d0*cos(sph_phi)**5d0 - &
-                                                            7d1*cos(sph_phi)**3d0 + 15d0*cos(sph_phi))
-                            elseif (beta == 1d0) then
-                                H = -1d0/16d0*sqrt(165d0/(2d0*pi))*exp(cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)*(21d0*cos(sph_phi)**4d0 - 14d0*cos(sph_phi)**2 + 1d0)
-                            elseif (beta == 2d0) then
-                                H = 125d-3*sqrt(1155d0/(2d0*pi))*exp(2d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**2*(3d0*cos(sph_phi)**3d0 - cos(sph_phi))
-                            elseif (beta == 3d0) then
-                                H = -1d0/32d0*sqrt(385d0/pi)*exp(3d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**3d0*(9d0*cos(sph_phi)**2 - 1d0)
-                            elseif (beta == 4d0) then
-                                H = 3d0/16d0*sqrt(385d0/(2d0*pi))*exp(4d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**4d0*cos(sph_phi)
-                            elseif (beta == 5d0) then
-                                H = -3d0/32d0*sqrt(77d0/pi)*exp(5d0*cmplx_i*z_cc(k))* &
-                                    sin(sph_phi)**5d0
-                            end if
-                        end if
-
-                        q_prim_vf(adv_idx%beg)%sf(i, j, k) = 1d0 - abs(real(H, kind(0d0)))
+                    elseif (x_cc(i) - x_centroid < 0 &
+                            .and. &
+                            r - as(2)*Ps(2) + as(3)*Ps(3) - as(4)*Ps(4) + as(5)*Ps(5) - as(6)*Ps(6) + as(7)*Ps(7) - as(8)*Ps(8) + as(9)*Ps(9) <= radius &
+                            .and. &
+                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                        then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                eta, q_prim_vf, patch_id_fp)
 
                     end if
-
                 end do
             end do
-        end do
+        end if
 
     end subroutine s_spherical_harmonic
 

@@ -23,6 +23,7 @@ class ParamType(Enum):
 
 COMMON = {
     'hypoelasticity': ParamType.LOG,
+    'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
     'pref': ParamType.REAL,
     'p': ParamType.INT,
@@ -85,6 +86,7 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'pre_stress': ParamType.LOG,
     'cfl_dt': ParamType.LOG,
     'n_start': ParamType.INT,
     'n_start_old': ParamType.INT,
@@ -135,9 +137,14 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%{attribute}"] = ty
 
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
-                      "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]:
+                      'non_axis_sym', "normal", "smooth_coeff", "rho", "vel",
+                      "alpha", "gamma", "pi_inf", "r0", "v0", "p0", "m0", "cv",
+                      "qv", "qvp"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
+
+    for real_attr in range(2, 9+1):
+        PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
+
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
     for i in range(100):
@@ -320,7 +327,6 @@ for f_id in range(1,10+1):
             SIMULATION[f"integral({int_id})%{cmp}min"] = ParamType.REAL
             SIMULATION[f"integral({int_id})%{cmp}max"] = ParamType.REAL
 
-
 # Removed: 'fourier_modes%beg', 'fourier_modes%end'.
 # Feel free to return them if they are needed once more.
 POST_PROCESS = COMMON.copy()
@@ -355,6 +361,7 @@ POST_PROCESS.update({
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
     'cf_wrt': ParamType.LOG,
+    'sim_data': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
     'cfl_target': ParamType.REAL,

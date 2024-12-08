@@ -528,6 +528,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push(f"Hypoelasticity -> {num_fluids} Fluid(s)", {
                 "hypoelasticity": 'T', "num_fluids": num_fluids,
                 'riemann_solver':             1,
+                'fd_order':                   4,
                 'fluid_pp(1)%gamma':          0.3,    'fluid_pp(1)%pi_inf':         7.8E+05,
                 'patch_icpp(1)%pres':         1.E+06, 'patch_icpp(1)%alpha_rho(1)': 1000.E+00,
                 'patch_icpp(2)%pres':         1.E+05, 'patch_icpp(2)%alpha_rho(1)': 1000.E+00,

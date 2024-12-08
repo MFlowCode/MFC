@@ -1,7 +1,7 @@
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
-!> @brief This module is used to compute source terms for hypoelastic model
+!> @brief This module is used to compute source terms for surface tension model
 module m_surface_tension
 
     ! Dependencies =============================================================
