@@ -196,7 +196,7 @@ print(json.dumps({
     'patch_icpp(2)%length_x'       : 2000,#dlengx,#dlengx/2.+2,   #
     'patch_icpp(2)%length_y'       : dlengy,
     'patch_icpp(2)%length_z'       : dlengz,
-    'patch_icpp(2)%a2)'             : interface_amp,
+    'patch_icpp(2)%a(2)'             : interface_amp,
     'patch_icpp(2)%vel(1)'         : 0.E+00,
     'patch_icpp(2)%vel(2)'         : 0.0,
     'patch_icpp(2)%vel(3)'         : 0.0,
