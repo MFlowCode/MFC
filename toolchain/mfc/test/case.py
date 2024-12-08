@@ -90,6 +90,34 @@ BASE_CFG = {
     'acoustic(1)%npulse'                : 1,
     'acoustic(1)%pulse'                 : 1,
     'rdma_mpi'                          : 'F',
+
+    'bubbles_lagrange'               : 'F',
+    'rkck_adap_dt'                   : 'F',
+    'lag_params%nBubs_glb'           : 1,
+    'lag_params%solver_approach'           : 2,
+    'lag_params%cluster_type'              : 2,
+    'lag_params%pressure_corrector'        : 'F',
+    'lag_params%smooth_type'               : 1,
+    'lag_params%bubble_model'              : 1,
+    'lag_params%heatTransfer_model'        : 'F',
+    'lag_params%massTransfer_model'        : 'F',
+    'lag_params%epsilonb'                  : 1.0,
+    'lag_params%rkck_tolerance'            : 1.0e-9,
+    'lag_params%valmaxvoid'                : 0.9,
+    'lag_params%csonhost'                      : 151.8,
+    'lag_params%vischost'                      : 0.0099542,
+    'lag_params%Thost'                         : 1,
+    'lag_params%gammagas'                      : 1.4,
+    'lag_params%gammavapor'                    : 1.33,
+    'lag_params%pvap'                          : 0.24673,
+    'lag_params%cpgas'                         : 2941.03,
+    'lag_params%cpvapor'                       : 6176.1658,
+    'lag_params%kgas'                          : 0.7304,
+    'lag_params%kvapor'                        : 0.5843,
+    'lag_params%Rgas'                          : 873.1922,
+    'lag_params%Rvapor'                          : 1358.4624,
+    'lag_params%diffcoefvap'                   : 0.24836,
+    'lag_params%sigmabubble'                   : 0.069,
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -117,6 +145,10 @@ class TestCase(case.Case):
         tasks             = ["-n", str(self.ppn)]
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
+
+        if "lagrangian bubbles" in self.trace:
+            path_lag_bubbles = f'{self.get_dirpath()}'
+            create_input_lag_bubbles(path_lag_bubbles)
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
@@ -158,6 +190,9 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "p_all"))
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
+        if "lagrangian bubbles" in self.trace:
+            common.delete_directory(os.path.join(dirpath, "input"))
+            common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -323,3 +358,13 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
             traces.append(trace)
 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
+
+
+def create_input_lag_bubbles(path_lag_bubbles):
+    folder_path_lag_bubbles = path_lag_bubbles + '/input'
+    file_path_lag_bubbles = folder_path_lag_bubbles + '/lag_bubbles.dat'
+    if not os.path.exists(folder_path_lag_bubbles):
+        os.mkdir(folder_path_lag_bubbles)
+
+    with open(file_path_lag_bubbles, "w") as file:
+        file.write('0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0')

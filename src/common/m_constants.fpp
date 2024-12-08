@@ -39,4 +39,24 @@ module m_constants
     real(kind(0d0)), parameter :: threshold_bary = 1d-1 !< Threshold to interpolate a barycentric facet
     real(kind(0d0)), parameter :: initial_distance_buffer = 1d12 !< Initialized levelset distance for the shortest path pair algorithm
 
+    ! Lagrange bubbles constants
+    integer, parameter :: mapCells = 3 !< Number of cells around the bubble where the smoothening function will have effect
+
+    ! RKCK constants
+    integer, parameter :: num_ts_rkck = 6 !< Number of time-stages in the RKCK stepper
+    real(kind(0d0)), parameter :: verysmall_dt = 1.d-14 !< Very small dt, stop stepper
+    real(kind(0d0)), parameter :: SAFETY = 0.9d0, PGROW = -0.2d0, PSHRNK = -0.25d0 !< Set of parameters to modify dt
+    real(kind(0d0)), parameter :: ERRCON = 1.89d-4, RNDDEC = 1.0d05 !< Set of parameters to modify dt
+    real(kind(0d0)), parameter :: SHRNKDT = 0.5d0, SHRNKDTMAX = 0.1d0 !< Set of parameters to modify dt
+    ! RKCK 4th/5th time stepper coefficients (Cash J. and Karp A., 1990)
+    real(kind(0.d0)), dimension(6), parameter :: &
+        RKCKcoef1 = (/0.2d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0/), &
+        RKCKcoef2 = (/3.0d0/40.0d0, 9.0d0/40.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0/), &
+        RKCKcoef3 = (/0.3d0, -0.9d0, 1.2d0, 0.0d0, 0.0d0, 0.0d0/), &
+        RKCKcoef4 = (/-11.0d0/54.0d0, 2.5d0, -70.0d0/27.0d0, 35.d0/27.d0, 0.0d0, 0.0d0/), &
+        RKCKcoef5 = (/1631.0d0/55296.0d0, 175.0d0/512.0d0, 575.d0/13824.d0, 44275.d0/110592.d0, 253.d0/4096.d0, 0.0d0/), &
+        RKCKcoef6 = (/37.d0/378.d0, 0.0d0, 250.d0/621.d0, 125.0d0/594.0d0, 0.0d0, 512.0d0/1771.0d0/), &
+        RKCKcoefE = (/37.d0/378.d0 - 2825.0d0/27648.0d0, 0.0d0, 250.d0/621.d0 - 18575.0d0/48384.0d0, &
+                      125.0d0/594.0d0 - 13525.0d0/55296.0d0, -277.0d0/14336.0d0, 512.0d0/1771.0d0 - 0.25d0/)
+
 end module m_constants

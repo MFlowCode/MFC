@@ -78,6 +78,8 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
+    use m_bubbles_EL            !< Lagrangian bubbles routines
     ! ==========================================================================
 
     implicit none
@@ -165,7 +167,8 @@ contains
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
-            viscous, surface_tension
+            viscous, surface_tension, &
+            bubbles_lagrange, lag_params, rkck_adap_dt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -197,7 +200,7 @@ contains
             n_glb = n
             p_glb = p
 
-            if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
+            if (cfl_adap_dt .or. cfl_const_dt .or. rkck_adap_dt) cfl_dt = .true.
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1211,13 +1214,13 @@ contains
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
 
-            if (cfl_adap_dt) call s_compute_dt()
+            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            if (dt < 1d-3*dt_init .and. cfl_adap_dt .and. proc_rank == 0 .and. .not. rkck_adap_dt) then
                 print*, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -1255,6 +1258,7 @@ contains
 
         call s_compute_derived_variables(t_step)
 
+
 #ifdef DEBUG
         print *, 'Computed derived vars'
 #endif
@@ -1270,6 +1274,9 @@ contains
             call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
+        elseif (time_stepper == 4) then
+            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)         
+            call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1378,7 +1385,15 @@ contains
             save_count = t_step
         end if
 
-        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+        if (bubbles_lagrange) then
+            !$acc update host(q_beta%vf(1)%sf)
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count, q_beta%vf(1))
+            !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
+            call s_write_restart_lag_bubbles(save_count) !parallel 
+            if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else
+            call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+        end if
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -1397,6 +1412,7 @@ contains
     end subroutine s_save_data
 
     subroutine s_initialize_modules
+
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
@@ -1482,6 +1498,7 @@ contains
         call s_initialize_cbc_module()
 
         call s_initialize_derived_variables()
+        if (bubbles_lagrange) call s_initialize_lag_bubbles(q_cons_ts(1)%vf)
 
     end subroutine s_initialize_modules
 
@@ -1607,6 +1624,7 @@ contains
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
+        if (bubbles_lagrange) call s_finalize_lagrangian_solver() 
         if (viscous) then
             call s_finalize_viscous_module()
         end if

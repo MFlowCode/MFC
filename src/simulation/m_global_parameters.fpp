@@ -202,6 +202,7 @@ module m_global_parameters
     type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
     type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
     type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
+    real(kind(0d0)), allocatable, dimension(:, :), public :: MPI_IO_DATA_lag_bubbles
 
     !> @name MPI info for parallel IO with Lustre file systems
     !> @{
@@ -451,6 +452,14 @@ module m_global_parameters
 
     !$acc declare create(pb_ts, mv_ts)
 
+    !> @name lagrangian subgrid bubble parameters
+    !> @{!
+    logical :: bubbles_lagrange              !< Lagrangian subgrid bubble model switch
+    type(bubbles_lagrange_parameters) :: lag_params !< Lagrange bubbles' parameters
+    logical :: rkck_adap_dt          !< Activates the adaptive rkck time stepping algorithm
+    real(kind(0d0)) :: dt_max, rkck_time_tmp !< Maximum time step size and temporal time (in rkck stepper)
+    !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp)
+    !> @}
     ! ======================================================================
 
 contains
@@ -676,6 +685,40 @@ contains
             bc_${dir}$%grcbc_out = .false.
             bc_${dir}$%grcbc_vel_out = .false.
         #:endfor
+
+        ! Lagrangian subgrid bubble model
+        bubbles_lagrange = .false.
+        lag_params%solver_approach = dflt_int
+        lag_params%bubble_model = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%epsilonb = dflt_real
+        lag_params%rkck_tolerance = dflt_real
+        lag_params%charwidth = dflt_real
+        lag_params%valmaxvoid = dflt_real
+        lag_params%csonhost = dflt_real
+        lag_params%vischost = dflt_real
+        lag_params%Thost = dflt_real
+        lag_params%gammagas = dflt_real
+        lag_params%gammavapor = dflt_real
+        lag_params%pvap = dflt_real
+        lag_params%cpgas = dflt_real
+        lag_params%cpvapor = dflt_real
+        lag_params%kgas = dflt_real
+        lag_params%kvapor = dflt_real
+        lag_params%Rgas = dflt_real
+        lag_params%Rvapor = dflt_real
+        lag_params%diffcoefvap = dflt_real
+        lag_params%sigmabubble = dflt_real
+        rkck_adap_dt = .false.
+        rkck_time_tmp = dflt_real
+        dt_max = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -982,6 +1025,9 @@ contains
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+        elseif (bubbles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -993,6 +1039,11 @@ contains
         end do
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        elseif (bubbles_lagrange) then
+            do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1029,6 +1080,11 @@ contains
 
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
+        end if
+
+        ! Correction for smearing function in the lagrangian subgrid bubble model
+        if (bubbles_lagrange) then
+            buff_size = max(buff_size, 6)
         end if
 
         ! Configuring Coordinate Direction Indexes =========================
@@ -1169,9 +1225,16 @@ contains
         deallocate (proc_coords)
         if (parallel_io) then
             deallocate (start_idx)
-            do i = 1, sys_size
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
+
+            if (bubbles_lagrange) then
+                do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            else
+                do i = 1, sys_size
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            end if
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

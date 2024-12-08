@@ -385,4 +385,34 @@ module m_derived_types
         integer :: gamma_method
     end type chemistry_parameters
 
+    !> Lagrangian bubble parameters
+    type bubbles_lagrange_parameters
+
+        integer :: solver_approach          !< 1: One-way coupling, 2: two-way coupling
+        integer :: bubble_model             !< Bubble dynamics model. 1: Keller-Miksis equation
+        integer :: cluster_type             !< Cluster model to find p_inf
+        logical :: pressure_corrector       !< Cell pressure correction term
+        integer :: smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3
+        logical :: heatTransfer_model       !< Activate HEAT transfer model at the bubble-liquid interface
+        logical :: massTransfer_model       !< Activate MASS transfer model at the bubble-liquid interface
+        logical :: write_bubbles            !< Write files to track the bubble evolution each time step
+        logical :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
+        integer :: nBubs_glb                !< Global number of bubbles
+        real(kind(0d0)) :: epsilonb         !< Standard deviation scaling for the gaussian function (default: 1.0d0)
+        real(kind(0d0)) :: rkck_tolerance   !< Adaptive RKCK tolerance
+        real(kind(0d0)) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
+        real(kind(0d0)) :: valmaxvoid       !< Maximum void fraction permitted
+        real(kind(0d0)) :: csonhost             !< Liquid speed of sound
+        real(kind(0d0)) :: vischost             !< Liquid viscosity
+        real(kind(0d0)) :: Thost                !< Liquid temperature
+        real(kind(0d0)) :: gammagas, gammavapor !< Gas and vapour gamma
+        real(kind(0d0)) :: pvap                 !< Vapour pressure at the reference temperature
+        real(kind(0d0)) :: cpgas, cpvapor       !< Gas and vapor specific heat capacity
+        real(kind(0d0)) :: kgas, kvapor         !< Gas and vapor thermal conductivity
+        real(kind(0d0)) :: Rgas, Rvapor           !< Gas and vapour specific gas constant
+        real(kind(0d0)) :: diffcoefvap          !< Vapor diffusivity in the gas
+        real(kind(0d0)) :: sigmabubble          !< Surface tension
+
+    end type bubbles_lagrange_parameters
+
 end module m_derived_types

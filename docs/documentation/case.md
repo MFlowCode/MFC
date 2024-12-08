@@ -799,6 +799,58 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `bc_y%beg = -2` to enable reflective boundary conditions
 
+### 15. Lagrangian subgrid bubble model
+
+| Parameter                 | Type    | Description                                               |
+| ---:                      | :---:   | :---                                                      |
+| `lag_bubbles`             | Logical | Lagrangian subgrid bubble model switch                    |
+| `lag_solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                  |
+| `lag_bubble_model`        | Integer | Bubble dynamics model. 1: Keller-Miksis equation          |
+| `lag_cluster_type`        | Integer | Method to find p_inf                                      |
+| `lag_pressure_corrector`  | Logical | Cell pressure correction term                             |
+| `lag_adap_dt`             | Logical | Activates the adaptive rkck time stepping algorithm       |
+| `lag_smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3              |
+| `lag_heatTransfer_model`  | Logical | Activates the interface heat transfer model               |
+| `lag_massTransfer_model`  | Logical | Activates the interface mass transfer model               |
+| `lag_write_bubbles`       | Logical | Write files to track the bubble evolution each time step  |
+| `lag_write_bubble_stats`  | Logical | Write the maximum and minimum radius of each bubble       |
+| `lag_nBubs_glb`           | Integer | Global number of bubbles                                  |
+| `lag_epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
+| `lag_rkck_tolerance`      | Real    | Adaptive RKCK tolerance                                   |
+| `lag_charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
+| `lag_valmaxvoid`          | Real    | Maximum void fraction permitted                           |
+| `csonhost`                | Real    | Liquid speed of sound                                     |
+| `vischost`                | Real    | Liquid viscosity                                          |
+| `Thost`                   | Real    | Liquid temperature                                        |
+| `gammagas`                | Real    | Heat capacity ratio of the gas                            |
+| `gammavapor`              | Real    | Heat capacity ratio of the vapor                          |
+| `pvap`                    | Real    | Vapor pressure at the reference temperature               |
+| `cpgas`                   | Real    | Specific heat capacity of the gas                         |
+| `cpvapor`                 | Real    | Specific heat capacity of the vapor                       |
+| `kgas`                    | Real    | Thermal conductivity of the gas                           |
+| `kvapor`                  | Real    | Thermal conductivity of the vapor                         |
+| `Rgas`                    | Real    | Specific gas constant od the gas                          |
+| `Rvap`                    | Real    | Specific gas constant od the vapor                        |
+| `diffcoefvap`             | Real    | Vapor diffusivity in the gas                              |
+| `sigmabubble`             | Real    | Surface tension                                           |
+
+- `lag_solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on [Maeda and Colonius (2018)](references.md#Maeda18), where the effect of the bubbles is added in the Eulerian field as source terms.
+
+- `lag_bubble_model` [1] Activates the Keller-Miksis equation to model the bubble dynamics.
+
+- `lag_cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](references.md#Maeda18), the full model is obtained when 'lag_pressure_corrector' is true.
+
+- `lag_adap_dt` Activates the adaptive 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepping algorithm. A maximum error between the 4th and 5th order Runge-Kutta-Cash-Karp solutions for the same time step size is calculated. If the error is smaller than a tolerance ('lag_rkck_tolerance'), then the algorithm employs the 5th order solution, while if not, both eulerian/lagrangian variables are re-calculated with a smaller time step size.
+
+- `lag_smooth_type` Specifies the smoothening method of projecting the lagrangian bubbles in the Eulerian field: [1] activates the gaussian kernel function described in  [Maeda and Colonius (2018)](references.md#Maeda18), while [2] activates the delta kernel function where the effect of the bubble is only seen in the specific bubble location cell.
+
+- `lag_heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](references.md#Preston07)).
+
+- `lag_massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](references.md#Preston07)).
+
+- `lag_nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
+
+
 ## Enumerations
 
 ### Boundary conditions
