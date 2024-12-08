@@ -70,7 +70,7 @@ jobs:
           wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt update
-          sudo apt install intel-oneapi-common-vars intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2024.2.1 intel-oneapi-compiler-fortran-2024.2.1 intel-oneapi-mpi-2021.7.1 intel-oneapi-mkl-2021.4.0
+          sudo apt install intel-oneapi-common-vars intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2023.1.0 intel-oneapi-compiler-fortran-2023.1.0 intel-oneapi-mpi-2021.7.1 intel-oneapi-mkl-2021.4.0
           source /opt/intel/oneapi/setvars.sh
           echo "CXX=$(which icpx)"          >> $GITHUB_ENV
           echo "CC=$(which icx)"            >> $GITHUB_ENV

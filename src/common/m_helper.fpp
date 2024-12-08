@@ -19,7 +19,7 @@ module m_helper
 
     implicit none
 
-    private;
+    private; 
     public :: s_comp_n_from_prim, &
               s_comp_n_from_cons, &
               s_initialize_nonpoly, &
@@ -520,11 +520,11 @@ contains
         real(kind(0d0)) :: Y, prefactor, pi
 
         pi = acos(-1d0)
-        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m));
+        prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
         if (m == 0) then
-            Y = prefactor*associated_legendre(x, l, m);
+            Y = prefactor*associated_legendre(x, l, m); 
         elseif (m > 0) then
-            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi);
+            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
         end if
 
     end function spherical_harmonic_func
@@ -542,17 +542,17 @@ contains
         real(kind(0d0)) :: P
 
         if (m <= 0 .and. l <= 0) then
-            P = 1;
+            P = 1; 
         elseif (l == 1 .and. m <= 0) then
-            P = x;
+            P = x; 
         elseif (l == 1 .and. m == 1) then
-            P = -(1 - x**2)**(1/2);
+            P = -(1 - x**2)**(1/2); 
         elseif (m == l) then
-            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2);
+            P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
         elseif (m == l - 1) then
-            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1);
+            P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
         else
-            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m);
+            P = ((2*l - 1)*x*associated_legendre(x, l - 1, m) - (l + m - 1)*associated_legendre(x, l - 2, m))/(l - m); 
         end if
 
     end function associated_legendre
