@@ -860,12 +860,6 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
-        if (chemistry) then
-            call nvtxStartRange("RHS-CHEM-ADVECTION")
-            call s_compute_chemistry_advection_flux(flux_n, rhs_vf)
-            call nvtxEndRange
-        end if
-
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
