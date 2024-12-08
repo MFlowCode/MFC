@@ -238,7 +238,8 @@ contains
                       FORM='unformatted', &
                       ACTION='read', &
                       STATUS='old')
-                call s_mpi_abort(trim(file_loc)//' is missing. Exiting ...')
+            else
+                call s_mpi_abort('File '//trim(file_loc_ib)//' is missing. Exiting ...')
             end if
         end if
 

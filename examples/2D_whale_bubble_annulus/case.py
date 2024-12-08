@@ -185,12 +185,14 @@ print(json.dumps({
 
     'acoustic_source'              : 'T',
     'num_source'                   : 1,
+    'acoustic(1)%support'          : 2,
     'acoustic(1)%loc(1)'           : -1.5,
     'acoustic(1)%loc(2)'           : 0.0,
+    'acoustic(1)%pulse'            : 1,
     'acoustic(1)%npulse'           : 4,
     'acoustic(1)%dir'              : 0.78539816339,
-    'acoustic(1)%pulse'            : 1,
     'acoustic(1)%mag'              : 1.,
-    'acoustic(1)%length'           : 0.2,
+    'acoustic(1)%length'           : 9.E+09,
+    'acoustic(1)%wavelength'       : 0.4,
     'rdma_mpi'                     : 'F',
 }))
