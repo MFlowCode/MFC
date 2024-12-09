@@ -19,7 +19,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -p gpuA100x4,gpuA100x4-interactive
+#SBATCH -p gpuA100x4,gpuA100x8
 #SBATCH --account=bdiy-delta-gpu
 #SBATCH --gpus-per-node=4
 "
@@ -40,7 +40,7 @@ sbatch <<EOT
 #SBATCH -Jshb-$job_slug            # Job name
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 01:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -n 20
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH --constraint="scratch"
