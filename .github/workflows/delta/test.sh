@@ -6,6 +6,7 @@ if [ "$job_device" == "gpu" ]; then
 fi
 
 n_build_threads=20
+n_test_threads=20
 
 if [ "$job_device" == "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
