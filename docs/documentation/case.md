@@ -166,12 +166,12 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
-| `model%%filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
-| `model%%scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
-| `model%%rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
-| `model%%translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
-| `model%%spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
-| `model%%threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
+| `model_filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
+| `model_scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
+| `model_rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
+| `model_translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
+| `model_spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
+| `model_threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index.
 
@@ -263,7 +263,11 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 - `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 
-- `model%%scale`, `model%%rotate` and `model%%translate` define how the model should be transformed to domain-space by first scaling by `model%%scale`, then rotating about the Z, X, and Y axes (using `model%%rotate`), and finally translating by `model%%translate`.
+- `model_filepath` defines the root directory of the STL or OBJ model file.
+
+- `model_scale`, `model_rotate` and `model_translate` define how the model should be transformed to domain-space by first scaling by `model_scale`, then rotating about the Z, X, and Y axes (using `model_rotate`), and finally translating by `model_translate`.
+
+- `model_spc` and `model_threshold` are ray-tracing parameters. `model_spc` defines the number of rays per cell to render the model. `model_threshold` defines the ray-tracing threshold at which the cell is marked as the model.
 
 ### 4. Immersed Boundary Patches
 
@@ -279,6 +283,12 @@ These physical parameters must be consistent with fluid material's parameters de
 | `m`                    | Real    | NACA airfoil parameters (see below) |
 | `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
+| `model_filepath`      | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
+| `model_scale(i)`      | Real    | Model's (applied) scaling factor for component $i$.          |
+| `model_rotate(i)`     | Real    | Model's (applied) angle of rotation about axis $i$.          |
+| `model_translate(i)`  | Real    | Model's $i$-th component of (applied) translation.           |
+| `model_spc`           | Integer | Number of samples per cell when discretizing the model into the grid. |
+| `model_threshold`     | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -300,6 +310,8 @@ Definitions for currently implemented patch types are list in table [Immersed Bo
 Additional details on this specification can be found in [The Naca Airfoil Series](https://web.stanford.edu/~cantwell/AA200_Course_Material/The%20NACA%20airfoil%20series.pdf)
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
+
+- Please see [Patch Parameters](#3-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
 
 ### 5. Fluid Material’s
 

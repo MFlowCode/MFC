@@ -165,6 +165,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
+
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
@@ -188,11 +189,12 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
+            $<$<COMPILE_LANGUAGE:Fortran>:-C> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
-    endif()
-
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-C -g -O0 -traceback -Minform=inform -Mbounds)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})

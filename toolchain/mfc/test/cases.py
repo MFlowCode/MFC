@@ -1,4 +1,4 @@
-import typing, itertools
+import os, typing, itertools
 
 from mfc   import common
 from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
@@ -328,16 +328,48 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         })
 
         if len(dimInfo[0]) == 3:
-            cases.append(define_case_d(stack, f'', {
+            cases.append(define_case_d(stack, f'Sphere', {
                 'patch_ib(1)%z_centroid': 0.5,
                 'patch_ib(1)%geometry': 8,
             }))
+
+            cases.append(define_case_d(stack, f'Cuboid', {
+                'patch_ib(1)%z_centroid': 0.5,
+                'patch_ib(1)%length_x': 0.1,
+                'patch_ib(1)%length_y': 0.1,
+                'patch_ib(1)%length_z': 0.1,
+                'patch_ib(1)%geometry': 9,
+            }))
+
+            cases.append(define_case_d(stack, f'Cylinder', {
+                'patch_ib(1)%z_centroid': 0.5,
+                'patch_ib(1)%length_x': 0.1,
+                'patch_ib(1)%geometry': 10,
+            }))
+
         elif len(dimInfo[0]) == 2:
-            cases.append(define_case_d(stack, f'', {'patch_ib(1)%geometry': 2 }))
+            cases.append(define_case_d(stack, f'Rectangle', {
+                'patch_ib(1)%length_x': 0.05,
+                'patch_ib(1)%length_y': 0.05,
+                'patch_ib(1)%geometry': 3 }))
+            cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
             if six_eqn_model:
                 cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
 
         stack.pop()
+
+    def ibm_stl():
+        common_mods = {
+        't_step_stop': Nt, 't_step_save': Nt
+        }
+        for ndim in range(2, 4):
+            cases.append(define_case_f(
+                f'{ndim}D -> IBM -> STL',
+                f'examples/{ndim}D_ibm_stl_test/case.py',
+                ['--ndim', str(ndim)],
+                mods=common_mods
+            ))
+    ibm_stl()
 
     def alter_acoustic_src(dimInfo):
         stack.push("Acoustic Source", {"acoustic_source": 'T', 'acoustic(1)%support': 1, 'dt': 1e-3, 't_step_stop': 50, 't_step_save': 50})
@@ -769,6 +801,41 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
             stack.pop()
 
+    def foreach_example():
+        for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
+            if path == "scaling":
+                continue
+
+            # # List of currently broken examples -> currently attempting to fix!
+            brokenCases = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous", "2D_laplace_pressure_jump", "2D_bubbly_steady_shock", "2D_advection", "2D_hardcodied_ic", "2D_ibm_multiphase", "2D_acoustic_broadband", "1D_inert_shocktube", "1D_reactive_shocktube", "2D_ibm_steady_shock", "3D_performance_test", "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse", "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid", "3D_ibm_bowshock", "3D_turb_mixing", "2D_mixing_artificial_Ma"]
+            if path in brokenCases:
+                continue
+            name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
+            path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
+            if not os.path.isfile(path):
+                continue
+            def modify_example_case(case: dict):
+                case['parallel_io'] = 'F'
+                if 't_step_stop' in case and case['t_step_stop'] >= 50:
+                    case['t_step_start'] = 0
+                    case['t_step_stop'] = 50
+                    case['t_step_save'] = 50
+
+                caseSize = case['m'] * max(case['n'], 1) * max(case['p'], 1)
+                if caseSize > 25 * 25:
+                    if case['n'] == 0 and case['p'] == 0:
+                        case['m'] = 25 * 25
+                    elif case['p'] == 0:
+                        case['m'] = 25
+                        case['n'] = 25
+                    elif caseSize > 25 * 25 * 25:
+                        case['m'] = 25
+                        case['n'] = 25
+                        case['p'] = 25
+
+
+            cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
+
     def chemistry_cases():
         common_mods = {
             't_step_stop': Nt, 't_step_save': Nt
@@ -794,6 +861,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
     foreach_dimension()
+    foreach_example()
     chemistry_cases()
 
     # Sanity Check 1
