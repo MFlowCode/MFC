@@ -105,10 +105,12 @@ jobs:
     strategy:
       matrix:
         device: ['cpu', 'gpu']
-        lbl: ['gt', 'frontier']
+        lbl: ['gt', 'delta', 'frontier']
         exclude:
           - device:   cpu
             lbl: frontier
+          - device:   gpu
+            lbl: delta
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -122,6 +124,14 @@ jobs:
       - name: Build & Test
         if:   matrix.lbl == 'gt'
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+
+      # - name: Build & Test
+      #   if:   matrix.lbl == 'ice'
+      #   run:  bash .github/workflows/ice/submit.sh .github/workflows/ice/test.sh ${{ matrix.device }}
+
+      - name: Build & Test
+        if:   matrix.lbl == 'delta'
+        run:  bash .github/workflows/delta/submit.sh .github/workflows/delta/test.sh ${{ matrix.device }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
