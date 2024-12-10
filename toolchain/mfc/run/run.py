@@ -135,7 +135,7 @@ def __execute_job_script(qsystem: queues.QueueSystem):
         raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
-@hunter.wrap(local=True)
+# @hunter.wrap(local=True)
 def run(targets = None, case = None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
     case    = case or input.load(ARG("input"), ARG("--"))
