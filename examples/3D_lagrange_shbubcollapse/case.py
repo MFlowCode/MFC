@@ -152,7 +152,7 @@ print(json.dumps({
     # Lagrangian Bubbles ===========================
      'bubbles_lagrange'                 : 'T',
      'bubble_model'                     : 2,    # Keller-Miksis model
-     'rkck_adap_dt'                     : 'F',  # Activate adaptive time stepper
+     'rkck_adap_dt'                     : 'T',  # Activate adaptive time stepper
      'rkck_tolerance'                   : 1.0e-05,
      'lag_params%nBubs_glb'             : 1,
      'lag_params%solver_approach'       : 2,    # Two-way coupled

@@ -873,6 +873,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['n'] = 25
                         case['p'] = 25
 
+                if 'rkck_adap_dt' in case and case['rkck_adap_dt'] == 'T':
+                    case['rkck_adap_dt'] = 'F'
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
 
