@@ -163,6 +163,7 @@ module m_global_parameters
     type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
     type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
     type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
+    real(kind(0.d0)), allocatable, dimension(:, :), public :: MPI_IO_DATA_lg_bubbles
 
 #endif
 
@@ -260,7 +261,7 @@ module m_global_parameters
     real(kind(0d0)) :: R0ref
     real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical :: bubbles
+    logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
@@ -291,6 +292,11 @@ module m_global_parameters
     integer :: bubxb, bubxe
     integer :: strxb, strxe
     integer :: chemxb, chemxe
+    !> @}
+
+    !> @name Lagrangian bubbles
+    !> @{
+    logical :: bubbles_lagrange, rkck_adap_dt
     !> @}
 
 contains
@@ -394,7 +400,7 @@ contains
         pref = dflt_real
 
         ! Bubble modeling
-        bubbles = .false.
+        bubbles_euler = .false.
         qbmm = .false.
         R0ref = dflt_real
         nb = dflt_int
@@ -404,6 +410,10 @@ contains
         sigma = dflt_real
         surface_tension = .false.
         adv_n = .false.
+
+        ! Lagrangian bubbles modeling
+        bubbles_lagrange = .false.
+        rkck_adap_dt = .false.
 
         ! IBM
         num_ibs = dflt_int
@@ -457,7 +467,7 @@ contains
 
             sys_size = adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 alf_idx = adv_idx%end
             else
                 alf_idx = 1
@@ -467,7 +477,7 @@ contains
                 nmom = 6
             end if
 
-            if (bubbles) then
+            if (bubbles_euler) then
 
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
@@ -584,7 +594,7 @@ contains
             alf_idx = adv_idx%end
             sys_size = alf_idx !adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
                 bub_idx%end = sys_size + 2*nb
                 if (polytropic .neqv. .true.) then
@@ -658,13 +668,22 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (bubbles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
+            do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -829,6 +848,8 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+
+            if (bubbles_lagrange) MPI_IO_DATA%var(sys_size + 1)%sf => null()
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
