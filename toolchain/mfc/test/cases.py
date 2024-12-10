@@ -1,6 +1,7 @@
 import os, typing, itertools
 
 from mfc   import common
+from ..state   import ARG
 from .case import Nt, define_case_d, define_case_f, CaseGeneratorStack, TestCaseBuilder
 
 def get_bc_mods(bc: int, dimInfo):
@@ -861,7 +862,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
     foreach_dimension()
+
     foreach_example()
+
     chemistry_cases()
 
     # Sanity Check 1
