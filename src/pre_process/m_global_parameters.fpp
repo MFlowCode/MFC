@@ -188,7 +188,7 @@ module m_global_parameters
     real(kind(0d0)) :: R0ref
     real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical :: bubbles
+    logical :: bubbles_euler
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
@@ -395,7 +395,7 @@ contains
         pref = dflt_real
 
         ! Bubble modeling
-        bubbles = .false.
+        bubbles_euler = .false.
         polytropic = .true.
         polydisperse = .false.
 
@@ -529,13 +529,13 @@ contains
 
             sys_size = adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 alf_idx = adv_idx%end
             else
                 alf_idx = 1
             end if
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
                     if (nnode == 4) then
@@ -665,7 +665,7 @@ contains
 
             !========================
         else if (model_eqns == 4) then
-            ! 4 equation model with subgrid bubbles
+            ! 4 equation model with subgrid bubbles_euler
             cont_idx%beg = 1 ! one continuity equation
             cont_idx%end = 1 ! num_fluids
             mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
@@ -676,7 +676,7 @@ contains
             alf_idx = adv_idx%end
             sys_size = alf_idx !adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
                 bub_idx%end = sys_size + 2*nb
                 if (.not. polytropic) then

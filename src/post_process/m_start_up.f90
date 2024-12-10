@@ -77,7 +77,7 @@ contains
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
             fd_order, mixture_err, alt_soundspeed, &
             flux_lim, flux_wrt, cyl_coord, &
-            parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
+            parallel_io, rhoref, pref, bubbles_euler, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
@@ -385,7 +385,7 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the volume fraction(s) to the formatted database file ---------
-        if (((model_eqns == 2) .and. (bubbles .neqv. .true.)) &
+        if (((model_eqns == 2) .and. (bubbles_euler .neqv. .true.)) &
             .or. (model_eqns == 3) &
             ) then
 
@@ -600,7 +600,7 @@ contains
         ! ----------------------------------------------------------------------
 
         ! Adding the volume fraction(s) to the formatted database file ---------
-        if (bubbles) then
+        if (bubbles_euler) then
             do i = adv_idx%beg, adv_idx%end
                 q_sf = q_cons_vf(i)%sf( &
                        -offset_x%beg:m + offset_x%end, &
@@ -614,7 +614,7 @@ contains
         end if
 
         ! Adding the bubble variables  to the formatted database file ---------
-        if (bubbles) then
+        if (bubbles_euler) then
             !nR
             do i = 1, nb
                 q_sf = q_cons_vf(bub_idx%rs(i))%sf( &
@@ -694,10 +694,10 @@ contains
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        if (bubbles .and. nb > 1) then
+        if (bubbles_euler .and. nb > 1) then
             call s_simpson
         end if
-        if (bubbles .and. .not. polytropic) then
+        if (bubbles_euler .and. .not. polytropic) then
             call s_initialize_nonpoly()
         end if
         if (num_procs > 1) call s_initialize_mpi_proxy_module()

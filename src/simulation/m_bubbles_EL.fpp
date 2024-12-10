@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to add the lagrangian subgrid bubble model
+!> @brief This module is used to to compute the volume-averaged bubble model
 module m_bubbles_EL
 
     ! Dependencies =============================================================
@@ -58,8 +58,8 @@ module m_bubbles_EL
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mtn_dposdt  !< Time derivative of the bubble's position
     real(kind(0d0)), allocatable, dimension(:, :, :) :: mtn_dveldt  !< Time derivative of the bubble's velocity
 
-    !$acc declare create(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt,
-    !$acc gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt,
+    !$acc declare create(lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt,       &
+    !$acc gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
     !$acc gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: lag_RKCKcoef   !< RKCK 4th-5th time stepper coefficients
@@ -145,21 +145,65 @@ contains
             !< Allocate space for the RKCK 4th/5th time stepper coefficients
             @:ALLOCATE(lag_RKCKcoef(1:lag_num_ts+1, 1:lag_num_ts))
             do i = 1, lag_num_ts
-                ! Populate RKCK coefficients
-                lag_RKCKcoef(1, i) = RKCKcoef1(i)
-                lag_RKCKcoef(2, i) = RKCKcoef2(i)
-                lag_RKCKcoef(3, i) = RKCKcoef3(i)
-                lag_RKCKcoef(4, i) = RKCKcoef4(i)
-                lag_RKCKcoef(5, i) = RKCKcoef5(i)
-                lag_RKCKcoef(6, i) = RKCKcoef6(i)
-                lag_RKCKcoef(7, i) = RKCKcoefE(i)
+                ! Populate RKCK coefficients (from constants)
+                lag_RKCKcoef(1, i) = rkck_coef1(i)
+                lag_RKCKcoef(2, i) = rkck_coef2(i)
+                lag_RKCKcoef(3, i) = rkck_coef3(i)
+                lag_RKCKcoef(4, i) = rkck_coef4(i)
+                lag_RKCKcoef(5, i) = rkck_coef5(i)
+                lag_RKCKcoef(6, i) = rkck_coef6(i)
+                lag_RKCKcoef(7, i) = rkck_coefE(i)
             end do
         end if
 
         ! Starting bubbles
+        call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
 
     end subroutine s_initialize_bubbles_EL_module
+
+    !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
+    subroutine s_start_lagrange_inputs()
+
+        integer :: id_bubbles, id_host
+        real(kind(0d0)) :: rho0, c0, T0, x0, p0
+
+        id_bubbles = num_fluids
+        id_host = num_fluids - 1
+
+        !Reference values
+        rho0 = lag_params%rho0
+        c0 = lag_params%c0
+        T0 = lag_params%T0
+        x0 = lag_params%x0
+        p0 = rho0*c0*c0
+
+        !Update inputs
+        Tw = lag_params%Thost/T0
+        pv = fluid_pp(id_host)%pv/p0
+        gamma_v = fluid_pp(id_bubbles)%gamma_v
+        gamma_n = fluid_pp(id_host)%gamma_v
+        k_vl = fluid_pp(id_bubbles)%k_v*(T0/(x0*rho0*c0*c0*c0))
+        k_nl = fluid_pp(id_host)%k_v*(T0/(x0*rho0*c0*c0*c0))
+        cp_v = fluid_pp(id_bubbles)%cp_v*(T0/(c0*c0))
+        cp_n = fluid_pp(id_host)%cp_v*(T0/(c0*c0))
+        R_v = (R_uni/fluid_pp(id_bubbles)%M_v)*(T0/(c0*c0))
+        R_n = (R_uni/fluid_pp(id_host)%M_v)*(T0/(c0*c0))
+        lag_params%diffcoefvap = lag_params%diffcoefvap/(x0*c0)
+        ss = fluid_pp(id_host)%ss/(rho0*x0*c0*c0)
+        mul0 = fluid_pp(id_host)%mul0/(rho0*x0*c0)
+
+        ! Parameters used in bubble_model
+        Web = 1d0/ss
+        Re_inv = mul0
+
+        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic  thermal models, and
+        ! the Gilmore and RP bubble models.
+        polytropic = .false.    ! Forcing no polytropic model
+        thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
+        ! If Keller-Miksis model is not selected, then no radial motion
+
+    end subroutine s_start_lagrange_inputs
 
     !> The purpose of this procedure is to obtain the initial bubbles' information
         !! @param q_cons_vf Conservative variables
@@ -178,21 +222,6 @@ contains
         ! Initialize number of particles
         bub_id = 0
         id = 0
-
-        ! Start general bubble parameters
-        Tw = lag_params%Thost
-        R_v = lag_params%Rvapor
-        R_n = lag_params%Rgas
-        pv = lag_params%pvap
-        gamma_v = lag_params%gammavapor
-        gamma_n = lag_params%gammagas
-        Web = 1d0/lag_params%sigmabubble
-        Re_inv = lag_params%vischost
-        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic  thermal models, and
-        ! the Gilmore and RP bubble models.
-        polytropic = .false.    ! Forcing no polytropic model
-        thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
-        ! If Keller-Miksis model is not selected, then no radial motion
 
         ! Read the input lag_bubble file or restart point
         if (cfl_dt) then
@@ -355,8 +384,8 @@ contains
         end if
         omegaN = dsqrt(omegaN/bub_R0(bub_id)**2d0)
 
-        cpparticle = concvap*lag_params%cpvapor + (1d0 - concvap)*lag_params%cpgas
-        kparticle = concvap*lag_params%kvapor + (1d0 - concvap)*lag_params%kgas
+        cpparticle = concvap*cp_v + (1d0 - concvap)*cp_n
+        kparticle = concvap*k_vl + (1d0 - concvap)*k_nl
 
         ! Mass and heat transfer coefficients (based on Preston 2007)
         PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2d0*omegaN/kparticle
@@ -484,33 +513,34 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer, intent(in) :: stage
 
-        real(kind(0d0)) :: vaporflux
-        integer :: i, k, l
+        real(kind(0d0)) :: vaporflux, pliqint
         real(kind(0d0)) :: preterm1, term2, paux, pint, Romega, term1_fac, Rb
-
         real(kind(0d0)) :: conc_v, R_m, gamma_m, fpb, fmass_n, fmass_v
         real(kind(0d0)) :: fR, fV, fbeta_c, fbeta_t, fR0, fpbdt
-        real(kind(0d0)) :: pinf, aux1, aux2, pliqint_EE, velint, rhol, cson, E, H, qv, gamma, pi_inf
-        real(kind(0d0)), dimension(num_fluids) :: alpha_rho, alpha
-        integer, dimension(3) :: cell
-        real(kind(0d0)), dimension(3) :: scoord
-
-        real(kind(0d0)), dimension(num_dims) :: vel
+        real(kind(0d0)) :: pinf, aux1, aux2, velint, cson, rhol
+        real(kind(0d0)) :: gamma, pi_inf, qv
+        real(kind(0d0)), dimension(contxe) :: myalpha_rho, myalpha
         real(kind(0d0)), dimension(2) :: Re
+        integer, dimension(3) :: cell
 
-        call nvtxStartRange("DYNAMICS-LAGRANGE-BUBBLES")
+        integer :: i, k, l
+
+        call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
 
         !< BUBBLE DYNAMICS
 
-        ! Subgrid p_inf model from Maeda and Colonius (2018).
+        ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            !$acc parallel loop gang vector default(present) private(k)
+            !$acc parallel loop gang vector default(present) private(k, cell)
             do k = 1, nBubs
-                paux = f_Pinf(k, q_prim_vf, 2, preterm1, term2, Romega)
-                !pint = f_pressureliq_int(k)
-                pint = f_cpbw_KM(bub_R0(k), intfc_rad(k, 2), intfc_vel(k, 2), gas_p(k, 2))
-                pint = pint + 0.5d0*intfc_vel(k, 2)**2
+                call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
+                fR0 = bub_R0(k)
+                fR = intfc_rad(k, 2)
+                fV = intfc_vel(k, 2)
+                fpb = gas_p(k, 2)
+                pint = f_cpbw_KM(fR0, fR, fV, fpb)
+                pint = pint + 0.5d0*fV**2
                 if (lag_params%cluster_type == 2) then
                     bub_dphidt(k) = (paux - pint) + term2
                     ! Accounting for the potential induced by the bubble averaged over the control volume
@@ -524,9 +554,10 @@ contains
 
         ! Radial motion model
         if (bubble_model == 2) then
-            !$acc parallel loop gang vector default(present) private(k) copyin(stage)
+            !$acc parallel loop gang vector default(present) private(k, myalpha_rho, myalpha, Re, cell) copyin(stage)
             do k = 1, nBubs
                 ! Keller-Miksis model
+
                 ! Current bubble state
                 fpb = gas_p(k, 2)
                 fmass_n = gas_mg(k)
@@ -536,41 +567,43 @@ contains
                 fbeta_c = gas_betaC(k)
                 fbeta_t = gas_betaT(k)
                 fR0 = bub_R0(k)
-                scoord = mtn_s(k, 1:3, 2)
+
                 ! Mixture properties in the bubble
                 conc_v = 0d0
                 if (lag_params%massTransfer_model) conc_v = 1d0/(1d0 + (R_v/R_n)*(fpb/pv - 1d0))
                 R_m = (fmass_n*R_n + fmass_v*R_v)
                 gamma_m = conc_v*gamma_v + (1d0 - conc_v)*gamma_n
+
                 ! Vapor and heat fluxes
                 vaporflux = f_vflux(fR, fV, fmass_v, k, fmass_n, fbeta_c, conc_v)
                 fpbdt = f_bpres_dot(vaporflux, fR, fV, fpb, fmass_v, k, fbeta_t, R_m, gamma_m, conc_v)
                 gas_dmvdt(k, stage) = 4d0*pi*fR**2d0*vaporflux
+
                 ! Pressure at the bubble wall
-                pliqint_EE = f_cpbw_KM(fR0, fR, fV, fpb)
-                ! Obtaining pinf
-                call s_get_cell(scoord, cell)
-                pinf = f_Pinf(k, q_prim_vf, 1, aux1, aux2)
-                ! Computing speed of sound from pinf
-                do i = 1, num_fluids
-                    alpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))* &
-                                   q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
+                pliqint = f_cpbw_KM(fR0, fR, fV, fpb)
+
+                ! Obtaining driving pressure
+                call s_get_pinf(k, q_prim_vf, 1, pinf, cell, aux1, aux2)
+
+                ! Obtain liquid density and computing speed of sound from pinf
+                !$acc loop seq
+                do i = 1, contxe
+                    myalpha_rho(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))* &
+                                     q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
+                    myalpha(i) = q_prim_vf(advxb + i - 1)%sf(cell(1), cell(2), cell(3))
                 end do
-                call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, alpha, &
-                                                                alpha_rho, Re, cell(1), cell(2), cell(3))
-                do i = 1, num_dims
-                    vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
-                end do
-                E = gamma*pinf + pi_inf + 0.5d0*rhol*dot_product(vel, vel)
-                H = (E + pinf)/rhol
-                cson = sqrt((H - 0.5d0*dot_product(vel, vel))/gamma)
+                call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
+                                                                myalpha_rho, Re, cell(1), cell(2), cell(3))
+                call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+
                 ! Velocity correction due to massflux
                 velint = fV - gas_dmvdt(k, stage)/(4d0*pi*fR**2*rhol)
+
                 ! Interphase acceleration and update vars
-                intfc_dveldt(k, stage) = f_rddot_KM(fpbdt, pinf, pliqint_EE, rhol, fR, velint, fR0, cson)
+                intfc_dveldt(k, stage) = f_rddot_KM(fpbdt, pinf, pliqint, rhol, fR, velint, fR0, cson)
                 gas_dpdt(k, stage) = fpbdt
                 intfc_draddt(k, stage) = fV
+
             end do
         else
             if (proc_rank == 0) print *, 'WARNING: Lagrange bubbles work with Keller Miksis model!', &
@@ -599,12 +632,48 @@ contains
 
     end subroutine s_compute_EL_coupled_solver
 
+    !>  This procedure computes the speed of sound from a given driving pressure
+        !! @param bub_id Bubble id
+        !! @param q_prim_vf Primitive variables
+        !! @param pinf Driving pressure
+        !! @param cell Bubble cell
+        !! @param rhol Liquid density
+        !! @param gamma Liquid specific heat ratio
+        !! @param pi_inf Liquid stiffness
+        !! @param cson Calculated speed of sound
+    subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_cson_from_pinf
+#else
+        !$acc routine seq
+#endif
+        integer, intent(in) :: bub_id
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        real(kind(0d0)), intent(in) :: pinf, rhol, gamma, pi_inf
+        integer, dimension(3), intent(in) :: cell
+        real(kind(0d0)), intent(out) :: cson
+
+        real(kind(0d0)) :: E, H
+        real(kind(0d0)), dimension(3) :: scoord
+        real(kind(0d0)), dimension(num_dims) :: vel
+        integer :: i
+
+        !$acc loop seq
+        do i = 1, num_dims
+            vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
+        end do
+        E = gamma*pinf + pi_inf + 0.5d0*rhol*dot_product(vel, vel)
+        H = (E + pinf)/rhol
+        cson = sqrt((H - 0.5d0*dot_product(vel, vel))/gamma)
+
+    end subroutine s_compute_cson_from_pinf
+
     !>  The purpose of this subroutine is to smear the effect of the bubbles in the Eulerian framework
     subroutine s_smear_voidfraction()
 
         integer :: i, j, k, l
 
-        call nvtxStartRange("EL-KERNELS")
+        call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, q_beta_idx
@@ -732,39 +801,108 @@ contains
         !! @param bub_id Particle identifier
         !! @param q_prim_vf  Primitive variables
         !! @param ptype 1: p at infinity, 2: averaged P at the bubble location
+        !! @param f_pinfl Driving pressure
+        !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    function f_Pinf(bub_id, q_prim_vf, ptype, preterm1, term2, Romega)
+    subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_get_pinf
+#else
         !$acc routine seq
-        integer, intent(in) :: bub_id
+#endif
+        integer, intent(in) :: bub_id, ptype
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer, intent(in) :: ptype
+        real(kind(0d0)), intent(out) :: f_pinfl
+        integer, dimension(3), intent(out) :: cell
         real(kind(0d0)), intent(out), optional :: preterm1, term2, Romega
-        real(kind(0d0)) :: f_Pinf
 
-        real(kind(0d0)), dimension(3) :: scoord
+        real(kind(0d0)), dimension(3) :: scoord, psi
         real(kind(0d0)) :: dc, vol, aux, dist
         real(kind(0d0)) :: volgas, term1, Rbeq, denom
         real(kind(0d0)) :: charvol, charpres, charvol2, charpres2
-        integer, dimension(3) :: cell, cellaux
-
+        integer, dimension(3) :: cellaux
         integer :: i, j, k
         integer :: mapCells_pinf, smearGrid, smearGridz
         logical :: celloutside
 
         scoord = mtn_s(bub_id, 1:3, 2)
-        f_Pinf = 0d0
-        call s_get_cell(scoord, cell)
+        f_pinfl = 0d0
+
+        !< Find current bubble cell
+        cell(:) = int(scoord(:))
+        !$acc loop seq
+        do i = 1, num_dims
+            if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
+        end do
 
         if ((lag_params%cluster_type == 1)) then
-            !getting p_cell in terms of only the current cell by interpolation
+            !< Getting p_cell in terms of only the current cell by interpolation
 
-            call s_get_char_vol(cell(1), cell(2), cell(3), vol)
+            !< Getting the cell volulme as Omega
+            if (p > 0) then
+                vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+            else
+                if (cyl_coord) then
+                    vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2.0d0*pi
+                else
+                    vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                end if
+            end if
 
-            ! Getting the cell volulme as Omega
-            call s_get_char_dist(cell(1), cell(2), cell(3), dist)
+            !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
+            psi(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+            if (cell(1) == (m + buff_size)) then
+                cell(1) = cell(1) - 1
+                psi(1) = 1.0d0
+            else if (cell(1) == (-buff_size)) then
+                psi(1) = 0.0d0
+            else
+                if (psi(1) < x_cc(cell(1))) cell(1) = cell(1) - 1
+                psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
+            end if
 
-            !p_cell (interpolated)
-            f_Pinf = f_interpolate(scoord, q_prim_vf(E_idx))
+            psi(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+            if (cell(2) == (n + buff_size)) then
+                cell(2) = cell(2) - 1
+                psi(2) = 1.0d0
+            else if (cell(2) == (-buff_size)) then
+                psi(2) = 0.0d0
+            else
+                if (psi(2) < y_cc(cell(2))) cell(2) = cell(2) - 1
+                psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
+            end if
+
+            if (p > 0) then
+                psi(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                if (cell(3) == (p + buff_size)) then
+                    cell(3) = cell(3) - 1
+                    psi(3) = 1.0d0
+                else if (cell(3) == (-buff_size)) then
+                    psi(3) = 0.0d0
+                else
+                    if (psi(3) < z_cc(cell(3))) cell(3) = cell(3) - 1
+                    psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
+                end if
+            else
+                psi(3) = 0.0d0
+            end if
+
+            !< Perform bilinear interpolation
+            if (p == 0) then  !2D
+                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1d0 - psi(1))*(1d0 - psi(2))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1d0 - psi(2))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1d0 - psi(1))*psi(2)
+            else              !3D
+                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1d0 - psi(1))*(1d0 - psi(2))*(1d0 - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1d0 - psi(2))*(1d0 - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1d0 - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1d0 - psi(1))*psi(2)*(1d0 - psi(3))
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1d0 - psi(1))*(1d0 - psi(2))*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1d0 - psi(2))*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
+                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1d0 - psi(1))*psi(2)*psi(3)
+            end if
 
             !R_Omega
             dc = (3d0*vol/(4d0*pi))**(1d0/3d0)
@@ -801,7 +939,27 @@ contains
                         cellaux(3) = cell(3) + k - (mapCells + 1)
                         if (p == 0) cellaux(3) = 0
 
-                        call s_check_celloutside(cellaux, celloutside)
+                        !< check if the current cell is outside the computational domain or not (including ghost cells)
+                        celloutside = .false.
+                        if (num_dims == 2) then
+                            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                                celloutside = .true.
+                            end if
+                            if (cyl_coord .and. y_cc(cellaux(2)) < 0d0) then
+                                celloutside = .true.
+                            end if
+                            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                                celloutside = .true.
+                            end if
+                        else
+                            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                                celloutside = .true.
+                            end if
+
+                            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                                celloutside = .true.
+                            end if
+                        end if
                         if (.not. celloutside) then
                             if (cyl_coord .and. (p == 0) .and. (y_cc(cellaux(2)) < 0d0)) then
                                 celloutside = .true.
@@ -809,7 +967,17 @@ contains
                         end if
 
                         if (.not. celloutside) then
-                            call s_get_char_vol(cellaux(1), cellaux(2), cellaux(3), vol)
+                            !< Obtaining the cell volulme
+                            if (p > 0) then
+                                vol = dx(cellaux(1))*dy(cellaux(2))*dz(cellaux(3))
+                            else
+                                if (cyl_coord) then
+                                    vol = dx(cellaux(1))*dy(cellaux(2))*y_cc(cellaux(2))*2.0d0*pi
+                                else
+                                    vol = dx(cellaux(1))*dy(cellaux(2))*lag_params%charwidth
+                                end if
+                            end if
+                            !< Update values
                             charvol = charvol + vol
                             charpres = charpres + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
                             charvol2 = charvol2 + vol*q_beta%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3))
@@ -821,7 +989,7 @@ contains
                 end do
             end do
 
-            f_Pinf = charpres2/charvol2
+            f_pinfl = charpres2/charvol2
             vol = charvol
             dc = (3d0*abs(vol)/(4d0*pi))**(1d0/3d0)
         else
@@ -849,14 +1017,15 @@ contains
 
             ! Getting p_inf
             if (ptype == 1) then
-                f_Pinf = f_Pinf + preterm1*term1 + term2
+                f_pinfl = f_pinfl + preterm1*term1 + term2
             end if
 
         end if
 
-    end function f_Pinf
+    end subroutine s_get_pinf
 
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
+        !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
         !! @param stage Current tvd RK stage
     subroutine s_update_lagrange_tdv_rk(stage)
 
@@ -1181,12 +1350,12 @@ contains
                 call s_mpi_allreduce_max(rkck_errmax, aux_glb)
                 rkck_errmax = aux_glb
             end if
-            rkck_errmax = rkck_errmax/lag_params%rkck_tolerance ! Scale relative to user required tolerance.
+            rkck_errmax = rkck_errmax/rkck_tolerance ! Scale relative to user required tolerance.
 
             if ((rkck_errmax > 1d0)) then   ! Truncation error too large, reduce dt and restart time step
                 restart_rkck_step = .true.
                 htemp = SAFETY*dt*((floor(rkck_errmax*RNDDEC)/RNDDEC)**PSHRNK)
-                dt = sign(max(abs(htemp), SHRNKDTMAX*abs(dt)), dt)  ! No more than a factor of 10.
+                dt = sign(max(abs(htemp), (1d0 - SAFETY)*abs(dt)), dt)  ! No more than a factor of 10.
                 if (proc_rank == 0) print *, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', dt
             else                            ! Step succeeded. Compute size of next step.
                 if (rkck_errmax > ERRCON) then
@@ -1207,40 +1376,6 @@ contains
 
     end subroutine s_compute_rkck_dt
 
-    !> This function performs a bilinear interpolation.
-          !! @param coord Interpolation coordinates
-          !! @param q Input scalar field
-    function f_interpolate(coord, q)
-        !$acc routine seq
-        type(scalar_field), intent(in) :: q
-        real(kind(0d0)), dimension(3), intent(in) :: coord
-
-        real(kind(0d0)) :: f_interpolate, tmp
-        real(kind(0d0)), dimension(3) :: psi !local coordinates
-        integer, dimension(3) :: cell
-
-        call s_get_psi(coord, psi, cell)
-
-        if (p == 0) then  !2D
-            tmp = q%sf(cell(1), cell(2), cell(3))*(1d0 - psi(1))*(1d0 - psi(2))
-            tmp = tmp + q%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1d0 - psi(2))
-            tmp = tmp + q%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
-            tmp = tmp + q%sf(cell(1), cell(2) + 1, cell(3))*(1d0 - psi(1))*psi(2)
-        else              !3D
-            tmp = q%sf(cell(1), cell(2), cell(3))*(1d0 - psi(1))*(1d0 - psi(2))*(1d0 - psi(3))
-            tmp = tmp + q%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1d0 - psi(2))*(1d0 - psi(3))
-            tmp = tmp + q%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1d0 - psi(3))
-            tmp = tmp + q%sf(cell(1), cell(2) + 1, cell(3))*(1d0 - psi(1))*psi(2)*(1d0 - psi(3))
-            tmp = tmp + q%sf(cell(1), cell(2), cell(3) + 1)*(1d0 - psi(1))*(1d0 - psi(2))*psi(3)
-            tmp = tmp + q%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1d0 - psi(2))*psi(3)
-            tmp = tmp + q%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
-            tmp = tmp + q%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1d0 - psi(1))*psi(2)*psi(3)
-        end if
-
-        f_interpolate = tmp
-
-    end function f_interpolate
-
     !> This subroutine returns the computational coordinate of the cell for the given position.
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
@@ -1250,6 +1385,8 @@ contains
         real(kind(0d0)), dimension(3) :: pos
         real(kind(0d0)), dimension(3), optional :: scoord
         integer, dimension(3) :: cell
+
+        integer :: i
 
         do while (pos(1) < x_cb(cell(1) - 1))
             cell(1) = cell(1) - 1
@@ -1288,7 +1425,10 @@ contains
             scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
             scoord(3) = 0d0
             if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
-            call s_get_cell(scoord, cell)
+            cell(:) = int(scoord(:))
+            do i = 1, num_dims
+                if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
+            end do
         end if
 
     end subroutine s_locate_cell

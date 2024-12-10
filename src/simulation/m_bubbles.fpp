@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains the procedures shared by the ensemble-averaged bubble model and the lagrange bubble model.
+!> @brief This module contains the procedures shared by the ensemble-averaged and volume-averaged bubble models.
 module m_bubbles
 
     ! Dependencies =============================================================
@@ -261,12 +261,7 @@ contains
                (1d0 + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
-        if (bubbles_lagrange) then
-            f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
-            return
-        end if
-
-        if (f_is_default(Re_inv)) then
+        if (bubbles_lagrange .or. f_is_default(Re_inv)) then
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
         else
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv/(fRho*fC))

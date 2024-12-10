@@ -293,6 +293,7 @@ module m_derived_types
         real(kind(0d0)) :: M_v     !< Bubble constants (see Preston (2007), Ando (2010))
         real(kind(0d0)) :: mu_v    !< Bubble constants (see Preston (2007), Ando (2010))
         real(kind(0d0)) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
+        real(kind(0d0)) :: cp_v
         real(kind(0d0)) :: G
     end type physical_parameters
 
@@ -398,19 +399,13 @@ module m_derived_types
         logical :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
         integer :: nBubs_glb                !< Global number of bubbles
         real(kind(0d0)) :: epsilonb         !< Standard deviation scaling for the gaussian function (default: 1.0d0)
-        real(kind(0d0)) :: rkck_tolerance   !< Adaptive RKCK tolerance
         real(kind(0d0)) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
         real(kind(0d0)) :: valmaxvoid       !< Maximum void fraction permitted
-        real(kind(0d0)) :: csonhost             !< Liquid speed of sound
-        real(kind(0d0)) :: vischost             !< Liquid viscosity
-        real(kind(0d0)) :: Thost                !< Liquid temperature
-        real(kind(0d0)) :: gammagas, gammavapor !< Gas and vapour gamma
-        real(kind(0d0)) :: pvap                 !< Vapour pressure at the reference temperature
-        real(kind(0d0)) :: cpgas, cpvapor       !< Gas and vapor specific heat capacity
-        real(kind(0d0)) :: kgas, kvapor         !< Gas and vapor thermal conductivity
-        real(kind(0d0)) :: Rgas, Rvapor           !< Gas and vapour specific gas constant
-        real(kind(0d0)) :: diffcoefvap          !< Vapor diffusivity in the gas
-        real(kind(0d0)) :: sigmabubble          !< Surface tension
+        real(kind(0d0)) :: c0               !< Reference speed
+        real(kind(0d0)) :: rho0             !< Reference density
+        real(kind(0d0)) :: T0, Thost        !< Reference temperature and host temperature
+        real(kind(0d0)) :: x0               !< Reference length
+        real(kind(0d0)) :: diffcoefvap      !< Vapor diffusivity in the gas
 
     end type bubbles_lagrange_parameters
 

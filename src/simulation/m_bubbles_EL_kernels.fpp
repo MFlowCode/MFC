@@ -37,17 +37,17 @@ contains
         case (1)
         call s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
         case (2)
-        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
         end select smoothfunc
 
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
             !!      The effect of the bubbles only affects the cell where the bubble is located.
-    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
         real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
@@ -205,7 +205,11 @@ contains
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_applygaussian
+#else
         !$acc routine seq
+#endif
         real(kind(0.d0)), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
         real(kind(0.d0)), dimension(3), intent(in) :: nodecoord
@@ -271,7 +275,11 @@ contains
             !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_check_celloutside
+#else
         !$acc routine seq
+#endif
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
 
@@ -303,7 +311,11 @@ contains
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
+#else
         !$acc routine seq
+#endif
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
@@ -364,7 +376,11 @@ contains
             !! @param volpart Volume of the bubble
             !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_stddsv
+#else
         !$acc routine seq
+#endif
         integer, dimension(3), intent(in) :: cell
         real(kind(0.d0)), intent(in) :: volpart
         real(kind(0.d0)), intent(out) :: stddsv
@@ -372,9 +388,22 @@ contains
         real(kind(0.d0)) :: chardist, charvol
         real(kind(0.d0)) :: rad
 
-        call s_get_char_dist(cell(1), cell(2), cell(3), chardist)
-        call s_get_char_vol(cell(1), cell(2), cell(3), charvol)
+        !< Compute characteristic distance
+        chardist = sqrt(dx(cell(1))*dy(cell(2)))
+        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1./3.)
 
+        !< Compute characteristic volume
+        if (p > 0) then
+            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+        else
+            if (cyl_coord) then
+                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2.0d0*pi
+            else
+                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+            end if
+        end if
+
+        !< Compute Standard deviaton
         if (((volpart/charvol) > 0.5d0*lag_params%valmaxvoid) .or. (lag_params%smooth_type == 1)) then
             rad = (3.0d0*volpart/(4.0d0*pi))**(1.0d0/3.0d0)
             stddsv = 1.0d0*lag_params%epsilonb*max(chardist, rad)
@@ -384,27 +413,15 @@ contains
 
     end subroutine s_compute_stddsv
 
-    !> The purpose of this procedure is to calculate the characteristic cell distance
-            !! @param cell Computational coordinates (x, y, z)
-            !! @param Chardist Characteristic distance
-    subroutine s_get_char_dist(cellx, celly, cellz, Chardist)
-        !$acc routine seq
-        integer, intent(in) :: cellx, celly, cellz
-        real(kind(0.d0)), intent(out) :: Chardist
-
-        if (p > 0) then
-            Chardist = (dx(cellx)*dy(celly)*dz(cellz))**(1./3.)
-        else
-            Chardist = sqrt(dx(cellx)*dy(celly))
-        end if
-
-    end subroutine s_get_char_dist
-
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_get_char_vol
+#else
         !$acc routine seq
+#endif
         integer, intent(in) :: cellx, celly, cellz
         real(kind(0.d0)), intent(out) :: Charvol
 
@@ -420,68 +437,16 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine returns the bilinear interpolation coefficients, based on the
-            !!      current location of the bubble.
-            !! @param coord Bubble's spatial lcation
-            !! @param psi Bilinear interpolation coefficients
-            !! @param cell Bubble's computational coordinate
-    subroutine s_get_psi(coord, psi, cell)
-        !$acc routine seq
-        real(kind(0.d0)), dimension(3), intent(in) :: coord
-        real(kind(0.d0)), dimension(3), intent(inout) :: psi
-        integer, dimension(3), intent(inout) :: cell
-        integer :: cellx, celly, cellz
-
-        call s_get_cell(coord, cell)
-        cell(1) = cellx
-        cell(2) = celly
-        cell(3) = cellz
-
-        psi(1) = (coord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
-        if (cell(1) == (m + buff_size)) then
-            cell(1) = cell(1) - 1
-            psi(1) = 1.0d0
-        else if (cell(1) == (-buff_size)) then
-            psi(1) = 0.0d0
-        else
-            if (psi(1) < x_cc(cell(1))) cell(1) = cell(1) - 1
-            psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
-        end if
-
-        psi(2) = (coord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
-        if (cell(2) == (n + buff_size)) then
-            cell(2) = cell(2) - 1
-            psi(2) = 1.0d0
-        else if (cell(2) == (-buff_size)) then
-            psi(2) = 0.0d0
-        else
-            if (psi(2) < y_cc(cell(2))) cell(2) = cell(2) - 1
-            psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
-        end if
-
-        if (p > 0) then
-            psi(3) = (coord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
-            if (cell(3) == (p + buff_size)) then
-                cell(3) = cell(3) - 1
-                psi(3) = 1.0d0
-            else if (cell(3) == (-buff_size)) then
-                psi(3) = 0.0d0
-            else
-                if (psi(3) < z_cc(cell(3))) cell(3) = cell(3) - 1
-                psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
-            end if
-        else
-            psi(3) = 0.0d0
-        end if
-
-    end subroutine s_get_psi
-
     !> This subroutine transforms the computational coordinates of the bubble from
             !!      real type into integer.
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
     subroutine s_get_cell(s_cell, get_cell)
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_get_cell
+#else
         !$acc routine seq
+#endif
         real(kind(0.d0)), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
         integer :: i

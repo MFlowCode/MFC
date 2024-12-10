@@ -231,7 +231,7 @@ contains
                     myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
                 end do
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     if (num_fluids > 2) then
                         !$acc loop seq
                         do q = 1, num_fluids - 1
@@ -246,7 +246,7 @@ contains
                     end if
                 end if
 
-                if ((.not. bubbles) .or. (mpp_lim .and. (num_fluids > 2))) then
+                if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
                     !$acc loop seq
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)

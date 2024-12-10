@@ -261,7 +261,7 @@ module m_global_parameters
     real(kind(0d0)) :: R0ref
     real(kind(0d0)) :: Ca, Web, Re_inv
     real(kind(0d0)), dimension(:), allocatable :: weight, R0, V0
-    logical :: bubbles
+    logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
     logical :: polydisperse
@@ -400,7 +400,7 @@ contains
         pref = dflt_real
 
         ! Bubble modeling
-        bubbles = .false.
+        bubbles_euler = .false.
         qbmm = .false.
         R0ref = dflt_real
         nb = dflt_int
@@ -467,7 +467,7 @@ contains
 
             sys_size = adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 alf_idx = adv_idx%end
             else
                 alf_idx = 1
@@ -477,7 +477,7 @@ contains
                 nmom = 6
             end if
 
-            if (bubbles) then
+            if (bubbles_euler) then
 
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
@@ -594,7 +594,7 @@ contains
             alf_idx = adv_idx%end
             sys_size = alf_idx !adv_idx%end
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
                 bub_idx%end = sys_size + 2*nb
                 if (polytropic .neqv. .true.) then

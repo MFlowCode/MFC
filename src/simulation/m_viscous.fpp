@@ -99,14 +99,14 @@ contains
                         !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles .and. num_fluids == 1) then
+                            if (bubbles_euler .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
                             pi_inf_visc = 0d0
@@ -206,14 +206,14 @@ contains
                         !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles .and. num_fluids == 1) then
+                            if (bubbles_euler .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
                             pi_inf_visc = 0d0
@@ -310,14 +310,14 @@ contains
                         !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles .and. num_fluids == 1) then
+                            if (bubbles_euler .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
                             pi_inf_visc = 0d0
@@ -418,14 +418,14 @@ contains
                         !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles .and. num_fluids == 1) then
+                            if (bubbles_euler .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             rho_visc = 0d0
                             gamma_visc = 0d0
                             pi_inf_visc = 0d0

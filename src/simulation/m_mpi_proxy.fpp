@@ -192,7 +192,7 @@ contains
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
             &  'mp_weno', 'rdma_mpi', 'weno_flat', 'riemann_flat', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
-            & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',          &
+            & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
             & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
@@ -221,15 +221,12 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', &
-                & 'nBubs_glb']
+            #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'csonhost', 'vischost', 'Thost', 'gammagas', 'gammavapor', &
-                & 'pvap', 'cpgas', 'cpvapor', 'kgas', 'kvapor', 'Rgas', 'Rvapor',     &
-                & 'diffcoefvap', 'sigmabubble', 'rkck_tolerance', 'epsilonb',         &
-                & 'charwidth', 'valmaxvoid']
+            #:for VAR in [ 'c0', 'rho0', 'T0', 'x0', 'diffcoefvap', 'epsilonb','charwidth', &
+                & 'valmaxvoid', 'Thost']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
@@ -241,7 +238,7 @@ contains
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
             & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
-            & 'z_domain%beg', 'z_domain%end', 't_stop',  't_save', 'cfl_target']
+            & 'z_domain%beg', 'z_domain%end', 't_stop',  't_save', 'cfl_target', 'rkck_tolerance']
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -264,7 +261,7 @@ contains
 
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v','G', 'cv', 'qv', 'qvp' ]
+                & 'mu_v','k_v', 'cp_v', 'G', 'cv', 'qv', 'qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)

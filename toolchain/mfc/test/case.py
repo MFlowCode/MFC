@@ -1,4 +1,4 @@
-import os, glob, hashlib, binascii, subprocess, itertools, dataclasses
+import os, glob, hashlib, binascii, subprocess, itertools, dataclasses, shutil
 
 from typing import List, Set, Union, Callable, Optional
 
@@ -55,7 +55,7 @@ BASE_CFG = {
     'fluid_pp(1)%cv'               : 0.0,
     'fluid_pp(1)%qv'               : 0.0,
     'fluid_pp(1)%qvp'              : 0.0,   
-    'bubbles'                       : 'F',
+    'bubbles_euler'                 : 'F',
     'Ca'                            : 0.9769178386380458,
     'Web'                           : 13.927835051546392,
     'Re_inv'                        : 0.009954269975623245,
@@ -91,32 +91,24 @@ BASE_CFG = {
     'acoustic(1)%pulse'                 : 1,
     'rdma_mpi'                          : 'F',
 
-    'bubbles_lagrange'               : 'F',
-    'rkck_adap_dt'                   : 'F',
-    'lag_params%nBubs_glb'           : 1,
-    'lag_params%solver_approach'           : 2,
-    'lag_params%cluster_type'              : 2,
-    'lag_params%pressure_corrector'        : 'F',
-    'lag_params%smooth_type'               : 1,
-    'lag_params%heatTransfer_model'        : 'F',
-    'lag_params%massTransfer_model'        : 'F',
-    'lag_params%epsilonb'                  : 1.0,
-    'lag_params%rkck_tolerance'            : 1.0e-9,
-    'lag_params%valmaxvoid'                : 0.9,
-    'lag_params%csonhost'                      : 151.8,
-    'lag_params%vischost'                      : 0.0099542,
-    'lag_params%Thost'                         : 1,
-    'lag_params%gammagas'                      : 1.4,
-    'lag_params%gammavapor'                    : 1.33,
-    'lag_params%pvap'                          : 0.24673,
-    'lag_params%cpgas'                         : 2941.03,
-    'lag_params%cpvapor'                       : 6176.1658,
-    'lag_params%kgas'                          : 0.7304,
-    'lag_params%kvapor'                        : 0.5843,
-    'lag_params%Rgas'                          : 873.1922,
-    'lag_params%Rvapor'                          : 1358.4624,
-    'lag_params%diffcoefvap'                   : 0.24836,
-    'lag_params%sigmabubble'                   : 0.069,
+    'bubbles_lagrange'                 : 'F',
+    'rkck_adap_dt'                     : 'F',
+    'rkck_tolerance'                   : 1.0e-09,
+    'lag_params%nBubs_glb'             : 1,
+    'lag_params%solver_approach'       : 0,
+    'lag_params%cluster_type'          : 2,
+    'lag_params%pressure_corrector'    : 'F',
+    'lag_params%smooth_type'           : 1,
+    'lag_params%epsilonb'              : 1.0,
+    'lag_params%heatTransfer_model'    : 'F',
+    'lag_params%massTransfer_model'    : 'F',
+    'lag_params%valmaxvoid'            : 0.9,
+    'lag_params%c0'                    : 10.1,
+    'lag_params%rho0'                  : 1000.,
+    'lag_params%T0'                    : 298.,
+    'lag_params%x0'                    : 1.,
+    'lag_params%diffcoefvap'           : 2.5e-5,
+    'lag_params%Thost'                 : 298.,
 }
 
 def trace_to_uuid(trace: str) -> str:
@@ -146,8 +138,13 @@ class TestCase(case.Case):
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
 
         if "lagrangian bubbles" in self.trace:
-            path_lag_bubbles = f'{self.get_dirpath()}'
-            create_input_lag_bubbles(path_lag_bubbles)
+            create_input_lagrange(f'{self.get_dirpath()}')
+
+        if "lagrange_bubblescreen" in self.trace:
+            copy_input_lagrange(f'/3D_lagrange_bubblescreen',f'{self.get_dirpath()}')
+
+        if "lagrange_shbubcollapse" in self.trace:
+            copy_input_lagrange(f'/3D_lagrange_shbubcollapse',f'{self.get_dirpath()}')
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
@@ -189,7 +186,8 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "p_all"))
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
-        if "lagrangian bubbles" in self.trace:
+        remove_lagrange_list = ["lagrangian bubbles", "lagrange_bubblescreen", "lagrange_shbubcollapse"]
+        if any( remove_lagrange in self.trace for remove_lagrange in remove_lagrange_list):
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
 
@@ -266,7 +264,7 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-3
         elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
-        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles']):
+        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler']):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
@@ -359,11 +357,20 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
 
 
-def create_input_lag_bubbles(path_lag_bubbles):
-    folder_path_lag_bubbles = path_lag_bubbles + '/input'
-    file_path_lag_bubbles = folder_path_lag_bubbles + '/lag_bubbles.dat'
-    if not os.path.exists(folder_path_lag_bubbles):
-        os.mkdir(folder_path_lag_bubbles)
+def create_input_lagrange(path_test):
+    folder_path_lagrange = path_test + '/input'
+    file_path_lagrange = folder_path_lagrange + '/lag_bubbles.dat'
+    if not os.path.exists(folder_path_lagrange):
+        os.mkdir(folder_path_lagrange)
 
-    with open(file_path_lag_bubbles, "w") as file:
+    with open(file_path_lagrange, "w") as file:
         file.write('0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0')
+
+def copy_input_lagrange(path_example_input, path_test):
+    folder_path_dest = path_test + '/input/'
+    fite_path_dest = folder_path_dest + 'lag_bubbles.dat'
+    file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + '/input/lag_bubbles.dat'
+    if not os.path.exists(folder_path_dest):
+        os.mkdir(folder_path_dest)
+
+    shutil.copyfile(file_path_src, fite_path_dest)

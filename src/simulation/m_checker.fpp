@@ -32,7 +32,7 @@ contains
         call s_check_inputs_model_eqns
         call s_check_inputs_acoustic_src
         call s_check_inputs_hypoelasticity
-        call s_check_inputs_bubbles
+        call s_check_inputs_bubbles_euler
         call s_check_inputs_bubbles_lagrange
         call s_check_inputs_adapt_dt
         call s_check_inputs_alt_soundspeed
@@ -252,12 +252,13 @@ contains
     end subroutine
 
     !> Checks constraints on bubble parameters
-    subroutine s_check_inputs_bubbles
-        @:PROHIBIT(bubbles .and. riemann_solver /= 2, "Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)")
-        @:PROHIBIT(bubbles .and. avg_state /= 2, "Bubble modeling requires arithmetic average (avg_state = 2)")
-        @:PROHIBIT(bubbles .and. model_eqns == 2 .and. bubble_model == 1, &
+    subroutine s_check_inputs_bubbles_euler
+        @:PROHIBIT(bubbles_euler .and. bubbles_lagrange, "Activate only one of the bubble subgrid models")
+        @:PROHIBIT(bubbles_euler .and. riemann_solver /= 2, "Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)")
+        @:PROHIBIT(bubbles_euler .and. avg_state /= 2, "Bubble modeling requires arithmetic average (avg_state = 2)")
+        @:PROHIBIT(bubbles_euler .and. model_eqns == 2 .and. bubble_model == 1, &
             "The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)")
-    end subroutine s_check_inputs_bubbles
+    end subroutine s_check_inputs_bubbles_euler
 
     !> Checks constraints on adaptive time stepping parameters (adap_dt)
     subroutine s_check_inputs_adapt_dt
@@ -323,7 +324,7 @@ contains
         !! including constraints on probe_wrt and integral_wrt
     subroutine s_check_inputs_misc
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
-        @:PROHIBIT(integral_wrt .and. (.not. bubbles))
+        @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
     end subroutine s_check_inputs_misc
 
 end module m_checker

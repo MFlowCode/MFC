@@ -136,7 +136,7 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(i))
         end do
 
-        if (bubbles) then
+        if (bubbles_euler) then
             do i = bub_idx%beg, bub_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
@@ -266,7 +266,7 @@ contains
                 do j = 1, sys_size
                     @:ALLOCATE(rhs_ts_rkck(i)%vf(j)%sf(0:m, 0:n, 0:p))
                 end do
-                @:ACC_SETUP_SFs(rhs_ts_rkck(i))
+                @:ACC_SETUP_VFs(rhs_ts_rkck(i))
             end do
         else
             ! Allocating the cell-average RHS variables
@@ -1043,9 +1043,6 @@ contains
         integer, intent(in) :: t_step
         real(kind(0d0)), intent(out) :: time_avg
 
-        real(kind(0d0)) :: c1 = 0.0d0, c2 = 0.2d0, c3 = 0.3d0, &
-                           c4 = 0.6d0, c5 = 1.0d0, c6 = 0.875d0
-
         logical :: restart_rkck_step, start_rkck_step
         real(kind(0.d0)) :: lag_largestep, rkck_errmax, dt_did
         integer :: RKstep
@@ -1062,7 +1059,7 @@ contains
 
             ! FIRST TIME-STAGE
             RKstep = 1
-            rkck_time_tmp = mytime + c1*dt
+            rkck_time_tmp = mytime + rkck_c1*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1076,7 +1073,7 @@ contains
 
             ! SECOND TIME-STAGE
             RKstep = 2
-            rkck_time_tmp = mytime + c2*dt
+            rkck_time_tmp = mytime + rkck_c2*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1090,7 +1087,7 @@ contains
 
             ! THIRD TIME-STAGE
             RKstep = 3
-            rkck_time_tmp = mytime + c3*dt
+            rkck_time_tmp = mytime + rkck_c3*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1104,7 +1101,7 @@ contains
 
             ! FOURTH TIME-STAGE
             RKstep = 4
-            rkck_time_tmp = mytime + c4*dt
+            rkck_time_tmp = mytime + rkck_c4*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1118,7 +1115,7 @@ contains
 
             ! FIFTH TIME-STAGE
             RKstep = 5
-            rkck_time_tmp = mytime + c5*dt
+            rkck_time_tmp = mytime + rkck_c5*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1132,7 +1129,7 @@ contains
 
             ! SIXTH TIME-STAGE
             RKstep = 6
-            rkck_time_tmp = mytime + c6*dt
+            rkck_time_tmp = mytime + rkck_c6*dt
 !$acc update device (rkck_time_tmp)
 
 #ifdef DEBUG
@@ -1216,7 +1213,7 @@ contains
             end do
         end if
 
-        if (bubbles) then
+        if (bubbles_euler) then
             do i = bub_idx%beg, bub_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do

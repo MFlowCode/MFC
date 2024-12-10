@@ -167,7 +167,7 @@ contains
             & 'alt_soundspeed', 'hypoelasticity', 'parallel_io', 'rho_wrt',    &
             & 'E_wrt', 'pres_wrt', 'gamma_wrt',                                &
             & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles', 'qbmm',   &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt', 'bubbles_euler', 'qbmm',   &
             & 'polytropic', 'polydisperse', 'file_per_process', 'relax', 'cf_wrt',     &
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'bubbles_lagrange', 'rkck_adap_dt' ]

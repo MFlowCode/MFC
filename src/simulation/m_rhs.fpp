@@ -275,7 +275,7 @@ contains
             @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
         end do
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
         ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
@@ -602,7 +602,7 @@ contains
             end do
         end do
 
-        if (bubbles) then
+        if (bubbles_euler) then
             @:ALLOCATE(nbub(0:m, 0:n, 0:p))
         end if
 
@@ -641,7 +641,7 @@ contains
 
         ! Converting Conservative to Primitive Variables ==================
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -833,8 +833,8 @@ contains
                 call nvtxEndRange
             end if
 
-            ! RHS additions for sub-grid bubbles
-            if (bubbles) then
+            ! RHS additions for sub-grid bubbles_euler
+            if (bubbles_euler) then
                 call nvtxStartRange("RHS-BUBBLES-COMPUTE")
                 call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf)
                 call nvtxEndRange
@@ -893,7 +893,7 @@ contains
         end if
 
         ! Add bubles source term
-        if (bubbles .and. (.not. adap_dt) .and. (.not. qbmm)) then
+        if (bubbles_euler .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
             call s_compute_bubble_EE_source( &
                 q_cons_qp%vf(1:sys_size), &
@@ -960,7 +960,7 @@ contains
                                             pi_infs(2))/gammas(2)
                         alpha1(j, k, l) = q_cons_vf%vf(advxb)%sf(j, k, l)
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             alpha2(j, k, l) = q_cons_vf%vf(alf_idx - 1)%sf(j, k, l)
                         else
                             alpha2(j, k, l) = q_cons_vf%vf(advxe)%sf(j, k, l)
@@ -1034,7 +1034,7 @@ contains
             else
                 if (alt_soundspeed) then
                     do j = advxb, advxe
-                        if ((j == advxe) .and. (bubbles .neqv. .true.)) then
+                        if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do q = 0, p
                                 do l = 0, n
@@ -1047,7 +1047,7 @@ contains
                                     end do
                                 end do
                             end do
-                        else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                        else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do q = 0, p
                                 do l = 0, n
@@ -1179,7 +1179,7 @@ contains
 
                 if (alt_soundspeed) then
                     do j = advxb, advxe
-                        if ((j == advxe) .and. (bubbles .neqv. .true.)) then
+                        if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do l = 0, p
                                 do k = 0, n
@@ -1206,7 +1206,7 @@ contains
                                     end do
                                 end do
                             end if
-                        else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                        else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
                             !$acc parallel loop collapse(3) gang vector default(present)
                             do l = 0, p
                                 do k = 0, n
@@ -1352,7 +1352,7 @@ contains
 
                     if (alt_soundspeed) then
                         do j = advxb, advxe
-                            if ((j == advxe) .and. (bubbles .neqv. .true.)) then
+                            if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do l = 0, p
                                     do k = 0, n
@@ -1379,7 +1379,7 @@ contains
                                         end do
                                     end do
                                 end if
-                            else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                            else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do l = 0, p
                                     do k = 0, n
@@ -1444,7 +1444,7 @@ contains
                 else
                     if (alt_soundspeed) then
                         do j = advxb, advxe
-                            if ((j == advxe) .and. (bubbles .neqv. .true.)) then
+                            if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do k = 0, p
                                     do q = 0, n
@@ -1457,7 +1457,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                            else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do k = 0, p
                                     do q = 0, n
@@ -1888,7 +1888,7 @@ contains
                         alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
                     end do
 
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         rho = 0d0
                         gamma = 0d0
                         pi_inf = 0d0
@@ -2160,7 +2160,7 @@ contains
             end if
         end if
 
-        if (mpp_lim .and. bubbles) then
+        if (mpp_lim .and. bubbles_euler) then
             !$acc exit data delete(alf_sum%sf)
             deallocate (alf_sum%sf)
         end if

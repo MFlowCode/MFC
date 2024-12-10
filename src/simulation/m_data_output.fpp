@@ -818,7 +818,7 @@ contains
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -877,7 +877,7 @@ contains
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
-            if (bubbles) then
+            if (bubbles_euler) then
                 ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -1085,7 +1085,7 @@ contains
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         alf = q_cons_vf(alf_idx)%sf(j - 2, k, l)
                         if (num_fluids == 3) then
                             alfgr = q_cons_vf(alf_idx - 1)%sf(j - 2, k, l)
@@ -1196,7 +1196,7 @@ contains
                             end do
                         end if
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             alf = q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)
                             do s = 1, nb
                                 nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
@@ -1300,7 +1300,7 @@ contains
                     call s_mpi_allreduce_sum(tmp, vel(s))
                 end do
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     #:for VAR in ['alf','alfgr','nbub','nR(1)','nRdot(1)','M00','R(1)','Rdot(1)','ptilde','ptot']
                         tmp = ${VAR}$
                         call s_mpi_allreduce_sum(tmp, ${VAR}$)
@@ -1324,7 +1324,7 @@ contains
 
             if (proc_rank == 0) then
                 if (n == 0) then
-                    if (bubbles .and. (num_fluids <= 2)) then
+                    if (bubbles_euler .and. (num_fluids <= 2)) then
                         if (qbmm) then
                             write (i + 30, '(6x,f12.6,14f28.16)') &
                                 nondim_time, &
@@ -1356,7 +1356,7 @@ contains
                             ! ptilde, &
                             ! ptot
                         end if
-                    else if (bubbles .and. (num_fluids == 3)) then
+                    else if (bubbles_euler .and. (num_fluids == 3)) then
                         write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
                             nondim_time, &
@@ -1371,7 +1371,7 @@ contains
                             Rdot(1), &
                             ptilde, &
                             ptot
-                    else if (bubbles .and. num_fluids == 4) then
+                    else if (bubbles_euler .and. num_fluids == 4) then
                         write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                             nondim_time, &
@@ -1396,7 +1396,7 @@ contains
                             pres
                     end if
                 elseif (p == 0) then
-                    if (bubbles) then
+                    if (bubbles_euler) then
                         write (i + 30, '(6X,10F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1445,7 +1445,7 @@ contains
             end if
         end do
 
-        if (integral_wrt .and. bubbles) then
+        if (integral_wrt .and. bubbles_euler) then
             if (n == 0) then ! 1D simulation
                 do i = 1, num_integrals
                     int_pres = 0d0
@@ -1488,7 +1488,7 @@ contains
                     end if
 
                     if (proc_rank == 0) then
-                        if (bubbles .and. (num_fluids <= 2)) then
+                        if (bubbles_euler .and. (num_fluids <= 2)) then
                             write (i + 70, '(6x,f12.6,f24.8)') &
                                 nondim_time, int_pres
                         end if
@@ -1571,7 +1571,7 @@ contains
                     end if
 
                     if (proc_rank == 0) then
-                        if (bubbles .and. (num_fluids <= 2)) then
+                        if (bubbles_euler .and. (num_fluids <= 2)) then
                             write (i + 70, '(6x,f12.6,f24.8,f24.8)') &
                                 nondim_time, int_pres, max_pres
                         end if
