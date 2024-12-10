@@ -162,7 +162,7 @@ contains
 
     end subroutine s_initialize_bubbles_EL_module
 
-    !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
+    !> The purpose of this procedure is to start the lagrange bubble parameters applying nondimensionalization if needed
     subroutine s_start_lagrange_inputs()
 
         integer :: id_bubbles, id_host
@@ -197,7 +197,7 @@ contains
         Web = 1d0/ss
         Re_inv = mul0
 
-        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic  thermal models, and
+        ! Need improvement to accept polytropic gas compression, isothermal and adiabatic thermal models, and
         ! the Gilmore and RP bubble models.
         polytropic = .false.    ! Forcing no polytropic model
         thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
@@ -350,7 +350,7 @@ contains
                                             rhol, gamma, pi_inf, qv, Re)
         dynP = 0d0
         do i = 1, num_dims
-            dynP = dynP + 0.5*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
+            dynP = dynP + 0.5d0*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
         pliq = (q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
         if (pliq < 0) print *, "Negative pressure", proc_rank, &
@@ -359,14 +359,14 @@ contains
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2d0*(1d0/Web)/bub_R0(bub_id)
         if ((1d0/Web) /= 0d0) then
-            pcrit = pv - 4d0*(1d0/Web)/(3.d0*sqrt(3d0*gas_p(bub_id, 1)*bub_R0(bub_id)**3/(2d0*(1d0/Web))))
+            pcrit = pv - 4d0*(1d0/Web)/(3d0*sqrt(3d0*gas_p(bub_id, 1)*bub_R0(bub_id)**3d0/(2d0*(1d0/Web))))
             pref = gas_p(bub_id, 1)
         else
             pcrit = 0d0
         end if
 
         ! Initial particle mass
-        volparticle = 4d0/3d0*pi*bub_R0(bub_id)**3 ! volume
+        volparticle = 4d0/3d0*pi*bub_R0(bub_id)**3d0 ! volume
         gas_mv(bub_id, 1) = pv*volparticle*(1d0/(R_v*Tw))*(massflag) ! vapermass
         gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1d0/(R_n*Tw)) ! gasmass
         if (gas_mg(bub_id) <= 0d0) then
@@ -473,9 +473,9 @@ contains
                 indomain = particle_in_domain(inputvals(1:3))
                 if (indomain .and. (id > 0)) then
                     bub_id = bub_id + 1
-                    nBubs = bub_id ! local number of bubbles
-                    lag_id(bub_id, 1) = id  !global ID
-                    lag_id(bub_id, 2) = bub_id  !local ID
+                    nBubs = bub_id                  ! local number of bubbles
+                    lag_id(bub_id, 1) = id          ! global ID
+                    lag_id(bub_id, 2) = bub_id      ! local ID
                     mtn_pos(bub_id, 1:3, 1) = inputvals(1:3)
                     mtn_posPrev(bub_id, 1:3, 1) = inputvals(4:6)
                     mtn_vel(bub_id, 1:3, 1) = inputvals(7:9)
@@ -540,14 +540,14 @@ contains
                 fV = intfc_vel(k, 2)
                 fpb = gas_p(k, 2)
                 pint = f_cpbw_KM(fR0, fR, fV, fpb)
-                pint = pint + 0.5d0*fV**2
+                pint = pint + 0.5d0*fV**2d0
                 if (lag_params%cluster_type == 2) then
                     bub_dphidt(k) = (paux - pint) + term2
                     ! Accounting for the potential induced by the bubble averaged over the control volume
                     ! Note that this is based on the incompressible flow assumption near the bubble.
                     Rb = intfc_rad(k, 2)
                     term1_fac = 3d0/2d0*(Rb*(Romega**2d0 - Rb**2d0))/(Romega**3d0 - Rb**3d0)
-                    bub_dphidt(k) = bub_dphidt(k)/(1 - term1_fac)
+                    bub_dphidt(k) = bub_dphidt(k)/(1d0 - term1_fac)
                 end if
             end do
         end if
@@ -594,10 +594,10 @@ contains
                 end do
                 call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
                                                                 myalpha_rho, Re, cell(1), cell(2), cell(3))
-                call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+                call s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 
                 ! Velocity correction due to massflux
-                velint = fV - gas_dmvdt(k, stage)/(4d0*pi*fR**2*rhol)
+                velint = fV - gas_dmvdt(k, stage)/(4d0*pi*fR**2d0*rhol)
 
                 ! Interphase acceleration and update vars
                 intfc_dveldt(k, stage) = f_rddot_KM(fpbdt, pinf, pliqint, rhol, fR, velint, fR0, cson)
@@ -641,20 +641,18 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
         !$acc routine seq
 #endif
-        integer, intent(in) :: bub_id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(kind(0d0)), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell
         real(kind(0d0)), intent(out) :: cson
 
         real(kind(0d0)) :: E, H
-        real(kind(0d0)), dimension(3) :: scoord
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i
 
@@ -817,7 +815,7 @@ contains
         real(kind(0d0)), intent(out), optional :: preterm1, term2, Romega
 
         real(kind(0d0)), dimension(3) :: scoord, psi
-        real(kind(0d0)) :: dc, vol, aux, dist
+        real(kind(0d0)) :: dc, vol, aux
         real(kind(0d0)) :: volgas, term1, Rbeq, denom
         real(kind(0d0)) :: charvol, charpres, charvol2, charpres2
         integer, dimension(3) :: cellaux
@@ -998,22 +996,22 @@ contains
 
         end if
 
-        if (lag_params%pressure_corrector .and. present(preterm1)) then
+        if (lag_params%pressure_corrector) then
 
             !Valid if only one bubble exists per cell
-            volgas = intfc_rad(bub_id, 2)**3
-            denom = intfc_rad(bub_id, 2)**2
-            term1 = bub_dphidt(bub_id)*intfc_rad(bub_id, 2)**2
-            term2 = intfc_vel(bub_id, 2)*intfc_rad(bub_id, 2)**2
+            volgas = intfc_rad(bub_id, 2)**3d0
+            denom = intfc_rad(bub_id, 2)**2d0
+            term1 = bub_dphidt(bub_id)*intfc_rad(bub_id, 2)**2d0
+            term2 = intfc_vel(bub_id, 2)*intfc_rad(bub_id, 2)**2d0
 
             Rbeq = volgas**(1d0/3d0) !surrogate bubble radius
-            aux = dc**3 - Rbeq**3
+            aux = dc**3d0 - Rbeq**3d0
             term2 = term2/denom
-            term2 = 3d0/2d0*term2**2*Rbeq**3*(1d0 - Rbeq/dc)/aux
-            preterm1 = 3d0/2d0*Rbeq*(dc**2 - Rbeq**2)/(aux*denom)
+            term2 = 3d0/2d0*term2**2d0*Rbeq**3d0*(1d0 - Rbeq/dc)/aux
+            preterm1 = 3d0/2d0*Rbeq*(dc**2d0 - Rbeq**2d0)/(aux*denom)
 
             !Control volume radius
-            if (present(Romega)) Romega = dc
+            if (ptype == 2) Romega = dc
 
             ! Getting p_inf
             if (ptype == 1) then
@@ -1167,7 +1165,7 @@ contains
 
         lag_largestep = 0d0
         remove_id = 0
-        !$acc parallel loop gang vector default(present) reduction(+: lag_largestep, remove_id) private(k) copyin(RKstep)
+        !$acc parallel loop gang vector default(present) reduction(+: lag_largestep) reduction(MAX: remove_id) private(k) copyin(RKstep)
         do k = 1, nBubs
 
             radiusOld = intfc_rad(k, 2)
@@ -1188,7 +1186,7 @@ contains
                 print *, 'Negative bubble radius encountered'
                 lag_largestep = lag_largestep + 1d0
                 if (dt < 2d0*verysmall_dt) then
-                    remove_id = k
+                    remove_id = max(remove_id, k)
                 end if
             end if
 
@@ -1382,9 +1380,9 @@ contains
           !! @param scoord Calculated particle coordinates
     subroutine s_locate_cell(pos, cell, scoord)
 
-        real(kind(0d0)), dimension(3) :: pos
-        real(kind(0d0)), dimension(3), optional :: scoord
-        integer, dimension(3) :: cell
+        real(kind(0d0)), dimension(3), intent(in) :: pos
+        real(kind(0d0)), dimension(3), intent(out) :: scoord
+        integer, dimension(3), intent(inout) :: cell
 
         integer :: i
 
@@ -1420,16 +1418,14 @@ contains
         ! In other words,  the coordinate of the center of the cell is x_cc(cell).
 
         !coordinates in computational space
-        if (present(scoord)) then
-            scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
-            scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
-            scoord(3) = 0d0
-            if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
-            cell(:) = int(scoord(:))
-            do i = 1, num_dims
-                if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
-            end do
-        end if
+        scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
+        scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
+        scoord(3) = 0d0
+        if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
+        cell(:) = int(scoord(:))
+        do i = 1, num_dims
+            if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
+        end do
 
     end subroutine s_locate_cell
 
@@ -1847,7 +1843,7 @@ contains
 
         integer :: k
 
-        !$acc parallel loop gang vector default(present) reduction(MAX: Rmax_glb) reduction(MAX: Rmin_glb) private(k)
+        !$acc parallel loop gang vector default(present) reduction(MAX: Rmax_glb) reduction(MIN: Rmin_glb) private(k)
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))

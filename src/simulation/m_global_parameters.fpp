@@ -699,7 +699,7 @@ contains
         lag_params%write_bubbles = .false.
         lag_params%write_bubbles_stats = .false.
         lag_params%nBubs_glb = dflt_int
-        lag_params%epsilonb = dflt_real
+        lag_params%epsilonb = 1.0d0
         lag_params%charwidth = dflt_real
         lag_params%valmaxvoid = dflt_real
         lag_params%c0 = dflt_real

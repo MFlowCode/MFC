@@ -62,12 +62,12 @@ contains
         !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
         do l = 1, nBubs
 
-            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3
+            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3d0
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2*lbk_vel(l, 2)
+            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2d0*lbk_vel(l, 2)
 
             if (num_dims == 2) then
                 Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
@@ -128,7 +128,7 @@ contains
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0.0d0
-            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3
+            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3d0
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
@@ -136,7 +136,7 @@ contains
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2*lbk_vel(l, 2)
+            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2d0*lbk_vel(l, 2)
 
             !$acc loop collapse(3) private(cellaux, nodecoord)
             do i = 1, smearGrid
@@ -218,25 +218,25 @@ contains
         real(kind(0.d0)), intent(out) :: func
 
         real(kind(0.d0)) :: distance
-        real(kind(0.d0)) :: theta, dtheta, L2, dz, Lz2
+        real(kind(0.d0)) :: theta, dtheta, L2, dzp, Lz2
         integer :: Nr, Nr_count
 
-        distance = sqrt((center(1) - nodecoord(1))**2 + (center(2) - nodecoord(2))**2 + (center(3) - nodecoord(3))**2)
+        distance = sqrt((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + (center(3) - nodecoord(3))**2d0)
 
         if (num_dims == 3) then
             !< 3D gaussian function
-            func = exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
+            func = exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
         else
             if (cyl_coord) then
                 !< 2D cylindrical function:
                 ! We smear particles in the azimuthal direction for given r
                 theta = 0d0
-                Nr = ceiling(2d0*PI*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                dtheta = 2d0*PI/Nr
+                Nr = ceiling(2d0*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                dtheta = 2d0*pi/Nr
                 L2 = center(2)**2d0 + nodecoord(2)**2d0 - 2d0*center(2)*nodecoord(2)*cos(theta)
                 distance = DSQRT((center(1) - nodecoord(1))**2d0 + L2)
                 ! Factor 2d0 is for symmetry (upper half of the 2D field (+r) is considered)
-                func = dtheta/2d0/PI*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
+                func = dtheta/2d0/pi*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
                 Nr_count = 0
                 do while (Nr_count < Nr - 1)
                     Nr_count = Nr_count + 1
@@ -246,7 +246,7 @@ contains
                     distance = DSQRT((center(1) - nodecoord(1))**2d0 + L2)
                     ! nodecoord(2)*dtheta is the azimuthal width of the cell
                     func = func + &
-                           dtheta/2d0/PI*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
+                           dtheta/2d0/pi*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**(3d0*(strength_idx + 1))
                 end do
             else
 
@@ -255,16 +255,16 @@ contains
                 theta = 0d0
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1 - mapCells
-                dz = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
-                Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
+                dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
+                Lz2 = (center(3) - (dzp*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
                 distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
-                func = dz/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**3
+                func = dzp/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
                 do while (Nr_count < Nr - 1 + (mapCells - 1))
                     Nr_count = Nr_count + 1
-                    Lz2 = (center(3) - (dz*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
+                    Lz2 = (center(3) - (dzp*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
                     distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
                     func = func + &
-                           dz/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2)/(DSQRT(2.0d0*pi)*stddsv)**(3*(strength_idx + 1))
+                           dzp/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**(3d0*(strength_idx + 1))
                 end do
             end if
         end if

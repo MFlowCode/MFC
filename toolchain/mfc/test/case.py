@@ -137,14 +137,8 @@ class TestCase(case.Case):
         jobs              = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
 
-        if "lagrangian bubbles" in self.trace:
-            create_input_lagrange(f'{self.get_dirpath()}')
-
-        if "lagrange_bubblescreen" in self.trace:
-            copy_input_lagrange(f'/3D_lagrange_bubblescreen',f'{self.get_dirpath()}')
-
-        if "lagrange_shbubcollapse" in self.trace:
-            copy_input_lagrange(f'/3D_lagrange_shbubcollapse',f'{self.get_dirpath()}')
+        if self.params.get("bubbles_lagrange", 'F') == 'T':
+            input_bubbles_lagrange(self)
 
         mfc_script = ".\\mfc.bat" if os.name == 'nt' else "./mfc.sh"
 
@@ -186,8 +180,7 @@ class TestCase(case.Case):
         common.delete_directory(os.path.join(dirpath, "p_all"))
         common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
         common.delete_directory(os.path.join(dirpath, "restart_data"))
-        remove_lagrange_list = ["lagrangian bubbles", "lagrange_bubblescreen", "lagrange_shbubcollapse"]
-        if any( remove_lagrange in self.trace for remove_lagrange in remove_lagrange_list):
+        if self.params.get("bubbles_lagrange", 'F') == 'T':
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
 
@@ -264,7 +257,7 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-3
         elif self.params.get("hypoelasticity", 'F') == 'T':
             tolerance = 1e-7
-        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler']):
+        elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler', 'bubbles_lagrange']):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
@@ -356,6 +349,13 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
 
     return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
 
+def input_bubbles_lagrange(self):
+    if "lagrange_bubblescreen" in self.trace:
+        copy_input_lagrange(f'/3D_lagrange_bubblescreen',f'{self.get_dirpath()}')
+    elif "lagrange_shbubcollapse" in self.trace:
+        copy_input_lagrange(f'/3D_lagrange_shbubcollapse',f'{self.get_dirpath()}')
+    else:
+        create_input_lagrange(f'{self.get_dirpath()}')
 
 def create_input_lagrange(path_test):
     folder_path_lagrange = path_test + '/input'
