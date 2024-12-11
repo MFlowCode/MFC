@@ -162,7 +162,7 @@ contains
 
     end subroutine s_initialize_bubbles_EL_module
 
-    !> The purpose of this procedure is to start the lagrange bubble parameters applying nondimensionalization if needed
+    !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
     subroutine s_start_lagrange_inputs()
 
         integer :: id_bubbles, id_host
@@ -197,7 +197,7 @@ contains
         Web = 1d0/ss
         Re_inv = mul0
 
-        ! Need improvement to accept polytropic gas compression, isothermal and adiabatic thermal models, and
+        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic thermal models, and
         ! the Gilmore and RP bubble models.
         polytropic = .false.    ! Forcing no polytropic model
         thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
@@ -594,7 +594,7 @@ contains
                 end do
                 call s_convert_species_to_mixture_variables_acc(rhol, gamma, pi_inf, qv, myalpha, &
                                                                 myalpha_rho, Re, cell(1), cell(2), cell(3))
-                call s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+                call s_compute_cson_from_pinf(k, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 
                 ! Velocity correction due to massflux
                 velint = fV - gas_dmvdt(k, stage)/(4d0*pi*fR**2d0*rhol)
@@ -641,18 +641,20 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    subroutine s_compute_cson_from_pinf(bub_id, q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_cson_from_pinf
 #else
         !$acc routine seq
 #endif
+        integer, intent(in) :: bub_id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(kind(0d0)), intent(in) :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in) :: cell
         real(kind(0d0)), intent(out) :: cson
 
         real(kind(0d0)) :: E, H
+        real(kind(0d0)), dimension(3) :: scoord
         real(kind(0d0)), dimension(num_dims) :: vel
         integer :: i
 
@@ -815,7 +817,7 @@ contains
         real(kind(0d0)), intent(out), optional :: preterm1, term2, Romega
 
         real(kind(0d0)), dimension(3) :: scoord, psi
-        real(kind(0d0)) :: dc, vol, aux
+        real(kind(0d0)) :: dc, vol, aux, dist
         real(kind(0d0)) :: volgas, term1, Rbeq, denom
         real(kind(0d0)) :: charvol, charpres, charvol2, charpres2
         integer, dimension(3) :: cellaux
@@ -1427,6 +1429,7 @@ contains
             if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
         end do
 
+
     end subroutine s_locate_cell
 
     !> This subroutine transfer data into the temporal variables.
@@ -1530,7 +1533,6 @@ contains
         integer, intent(in) :: dir
 
         integer :: i, j, k
-        real(kind(0d0)) :: aux1, aux2
 
         if (dir == 1) then
             ! Gradient in x dir.
@@ -1538,12 +1540,11 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        aux1 = dx(i) + dx(i - 1)
-                        aux2 = dx(i) + dx(i + 1)
                         dq%sf(i, j, k) = q%sf(i, j, k)*(dx(i + 1) - dx(i - 1)) &
-                                         + q%sf(i + 1, j, k)*aux1 &
-                                         - q%sf(i - 1, j, k)*aux2
-                        dq%sf(i, j, k) = dq%sf(i, j, k)/(aux1*aux2)
+                                         + q%sf(i + 1, j, k)*(dx(i) + dx(i - 1)) &
+                                         - q%sf(i - 1, j, k)*(dx(i) + dx(i + 1))
+                        dq%sf(i, j, k) = dq%sf(i, j, k) / &
+                                        ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
                     end do
                 end do
             end do
@@ -1554,12 +1555,11 @@ contains
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            aux1 = dy(j) + dy(j - 1)
-                            aux2 = dy(j) + dy(j + 1)
                             dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                             + q%sf(i, j + 1, k)*aux1 &
-                                             - q%sf(i, j - 1, k)*aux2
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/(aux1*aux2)
+                                             + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                             - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
+                            dq%sf(i, j, k) = dq%sf(i, j, k) / &
+                                            ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                         end do
                     end do
                 end do
@@ -1569,12 +1569,11 @@ contains
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            aux1 = dz(k) + dz(k - 1)
-                            aux2 = dz(k) + dz(k + 1)
                             dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                             + q%sf(i, j, k + 1)*aux1 &
-                                             - q%sf(i, j, k - 1)*aux2
-                            dq%sf(i, j, k) = dq%sf(i, j, k)/(aux1*aux2)
+                                             + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                             - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
+                            dq%sf(i, j, k) = dq%sf(i, j, k) / &
+                                            ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                         end do
                     end do
                 end do
