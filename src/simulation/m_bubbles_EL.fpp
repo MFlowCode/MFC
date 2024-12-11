@@ -1429,7 +1429,6 @@ contains
             if (scoord(i) < 0.0d0) cell(i) = cell(i) - 1
         end do
 
-
     end subroutine s_locate_cell
 
     !> This subroutine transfer data into the temporal variables.
@@ -1543,8 +1542,8 @@ contains
                         dq%sf(i, j, k) = q%sf(i, j, k)*(dx(i + 1) - dx(i - 1)) &
                                          + q%sf(i + 1, j, k)*(dx(i) + dx(i - 1)) &
                                          - q%sf(i - 1, j, k)*(dx(i) + dx(i + 1))
-                        dq%sf(i, j, k) = dq%sf(i, j, k) / &
-                                        ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                         ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
                     end do
                 end do
             end do
@@ -1558,8 +1557,8 @@ contains
                             dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
                                              + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
                                              - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k) / &
-                                            ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                             ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                         end do
                     end do
                 end do
@@ -1572,8 +1571,8 @@ contains
                             dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
                                              + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
                                              - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
-                            dq%sf(i, j, k) = dq%sf(i, j, k) / &
-                                            ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+                            dq%sf(i, j, k) = dq%sf(i, j, k)/ &
+                                             ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                         end do
                     end do
                 end do
