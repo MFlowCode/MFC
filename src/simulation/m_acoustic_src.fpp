@@ -159,6 +159,7 @@ contains
         integer, parameter :: mass_label = 1, mom_label = 2
 
         sim_time = t_step*dt
+        if (time_stepper == 4) sim_time = rkck_time_tmp ! Probably create a time_stepper == 5 for the rkck stepper
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -230,7 +231,7 @@ contains
                     myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
                 end do
 
-                if (bubbles) then
+                if (bubbles_euler) then
                     if (num_fluids > 2) then
                         !$acc loop seq
                         do q = 1, num_fluids - 1
@@ -245,7 +246,7 @@ contains
                     end if
                 end if
 
-                if ((.not. bubbles) .or. (mpp_lim .and. (num_fluids > 2))) then
+                if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
                     !$acc loop seq
                     do q = 1, num_fluids
                         myRho = myRho + myalpha_rho(q)
