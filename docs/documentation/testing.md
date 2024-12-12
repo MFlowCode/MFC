@@ -11,7 +11,7 @@ A test is considered passing when our error tolerances are met in order to maint
 `./mfc.sh test` has the following unique options:
 - `-l` outputs the full list of tests
 - `--from` (`-f)` and `--to` (`t`) restrict testing to a range of contiguous slugs
-- `--only` (`-o`) restricts testing to a non-contiguous rage of tests based on if their trace contains a certain feature
+- `--only` (`-o`) restricts testing to a non-contiguous range of tests based on if their trace contains a certain feature
 - `--test-all` (`a`) test post process and ensure the Silo database files are correct
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
