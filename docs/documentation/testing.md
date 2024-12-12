@@ -1,5 +1,5 @@
 ## Testing
- 
+
 To run MFC's test suite, run
 ```shell
 ./mfc.sh test -j <thread count>
@@ -8,15 +8,15 @@ To run MFC's test suite, run
 It will generate and run test cases, comparing their output to previous runs from versions of MFC considered accurate.
 *golden files*, stored in the `tests/` directory contain this data, aggregating `.dat` files generated when running MFC.
 A test is considered passing when our error tolerances are met in order to maintain a high level of stability and accuracy.
-Run `./mfc.sh test -h` for a full list of accepted arguments.
+`./mfc.sh test` has the following unique options:
+- `-l` outputs the full list of tests
+- `--from` (`-f)` and `--to` (`t`) restrict testing to a range of contiguous slugs
+- `--only` (`-o`) restricts testing to a non-contiguous range of tests based on if their trace contains a certain feature
+- `--test-all` (`a`) test post process and ensure the Silo database files are correct
+- `--percent` (`%`) to specify a percentage of the test suite to select at random and test
+- `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
+- `--no-examples` skips the testing of cases in the examples folder
 
-Most notably, you can consult the full list of tests by running
-```shell
-./mfc.sh test -l
-```
-
-To restrict to a given range, use the `--from` (`-f`) and `--to` (`-t`) options.
-To run a (non-contiguous) subset of tests, use the `--only` (`-o`) option instead.
 To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
 ```shell
 ./mfc.sh test -j <thread count> -- -c <computer name>
@@ -27,14 +27,12 @@ The use of `--` in the above command passes options to the `./mfc.sh run` comman
 
 ### Creating Tests
 
-To (re)generate *golden files*, append the `--generate` option:
-```shell
-./mfc.sh test --generate -j 8
-```
+Creating and updating test cases can be done with the following command line arguments:
+- `--generate` to generate golden files for a new test case
+- `--add-new-variables` to similar to `--generate`, but rather than generating a golden file from scratch, it generates a gold file with new variables for an updated test without changing the original golden file values.
+- `--remove-old-tests` to remove the directories of tests that no longer exist
 
 It is recommended that a range be specified when generating golden files for new test cases, as described in the previous section, in an effort not to regenerate the golden files of existing test cases.
-
-**Note:** If you output new variables and want to update the golden files to include these without modifying the original data, use the `--add-new-variables` option instead.
 
 Adding a new test case can be done by modifying [cases.py](https://github.com/MFlowCode/MFC/tree/master/toolchain/mfc/test/cases.py).
 The function `list_cases` is responsible for generating the list of test cases.
@@ -44,7 +42,7 @@ The function operates on two variables:
 - `stack`: A stack that holds the variations to the default case parameters.
 By pushing and popping the stack inside loops and conditionals, it is easier to nest test case descriptions, as it holds the variations that are common to all future test cases within the same indentation level (in most scenarios).
 
-- `cases`: A list that holds fully-formed `Case` objects, that will be returned at the end of the function. 
+- `cases`: A list that holds fully-formed `Case` objects, that will be returned at the end of the function.
 
 Internally a test case is described as:
 ```python
@@ -93,7 +91,7 @@ Finally, the case is appended to the `cases` list, which will be returned by the
 
 ### Testing Post Process
 
-To test the post-processing code, append the `-a` or `--test-all` option: 
+To test the post-processing code, append the `-a` or `--test-all` option:
 ```shell
 ./mfc.sh test -a -j 8
 ```
@@ -101,5 +99,5 @@ To test the post-processing code, append the `-a` or `--test-all` option:
 This argument will re-run the test stack with `parallel_io='T'`, which generates silo_hdf5 files.
 It will also turn most write parameters (`*_wrt`) on.
 Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
-Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data. 
+Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
 
