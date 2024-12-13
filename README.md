@@ -85,6 +85,10 @@ then you can build MFC and run the test suite!
 ```
 And... you're done!
 
+If you want to build MFC in single precision to ensure calculations are done in fp32 instead of fp64
+then build with the --single flag
+./mfc.sh build -j $(nproc) --single
+
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
 
 The shock-droplet interaction case above was run via
