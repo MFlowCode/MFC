@@ -861,7 +861,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
     foreach_dimension()
+
     foreach_example()
+
     chemistry_cases()
 
     # Sanity Check 1

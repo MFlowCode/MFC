@@ -65,6 +65,9 @@ def __filter(cases_) -> typing.List[TestCase]:
                 cases.remove(case)
 
 
+    if ARG("no_examples"):
+        cases = [case for case in cases if not "Example" in case.trace]
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 

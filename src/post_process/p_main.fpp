@@ -44,6 +44,13 @@ program p_main
 
     ! Time-Marching Loop =======================================================
     do
+        ! If all time-steps are not ready to be post-processed and one rank is
+        ! faster than another, the slower rank processing the last available
+        ! step might be killed when the faster rank attempts to process the
+        ! first missing step, before the slower rank finishes writing the last
+        ! available step. To avoid this, we force synchronization here.
+        call s_mpi_barrier()
+
         call s_perform_time_step(t_step)
 
         call s_save_data(t_step, varname, pres, c, H)
