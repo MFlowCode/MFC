@@ -188,7 +188,7 @@ module m_derived_types
         !! Identity (id) of the patch with which current patch is to get smoothed
 
         real(wp) :: smooth_coeff !<
-        !! Smoothing coefficient (coeff) adminstrating the size of the stencil of
+        !! Smoothing coefficient (coeff) for the size of the stencil of
         !! cells across which boundaries of the current patch will be smeared out
 
         real(wp), dimension(num_fluids_max) :: alpha_rho

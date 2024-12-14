@@ -229,8 +229,8 @@ contains
         real(wp), intent(in) :: omega, peclet
         real(wp), intent(out) :: Re_trans, Im_trans
 
-        complex :: trans, c1, c2, c3
-        complex :: imag = (0._wp, 1._wp)
+        complex(wp) :: trans, c1, c2, c3
+        complex(wp) :: imag = (0._wp, 1._wp)
         real(wp) :: f_transcoeff
 
         c1 = imag*omega*peclet
@@ -238,7 +238,7 @@ contains
         c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
         trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
-        Re_trans = dble(trans)
+        Re_trans = trans
         Im_trans = aimag(trans)
 
     end subroutine s_transcoeff
@@ -279,7 +279,7 @@ contains
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
             phi(ir) = log(R0mn) &
-                      + dble(ir - 1)*log(R0mx/R0mn)/dble(nb - 1)
+                      + (ir - 1._wp)*log(R0mx/R0mn)/(nb - 1._wp)
             R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)

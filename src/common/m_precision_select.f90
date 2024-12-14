@@ -19,7 +19,7 @@ module m_precision_select
     integer, parameter :: sp = single_precision
     integer, parameter :: dp = double_precision
 
-    ! Set the working precision (wp) to single or double precision
+    ! Set the working precision (wp) to single or double
 #ifdef MFC_SINGLE_PRECISION
     integer, parameter :: wp = single_precision  ! Change to single_precision if needed
 #else

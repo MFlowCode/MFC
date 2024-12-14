@@ -899,7 +899,7 @@ contains
 
         if (chemistry) then
             !$acc kernels
-            rhs_vf(T_idx)%sf(:, :, :) = 0d0
+            rhs_vf(T_idx)%sf(:, :, :) = 0.0_wp
             !$acc end kernels
 
             if (chem_params%reactions) then
