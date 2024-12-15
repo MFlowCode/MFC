@@ -65,7 +65,6 @@ def get_dimensions():
 
     return r
 
-
 # pylint: disable=too-many-locals, too-many-statements
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
@@ -447,7 +446,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def alter_bubbles(dimInfo):
         if len(dimInfo[0]) > 0:
-            stack.push("Bubbles", {"bubbles": 'T'})
+            stack.push("Bubbles", {"bubbles_euler": 'T'})
 
             stack.push('', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
@@ -629,12 +628,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 })
 
                 if bubbles == 'F':
-                    stack.push('',{'bubbles': 'F',
+                    stack.push('',{'bubbles_euler': 'F',
                         'patch_icpp(1)%alpha_rho(1)': 1.0, 'patch_icpp(1)%alpha(1)': 1.0,
                         'patch_icpp(1)%r0': -1e6, 'patch_icpp(1)%v0': -1e6
                         })
                 elif bubbles == 'T':
-                    stack.push('bubbles',{'bubbles': 'T',
+                    stack.push('bubbles',{'bubbles_euler': 'T',
                         'patch_icpp(1)%alpha_rho(1)': 0.99999, 'patch_icpp(1)%alpha(1)': 0.00001,
                         'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0,
                         'Ca': 0.7160271976687712, 'Web': 5.660481099656358, 'Re_inv': 0.0069829599021229965,
@@ -731,7 +730,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Viscosity & bubbles checks
         if len(dimInfo[0]) > 0:
             stack.push("Viscosity -> Bubbles",
-                       {"fluid_pp(1)%Re(1)": 50, "bubbles": 'T', "viscous": 'T'})
+                       {"fluid_pp(1)%Re(1)": 50, "bubbles_euler": 'T', "viscous": 'T'})
 
             stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
@@ -778,6 +777,46 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
+    def alter_lag_bubbles():
+        # Lagrangian bubbles
+        for adap_dt in ['F', 'T']:
+            for couplingMethod in [1, 2]:
+                stack.push("lagrangian bubbles", {"bubbles_lagrange": 'T',
+                    'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
+                    'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T', 
+                    'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
+                    'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002, 'fluid_pp(1)%ss' : 0.07275,
+                    'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33, 'fluid_pp(1)%M_v' : 18.02,
+                    'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426, 'fluid_pp(1)%cp_v' : 2.1e3,
+                    'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97, 'fluid_pp(2)%mu_v' : 1.8e-05,
+                    'fluid_pp(2)%k_v' : 0.02556, 'fluid_pp(2)%cp_v' : 1.e3, 'patch_icpp(1)%alpha_rho(1)': 0.96,
+                    'patch_icpp(1)%alpha(1)': 4e-02, 'patch_icpp(1)%alpha_rho(2)': 0., 'patch_icpp(1)%alpha(2)': 0.,
+                    'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02, 'patch_icpp(2)%alpha_rho(2)': 0.,
+                    'patch_icpp(2)%alpha(2)': 0.,  'patch_icpp(3)%alpha_rho(1)': 0.96, 'patch_icpp(3)%alpha(1)': 4e-02,
+                    'patch_icpp(3)%alpha_rho(2)': 0., 'patch_icpp(3)%alpha(2)': 0.,'patch_icpp(1)%pres': 1.0,
+                    'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0, 'acoustic_source': 'T', 'acoustic(1)%loc(2)': 0.5,
+                    'acoustic(1)%wavelength': 0.25, 'acoustic(1)%support': 3, 'acoustic(1)%height': 1e10
+                })
+                if couplingMethod==1:
+                    stack.push('One-way coupling',{'lag_params%solver_approach': 1})
+                else:
+                    stack.push('Two-way coupling',{'lag_params%solver_approach': 2})
+
+                if adap_dt=='F':
+                    stack.push('',{'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50, 't_step_save': 50})
+                else:
+                    stack.push('rkck_adap_dt=T',{'rkck_adap_dt': 'T', 'time_stepper': 4,
+                            'acoustic(1)%mag': 6e+04, 'n_start': 0, 't_save': 5e-05, 't_stop': 5e-05})
+
+                cases.append(define_case_d(stack, '', {}))
+
+                stack.pop()
+
+                stack.pop()
+
+                stack.pop()
+
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
@@ -789,6 +828,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 alter_2d()
             if len(dimInfo[0]) == 3:
                 alter_3d()
+                alter_lag_bubbles()
             alter_ppn(dimInfo)
             stack.push('', {'dt': [1e-07, 1e-06, 1e-06][len(dimInfo[0])-1]})
             alter_acoustic_src(dimInfo)
@@ -833,6 +873,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         case['n'] = 25
                         case['p'] = 25
 
+                if 'rkck_adap_dt' in case and case['rkck_adap_dt'] == 'T':
+                    case['rkck_adap_dt'] = 'F'
 
             cases.append(define_case_f(name, path, [], {}, functor=modify_example_case))
 

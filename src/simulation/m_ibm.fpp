@@ -170,7 +170,7 @@ contains
             end if
 
             !Interpolate primitive variables at image point associated w/ GP
-            if (bubbles .and. .not. qbmm) then
+            if (bubbles_euler .and. .not. qbmm) then
                 call s_interpolate_image_point(q_prim_vf, gp, &
                                                alpha_rho_IP, alpha_IP, pres_IP, vel_IP, &
                                                r_IP, v_IP, pb_IP, mv_IP)
@@ -201,7 +201,7 @@ contains
                 if (hypoelasticity) then
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
                                                                     alpha_rho_IP, Re_K, j, k, l, G_K, Gs)
-                else if (bubbles) then
+                else if (bubbles_euler) then
                     call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
                                                                             alpha_rho_IP, Re_K, j, k, l)
                 else
@@ -235,14 +235,14 @@ contains
             end do
 
             ! Set Energy
-            if (bubbles) then
+            if (bubbles_euler) then
                 q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
             else
                 q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
             end if
 
             ! Set bubble vars
-            if (bubbles .and. .not. qbmm) then
+            if (bubbles_euler .and. .not. qbmm) then
                 call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
                 do q = 1, nb
                     q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
@@ -782,7 +782,7 @@ contains
         pres_IP = 0d0
         vel_IP = 0d0
 
-        if (bubbles) then
+        if (bubbles_euler) then
             r_IP = 0d0
             v_IP = 0d0
             if (.not. polytropic) then
@@ -825,7 +825,7 @@ contains
                                       q_prim_vf(advxb + l - 1)%sf(i, j, k)
                     end do
 
-                    if (bubbles .and. .not. qbmm) then
+                    if (bubbles_euler .and. .not. qbmm) then
                         !$acc loop seq
                         do l = 1, nb
                             if (polytropic) then
