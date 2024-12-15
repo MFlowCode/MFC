@@ -229,13 +229,13 @@ contains
         real(wp), intent(in) :: omega, peclet
         real(wp), intent(out) :: Re_trans, Im_trans
 
-        complex(wp) :: trans, c1, c2, c3
-        complex(wp) :: imag = (0._wp, 1._wp)
+        complex :: trans, c1, c2, c3
+        complex :: imag = (0._wp, 1._wp)
         real(wp) :: f_transcoeff
 
         c1 = imag*omega*peclet
-        c2 = CSQRT(c1)
-        c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
+        c2 = csqrt(c1)
+        c3 = (cexp(c2) - cexp(-c2))/(cexp(c2) + cexp(-c2)) ! TANH(c2)
         trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
         Re_trans = trans
@@ -258,19 +258,6 @@ contains
         integer :: ir
         real(wp) :: R0mn, R0mx, dphi, tmp, sd
         real(wp), dimension(nb) :: phi
-
-        ! nondiml. min. & max. initial radii for numerical quadrature
-        !sd   = 0.05e0_wp
-        !R0mn = 0.75e0_wp
-        !R0mx = 1.3e0_wp
-
-        !sd   = 0.3e0_wp
-        !R0mn = 0.3e0_wp
-        !R0mx = 6.e0_wp
-
-        !sd   = 0.7e0_wp
-        !R0mn = 0.12e0_wp
-        !R0mx = 150.e0_wp
 
         sd = poly_sigma
         R0mn = 0.8_wp*exp(-2.8_wp*sd)
