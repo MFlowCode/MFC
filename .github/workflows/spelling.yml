@@ -9,6 +9,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
+      
+    - name: MFC Python Setup
+      run:  ./mfc.sh init
+      
     - name: Spell Check
       run:  ./mfc.sh spelling
