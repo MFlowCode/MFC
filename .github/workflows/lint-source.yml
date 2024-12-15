@@ -34,15 +34,6 @@ jobs:
     - name: Ensure kind is specified
       run:  fortitude check --file-extensions=f90,fpp,fypp --select=P001 ./src/**
 
-  double-check:
-    name: Look for double intrinsics
-    runs-on: 'ubuntu-latest'
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Check for doubles via grep
+    - name: No double precision intrinsics
       run: |
-        cd src |
-        grep -iR 'dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|\.d0\|\dd0' --exclude-dir=syscheck ./* || true |
-        grep -qiR 'dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|\.d0\|\dd0' --exclude-dir=syscheck ./* 
+        ! grep -iR 'dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|\.d0\|\dd0' --exclude-dir=syscheck ./src/*

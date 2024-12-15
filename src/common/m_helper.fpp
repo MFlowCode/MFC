@@ -69,9 +69,6 @@ contains
 
         nR3 = dot_product(weights, nRtmp**3._wp)
         ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)
-        !ntmp = (3._wp/(4._wp*pi))*0.00001
-
-        !print *, "nbub", ntmp
 
     end subroutine s_comp_n_from_cons
 
@@ -82,7 +79,7 @@ contains
 
         integer :: i, j
         integer :: m, n
-        real :: c
+        real(wp) :: c
 
         m = size(A, 1)
         n = size(A, 2)
@@ -90,7 +87,7 @@ contains
         if (present(div)) then
             c = div
         else
-            c = 1
+            c = 1._wp
         end if
 
         print *, m, n

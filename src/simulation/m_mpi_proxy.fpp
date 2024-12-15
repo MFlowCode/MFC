@@ -74,10 +74,6 @@ module m_mpi_proxy
     !> @}
     !$acc declare create(v_size)
 
-    !real :: s_time, e_time
-    !real :: compress_time, mpi_time, decompress_time
-    !integer :: nCalls_time = 0
-
     integer :: nVars !< nVars for surface tension communication
     !$acc declare create(nVars)
 
