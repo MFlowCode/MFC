@@ -26,7 +26,7 @@ sol     = ct.Solution(ctfile)
 
 sol.TPX = 1_600, ct.one_atm, 'H2:0.04, O2:0.02, AR:0.94'
 
-Nx   = 25 * args.scale
+Nx   = int(25 * args.scale)
 Tend = 1e-4
 s    = 1e-2
 dt   = 1e-7
