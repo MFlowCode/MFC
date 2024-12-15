@@ -10,5 +10,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: MFC Python setup
+      run: ./mfc.sh init
+
     - name: Lint the toolchain
       run: ./mfc.sh lint
