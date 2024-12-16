@@ -75,7 +75,7 @@ contains
     subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:, :), intent(in) :: A
-        real, optional, intent(in) :: div
+        real(wp), optional, intent(in) :: div
 
         integer :: i, j
         integer :: m, n
