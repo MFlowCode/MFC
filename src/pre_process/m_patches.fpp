@@ -1418,8 +1418,8 @@ contains
         logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
-        
-        real(wp) :: radius, epsilon, beta
+
+        real(wp) :: epsilon, beta
         complex(wp) :: cmplx_i = (0._wp, 1._wp)
         complex(wp) :: H
 
@@ -1464,9 +1464,9 @@ contains
 
                         r = dsqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) + eps
                         if (x_cc(i) - x_centroid <= 0) then
-                            x_p = -dabs(x_cc(i) - x_centroid + eps)/r
+                            x_p = -1._wp*abs(x_cc(i) - x_centroid + eps)/r
                         else
-                            x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                            x_p = abs(x_cc(i) - x_centroid + eps)/r
                         end if
 
                         Ps(2) = unassociated_legendre(x_p, 2)
@@ -1514,7 +1514,7 @@ contains
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
                         r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
-                        x_p = dabs(x_cc(i) - x_centroid + eps)/r
+                        x_p = abs(x_cc(i) - x_centroid + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)
                         Ps(4) = unassociated_legendre(x_p, 4)

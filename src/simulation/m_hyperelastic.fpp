@@ -179,7 +179,7 @@ contains
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
                             tensorb(tensor_size) = 1d0/tensorb(tensor_size)
 
-                            ! STEP 3: computing F tranpose F
+                            ! STEP 3: computing F transpose F
                             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
                             tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
                             tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2

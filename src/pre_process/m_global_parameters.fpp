@@ -393,7 +393,7 @@ contains
             patch_icpp(i)%a(8) = dflt_real
             patch_icpp(i)%a(9) = dflt_real
             patch_icpp(i)%non_axis_sym = .false.
-            
+
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real

@@ -537,13 +537,13 @@ contains
                             ! elastic energy update
                             if (hypoelasticity) then
                                 G_L = 0._wp; G_R = 0._wp
-                                
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     G_L = G_L + alpha_L(i)*Gs(i)
                                     G_R = G_R + alpha_R(i)*Gs(i)
                                 end do
-                                
+
                                 do i = 1, strxe - strxb + 1
                                     tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                     tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
@@ -959,7 +959,7 @@ contains
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        
+
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         real(wp) :: rho_L, rho_R
         real(wp), dimension(num_dims) :: vel_L, vel_R
@@ -1009,7 +1009,7 @@ contains
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp), dimension(num_dims) :: xi_field_L, xi_field_R
         real(wp) :: G_L, G_R
-        
+
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: vel_L_tmp, vel_R_tmp
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star
@@ -1279,7 +1279,7 @@ contains
                                     Ms_R = max(1._wp, sqrt(1._wp + ((5e-1_wp + gamma_R)/(1._wp + gamma_R))* &
                                                            (pres_SR/pres_R - 1._wp)*pres_R/ &
                                                            ((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-                                                           
+
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
 
@@ -1307,15 +1307,15 @@ contains
                                 xi_MP = -min(0d0, sign(1d0, s_L))
                                 xi_PP = max(0d0, sign(1d0, s_R))
 
-                                E_star = xi_M * (E_L + xi_MP * (xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                   (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
-                                         xi_P * (E_R + xi_PP * (xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                   (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R)) 
-                                p_Star = xi_M * (pres_L + xi_MP * (rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) + &
-                                         xi_P * (pres_R + xi_PP * (rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
+                                E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                                  (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
+                                         xi_P*(E_R + xi_PP*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                                  (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
+                                p_Star = xi_M*(pres_L + xi_MP*(rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) + &
+                                         xi_P*(pres_R + xi_PP*(rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
 
-                                rho_Star = xi_M * (rho_L * (xi_MP * xi_L + 1._wp - xi_MP)) + &
-                                           xi_P * (rho_R * (xi_PP * xi_R + 1._wp - xi_PP))
+                                rho_Star = xi_M*(rho_L*(xi_MP*xi_L + 1._wp - xi_MP)) + &
+                                           xi_P*(rho_R*(xi_PP*xi_R + 1._wp - xi_PP))
 
                                 vel_K_Star = vel_L(idx1)*(1d0 - xi_MP) + xi_MP*vel_R(idx1) + &
                                              xi_MP*xi_PP*(s_S - vel_R(idx1))
@@ -1334,13 +1334,13 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star * vel_K_Star * & 
-                                    (dir_flg(idxi) * vel_K_Star + (1d0 - dir_flg(idxi)) * (xi_M*vel_L(idxi) + xi_P * vel_R(idxi)) ) + dir_flg(idxi)*p_Star                      
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star*vel_K_Star* &
+                                                                                (dir_flg(idxi)*vel_K_Star + (1d0 - dir_flg(idxi))*(xi_M*vel_L(idxi) + xi_P*vel_R(idxi))) + dir_flg(idxi)*p_Star
                                 end do
 
                                 ! ENERGY FLUX.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star) * vel_K_Star
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star)*vel_K_Star
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
@@ -1389,9 +1389,9 @@ contains
                                                             xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i)) - pres_R) + pres_R)
 
                                     flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                        ((xi_M * qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P * qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)) * &
+                                        ((xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1))* &
                                          (gammas(i)*p_K_Star + pi_infs(i)) + &
-                                         (xi_M * qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) + xi_P * qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)) * &
+                                         (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1))* &
                                          qvs(i))*vel_K_Star
                                 end do
 

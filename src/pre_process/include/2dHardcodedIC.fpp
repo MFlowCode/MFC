@@ -2,7 +2,7 @@
 
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
-    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
 
     eps = 1e-9_wp
 

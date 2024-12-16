@@ -167,10 +167,10 @@ module m_derived_types
         !! Vector indicating the various radii for the elliptical and ellipsoidal
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
-        
+
         real(wp) :: epsilon, beta !<
-        !! The isentropic vortex parameters administrating, respectively, both
-        !! the amplitude of the disturbance as well as its domain of influence.
+        !! The isentropic vortex parameters for the amplitude of the disturbance and
+        !! domain of influence.
 
         real(wp), dimension(2:9) :: a !<
         !! The parameters needed for the spherical harmonic patch
@@ -180,7 +180,7 @@ module m_derived_types
         real(wp), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
         !! through its x-, y- and z-components, respectively.
-        
+
         logical, dimension(0:num_patches_max - 1) :: alter_patch !<
 
         !! List of permissions that indicate to the current patch which preceding

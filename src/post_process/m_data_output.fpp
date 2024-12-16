@@ -537,7 +537,7 @@ contains
         ! END: Binary Database Format ======================================
 
     end subroutine s_open_formatted_database_file ! ------------------------
-    
+
     subroutine s_open_intf_data_file() ! ------------------------
 
         character(LEN=path_len + 3*name_len) :: file_path !<
@@ -1030,10 +1030,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l, w, cent !< Generic loop iterators
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
-        real(kind(0d0)), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
-        real(kind(0d0)), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
-        real(kind(0d0)) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
+        real(wp), dimension(num_fluids) :: alpha, vol_fluid, xcom, ycom, zcom
+        real(wp), parameter :: pi = 4._wp*tan(1._wp)
+        real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
+        real(wp) :: axp, axm, ayp, aym, azm, azp, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
@@ -1123,7 +1123,7 @@ contains
         real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
         real(kind(0d0)), dimension(num_dims) :: vel
         real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs, adv
-        integer :: i, j, k, l, s !looping indicies
+        integer :: i, j, k, l, s !looping indices
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
         Egk = 0d0
@@ -1153,8 +1153,8 @@ contains
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
                         Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
-                        if (dabs(vel(s)) > maxvel) then
-                            maxvel = dabs(vel(s))
+                        if (abs(vel(s)) > maxvel) then
+                            maxvel = abs(vel(s))
                         end if
                     end do
                     do l = 1, adv_idx%end - E_idx
