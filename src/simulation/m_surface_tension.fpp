@@ -36,7 +36,7 @@ module m_surface_tension
 
     !> @name cell boundary reconstructed gradient components and magnitude
     !> @{
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
+    real(wp), allocatable, dimension(:, :, :, :) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !> @}
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
@@ -74,18 +74,18 @@ contains
                                               id, isx, isy, isz)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf !> unused so unsure what intent to give it
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
+        real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
-        real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
-        real(kind(0d0)) :: normWL, normWR, normW
+        real(wp), dimension(num_dims, num_dims) :: Omega
+        real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
+        real(wp) :: normWL, normWR, normW
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
@@ -96,21 +96,21 @@ contains
 
                         w1L = gL_x(j, k, l, 1)
                         w2L = gL_x(j, k, l, 2)
-                        w3L = 0d0
+                        w3L = 0._wp
                         if (p > 0) w3L = gL_x(j, k, l, 3)
 
                         w1R = gR_x(j + 1, k, l, 1)
                         w2R = gR_x(j + 1, k, l, 2)
-                        w3R = 0d0
+                        w3R = 0._wp
                         if (p > 0) w3R = gR_x(j + 1, k, l, 3)
 
                         normWL = gL_x(j, k, l, num_dims + 1)
                         normWR = gR_x(j + 1, k, l, num_dims + 1)
 
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
+                        w1 = (w1L + w1R)/2._wp
+                        w2 = (w2L + w2R)/2._wp
+                        w3 = (w3L + w3R)/2._wp
+                        normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
                             @:compute_capilary_stress_tensor()
@@ -142,21 +142,21 @@ contains
 
                         w1L = gL_y(k, j, l, 1)
                         w2L = gL_y(k, j, l, 2)
-                        w3L = 0d0
+                        w3L = 0._wp
                         if (p > 0) w3L = gL_y(k, j, l, 3)
 
                         w1R = gR_y(k + 1, j, l, 1)
                         w2R = gR_y(k + 1, j, l, 2)
-                        w3R = 0d0
+                        w3R = 0._wp
                         if (p > 0) w3R = gR_y(k + 1, j, l, 3)
 
                         normWL = gL_y(k, j, l, num_dims + 1)
                         normWR = gR_y(k + 1, j, l, num_dims + 1)
 
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
+                        w1 = (w1L + w1R)/2._wp
+                        w2 = (w2L + w2R)/2._wp
+                        w3 = (w3L + w3R)/2._wp
+                        normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
                             @:compute_capilary_stress_tensor()
@@ -188,21 +188,21 @@ contains
 
                         w1L = gL_z(l, k, j, 1)
                         w2L = gL_z(l, k, j, 2)
-                        w3L = 0d0
+                        w3L = 0._wp
                         if (p > 0) w3L = gL_z(l, k, j, 3)
 
                         w1R = gR_z(l + 1, k, j, 1)
                         w2R = gR_z(l + 1, k, j, 2)
-                        w3R = 0d0
+                        w3R = 0._wp
                         if (p > 0) w3R = gR_z(l + 1, k, j, 3)
 
                         normWL = gL_z(l, k, j, num_dims + 1)
                         normWR = gR_z(l + 1, k, j, num_dims + 1)
 
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
+                        w1 = (w1L + w1R)/2._wp
+                        w2 = (w2L + w2R)/2._wp
+                        w3 = (w3L + w3R)/2._wp
+                        normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
                             @:compute_capilary_stress_tensor()
@@ -245,7 +245,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(1)%sf(j, k, l) = 1d0/(x_cc(j + 1) - x_cc(j - 1))* &
+                    c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))* &
                                             (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
@@ -255,7 +255,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(2)%sf(j, k, l) = 1d0/(y_cc(k + 1) - y_cc(k - 1))* &
+                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))* &
                                             (q_prim_vf(c_idx)%sf(j, k + 1, l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
@@ -266,7 +266,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs(3)%sf(j, k, l) = 1d0/(z_cc(l + 1) - z_cc(l - 1))* &
+                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))* &
                                                 (q_prim_vf(c_idx)%sf(j, k, l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
@@ -277,12 +277,12 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(num_dims + 1)%sf(j, k, l) = 0d0
+                    c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
                     !s$acc loop seq
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = &
                             c_divs(num_dims + 1)%sf(j, k, l) + &
-                            c_divs(i)%sf(j, k, l)**2d0
+                            c_divs(i)%sf(j, k, l)**2._wp
                     end do
                     c_divs(num_dims + 1)%sf(j, k, l) = &
                         sqrt(c_divs(num_dims + 1)%sf(j, k, l))
@@ -306,8 +306,8 @@ contains
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

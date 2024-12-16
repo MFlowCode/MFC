@@ -25,12 +25,12 @@ program p_main
     implicit none
 
     integer :: t_step !< Iterator for the time-stepping loop
-    real(kind(0d0)) :: time_avg, time_final
-    real(kind(0d0)) :: io_time_avg, io_time_final
-    real(kind(0d0)), allocatable, dimension(:) :: proc_time
-    real(kind(0d0)), allocatable, dimension(:) :: io_proc_time
+    real(wp) :: time_avg, time_final
+    real(wp) :: io_time_avg, io_time_final
+    real(wp), allocatable, dimension(:) :: proc_time
+    real(wp), allocatable, dimension(:) :: io_proc_time
     logical :: file_exists
-    real(kind(0d0)) :: start, finish
+    real(wp) :: start, finish
     integer :: nt
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
@@ -61,7 +61,7 @@ program p_main
     else
         t_step = t_step_start
         if (t_step == 0) then
-            mytime = 0d0
+            mytime = 0._wp
         else
             mytime = t_step*dt
         end if

@@ -39,7 +39,7 @@ contains
 
         !$acc kernels
         do i = 1, num_dims
-            grads(i)%sf(:, :, :) = 0.0d0
+            grads(i)%sf(:, :, :) = 0.0_wp
         end do
         !$acc end kernels
 
@@ -51,62 +51,16 @@ contains
 
     end subroutine s_finalize_chemistry_module
 
-    subroutine s_compute_chemistry_advection_flux(flux_n, rhs_vf)
-
-        type(vector_field), dimension(:), intent(IN) :: flux_n
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        integer :: x, y, z
-        integer :: eqn
-
-        real(kind(0d0)) :: flux_x, flux_y, flux_z
-
-        #:for num_dims in range(1, 4)
-            if (num_dims == ${num_dims}$) then
-                !$acc parallel loop collapse(4) gang vector default(present) &
-                !$acc private(flux_x, flux_y, flux_z)
-                do z = idwint(3)%beg, idwint(3)%end
-                    do y = idwint(2)%beg, idwint(2)%end
-                        do x = idwint(1)%beg, idwint(1)%end
-                            do eqn = chemxb, chemxe
-                                ! \nabla \cdot (F)
-                                flux_x = (flux_n(1)%vf(eqn)%sf(x - 1, y, z) - &
-                                          flux_n(1)%vf(eqn)%sf(x, y, z))/dx(x)
-
-                                #:if num_dims >= 2
-                                    flux_y = (flux_n(2)%vf(eqn)%sf(x, y - 1, z) - &
-                                              flux_n(2)%vf(eqn)%sf(x, y, z))/dy(y)
-                                #:else
-                                    flux_y = 0d0
-                                #:endif
-
-                                #:if num_dims == 3
-                                    flux_z = (flux_n(3)%vf(eqn)%sf(x, y, z - 1) - &
-                                              flux_n(3)%vf(eqn)%sf(x, y, z))/dz(z)
-                                #:else
-                                    flux_z = 0d0
-                                #:endif
-
-                                rhs_vf(eqn)%sf(x, y, z) = flux_x + flux_y + flux_z
-                            end do
-
-                            rhs_vf(T_idx)%sf(x, y, z) = 0d0
-                        end do
-                    end do
-                end do
-            end if
-        #:endfor
-
-    end subroutine s_compute_chemistry_advection_flux
-
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_prim_qp)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_qp, q_prim_qp
         integer :: x, y, z
         integer :: eqn
-        real(kind(0d0)) :: T
-        real(kind(0d0)) :: rho, omega_m
-        real(kind(0d0)), dimension(num_species) :: Ys
-        real(kind(0d0)), dimension(num_species) :: omega
+
+        real(wp) :: T
+        real(wp) :: rho, omega_m
+        real(wp), dimension(num_species) :: Ys
+        real(wp), dimension(num_species) :: omega
 
         if (chemistry) then
             !$acc parallel loop collapse(3) gang vector default(present) &

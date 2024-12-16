@@ -133,6 +133,7 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
+            f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
         ]
 
         if ARG("verbose"):
@@ -243,15 +244,17 @@ def get_configured_targets(case: input.MFCInputFile) -> typing.List[MFCTarget]:
     return [ target for target in TARGETS if target.is_configured(case) ]
 
 
-def __generate_header(step_name: str, targets: typing.List):
-    caseopt_info = "Generic Build"
+def __generate_header(case: input.MFCInputFile, targets: typing.List):
+    feature_flags = [
+        'Build',
+        format_list_to_string([ t.name for t in get_targets(targets) ], 'magenta')
+    ]
     if ARG("case_optimization"):
-        caseopt_info = f"Case Optimized for [magenta]{ARG('input')}[/magenta]"
+        feature_flags.append(f"Case Optimized: [magenta]{ARG('input')}[/magenta]")
+    if case.params.get('chemistry', 'F') == 'T':
+        feature_flags.append(f"Chemistry: [magenta]{case.get_cantera_solution().source}[/magenta]")
 
-    targets     = get_targets(targets)
-    target_list = format_list_to_string([ t.name for t in targets ], 'magenta')
-
-    return f"[bold]{step_name} | {target_list} | {caseopt_info}[/bold]"
+    return f"[bold]{' | '.join(feature_flags or ['Generic'])}[/bold]"
 
 
 def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[str] = None):
@@ -267,7 +270,7 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
     case.validate_params()
 
     if len(history) == 0:
-        cons.print(__generate_header("Build", targets))
+        cons.print(__generate_header(case, targets))
         cons.print(no_indent=True)
 
     for target in targets:

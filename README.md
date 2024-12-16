@@ -161,6 +161,7 @@ They are organized below. Just click the drop-downs!
 	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
+* Optional single-precision computation and storage
 </details>
 
 <details>

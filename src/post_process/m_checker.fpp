@@ -104,7 +104,7 @@ contains
 
         do i = 1, num_fluids
             call s_int_to_str(i, iStr)
-            @:PROHIBIT(.not. f_is_default(schlieren_alpha(i)) .and. schlieren_alpha(i) <= 0d0, &
+            @:PROHIBIT(.not. f_is_default(schlieren_alpha(i)) .and. schlieren_alpha(i) <= 0._wp, &
                 "schlieren_alpha("//trim(iStr)//") must be greater than zero")
             @:PROHIBIT(.not. f_is_default(schlieren_alpha(i)) .and. i > num_fluids, &
                 "Index of schlieren_alpha("//trim(iStr)//") exceeds the total number of fluids")
