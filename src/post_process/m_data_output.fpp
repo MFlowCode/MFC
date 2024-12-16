@@ -1139,6 +1139,8 @@ contains
         dV = 0_wp
         pres_av = 0_wp
         pres = 0_wp
+        c = 0._wp
+
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1168,10 +1170,10 @@ contains
 
                     call s_compute_speed_of_sound(pres, rho, &
                                                   gamma, pi_inf, &
-                                                  H, adv, 0_wp, 0_wp, c)
+                                                  H, adv, 0._wp, 0._wp, c)
 
                     Ma = maxvel/c
-                    if (Ma > MaxMa .and. adv(1) > 1.0_wp - 1.0d-10) then
+                    if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then
                         MaxMa = Ma
                     end if
                     Vl = Vl + adv(1)*dV

@@ -503,12 +503,12 @@ contains
         real(wp), intent(in) :: x, phi
         real(wp) :: Y, prefactor, pi
 
-        pi = acos(-1_wp)
+        pi = acos(-1._wp)
         prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
         if (m == 0) then
             Y = prefactor*associated_legendre(x, l, m); 
         elseif (m > 0) then
-            Y = (-1_wp)**m*sqrt(2_wp)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+            Y = (-1._wp)**m*sqrt(2._wp)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
         end if
 
     end function spherical_harmonic_func
@@ -530,7 +530,7 @@ contains
         elseif (l == 1 .and. m <= 0) then
             P = x; 
         elseif (l == 1 .and. m == 1) then
-            P = -(1 - x**2)**(1/2); 
+            P = -(1 - x**2)**(1._wp/2._wp); 
         elseif (m == l) then
             P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
         elseif (m == l - 1) then

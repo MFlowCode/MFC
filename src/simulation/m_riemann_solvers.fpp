@@ -572,7 +572,7 @@ contains
                             !        G_R = G_R + alpha_R(i)*Gs(i)
                             !    end do
                             !    ! Elastic contribution to energy if G large enough
-                            !    if ((G_L > 1d-3) .and. (G_R > 1d-3)) then
+                            !    if ((G_L > 1e-3_wp) .and. (G_R > 1e-3_wp)) then
                             !    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                             !    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                             !    !$acc loop seq
@@ -1299,13 +1299,13 @@ contains
 
                                 ! goes with numerical star velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                xi_M = (5d-1 + sign(5d-1, s_S))
-                                xi_P = (5d-1 - sign(5d-1, s_S))
+                                xi_M = (5e-1_wp + sign(0.5_wp, s_S))
+                                xi_P = (5e-1_wp - sign(0.5_wp, s_S))
 
                                 ! goes with the numerical velocity in x/y/z directions
                                 ! xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
-                                xi_MP = -min(0_wp, sign(1_wp, s_L))
-                                xi_PP = max(0_wp, sign(1_wp, s_R))
+                                xi_MP = -min(0._wp, sign(1._wp, s_L))
+                                xi_PP = max(0._wp, sign(1._wp, s_R))
 
                                 E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
                                                                   (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
