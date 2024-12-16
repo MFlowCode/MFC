@@ -839,8 +839,8 @@ contains
                                     Y_L = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                     Y_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
 
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(1)) &
-                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(1)) &
+                                    flux_rs${XYZ}$_vf(j, k, l, i) = (s_M*Y_R*rho_R*vel_R(dir_idx(norm_dir)) &
+                                                                     - s_P*Y_L*rho_L*vel_L(dir_idx(norm_dir)) &
                                                                      + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
                                                                     /(s_M - s_P)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0d0
@@ -1047,6 +1047,8 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
+                                idx1 = dir_idx(1)
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
 
@@ -1280,6 +1282,19 @@ contains
                                 xi_MP = -min(0d0, sign(1d0, s_L))
                                 xi_PP = max(0d0, sign(1d0, s_R))
 
+                                E_star = xi_M * (E_L + xi_MP * (xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                   (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) + &
+                                         xi_P * (E_R + xi_PP * (xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                   (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R)) 
+                                p_Star = xi_M * (pres_L + xi_MP * (rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) + &
+                                         xi_P * (pres_R + xi_PP * (rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
+
+                                rho_Star = xi_M * (rho_L * (xi_MP * xi_L + 1d0 - xi_MP)) + &
+                                           xi_P * (rho_R * (xi_PP * xi_R + 1d0 - xi_PP))
+
+                                vel_K_Star = vel_L(idx1)*(1d0 - xi_MP) + xi_MP*vel_R(idx1) + &
+                                             xi_MP*xi_PP*(s_S - vel_R(idx1))
+
                                 ! COMPUTING FLUXES
                                 ! MASS FLUX.
                                 !$acc loop seq
@@ -1294,20 +1309,13 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_dims
                                     idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idxi) + s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                                          (1d0 - dir_flg(idxi))*vel_L(idxi)) - vel_L(idxi))) + dir_flg(idxi)*(pres_L)) + &
-                                        xi_P*(rho_R*(vel_R(idx1)*vel_R(idxi) + s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                                          (1d0 - dir_flg(idxi))*vel_R(idxi)) - vel_R(idxi))) + dir_flg(idxi)*(pres_R))
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = rho_Star * vel_K_Star * & 
+                                    (dir_flg(idxi) * vel_K_Star + (1d0 - dir_flg(idxi)) * (xi_M*vel_L(idxi) + xi_P * vel_R(idxi)) ) + dir_flg(idxi)*p_Star                      
                                 end do
 
                                 ! ENERGY FLUX.
                                 ! f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    xi_M*(vel_L(idx1)*(E_L + pres_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(idx1))*(rho_L*s_S + pres_L/(s_L - vel_L(idx1)))) - E_L)) &
-                                    + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))*(rho_R*s_S + pres_R/(s_R - vel_R(idx1)))) - E_R))
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_star + p_Star) * vel_K_Star
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
@@ -1348,8 +1356,6 @@ contains
 
                                 ! INTERNAL ENERGIES ADVECTION FLUX.
                                 ! K-th pressure and velocity in preparation for the internal energy flux
-                                vel_K_Star = vel_L(idx1)*(1d0 - xi_MP) + xi_MP*vel_R(idx1) + &
-                                             xi_MP*xi_PP*(s_S - vel_R(idx1))
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
@@ -1358,9 +1364,9 @@ contains
                                                             xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i)) - pres_R) + pres_R)
 
                                     flux_rs${XYZ}$_vf(j, k, l, i + intxb - 1) = &
-                                        (qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)* &
+                                        ((xi_M * qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P * qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)) * &
                                          (gammas(i)*p_K_Star + pi_infs(i)) + &
-                                         qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1)* &
+                                         (xi_M * qL_prim_rs${XYZ}$_vf(j, k, l, i + contxb - 1) + xi_P * qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + contxb - 1)) * &
                                          qvs(i))*vel_K_Star
                                 end do
 
@@ -1394,12 +1400,6 @@ contains
                                         (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) + &
                                          xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))*s_S
                                 end if
-
-                                ! correction pressure for the cylindrical terms
-                                p_Star = xi_M*(pres_L + xi_MP*rho_L*(s_L - &
-                                                                     vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1)))) + &
-                                         xi_P*(pres_R + xi_PP*rho_R*(s_R - &
-                                                                     vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))))
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
