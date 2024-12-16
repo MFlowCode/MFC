@@ -478,11 +478,11 @@ contains
     recursive function unassociated_legendre(x, l) result(P)
 
         integer, intent(in) :: l
-        real(kind(0d0)), intent(in) :: x
-        real(kind(0d0)) :: P
+        real(wp), intent(in) :: x
+        real(wp) :: P
 
         if (l == 0) then
-            P = 1d0
+            P = 1_wp
         else if (l == 1) then
             P = x
         else
@@ -500,15 +500,15 @@ contains
     recursive function spherical_harmonic_func(x, phi, l, m) result(Y)
 
         integer, intent(in) :: l, m
-        real(kind(0d0)), intent(in) :: x, phi
-        real(kind(0d0)) :: Y, prefactor, pi
+        real(wp), intent(in) :: x, phi
+        real(wp) :: Y, prefactor, pi
 
-        pi = acos(-1d0)
+        pi = acos(-1_wp)
         prefactor = sqrt((2*l + 1)/(4*pi)*factorial(l - m)/factorial(l + m)); 
         if (m == 0) then
             Y = prefactor*associated_legendre(x, l, m); 
         elseif (m > 0) then
-            Y = (-1d0)**m*sqrt(2d0)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
+            Y = (-1_wp)**m*sqrt(2_wp)*prefactor*associated_legendre(x, l, m)*cos(m*phi); 
         end if
 
     end function spherical_harmonic_func
@@ -522,8 +522,8 @@ contains
     recursive function associated_legendre(x, l, m) result(P)
 
         integer, intent(in) :: l, m
-        real(kind(0d0)), intent(in) :: x
-        real(kind(0d0)) :: P
+        real(wp), intent(in) :: x
+        real(wp) :: P
 
         if (m <= 0 .and. l <= 0) then
             P = 1; 

@@ -1038,7 +1038,7 @@ contains
         allocate (x_d1(m*n))
         allocate (y_d1(m*n))
         counter = 0
-        maxalph_loc = 0d0
+        maxalph_loc = 0_wp
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1060,7 +1060,7 @@ contains
             cent = 0
         end if
 
-        thres = 0.9d0*maxalph_glb
+        thres = 0.9_wp*maxalph_glb
         do k = 0, n
             do j = 0, m
                 axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
@@ -1110,7 +1110,7 @@ contains
                         x_td(i), y_td(i), size(x_td)
                 else
                     write (211, '(F12.9,1X,F12.9,1X,F3.1)') &
-                        x_td(i), y_td(i), 0d0
+                        x_td(i), y_td(i), 0_wp
                 end if
             end do
         end if
@@ -1119,40 +1119,40 @@ contains
 
     subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
-        real(kind(0d0)) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
-        real(kind(0d0)) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
-        real(kind(0d0)), dimension(num_dims) :: vel
-        real(kind(0d0)), dimension(num_fluids) :: gammas, pi_infs, adv
+        real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
+        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
+        real(wp), dimension(num_dims) :: vel
+        real(wp), dimension(num_fluids) :: gammas, pi_infs, adv
         integer :: i, j, k, l, s !looping indices
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
 
-        Egk = 0d0
-        Elp = 0d0
-        Egint = 0d0
-        Vb = 0d0
-        maxvel = 0d0
-        MaxMa = 0d0
-        Vl = 0d0
-        Elk = 0d0
-        Et = 0d0
-        Vb = 0d0
-        dV = 0d0
-        pres_av = 0d0
-        pres = 0d0
+        Egk = 0_wp
+        Elp = 0_wp
+        Egint = 0_wp
+        Vb = 0_wp
+        maxvel = 0_wp
+        MaxMa = 0_wp
+        Vl = 0_wp
+        Elk = 0_wp
+        Et = 0_wp
+        Vb = 0_wp
+        dV = 0_wp
+        pres_av = 0_wp
+        pres = 0_wp
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    pres = 0d0
+                    pres = 0_wp
                     dV = dx(i)*dy(j)*dz(k)
-                    rho = 0d0
-                    gamma = 0d0
-                    pi_inf = 0d0
+                    rho = 0_wp
+                    gamma = 0_wp
+                    pi_inf = 0_wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                     do s = 1, num_dims
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                        Egk = Egk + 0.5d0*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                        Elk = Elk + 0.5d0*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                         if (abs(vel(s)) > maxvel) then
                             maxvel = abs(vel(s))
                         end if
@@ -1164,14 +1164,14 @@ contains
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    H = ((gamma + 1d0)*pres + pi_inf)/rho
+                    H = ((gamma + 1_wp)*pres + pi_inf)/rho
 
                     call s_compute_speed_of_sound(pres, rho, &
                                                   gamma, pi_inf, &
-                                                  H, adv, 0d0, 0d0, c)
+                                                  H, adv, 0_wp, 0_wp, c)
 
                     Ma = maxvel/c
-                    if (Ma > MaxMa .and. adv(1) > 1.0d0 - 1.0d-10) then
+                    if (Ma > MaxMa .and. adv(1) > 1.0_wp - 1.0d-10) then
                         MaxMa = Ma
                     end if
                     Vl = Vl + adv(1)*dV

@@ -1412,9 +1412,9 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
 
-        real(kind(0d0)) :: r, x_p, eps, phi
-        real(kind(0d0)), dimension(2:9) :: as, Ps
-        real(kind(0d0)) :: radius, x_centroid, y_centroid, z_centroid, eta, smooth_coeff
+        real(wp) :: r, x_p, eps, phi
+        real(wp), dimension(2:9) :: as, Ps
+        real(wp) :: radius, x_centroid, y_centroid, z_centroid, eta, smooth_coeff
         logical :: non_axis_sym
 
         integer :: i, j, k !< generic loop iterators
@@ -1485,7 +1485,7 @@ contains
                             if (patch_icpp(patch_id)%smoothen) then
                                 eta = tanh(smooth_coeff/min(dx, dy, dz)* &
                                            ((r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7)) &
-                                            - radius))*(-0.5d0) + 0.5d0
+                                            - radius))*(-0.5_wp) + 0.5_wp
                             end if
 
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, &
@@ -1502,7 +1502,7 @@ contains
 
                     if (non_axis_sym) then
                         phi = atan(((y_cc(j) - y_centroid) + eps)/((x_cc(i) - x_centroid) + eps))
-                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        r = dsqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
                         x_p = (eps)/r
                         Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
                         Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
@@ -1513,7 +1513,7 @@ contains
                         Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
                         Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
                     else
-                        r = dsqrt((x_cc(i) - x_centroid)**2d0 + (y_cc(j) - y_centroid)**2d0) + eps
+                        r = dsqrt((x_cc(i) - x_centroid)**2_wp + (y_cc(j) - y_centroid)**2_wp) + eps
                         x_p = abs(x_cc(i) - x_centroid + eps)/r
                         Ps(2) = unassociated_legendre(x_p, 2)
                         Ps(3) = unassociated_legendre(x_p, 3)

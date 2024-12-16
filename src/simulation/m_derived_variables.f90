@@ -326,14 +326,14 @@ contains
     !!  @param c_m Mass,x-location,y-location,z-location
     subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
-        real(kind(0d0)), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
+        real(wp), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
         integer :: i, j, k, l !< Generic loop iterators
-        real(kind(0d0)) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
-        real(kind(0d0)) :: dV !< Discrete cell volume
+        real(wp) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
+        real(wp) :: dV !< Discrete cell volume
 
         do i = 1, num_fluids
             do j = 1, 5
-                c_m(i, j) = 0.0d0
+                c_m(i, j) = 0.0_wp
             end do
         end do
 

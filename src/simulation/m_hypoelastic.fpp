@@ -34,9 +34,9 @@ module m_hypoelastic
     real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_x_h
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y_h
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_z_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
     !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
 
 contains
@@ -169,8 +169,8 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = 0d0; dv_dz(k, l, q) = 0d0; dw_dx(k, l, q) = 0d0; 
-                                dw_dy(k, l, q) = 0d0; dw_dz(k, l, q) = 0d0; 
+                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
+                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
                             end do
                         end do
                     end do

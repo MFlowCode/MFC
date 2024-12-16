@@ -221,9 +221,9 @@ contains
 
         implicit none
         integer, intent(in) :: counts          ! Array of vector lengths for each process
-        real(kind(0d0)), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
+        real(wp), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
         integer, intent(in) :: root               ! Rank of the root process
-        real(kind(0d0)), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
+        real(wp), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
 
         integer :: i, offset, ierr
         integer, allocatable :: recounts(:), displs(:)

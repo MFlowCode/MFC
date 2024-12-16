@@ -192,8 +192,8 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io

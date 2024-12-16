@@ -932,15 +932,15 @@ contains
     subroutine s_write_com_files(t_step, c_mass) ! -------------------
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), dimension(num_fluids, 5), intent(in) :: c_mass
+        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
         integer :: i, j !< Generic loop iterator
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
+        real(wp) :: nondim_time !< Non-dimensional time
 
         ! Non-dimensional time calculation
         if (t_step_old /= dflt_int) then
-            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+            nondim_time = real(t_step + t_step_old, wp)*dt
         else
-            nondim_time = real(t_step, kind(0d0))*dt
+            nondim_time = real(t_step, wp)*dt
         end if
 
         if (proc_rank == 0) then
