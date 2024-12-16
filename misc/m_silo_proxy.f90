@@ -189,9 +189,9 @@ contains
         integer, intent(IN) :: lyname
         character(LEN=*), intent(IN) :: zname
         integer, intent(IN) :: lzname
-        real(kind(0d0)), dimension(:), intent(IN) :: x
-        real(kind(0d0)), dimension(:), intent(IN) :: y
-        real(kind(0d0)), dimension(:), intent(IN) :: z
+        real(wp), dimension(:), intent(IN) :: x
+        real(wp), dimension(:), intent(IN) :: y
+        real(wp), dimension(:), intent(IN) :: z
         integer, dimension(:), intent(IN) :: dims
         integer, intent(IN) :: ndims
         integer, intent(IN) :: datatype
@@ -215,8 +215,8 @@ contains
         integer, intent(IN) :: dbid
         character(LEN=*), intent(IN) :: curvename
         integer, intent(IN) :: lcurvename
-        real(kind(0d0)), dimension(:), intent(IN) :: xvals
-        real(kind(0d0)), dimension(:), intent(IN) :: yvals
+        real(wp), dimension(:), intent(IN) :: xvals
+        real(wp), dimension(:), intent(IN) :: yvals
         integer, intent(IN) :: datatype
         integer, intent(IN) :: npoints
         integer, intent(IN) :: optlist_id
@@ -264,7 +264,7 @@ contains
         integer, intent(IN) :: lname
         character(LEN=*), intent(IN) :: meshname
         integer, intent(IN) :: lmeshname
-        real(kind(0d0)), dimension(:, :, :), intent(IN) :: var
+        real(wp), dimension(:, :, :), intent(IN) :: var
         integer, dimension(:), intent(IN) :: dims
         integer, intent(IN) :: ndims
         integer, intent(IN) :: mixvar
