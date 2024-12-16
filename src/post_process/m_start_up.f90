@@ -156,11 +156,11 @@ contains
         if (proc_rank == 0) then
             if (cfl_dt) then
                 print '(" ["I3"%]  Saving "I8" of "I0"")', &
-                    int(ceiling(100d0*(real(t_step - n_start)/(n_save)))), &
+                    int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), &
                     t_step, n_save
             else
                 print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
-                    int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     (t_step - t_step_start)/t_step_save + 1, &
                     (t_step_stop - t_step_start)/t_step_save + 1, &
                     t_step
@@ -188,7 +188,7 @@ contains
 
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
-        real(kind(0d0)), intent(inout) :: pres, c, H
+        real(wp), intent(inout) :: pres, c, H
 
         integer :: i, j, k, l
 
@@ -517,12 +517,12 @@ contains
 
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
-                        H = ((gamma_sf(i, j, k) + 1d0)*pres + &
+                        H = ((gamma_sf(i, j, k) + 1._wp)*pres + &
                              pi_inf_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                                                      H, adv, 0d0, 0d0, c)
+                                                      H, adv, 0._wp, 0._wp, c)
 
                         q_sf(i, j, k) = c
                     end do

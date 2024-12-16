@@ -74,7 +74,7 @@ contains
             !! Generic string used to store the location of a particular file
 
         character(LEN= &
-                  int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !<
+                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
             !! Used to store the variable position, in character form, of the
             !! currently manipulated conservative variable file
 
@@ -140,7 +140,7 @@ contains
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
 
         ! Computing the cell-center locations
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         ! ==================================================================
 
@@ -167,7 +167,7 @@ contains
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
 
             ! Computing the cell-center locations
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             ! ==================================================================
 
@@ -194,7 +194,7 @@ contains
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
 
                 ! Computing the cell-center locations
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
             end if
 
@@ -255,11 +255,11 @@ contains
 
 #ifdef MFC_MPI
 
-        real(kind(0d0)), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
@@ -284,7 +284,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ(ifile, x_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+            call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -295,7 +295,7 @@ contains
         ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         ! Computing the cell center location
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2d0
+        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
@@ -305,7 +305,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ(ifile, y_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -316,7 +316,7 @@ contains
             ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
             ! Computing the cell center location
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2d0
+            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
                 ! Read in cell boundary locations in z-direction
@@ -326,7 +326,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, MPI_DOUBLE_PRECISION, status, ierr)
+                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
                     call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
@@ -337,7 +337,7 @@ contains
                 ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
                 ! Computing the cell center location
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2d0
+                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
             end if
         end if
 
@@ -365,8 +365,8 @@ contains
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8d0, MPI_OFFSET_KIND)
-                MOK = int(1d0, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -376,14 +376,14 @@ contains
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                     end do
                 else
                     do i = 1, adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                     end do
                 end if
 
@@ -439,8 +439,8 @@ contains
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8d0, MPI_OFFSET_KIND)
-                MOK = int(1d0, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
@@ -452,10 +452,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size
@@ -464,10 +464,10 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, MPI_DOUBLE_PRECISION, MPI_IO_DATA%view(i), &
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               MPI_DOUBLE_PRECISION, status, ierr)
+                                               mpi_p, status, ierr)
                     end do
                 end if
 
@@ -554,7 +554,7 @@ contains
         end do
 
         do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2d0
+            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
         end do
 
         ! Ghost-cell extrapolation BC at the end
@@ -590,7 +590,7 @@ contains
         end do
 
         do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2d0
+            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
 
         ! END: Populating Buffer Regions in the x-direction ================
@@ -632,7 +632,7 @@ contains
             end do
 
             do i = 1, buff_size
-                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2d0
+                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
             end do
 
             ! Ghost-cell extrapolation BC at the end
@@ -668,7 +668,7 @@ contains
             end do
 
             do i = 1, buff_size
-                y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2d0
+                y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
             end do
 
             ! END: Populating Buffer Regions in the y-direction ================
@@ -710,7 +710,7 @@ contains
                 end do
 
                 do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2d0
+                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
                 end do
 
                 ! Ghost-cell extrapolation BC at the end
@@ -746,7 +746,7 @@ contains
                 end do
 
                 do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2d0
+                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
                 end do
 
             end if

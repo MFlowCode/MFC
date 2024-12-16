@@ -51,43 +51,40 @@ contains
         !! @param ntmp is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(in) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(in) :: Rtmp
-        real(kind(0.d0)), intent(out) :: ntmp
-        real(kind(0.d0)), dimension(nb), intent(in) :: weights
+        real(wp), intent(in) :: vftmp
+        real(wp), dimension(nb), intent(in) :: Rtmp
+        real(wp), intent(out) :: ntmp
+        real(wp), dimension(nb), intent(in) :: weights
 
-        real(kind(0.d0)) :: R3
+        real(wp) :: R3
 
-        R3 = dot_product(weights, Rtmp**3.d0)
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
+        R3 = dot_product(weights, Rtmp**3._wp)
+        ntmp = (3._wp/(4._wp*pi))*vftmp/R3
 
     end subroutine s_comp_n_from_prim
 
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         !$acc routine seq
-        real(kind(0.d0)), intent(in) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(in) :: nRtmp
-        real(kind(0.d0)), intent(out) :: ntmp
-        real(kind(0.d0)), dimension(nb), intent(in) :: weights
+        real(wp), intent(in) :: vftmp
+        real(wp), dimension(nb), intent(in) :: nRtmp
+        real(wp), intent(out) :: ntmp
+        real(wp), dimension(nb), intent(in) :: weights
 
-        real(kind(0.d0)) :: nR3
+        real(wp) :: nR3
 
-        nR3 = dot_product(weights, nRtmp**3.d0)
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        !ntmp = (3.d0/(4.d0*pi))*0.00001
-
-        !print *, "nbub", ntmp
+        nR3 = dot_product(weights, nRtmp**3._wp)
+        ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)
 
     end subroutine s_comp_n_from_cons
 
     subroutine s_print_2D_array(A, div)
 
-        real(kind(0d0)), dimension(:, :), intent(in) :: A
-        real, optional, intent(in) :: div
+        real(wp), dimension(:, :), intent(in) :: A
+        real(wp), optional, intent(in) :: div
 
         integer :: i, j
         integer :: m, n
-        real :: c
+        real(wp) :: c
 
         m = size(A, 1)
         n = size(A, 2)
@@ -95,7 +92,7 @@ contains
         if (present(div)) then
             c = div
         else
-            c = 1
+            c = 1._wp
         end if
 
         print *, m, n
@@ -114,13 +111,13 @@ contains
     subroutine s_initialize_nonpoly
 
         integer :: ir
-        real(kind(0.d0)) :: rhol0, pl0, uu, D_m, temp, omega_ref
-        real(kind(0.d0)), dimension(Nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw
+        real(wp) :: rhol0, pl0, uu, D_m, temp, omega_ref
+        real(wp), dimension(Nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw
 
-        real(kind(0.d0)), parameter :: k_poly = 1.d0 !<
+        real(wp), parameter :: k_poly = 1._wp !<
             !! polytropic index used to compute isothermal natural frequency
 
-        real(kind(0.d0)), parameter :: Ru = 8314.d0 !<
+        real(wp), parameter :: Ru = 8314._wp !<
             !! universal gas constant
 
         rhol0 = rhoref
@@ -155,42 +152,42 @@ contains
         k_n(:) = fluid_pp(2)%k_v
 
         gamma_m = gamma_n
-        if (thermal == 2) gamma_m = 1.d0
+        if (thermal == 2) gamma_m = 1._wp
 
-        temp = 293.15d0
-        D_m = 0.242d-4
-        uu = DSQRT(pl0/rhol0)
+        temp = 293.15_wp
+        D_m = 0.242e-4_wp
+        uu = sqrt(pl0/rhol0)
 
-        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
+        omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
 
             !!! thermal properties !!!
         ! gas constants
         R_n = Ru/M_n
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
-        phi_vn = (1.d0 + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))
-        phi_nv = (1.d0 + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))
+        phi_vn = (1._wp + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_v/M_n))
+        phi_nv = (1._wp + sqrt(mu_n/mu_v)*(M_v/M_n)**(0.25_wp))**2 &
+                 /(sqrt(8._wp)*sqrt(1._wp + M_n/M_v))
         ! internal bubble pressure
-        pb0 = pl0 + 2.d0*ss/(R0ref*R0)
+        pb0 = pl0 + 2._wp*ss/(R0ref*R0)
 
         ! mass fraction of vapor
-        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))
+        chi_vw0 = 1._wp/(1._wp + R_v/R_n*(pb0/pv - 1._wp))
         ! specific heat for gas/vapor mixture
-        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1.d0) &
-                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)
+        cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1._wp) &
+                + (1._wp - chi_vw0)*R_n*gamma_n/(gamma_n - 1._wp)
         ! mole fraction of vapor
         x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)
         ! thermal conductivity for gas/vapor mixture
-        k_m0 = x_vw*k_v/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)
+        k_m0 = x_vw*k_v/(x_vw + (1._wp - x_vw)*phi_vn) &
+               + (1._wp - x_vw)*k_n/(x_vw*phi_nv + 1._wp - x_vw)
         ! mixture density
         rho_m0 = pv/(chi_vw0*R_v*temp)
 
         ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3
+        mass_n0 = 4._wp*(pb0 - pv)*pi/(3._wp*R_n*temp*rhol0)*R0**3
+        mass_v0 = 4._wp*pv*pi/(3._wp*R_v*temp*rhol0)*R0**3
         ! Peclet numbers
         Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
         Pe_c = uu*R0ref/D_m
@@ -205,22 +202,22 @@ contains
         k_v = k_v/k_m0
         pb0 = pb0/pl0
         pv = pv/pl0
-        Tw = 1.d0
-        pl0 = 1.d0
+        Tw = 1._wp
+        pl0 = 1._wp
 
-        rhoref = 1.d0
-        pref = 1.d0
+        rhoref = 1._wp
+        pref = 1._wp
         !end if
 
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
+        omegaN = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
                               Re_trans_T(ir), Im_trans_T(ir))
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_c*R0(ir), &
                               Re_trans_c(ir), Im_trans_c(ir))
         end do
-        Im_trans_T = 0d0
+        Im_trans_T = 0._wp
 
     end subroutine s_initialize_nonpoly
 
@@ -231,19 +228,19 @@ contains
         !! @param Im_trans Imaginary part of the transport coefficients
     subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
-        real(kind(0.d0)), intent(in) :: omega, peclet
-        real(kind(0.d0)), intent(out) :: Re_trans, Im_trans
+        real(wp), intent(in) :: omega, peclet
+        real(wp), intent(out) :: Re_trans, Im_trans
 
         complex :: trans, c1, c2, c3
-        complex :: imag = (0., 1.)
-        real(kind(0.d0)) :: f_transcoeff
+        complex :: imag = (0._wp, 1._wp)
+        real(wp) :: f_transcoeff
 
         c1 = imag*omega*peclet
-        c2 = CSQRT(c1)
-        c3 = (CEXP(c2) - CEXP(-c2))/(CEXP(c2) + CEXP(-c2)) ! TANH(c2)
-        trans = ((c2/c3 - 1.d0)**(-1) - 3.d0/c1)**(-1) ! transfer function
+        c2 = csqrt(c1)
+        c3 = (cexp(c2) - cexp(-c2))/(cexp(c2) + cexp(-c2)) ! TANH(c2)
+        trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
 
-        Re_trans = dble(trans)
+        Re_trans = trans
         Im_trans = aimag(trans)
 
     end subroutine s_transcoeff
@@ -261,48 +258,35 @@ contains
     subroutine s_simpson
 
         integer :: ir
-        real(kind(0.d0)) :: R0mn, R0mx, dphi, tmp, sd
-        real(kind(0.d0)), dimension(nb) :: phi
-
-        ! nondiml. min. & max. initial radii for numerical quadrature
-        !sd   = 0.05D0
-        !R0mn = 0.75D0
-        !R0mx = 1.3D0
-
-        !sd   = 0.3D0
-        !R0mn = 0.3D0
-        !R0mx = 6.D0
-
-        !sd   = 0.7D0
-        !R0mn = 0.12D0
-        !R0mx = 150.D0
+        real(wp) :: R0mn, R0mx, dphi, tmp, sd
+        real(wp), dimension(nb) :: phi
 
         sd = poly_sigma
-        R0mn = 0.8d0*DEXP(-2.8d0*sd)
-        R0mx = 0.2d0*DEXP(9.5d0*sd) + 1.d0
+        R0mn = 0.8_wp*exp(-2.8_wp*sd)
+        R0mx = 0.2_wp*exp(9.5_wp*sd) + 1._wp
 
         ! phi = ln( R0 ) & return R0
         do ir = 1, nb
-            phi(ir) = DLOG(R0mn) &
-                      + dble(ir - 1)*DLOG(R0mx/R0mn)/dble(nb - 1)
-            R0(ir) = DEXP(phi(ir))
+            phi(ir) = log(R0mn) &
+                      + (ir - 1._wp)*log(R0mx/R0mn)/(nb - 1._wp)
+            R0(ir) = exp(phi(ir))
         end do
         dphi = phi(2) - phi(1)
 
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
             ! Gaussian
-            tmp = DEXP(-0.5d0*(phi(ir)/sd)**2)/DSQRT(2.d0*pi)/sd
+            tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
-                weight(ir) = tmp*4.d0*dphi/3.d0
+                weight(ir) = tmp*4._wp*dphi/3._wp
             else
-                weight(ir) = tmp*2.d0*dphi/3.d0
+                weight(ir) = tmp*2._wp*dphi/3._wp
             end if
         end do
-        tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(1) = tmp*dphi/3.d0
-        tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
-        weight(nb) = tmp*dphi/3.d0
+        tmp = exp(-0.5_wp*(phi(1)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(1) = tmp*dphi/3._wp
+        tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
+        weight(nb) = tmp*dphi/3._wp
     end subroutine s_simpson
 
     !> This procedure computes the cross product of two vectors.
@@ -311,8 +295,8 @@ contains
     !! @return The cross product of the two vectors.
     function f_cross(a, b) result(c)
 
-        real(kind(0d0)), dimension(3), intent(in) :: a, b
-        real(kind(0d0)), dimension(3) :: c
+        real(wp), dimension(3), intent(in) :: a, b
+        real(wp), dimension(3) :: c
 
         c(1) = a(2)*b(3) - a(3)*b(2)
         c(2) = a(3)*b(1) - a(1)*b(3)
@@ -324,8 +308,8 @@ contains
     !! @param rhs Right-hand side.
     subroutine s_swap(lhs, rhs)
 
-        real(kind(0d0)), intent(inout) :: lhs, rhs
-        real(kind(0d0)) :: ltemp
+        real(wp), intent(inout) :: lhs, rhs
+        real(wp) :: ltemp
 
         ltemp = lhs
         lhs = rhs
@@ -341,34 +325,34 @@ contains
         t_mat4x4 :: sc, rz, rx, ry, tr, out_matrix
 
         sc = transpose(reshape([ &
-                               p%scale(1), 0d0, 0d0, 0d0, &
-                               0d0, p%scale(2), 0d0, 0d0, &
-                               0d0, 0d0, p%scale(3), 0d0, &
-                               0d0, 0d0, 0d0, 1d0], shape(sc)))
+                               p%scale(1), 0._wp, 0._wp, 0._wp, &
+                               0._wp, p%scale(2), 0._wp, 0._wp, &
+                               0._wp, 0._wp, p%scale(3), 0._wp, &
+                               0._wp, 0._wp, 0._wp, 1._wp], shape(sc)))
 
         rz = transpose(reshape([ &
-                               cos(p%rotate(3)), -sin(p%rotate(3)), 0d0, 0d0, &
-                               sin(p%rotate(3)), cos(p%rotate(3)), 0d0, 0d0, &
-                               0d0, 0d0, 1d0, 0d0, &
-                               0d0, 0d0, 0d0, 1d0], shape(rz)))
+                               cos(p%rotate(3)), -sin(p%rotate(3)), 0._wp, 0._wp, &
+                               sin(p%rotate(3)), cos(p%rotate(3)), 0._wp, 0._wp, &
+                               0._wp, 0._wp, 1._wp, 0._wp, &
+                               0._wp, 0._wp, 0._wp, 1._wp], shape(rz)))
 
         rx = transpose(reshape([ &
-                               1d0, 0d0, 0d0, 0d0, &
-                               0d0, cos(p%rotate(1)), -sin(p%rotate(1)), 0d0, &
-                               0d0, sin(p%rotate(1)), cos(p%rotate(1)), 0d0, &
-                               0d0, 0d0, 0d0, 1d0], shape(rx)))
+                               1._wp, 0._wp, 0._wp, 0._wp, &
+                               0._wp, cos(p%rotate(1)), -sin(p%rotate(1)), 0._wp, &
+                               0._wp, sin(p%rotate(1)), cos(p%rotate(1)), 0._wp, &
+                               0._wp, 0._wp, 0._wp, 1._wp], shape(rx)))
 
         ry = transpose(reshape([ &
-                               cos(p%rotate(2)), 0d0, sin(p%rotate(2)), 0d0, &
-                               0d0, 1d0, 0d0, 0d0, &
-                               -sin(p%rotate(2)), 0d0, cos(p%rotate(2)), 0d0, &
-                               0d0, 0d0, 0d0, 1d0], shape(ry)))
+                               cos(p%rotate(2)), 0._wp, sin(p%rotate(2)), 0._wp, &
+                               0._wp, 1._wp, 0._wp, 0._wp, &
+                               -sin(p%rotate(2)), 0._wp, cos(p%rotate(2)), 0._wp, &
+                               0._wp, 0._wp, 0._wp, 1._wp], shape(ry)))
 
         tr = transpose(reshape([ &
-                               1d0, 0d0, 0d0, p%translate(1), &
-                               0d0, 1d0, 0d0, p%translate(2), &
-                               0d0, 0d0, 1d0, p%translate(3), &
-                               0d0, 0d0, 0d0, 1d0], shape(tr)))
+                               1._wp, 0._wp, 0._wp, p%translate(1), &
+                               0._wp, 1._wp, 0._wp, p%translate(2), &
+                               0._wp, 0._wp, 1._wp, p%translate(3), &
+                               0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
         out_matrix = matmul(tr, matmul(ry, matmul(rx, matmul(rz, sc))))
 
@@ -382,9 +366,9 @@ contains
         t_vec3, intent(inout) :: vec
         t_mat4x4, intent(in) :: matrix
 
-        real(kind(0d0)), dimension(1:4) :: tmp
+        real(wp), dimension(1:4) :: tmp
 
-        tmp = matmul(matrix, [vec(1), vec(2), vec(3), 1d0])
+        tmp = matmul(matrix, [vec(1), vec(2), vec(3), 1._wp])
         vec = tmp(1:3)
 
     end subroutine s_transform_vec
@@ -399,7 +383,7 @@ contains
 
         integer :: i
 
-        real(kind(0d0)), dimension(1:4) :: tmp
+        real(wp), dimension(1:4) :: tmp
 
         do i = 1, 3
             call s_transform_vec(triangle%v(i, :), matrix)
@@ -434,8 +418,8 @@ contains
         integer :: i, j
 
         if (size(model%trs) == 0) then
-            bbox%min = 0d0
-            bbox%max = 0d0
+            bbox%min = 0._wp
+            bbox%max = 0._wp
             return
         end if
 

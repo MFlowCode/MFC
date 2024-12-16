@@ -156,7 +156,7 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(n > 0, "Line segment patch "//trim(iStr)//": n must be zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "Line segment patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Line segment patch "//trim(iStr)//": length_x must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Line segment patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(cyl_coord, "Line segment patch "//trim(iStr)//": cyl_coord is not supported")
 
@@ -171,7 +171,7 @@ contains
 
         @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be zero")
         @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Circle patch "//trim(iStr)//": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Circle patch "//trim(iStr)//": radius must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Circle patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Circle patch "//trim(iStr)//": y_centroid must be set")
 
@@ -188,8 +188,8 @@ contains
         @:PROHIBIT(p > 0, "Rectangle patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Rectangle patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Rectangle patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "Rectangle patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0d0, "Rectangle patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Rectangle patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Rectangle patch "//trim(iStr)//": length_y must be greater than zero")
 
     end subroutine s_check_rectangle_patch_geometry
 
@@ -221,8 +221,8 @@ contains
         @:PROHIBIT(p > 0, "Ellipse patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Ellipse patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Ellipse patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%radii(1) <= 0d0, "Ellipse patch "//trim(iStr)//": radii(1) must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0d0, "Ellipse patch "//trim(iStr)//": radii(2) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radii(1) <= 0._wp, "Ellipse patch "//trim(iStr)//": radii(1) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0._wp, "Ellipse patch "//trim(iStr)//": radii(2) must be greater than zero")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%radii(3)), "Ellipse patch "//trim(iStr)//": radii(3) must not be set")
 
     end subroutine s_check_ellipse_patch_geometry
@@ -238,9 +238,9 @@ contains
         @:PROHIBIT(p > 0, "Taylor Green vortex patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Taylor Green vortex patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Taylor Green vortex patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "Taylor Green vortex patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0d0, "Taylor Green vortex patch "//trim(iStr)//": length_y must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%vel(2) <= 0d0, "Taylor Green vortex patch "//trim(iStr)//": vel(2) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%vel(2) <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": vel(2) must be greater than zero")
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
 
@@ -255,7 +255,7 @@ contains
         @:PROHIBIT(p > 0, "1D analytical patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(model_eqns /= 4 .and. model_eqns /= 2, "1D analytical patch "//trim(iStr)//": model_eqns must be either 4 or 2")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "1D analytical patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "1D analytical patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "1D analytical patch "//trim(iStr)//": length_x must be greater than zero")
 
     end subroutine s_check_1D_analytical_patch_geometry
 
@@ -270,8 +270,8 @@ contains
         @:PROHIBIT(p > 0, "2D analytical patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "2D analytical patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "2D analytical patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "2D analytical patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0d0, "2D analytical patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "2D analytical patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "2D analytical patch "//trim(iStr)//": length_y must be greater than zero")
 
     end subroutine s_check_2D_analytical_patch_geometry
 
@@ -286,9 +286,9 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "3D analytical patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "3D analytical patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "3D analytical patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "3D analytical patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0d0, "3D analytical patch "//trim(iStr)//": length_y must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0d0, "3D analytical patch "//trim(iStr)//": length_z must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "3D analytical patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "3D analytical patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, "3D analytical patch "//trim(iStr)//": length_z must be greater than zero")
 
     end subroutine s_check_3D_analytical_patch_geometry
 
@@ -300,7 +300,7 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(p == 0, "Sphere patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Sphere patch "//trim(iStr)//": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Sphere patch "//trim(iStr)//": radius must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Sphere patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Sphere patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Sphere patch "//trim(iStr)//": z_centroid must be set")
@@ -315,13 +315,13 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(p == 0, "Spherical harmonic patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Spherical harmonic patch "//trim(iStr)//": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Spherical harmonic patch "//trim(iStr)//": radius must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Spherical harmonic patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spherical harmonic patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Spherical harmonic patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(all(patch_icpp(patch_id)%epsilon /= (/1d0, 2d0, 3d0, 4d0, 5d0/)), &
+        @:PROHIBIT(all(patch_icpp(patch_id)%epsilon /= (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)), &
             "Spherical harmonic patch "//trim(iStr)//": epsilon must be one of 1, 2, 3, 4, 5")
-        @:PROHIBIT(patch_icpp(patch_id)%beta < 0d0, &
+        @:PROHIBIT(patch_icpp(patch_id)%beta < 0._wp, &
             "Spherical harmonic patch "//trim(iStr)//": beta must be greater than or equal to zero")
         @:PROHIBIT(patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon, &
             "Spherical harmonic patch "//trim(iStr)//": beta must be less than or equal to epsilon")
@@ -340,9 +340,9 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Cuboid patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Cuboid patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Cuboid patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0d0, "Cuboid patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0d0, "Cuboid patch "//trim(iStr)//": length_y must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0d0, "Cuboid patch "//trim(iStr)//": length_z must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Cuboid patch "//trim(iStr)//": length_x must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Cuboid patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, "Cuboid patch "//trim(iStr)//": length_z must be greater than zero")
 
     end subroutine s_check_cuboid_patch_geometry
 
@@ -358,20 +358,20 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Cylinder patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Cylinder patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Cylinder patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0d0, "Cylinder patch "//trim(iStr)//": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Cylinder patch "//trim(iStr)//": radius must be greater than zero")
 
         ! Check if exactly one length is defined
         @:PROHIBIT(count([ &
-            patch_icpp(patch_id)%length_x > 0d0, &
-            patch_icpp(patch_id)%length_y > 0d0, &
-            patch_icpp(patch_id)%length_z > 0d0 &
+            patch_icpp(patch_id)%length_x > 0._wp, &
+            patch_icpp(patch_id)%length_y > 0._wp, &
+            patch_icpp(patch_id)%length_z > 0._wp &
             ]) /= 1, "Cylinder patch "//trim(iStr)//": Exactly one of length_x, length_y, or length_z must be defined and positive")
 
         ! Ensure the defined length is positive
         @:PROHIBIT( &
-            (.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0d0) .or. &
-            (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0d0) .or. &
-            (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0d0), &
+            (.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0._wp) .or. &
+            (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0._wp) .or. &
+            (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0._wp), &
             "Cylinder patch "//trim(iStr)//": The defined length_{} must be greater than zero")
 
     end subroutine s_check_cylinder_patch_geometry
@@ -405,9 +405,9 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Ellipsoid patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Ellipsoid patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Ellipsoid patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%radii(1) <= 0d0, "Ellipsoid patch "//trim(iStr)//": radii(1) must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0d0, "Ellipsoid patch "//trim(iStr)//": radii(2) must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radii(3) <= 0d0, "Ellipsoid patch "//trim(iStr)//": radii(3) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radii(1) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(1) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(2) must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radii(3) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(3) must be greater than zero")
 
     end subroutine s_check_ellipsoid_patch_geometry
 
@@ -475,7 +475,7 @@ contains
                 "Smoothen enabled. Patch "//trim(iStr)//": smooth_patch_id must be less than patch_id")
             @:PROHIBIT(patch_icpp(patch_id)%smooth_patch_id == 0, &
                 "Smoothen enabled. Patch "//trim(iStr)//": smooth_patch_id must be greater than zero")
-            @:PROHIBIT(patch_icpp(patch_id)%smooth_coeff <= 0d0, &
+            @:PROHIBIT(patch_icpp(patch_id)%smooth_coeff <= 0._wp, &
                 "Smoothen enabled. Patch "//trim(iStr)//": smooth_coeff must be greater than zero")
         else
             @:PROHIBIT(patch_icpp(patch_id)%smooth_patch_id /= patch_id, &
@@ -521,15 +521,15 @@ contains
             "Patch "//trim(iStr)//": vel(3) must not be set when p = 0")
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), &
             "Patch "//trim(iStr)//": vel(3) must be set when p > 0")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%rho <= 0d0, &
+        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%rho <= 0._wp, &
             "Patch "//trim(iStr)//": rho must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%gamma <= 0d0, &
+        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%gamma <= 0._wp, &
             "Patch "//trim(iStr)//": gamma must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%pi_inf < 0d0, &
+        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
             "Patch "//trim(iStr)//": pi_inf must be greater than or equal to zero when model_eqns = 1")
         @:PROHIBIT(patch_icpp(patch_id)%geometry == 5 .and. patch_icpp(patch_id)%pi_inf > 0, &
             "Patch "//trim(iStr)//": pi_inf must be less than or equal to zero when geometry = 5")
-        @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0d0), &
+        @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
             "Patch "//trim(iStr)//": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")
 
         if (model_eqns == 2 .and. num_fluids < num_fluids_max) then
@@ -542,7 +542,7 @@ contains
         end if
 
         if (chemistry) then
-            !@:ASSERT(all(patch_icpp(patch_id)%Y(1:num_species) >=       0d0), "Patch " // trim(iStr) // ".")
+            !@:ASSERT(all(patch_icpp(patch_id)%Y(1:num_species) >=       0._wp), "Patch " // trim(iStr) // ".")
             !@:ASSERT(any(patch_icpp(patch_id)%Y(1:num_species) >  verysmall), "Patch " // trim(iStr) // ".")
         end if
 
