@@ -1076,8 +1076,8 @@ contains
                         euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                         tgp = sqrt(dx(j)**2 + dy(k)**2)
                     else
-                        euc_d = dsqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
-                        tgp = dsqrt(dx(j)**2 + dy(k)**2)
+                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                        tgp = sqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
                             if (euc_d < tgp) then
                                 cycle
