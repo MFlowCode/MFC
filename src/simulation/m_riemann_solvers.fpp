@@ -563,8 +563,8 @@ contains
 
                             ! elastic energy update
                             !if ( hyperelasticity ) then
-                            !    G_L = 0d0
-                            !    G_R = 0d0
+                            !    G_L = 0._wp
+                            !    G_R = 0._wp
                             !
                             !    !$acc loop seq
                             !    do i = 1, num_fluids
@@ -1012,7 +1012,7 @@ contains
 
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: vel_L_tmp, vel_R_tmp
-        real(wp) :: rho_Star, E_Star, p_Star, p_K_Star
+        real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr !< low Mach number correction
