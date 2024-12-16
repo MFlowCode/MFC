@@ -39,7 +39,7 @@ contains
 
         !$acc kernels
         do i = 1, num_dims
-            grads(i)%sf(:, :, :) = 0.0d0
+            grads(i)%sf(:, :, :) = 0.0_wp
         end do
         !$acc end kernels
 
@@ -56,10 +56,11 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_qp, q_prim_qp
         integer :: x, y, z
         integer :: eqn
-        real(kind(0d0)) :: T
-        real(kind(0d0)) :: rho, omega_m
-        real(kind(0d0)), dimension(num_species) :: Ys
-        real(kind(0d0)), dimension(num_species) :: omega
+
+        real(wp) :: T
+        real(wp) :: rho, omega_m
+        real(wp), dimension(num_species) :: Ys
+        real(wp), dimension(num_species) :: omega
 
         if (chemistry) then
             !$acc parallel loop collapse(3) gang vector default(present) &
