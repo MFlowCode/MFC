@@ -41,6 +41,7 @@ Note:
 | Intel Xeon 8592+          | Emerald Rapids            | CPU           | 64 cores     | 2.6              | Intel 2024.2         | Intel AI Cloud   |
 | Intel Xeon 6900E          | Sierra Forest Adv., 2.8GHz Boost, 384 MiB L3    | CPU           | 192 cores     | 2.6       | Intel 2024.2         | Intel AI Cloud   |
 | AMD EPYC 9534             | Genoa, Zen4               | CPU           | 64 cores     | 2.7              | GNU 12.3.0           | GT Phoenix  |
+| AMD EPYC 9754             | Bergamo, Zen4c            | CPU           | 128 cores    | 2.7              | GNU 12.3.0           | AMD Internal    |
 | NVIDIA A40                | FP32-only GPU             | GPU           | 1 GPU        | 3.3              | NVHPC 22.11          | NCSA Delta  |
 | Intel Xeon Max 9468       | Sapphire Rapids HBM       | CPU           | 48 cores     | 3.5              | NVHPC 24.5           | GT Rogues Gallery  |
 | NVIDIA Grace CPU          | Arm, Neoverse V2          | CPU           | 72 cores     | 3.7              | NVHPC 24.1           | GT Rogues Gallery  |
