@@ -73,10 +73,6 @@ module m_time_steppers
 
     !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,rhs_ts_rkck,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
-    ! Module variables for rkck timestepper
-    real(kind(0d0)) :: lag_largestep, rkck_errmax
-    !$acc declare create(lag_largestep, rkck_errmax)
-
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -1048,7 +1044,7 @@ contains
         real(kind(0d0)), intent(out) :: time_avg
 
         logical :: restart_rkck_step, start_rkck_step
-        real(kind(0.d0)) :: dt_did
+        real(kind(0.d0)) :: lag_largestep, rkck_errmax, dt_did
         integer :: RKstep
 
         mytime = mytime - dt
