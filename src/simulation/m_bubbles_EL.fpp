@@ -74,6 +74,13 @@ module m_bubbles_EL
 
     !$acc declare create(nBubs, Rmax_glb, Rmin_glb, q_beta, q_beta_idx)
 
+    integer :: remove_id !< Module variable for s_update_tmp_rkck
+    !$acc declare create(remove_id)
+
+    ! Module variables for s_write_void_evol
+    real(kind(0d0)) :: lag_voidmax, lag_voidavg, lag_vol
+    !$acc declare create(lag_voidmax, lag_voidavg, lag_vol)
+
 contains
 
     !> Initializes the lagrangian subgrid bubble solver
@@ -1161,13 +1168,16 @@ contains
 
         integer :: i, j, k, l, q
         real(kind(0d0)) :: radiusOld, velOld, aux_glb
-        integer :: remove_id
 
         call s_transfer_data_to_tmp()
 
         lag_largestep = 0d0
         remove_id = 0
-        !$acc parallel loop gang vector default(present) reduction(+: lag_largestep) reduction(MAX: remove_id) private(k) copyin(RKstep)
+
+        !$acc update device(lag_largestep, remove_id)
+
+        !$acc parallel loop gang vector default(present) reduction(+:lag_largestep) &
+        !%acc reduction(MAX: remove_id) private(k) copyin(RKstep) copy(largstep, remove_id)
         do k = 1, nBubs
 
             radiusOld = intfc_rad(k, 2)
@@ -1193,6 +1203,8 @@ contains
             end if
 
         end do
+
+        !$acc update host(lag_largestep, remove_id)
 
         if (remove_id /= 0) call s_remove_lag_bubble(remove_id)
 
@@ -1239,7 +1251,11 @@ contains
         integer :: i, j, k
 
         rkck_errmax = 0d0
-        !$acc parallel loop gang vector default(present) reduction(MAX: rkck_errmax) private(k)
+
+        !$acc update device(rkck_errmax)
+
+        !$acc parallel loop gang vector default(present) reduction(MAX: rkck_errmax) &
+        !$acc private(k) copy(rkck_errmax)
         do k = 1, nBubs
             errb = 0d0
 
@@ -1272,6 +1288,8 @@ contains
             rkck_errmax = max(rkck_errmax, errb)
         end do
 
+        !$acc update host(rkck_errmax)
+
     end subroutine s_calculate_rkck_truncation_error
 
     !>  This subroutine updates the conservative fields and the lagrangian variables after accepting the performed time step.
@@ -1294,10 +1312,10 @@ contains
         end do
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    do l = 1, sys_size
+        do l = 1, sys_size
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
                         q_cons_ts(1)%vf(l)%sf(i, j, k) = q_cons_ts(2)%vf(l)%sf(i, j, k)
                     end do
                 end do
@@ -1628,11 +1646,9 @@ contains
     subroutine s_write_void_evol(qtime)
 
         real(kind(0d0)) :: qtime, volcell, voltot
-        real(kind(0d0)) :: lag_voidmax, lag_voidavg, lag_vol
         real(kind(0d0)) :: voidmax_glb, voidavg_glb, vol_glb
 
         integer :: i, j, k
-        integer, dimension(3) :: cell
 
         character(LEN=path_len + 2*name_len) :: file_loc
 
@@ -1641,11 +1657,6 @@ contains
             file_loc = trim(case_dir)//'/D/'//trim(file_loc)
             if (qtime == 0d0) then
                 open (12, FILE=trim(file_loc), FORM='formatted', position='rewind')
-                !write (12, *) 'currentTime, averageVoidFraction, ', &
-                !    'maximumVoidFraction, totalParticlesVolume'
-                !write (12, *) 'The averageVoidFraction value does ', &
-                !    'not reflect the real void fraction in the cloud since the ', &
-                !    'cells which do not have bubbles are not accounted'
             else
                 open (12, FILE=trim(file_loc), FORM='formatted', position='append')
             end if
@@ -1654,16 +1665,16 @@ contains
         lag_voidmax = 0d0
         lag_voidavg = 0d0
         lag_vol = 0d0
+
+        !$acc update device(lag_voidmax, lag_voidavg, lag_vol)
+
         !$acc parallel loop collapse(3) gang vector default(present) reduction(+:lag_vol,lag_voidavg) &
-        !$acc reduction(MAX:lag_voidmax) private(cell)
-        do i = 0, m
+        !$acc reduction(MAX:lag_voidmax) copy(lag_voidmax,lag_voidavg, lag_vol)
+        do k = 0, p
             do j = 0, n
-                do k = 0, p
+                do i = 0, p
                     lag_voidmax = max(lag_voidmax, 1d0 - q_beta%vf(1)%sf(i, j, k))
-                    cell(1) = i
-                    cell(2) = j
-                    cell(3) = k
-                    call s_get_char_vol(cell(1), cell(2), cell(3), volcell)
+                    call s_get_char_vol(i, j, k, volcell)
                     if ((1d0 - q_beta%vf(1)%sf(i, j, k)) > 5.0d-11) then
                         lag_voidavg = lag_voidavg + (1d0 - q_beta%vf(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
@@ -1671,6 +1682,8 @@ contains
                 end do
             end do
         end do
+
+        !$acc update host(lag_voidmax, lag_voidavg, lag_vol)
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -1841,13 +1854,21 @@ contains
 
         integer :: k
 
-        !$acc parallel loop gang vector default(present) reduction(MAX: Rmax_glb) reduction(MIN: Rmin_glb) private(k)
+        Rmax_glb = 0d0
+        Rmin_glb = 0d0
+
+        !$acc update device(Rmax_glb, Rmin_glb)
+
+        !$acc parallel loop gang vector default(present) reduction(MAX: Rmax_glb) reduction(MIN: Rmin_glb) &
+        !$acc  private(k) copy(Rmax_glb, Rmin_glb)
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))
             Rmin_stats(k) = min(Rmin_stats(k), intfc_rad(k, 1)/bub_R0(k))
         end do
+
+        !$acc update host(Rmax_glb, Rmin_glb)
 
     end subroutine s_calculate_lag_bubble_stats
 
