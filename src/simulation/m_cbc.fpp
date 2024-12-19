@@ -802,7 +802,7 @@ contains
                             adv(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
                         end do
 
-                        if (bubbles) then
+                        if (bubbles_euler) then
                             call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
                         else
                             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv, alpha_rho, Re_cbc, 0, k, r)
