@@ -43,24 +43,32 @@ contains
         real(wp), dimension(num_dims) :: vel
         real(wp) :: rho, gamma, pi_inf, qv, vel_sum, E, H, pres
         real(wp), dimension(2) :: Re
+        real(wp) :: G          !< Cell-avg. fluid shear modulus
+        real(wp), dimension(num_fluids) :: Gs      !< Cell-avg. fluid shear moduli
         integer :: i, j, k, l
 
+        !$acc loop seq
         do i = 1, num_fluids
             alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
             alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
         end do
 
-        if (bubbles) then
+        if (elasticity) then
+            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
+                                                            alpha_rho, Re, j, k, l, G, Gs)
+        elseif (bubbles) then
             call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
         end if
 
+        !$acc loop seq
         do i = 1, num_dims
             vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
         end do
 
         vel_sum = 0._wp
+        !$acc loop seq
         do i = 1, num_dims
             vel_sum = vel_sum + vel(i)**2._wp
         end do
@@ -68,6 +76,11 @@ contains
         pres = q_prim_vf(E_idx)%sf(j, k, l)
 
         E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+
+        ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+        if (hyperelasticity) then
+            E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
+        end if
 
         H = (E + pres)/rho
 

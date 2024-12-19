@@ -1,0 +1,150 @@
+This file was created on 2024-12-08 17:22:08.907408.
+
+mfc.sh:
+
+    Invocation: test -o 1BA21D14 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
+    Git:        bd7067adf237718233c836fcf968b3ed19287174 on prcode (dirty)
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+    
+        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M2
+

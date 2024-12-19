@@ -1046,7 +1046,7 @@ contains
         real(wp), dimension(0:2, 0:2) :: moms
         real(wp), dimension(3) :: M1, M3
         real(wp), dimension(2) :: myrho, myrho3, up, up3, Vf
-        real(wp) :: bu, bv, d20, d11, d02, c20, c11, c02
+        real(wp) :: bu, bv, d20, d11, d_02, c20, c11, c02
         real(wp) :: mu2avg, mu2, vp21, vp22, rho21, rho22
 
         moms(0, 0) = momin(1)
@@ -1060,11 +1060,11 @@ contains
         bv = moms(0, 1)/moms(0, 0)
         d20 = moms(2, 0)/moms(0, 0)
         d11 = moms(1, 1)/moms(0, 0)
-        d02 = moms(0, 2)/moms(0, 0)
+        d_02 = moms(0, 2)/moms(0, 0)
 
         c20 = d20 - bu**2._wp; 
         c11 = d11 - bu*bv; 
-        c02 = d02 - bv**2._wp; 
+        c02 = d_02 - bv**2._wp; 
         M1 = (/1._wp, 0._wp, c20/)
         call s_hyqmom(myrho, up, M1)
         Vf = c11*up/c20

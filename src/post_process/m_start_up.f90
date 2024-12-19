@@ -84,7 +84,8 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension
+            cfl_target, surface_tension, &
+            sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -167,7 +168,6 @@ contains
                     t_step
             end if
         end if
-
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
 
@@ -199,6 +199,16 @@ contains
 
         ! Opening a new formatted database file
         call s_open_formatted_database_file(t_step)
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_open_intf_data_file()
+            call s_open_energy_data_file()
+        end if
+
+        if (sim_data) then
+            call s_write_intf_data_file(q_prim_vf)
+            call s_write_energy_data_file(q_prim_vf, q_cons_vf)
+        end if
 
         ! Adding the grid to the formatted database file
         call s_write_grid_to_formatted_database_file(t_step)
@@ -356,22 +366,34 @@ contains
 
         end if
         ! ----------------------------------------------------------------------
-
         ! Adding the elastic shear stresses to the formatted database file -----
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
                 if (prim_vars_wrt) then
                     q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
                            -offset_x%beg:m + offset_x%end, &
                            -offset_y%beg:n + offset_y%end, &
                            -offset_z%beg:p + offset_z%end)
-
                     write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
                 varname(:) = ' '
             end do
         end if
+        if (hyperelasticity) then
+            do i = 1, xiend - xibeg + 1
+                if (prim_vars_wrt) then
+                    q_sf = q_prim_vf(i - 1 + xibeg)%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+                    write (varname, '(A,I0)') 'xi', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                end if
+                varname(:) = ' '
+            end do
+        end if
+
         ! ----------------------------------------------------------------------
 
         ! Adding the pressure to the formatted database file -------------------
@@ -677,8 +699,19 @@ contains
             end if
         end if
 
+!        if (proc_rank == 0 .and. sim_data) then
+!            close (211)
+!            close (251)
+!        end if
+
+        if (sim_data .and. proc_rank == 0) then
+            call s_close_intf_data_file()
+            call s_close_energy_data_file()
+        end if
+
         ! Closing the formatted database file
         call s_close_formatted_database_file()
+
     end subroutine s_save_data
 
     subroutine s_initialize_modules
@@ -733,6 +766,11 @@ contains
     subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
+
+!        if (sim_data .and. proc_rank == 0) then
+!            call s_close_intf_data_file()
+!            call s_close_energy_data_file()
+!        end if
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()

@@ -2,8 +2,7 @@
 
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
-
-    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
 
     eps = 1e-9_wp
 
@@ -12,6 +11,7 @@
 #:def Hardcoded2D()
 
     select case (patch_icpp(patch_id)%hcid) ! 2D_hardcoded_ic example case
+
     case (200)
         if (y_cc(j) <= (-x_cc(i)**3 + 1)**(1._wp/3._wp)) then
             ! Volume Fractions
@@ -67,7 +67,6 @@
         end if
 
         q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1._wp/gam)
-
     case (204) ! Rayleigh-Taylor instability
         rhoH = 3._wp
         rhoL = 1._wp
@@ -100,11 +99,42 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
 
+    case (205) ! 2D lung wave interaction problem
+        h = 0.0           !non dim origin y
+        lam = 1.0         !non dim lambda
+        amp = patch_icpp(patch_id)%a(2)         !to be changed later!       !non dim amplitude
+
+        intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
+
+        if (y_cc(j) > intH) then
+            q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+        end if
+
+    case (206) ! 2D lung wave interaction problem - horizontal domain
+        h = 0.0           !non dim origin y
+        lam = 1.0         !non dim lambda
+        amp = patch_icpp(patch_id)%a(2)
+
+        intL = amp*sin(2*pi*y_cc(j)/lam - pi/2) + h
+
+        if (x_cc(i) > intL) then        !this is the liquid
+            q_prim_vf(contxb)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(contxe)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(2)
+            q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
+            q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+        end if
+
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)
             call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
         end if
+
     end select
 
 #:enddef

@@ -40,6 +40,8 @@ module m_rhs
 
     use m_hypoelastic
 
+    use m_hyperelastic
+
     use m_acoustic_src
 
     use m_viscous
@@ -548,7 +550,6 @@ contains
                 if (riemann_solver /= 1) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
-
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
@@ -556,7 +557,6 @@ contains
                 do l = 1, sys_size
                     flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
                     flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
-
                     !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
                 end do
             end if
@@ -661,7 +661,6 @@ contains
                 end do
             end do
         end if
-
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -673,6 +672,10 @@ contains
 
         call nvtxStartRange("RHS-COMMUNICATION")
         call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        call nvtxEndRange
+
+        call nvtxStartRange("RHS-ELASTIC")
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -786,7 +789,7 @@ contains
             call nvtxStartRange("RHS-RIEMANN-SOLVER")
 
             ! Computing Riemann Solver Flux and Source Flux =================
-
+            call nvtxStartRange("RHS_riemann_solver")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -804,8 +807,8 @@ contains
                                   id, irx, iry, irz)
             call nvtxEndRange
 
-            ! Additional physics and source terms ==============================
-
+            ! ===============================================================
+            ! Additional physics and source terms ===========================
             ! RHS addition for advection source
             call nvtxStartRange("RHS-ADVECTION-SRC")
             call s_compute_advection_source_term(id, &
