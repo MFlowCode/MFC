@@ -36,7 +36,7 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera",
+    "cantera==3.0.1",
     "pyrometheus==1.0.2"
 ]
 

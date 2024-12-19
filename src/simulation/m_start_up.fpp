@@ -1166,6 +1166,8 @@ contains
 
         real(wp), dimension(num_species) :: rhoYks
 
+        T = dflt_T_guess
+
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -1381,7 +1383,7 @@ contains
             save_count = t_step
         end if
 
-        call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, save_count)
+        call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -1400,6 +1402,9 @@ contains
     end subroutine s_save_data
 
     subroutine s_initialize_modules
+
+        integer :: s
+
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1 .and. R0_type == 1) then
@@ -1451,7 +1456,6 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (relax) call s_initialize_phasechange_module()
-        if (chemistry) call s_initialize_chemistry_module()
 
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -1471,6 +1475,9 @@ contains
 
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
+
+        ! Initialize the Temperature cache.
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
 
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
@@ -1568,6 +1575,9 @@ contains
         end do
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
+        end if
+        if (chemistry) then
+            !$acc update device(q_T_sf%sf)
         end if
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac, low_Mach)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)

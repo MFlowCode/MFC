@@ -58,6 +58,9 @@ module m_time_steppers
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
+    type(scalar_field) :: q_T_sf !<
+    !! Cell-average temperature variables at the current time-stage
+
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
     real(wp), allocatable, dimension(:, :, :) :: max_dt
@@ -65,7 +68,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
 contains
 
@@ -179,10 +182,10 @@ contains
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
-            @:ALLOCATE(q_prim_vf(T_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(T_idx))
+            @:ACC_SETUP_SFs(q_T_sf)
         end if
 
         @:ALLOCATE(pb_ts(1:2))
@@ -281,7 +284,7 @@ contains
         ! Stage 1 of 1 =====================================================
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -390,7 +393,7 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -475,7 +478,7 @@ contains
 
         ! Stage 2 of 2 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -570,7 +573,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -655,7 +658,7 @@ contains
 
         ! Stage 2 of 3 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -727,7 +730,7 @@ contains
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -851,6 +854,7 @@ contains
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
+            q_T_sf, &
             q_prim_vf, &
             idwint, &
             gm_alpha_qp%vf)
@@ -880,6 +884,7 @@ contains
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
+            q_T_sf, &
             q_prim_vf, &
             idwint, &
             gm_alpha_qp%vf)
