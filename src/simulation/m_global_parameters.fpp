@@ -238,6 +238,7 @@ module m_global_parameters
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
+    integer :: c_idx                                   !< Index of color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -292,7 +293,7 @@ module m_global_parameters
     !! to the next time-step.
 
     integer :: startx, starty, startz
-    
+
     !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
