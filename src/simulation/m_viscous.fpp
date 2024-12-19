@@ -28,7 +28,7 @@ module m_viscous
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
     !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: Res_viscous
+    real(wp), allocatable, dimension(:, :) :: Res_viscous
     !$acc declare create(Res_viscous)
 
 contains
@@ -67,11 +67,11 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        real(kind(0d0)) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
-        real(kind(0d0)), dimension(2) :: Re_visc
-        real(kind(0d0)), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
+        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
+        real(wp), dimension(2) :: Re_visc
+        real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
 
-        real(kind(0d0)), dimension(num_dims, num_dims) :: tau_Re
+        real(wp), dimension(num_dims, num_dims) :: tau_Re
 
         integer :: i, j, k, l, q !< Generic loop iterator
 
@@ -85,7 +85,7 @@ contains
                 do j = is1_viscous%beg, is1_viscous%end
                     !$acc loop seq
                     do i = momxb, E_idx
-                        tau_Re_vf(i)%sf(j, k, l) = 0d0
+                        tau_Re_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -100,16 +100,16 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
                         if (bubbles_euler) then
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
                                 !$acc loop seq
@@ -131,17 +131,17 @@ contains
                                 pi_inf_visc = pi_infs(1)
                             end if
                         else
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
-                            alpha_visc_sum = 0d0
+                            alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
                                     alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
 
@@ -161,14 +161,14 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0d0
+                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
-                                    Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
+                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
 
                                 end do
                             end if
@@ -178,10 +178,10 @@ contains
                                         grad_x_vf(2)%sf(j, k, l))/ &
                                        Re_visc(1)
 
-                        tau_Re(2, 2) = (4d0*grad_y_vf(2)%sf(j, k, l) &
-                                        - 2d0*grad_x_vf(1)%sf(j, k, l) &
-                                        - 2d0*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
-                                       (3d0*Re_visc(1))
+                        tau_Re(2, 2) = (4._wp*grad_y_vf(2)%sf(j, k, l) &
+                                        - 2._wp*grad_x_vf(1)%sf(j, k, l) &
+                                        - 2._wp*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
+                                       (3._wp*Re_visc(1))
                         !$acc loop seq
                         do i = 1, 2
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
@@ -207,16 +207,16 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
                         if (bubbles_euler) then
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
                                 !$acc loop seq
@@ -238,17 +238,17 @@ contains
                                 pi_inf_visc = pi_infs(1)
                             end if
                         else
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
-                            alpha_visc_sum = 0d0
+                            alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
                                     alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
 
@@ -268,14 +268,14 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0d0
+                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
-                                    Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
+                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
 
                                 end do
                             end if
@@ -311,16 +311,16 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
                         if (bubbles_euler) then
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
                                 !$acc loop seq
@@ -342,17 +342,17 @@ contains
                                 pi_inf_visc = pi_infs(1)
                             end if
                         else
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
-                            alpha_visc_sum = 0d0
+                            alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
                                     alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
 
@@ -372,20 +372,20 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0d0
+                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
-                                    Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
+                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
 
                                 end do
                             end if
                         end if
 
-                        tau_Re(2, 2) = -(2d0/3d0)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
+                        tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
                                        Re_visc(1)
 
                         tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - &
@@ -419,16 +419,16 @@ contains
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
                             else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
 
                         if (bubbles_euler) then
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
                                 !$acc loop seq
@@ -450,17 +450,17 @@ contains
                                 pi_inf_visc = pi_infs(1)
                             end if
                         else
-                            rho_visc = 0d0
-                            gamma_visc = 0d0
-                            pi_inf_visc = 0d0
+                            rho_visc = 0._wp
+                            gamma_visc = 0._wp
+                            pi_inf_visc = 0._wp
 
-                            alpha_visc_sum = 0d0
+                            alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
                                     alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
 
@@ -480,14 +480,14 @@ contains
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0d0
+                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
                                     !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
                                     end do
 
-                                    Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
+                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
 
                                 end do
                             end if
@@ -524,7 +524,7 @@ contains
                              dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                              ix, iy, iz)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
+        real(wp), dimension(startx:, starty:, startz:, 1:), &
             intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
                              qL_prim_rsz_vf, qR_prim_rsz_vf
@@ -665,7 +665,7 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
 
-                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
+                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                      dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
                             end do
                         end do
@@ -684,7 +684,7 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
 
-                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
+                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                      dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
 
                             end do
@@ -704,7 +704,7 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
 
-                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
+                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                      dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
@@ -724,7 +724,7 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
 
-                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
+                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                      dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
@@ -779,7 +779,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
 
-                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
+                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                          dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
@@ -800,7 +800,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
 
-                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
+                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
                                                                          dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
@@ -821,7 +821,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
 
-                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
+                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                          dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
@@ -842,7 +842,7 @@ contains
                                          dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
                                          dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
 
-                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
+                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
                                                                          dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
@@ -863,7 +863,7 @@ contains
                                          dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
                                          dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
+                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -884,7 +884,7 @@ contains
                                          dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
                                          dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
+                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -904,7 +904,7 @@ contains
                                          dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
                                          dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
+                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -923,7 +923,7 @@ contains
                                          dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
                                          dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
+                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
                                                                          dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
@@ -970,7 +970,7 @@ contains
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
@@ -1068,7 +1068,7 @@ contains
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
@@ -1191,7 +1191,7 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz, iv_in
         integer, intent(in) :: dim, buff_size_in
-        real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
+        real(wp), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
 
         integer :: i, j, k, l !< Generic loop iterators
 
@@ -1218,7 +1218,7 @@ contains
                         !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dL(j)) &
+                                1._wp/((1._wp + wa_flg)*dL(j)) &
                                 *(wa_flg*vL_vf(i)%sf(j + 1, k, l) &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
@@ -1246,7 +1246,7 @@ contains
                         !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dL(k)) &
+                                1._wp/((1._wp + wa_flg)*dL(k)) &
                                 *(wa_flg*vL_vf(i)%sf(j, k + 1, l) &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
@@ -1274,7 +1274,7 @@ contains
                         !$acc loop seq
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
-                                1d0/((1d0 + wa_flg)*dL(l)) &
+                                1._wp/((1._wp + wa_flg)*dL(l)) &
                                 *(wa_flg*vL_vf(i)%sf(j, k, l + 1) &
                                   + vR_vf(i)%sf(j, k, l) &
                                   - vL_vf(i)%sf(j, k, l) &
@@ -1363,10 +1363,10 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
-                    (-3d0*var%sf(idwbuff(1)%beg, k, l) + 4d0*var%sf(idwbuff(1)%beg + 1, k, l) - var%sf(idwbuff(1)%beg + 2, k, l))/ &
+                    (-3._wp*var%sf(idwbuff(1)%beg, k, l) + 4._wp*var%sf(idwbuff(1)%beg + 1, k, l) - var%sf(idwbuff(1)%beg + 2, k, l))/ &
                     (x_cc(idwbuff(1)%beg + 2) - x_cc(idwbuff(1)%beg))
                 grad_x%sf(idwbuff(1)%end, k, l) = &
-                    (+3d0*var%sf(idwbuff(1)%end, k, l) - 4d0*var%sf(idwbuff(1)%end - 1, k, l) + var%sf(idwbuff(1)%end - 2, k, l))/ &
+                    (+3._wp*var%sf(idwbuff(1)%end, k, l) - 4._wp*var%sf(idwbuff(1)%end - 1, k, l) + var%sf(idwbuff(1)%end - 2, k, l))/ &
                     (x_cc(idwbuff(1)%end) - x_cc(idwbuff(1)%end - 2))
             end do
         end do
@@ -1375,10 +1375,10 @@ contains
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
-                        (-3d0*var%sf(j, idwbuff(2)%beg, l) + 4d0*var%sf(j, idwbuff(2)%beg + 1, l) - var%sf(j, idwbuff(2)%beg + 2, l))/ &
+                        (-3._wp*var%sf(j, idwbuff(2)%beg, l) + 4._wp*var%sf(j, idwbuff(2)%beg + 1, l) - var%sf(j, idwbuff(2)%beg + 2, l))/ &
                         (y_cc(idwbuff(2)%beg + 2) - y_cc(idwbuff(2)%beg))
                     grad_y%sf(j, idwbuff(2)%end, l) = &
-                        (+3d0*var%sf(j, idwbuff(2)%end, l) - 4d0*var%sf(j, idwbuff(2)%end - 1, l) + var%sf(j, idwbuff(2)%end - 2, l))/ &
+                        (+3._wp*var%sf(j, idwbuff(2)%end, l) - 4._wp*var%sf(j, idwbuff(2)%end - 1, l) + var%sf(j, idwbuff(2)%end - 2, l))/ &
                         (y_cc(idwbuff(2)%end) - y_cc(idwbuff(2)%end - 2))
                 end do
             end do
@@ -1387,10 +1387,10 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
-                            (-3d0*var%sf(j, k, idwbuff(3)%beg) + 4d0*var%sf(j, k, idwbuff(3)%beg + 1) - var%sf(j, k, idwbuff(3)%beg + 2))/ &
+                            (-3._wp*var%sf(j, k, idwbuff(3)%beg) + 4._wp*var%sf(j, k, idwbuff(3)%beg + 1) - var%sf(j, k, idwbuff(3)%beg + 2))/ &
                             (z_cc(idwbuff(3)%beg + 2) - z_cc(is3_viscous%beg))
                         grad_z%sf(j, k, idwbuff(3)%end) = &
-                            (+3d0*var%sf(j, k, idwbuff(3)%end) - 4d0*var%sf(j, k, idwbuff(3)%end - 1) + var%sf(j, k, idwbuff(3)%end - 2))/ &
+                            (+3._wp*var%sf(j, k, idwbuff(3)%end) - 4._wp*var%sf(j, k, idwbuff(3)%end - 1) + var%sf(j, k, idwbuff(3)%end - 2))/ &
                             (z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
                     end do
                 end do
@@ -1401,7 +1401,7 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
-                    grad_x%sf(0, k, l) = (-3d0*var%sf(0, k, l) + 4d0*var%sf(1, k, l) - var%sf(2, k, l))/ &
+                    grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
                                          (x_cc(2) - x_cc(0))
                 end do
             end do
@@ -1410,7 +1410,7 @@ contains
             !$acc parallel loop collapse(2) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
-                    grad_x%sf(m, k, l) = (3d0*var%sf(m, k, l) - 4d0*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
+                    grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
                                          (x_cc(m) - x_cc(m - 2))
                 end do
             end do
@@ -1420,7 +1420,7 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        grad_y%sf(j, 0, l) = (-3d0*var%sf(j, 0, l) + 4d0*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
+                        grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
                                              (y_cc(2) - y_cc(0))
                     end do
                 end do
@@ -1429,7 +1429,7 @@ contains
                 !$acc parallel loop collapse(2) gang vector default(present)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        grad_y%sf(j, n, l) = (3d0*var%sf(j, n, l) - 4d0*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
+                        grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
                                              (y_cc(n) - y_cc(n - 2))
                     end do
                 end do
@@ -1440,7 +1440,7 @@ contains
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = &
-                                (-3d0*var%sf(j, k, 0) + 4d0*var%sf(j, k, 1) - var%sf(j, k, 2))/ &
+                                (-3._wp*var%sf(j, k, 0) + 4._wp*var%sf(j, k, 1) - var%sf(j, k, 2))/ &
                                 (z_cc(2) - z_cc(0))
                         end do
                     end do
@@ -1450,7 +1450,7 @@ contains
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = &
-                                (3d0*var%sf(j, k, p) - 4d0*var%sf(j, k, p - 1) + var%sf(j, k, p - 2))/ &
+                                (3._wp*var%sf(j, k, p) - 4._wp*var%sf(j, k, p - 1) + var%sf(j, k, p - 2))/ &
                                 (z_cc(p) - z_cc(p - 2))
                         end do
                     end do

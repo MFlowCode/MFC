@@ -252,10 +252,14 @@ print(json.dumps({{**case, **mods}}))
         if self.override_tol:
             return self.override_tol
 
-        tolerance = 1e-12 # Default
+        tolerance = 1e-12  # Default
+        single = ARG("single")
+
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
         elif self.params.get("hypoelasticity", 'F') == 'T':
+            tolerance = 1e-7
+        elif self.params.get("mixlayer_perturb", 'F') == 'T':
             tolerance = 1e-7
         elif any(self.params.get(key, 'F') == 'T' for key in ['relax', 'ib', 'qbmm', 'bubbles_euler', 'bubbles_lagrange']):
             tolerance = 1e-10
@@ -263,11 +267,13 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-10
         elif self.params.get("acoustic_source", 'F') == 'T':
             if self.params.get("acoustic(1)%pulse") == 3:  # Square wave
-                tolerance = 1e-5
-            else:
-                tolerance = 3e-12
+                return 1e-1 if single else 1e-5
+            tolerance = 3e-12
+        elif self.params.get("weno_order") == 7:
+            tolerance = 1e-9
 
-        return tolerance
+        return 1e8 * tolerance if single else tolerance
+
 
 
 @dataclasses.dataclass

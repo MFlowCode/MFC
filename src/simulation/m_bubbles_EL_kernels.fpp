@@ -29,8 +29,8 @@ contains
     subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
         smoothfunc:select case(lag_params%smooth_type)
@@ -47,31 +47,31 @@ contains
     subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
-        real(kind(0.d0)) :: strength_vel, strength_vol
+        real(wp) :: strength_vel, strength_vol
 
-        real(kind(0.d0)) :: addFun1, addFun2, addFun3
-        real(kind(0.d0)) :: volpart, Vol
-        real(kind(0.d0)), dimension(3) :: s_coord
+        real(wp) :: addFun1, addFun2, addFun3
+        real(wp) :: volpart, Vol
+        real(wp), dimension(3) :: s_coord
         integer :: l
 
         !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
         do l = 1, nBubs
 
-            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3d0
+            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2d0*lbk_vel(l, 2)
+            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
             if (num_dims == 2) then
                 Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2d0*pi
+                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
             else
                 Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
             end if
@@ -102,20 +102,20 @@ contains
     subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(kind(0d0)), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(vector_field), intent(inout) :: updatedvar
 
-        real(kind(0.d0)), dimension(3) :: center
+        real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
-        real(kind(0.d0)) :: stddsv
-        real(kind(0.d0)) :: strength_vel, strength_vol
+        real(wp) :: stddsv
+        real(wp) :: strength_vel, strength_vol
 
-        real(kind(0.d0)), dimension(3) :: nodecoord
-        real(kind(0.d0)) :: addFun1, addFun2, addFun3
-        real(kind(0.d0)) :: func, func2, volpart
+        real(wp), dimension(3) :: nodecoord
+        real(wp) :: addFun1, addFun2, addFun3
+        real(wp) :: func, func2, volpart
         integer, dimension(3) :: cellaux
-        real(kind(0.d0)), dimension(3) :: s_coord
+        real(wp), dimension(3) :: s_coord
         integer :: l, i, j, k
         logical :: celloutside
         integer :: smearGrid, smearGridz
@@ -127,8 +127,8 @@ contains
         !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
         do l = 1, nBubs
             nodecoord(1:3) = 0
-            center(1:3) = 0.0d0
-            volpart = 4.0d0/3.0d0*pi*lbk_rad(l, 2)**3d0
+            center(1:3) = 0._wp
+            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
@@ -136,7 +136,7 @@ contains
             call s_compute_stddsv(cell, volpart, stddsv)
 
             strength_vol = volpart
-            strength_vel = 4.0d0*pi*lbk_rad(l, 2)**2d0*lbk_vel(l, 2)
+            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
             !$acc loop collapse(3) private(cellaux, nodecoord)
             do i = 1, smearGrid
@@ -165,8 +165,8 @@ contains
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
                         else
-                            func = 0.0d0
-                            func2 = 0.0d0
+                            func = 0._wp
+                            func2 = 0._wp
                             cellaux(1) = cell(1)
                             cellaux(2) = cell(2)
                             cellaux(3) = cell(3)
@@ -210,61 +210,61 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0.d0)), dimension(3), intent(in) :: center
+        real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
-        real(kind(0.d0)), dimension(3), intent(in) :: nodecoord
-        real(kind(0.d0)), intent(in) :: stddsv
+        real(wp), dimension(3), intent(in) :: nodecoord
+        real(wp), intent(in) :: stddsv
         integer, intent(in) :: strength_idx
-        real(kind(0.d0)), intent(out) :: func
+        real(wp), intent(out) :: func
 
-        real(kind(0.d0)) :: distance
-        real(kind(0.d0)) :: theta, dtheta, L2, dzp, Lz2
+        real(wp) :: distance
+        real(wp) :: theta, dtheta, L2, dzp, Lz2
         integer :: Nr, Nr_count
 
-        distance = sqrt((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + (center(3) - nodecoord(3))**2d0)
+        distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + (center(3) - nodecoord(3))**2._wp)
 
         if (num_dims == 3) then
             !< 3D gaussian function
-            func = exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
+            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
         else
             if (cyl_coord) then
                 !< 2D cylindrical function:
                 ! We smear particles in the azimuthal direction for given r
-                theta = 0d0
-                Nr = ceiling(2d0*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                dtheta = 2d0*pi/Nr
-                L2 = center(2)**2d0 + nodecoord(2)**2d0 - 2d0*center(2)*nodecoord(2)*cos(theta)
-                distance = DSQRT((center(1) - nodecoord(1))**2d0 + L2)
-                ! Factor 2d0 is for symmetry (upper half of the 2D field (+r) is considered)
-                func = dtheta/2d0/pi*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
+                theta = 0._wp
+                Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                dtheta = 2._wp*pi/Nr
+                L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+                distance = DSQRT((center(1) - nodecoord(1))**2._wp + L2)
+                ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
+                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
                 Nr_count = 0
                 do while (Nr_count < Nr - 1)
                     Nr_count = Nr_count + 1
                     theta = Nr_count*dtheta
                     ! trigonometric relation
-                    L2 = center(2)**2d0 + nodecoord(2)**2d0 - 2d0*center(2)*nodecoord(2)*cos(theta)
-                    distance = DSQRT((center(1) - nodecoord(1))**2d0 + L2)
+                    L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+                    distance = DSQRT((center(1) - nodecoord(1))**2._wp + L2)
                     ! nodecoord(2)*dtheta is the azimuthal width of the cell
                     func = func + &
-                           dtheta/2d0/pi*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**(3d0*(strength_idx + 1))
+                           dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1))
                 end do
             else
 
                 !< 2D cartesian function:
                 ! We smear particles considering a virtual depth (lag_params%charwidth)
-                theta = 0d0
+                theta = 0._wp
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1 - mapCells
                 dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
-                Lz2 = (center(3) - (dzp*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
-                distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
-                func = dzp/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**3d0
+                Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
+                distance = DSQRT((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
+                func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**3._wp
                 do while (Nr_count < Nr - 1 + (mapCells - 1))
                     Nr_count = Nr_count + 1
-                    Lz2 = (center(3) - (dzp*(5d-1 + Nr_count) - lag_params%charwidth/2d0))**2d0
-                    distance = DSQRT((center(1) - nodecoord(1))**2d0 + (center(2) - nodecoord(2))**2d0 + Lz2)
+                    Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
+                    distance = DSQRT((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                     func = func + &
-                           dzp/lag_params%charwidth*exp(-0.5d0*(distance/stddsv)**2d0)/(DSQRT(2.0d0*pi)*stddsv)**(3d0*(strength_idx + 1))
+                           dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(DSQRT(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1))
                 end do
             end if
         end if
@@ -289,7 +289,7 @@ contains
             if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
-            if (cyl_coord .and. y_cc(cellaux(2)) < 0d0) then
+            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
                 celloutside = .true.
             end if
             if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
@@ -382,11 +382,11 @@ contains
         !$acc routine seq
 #endif
         integer, dimension(3), intent(in) :: cell
-        real(kind(0.d0)), intent(in) :: volpart
-        real(kind(0.d0)), intent(out) :: stddsv
+        real(wp), intent(in) :: volpart
+        real(wp), intent(out) :: stddsv
 
-        real(kind(0.d0)) :: chardist, charvol
-        real(kind(0.d0)) :: rad
+        real(wp) :: chardist, charvol
+        real(wp) :: rad
 
         !< Compute characteristic distance
         chardist = sqrt(dx(cell(1))*dy(cell(2)))
@@ -397,18 +397,18 @@ contains
             charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
         else
             if (cyl_coord) then
-                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2.0d0*pi
+                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
             else
                 charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
             end if
         end if
 
         !< Compute Standard deviaton
-        if (((volpart/charvol) > 0.5d0*lag_params%valmaxvoid) .or. (lag_params%smooth_type == 1)) then
-            rad = (3.0d0*volpart/(4.0d0*pi))**(1.0d0/3.0d0)
-            stddsv = 1.0d0*lag_params%epsilonb*max(chardist, rad)
+        if (((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid) .or. (lag_params%smooth_type == 1)) then
+            rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
+            stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
         else
-            stddsv = 0.0d0
+            stddsv = 0._wp
         end if
 
     end subroutine s_compute_stddsv
@@ -423,13 +423,13 @@ contains
         !$acc routine seq
 #endif
         integer, intent(in) :: cellx, celly, cellz
-        real(kind(0.d0)), intent(out) :: Charvol
+        real(wp), intent(out) :: Charvol
 
         if (p > 0) then
             Charvol = dx(cellx)*dy(celly)*dz(cellz)
         else
             if (cyl_coord) then
-                Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2.0d0*pi
+                Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2._wp*pi
             else
                 Charvol = dx(cellx)*dy(celly)*lag_params%charwidth
             end if
@@ -447,13 +447,13 @@ contains
 #else
         !$acc routine seq
 #endif
-        real(kind(0.d0)), dimension(3), intent(in) :: s_cell
+        real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
         integer :: i
 
         get_cell(:) = int(s_cell(:))
         do i = 1, num_dims
-            if (s_cell(i) < 0.0d0) get_cell(i) = get_cell(i) - 1
+            if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
         end do
 
     end subroutine s_get_cell

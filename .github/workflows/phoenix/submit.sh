@@ -20,7 +20,7 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH -CV100-16GB
+#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
 #SBATCH -G2\
 "
 

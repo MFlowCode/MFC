@@ -23,8 +23,8 @@ module m_bubbles_EE
 
     implicit none
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: bub_adv_src
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
+    real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
+    real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     !$acc declare create(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src)
 
     type(scalar_field) :: divu !< matrix for div(u)
@@ -75,19 +75,19 @@ contains
         !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0d0)) :: nR3bar
-        integer(kind(0d0)) :: i, j, k, l
+        real(wp) :: nR3bar
+        integer(wp) :: i, j, k, l
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    nR3bar = 0d0
+                    nR3bar = 0._wp
                     !$acc loop seq
                     do i = 1, nb
-                        nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
+                        nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3._wp
                     end do
-                    q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+                    q_cons_vf(alf_idx)%sf(j, k, l) = (4._wp*pi*nR3bar)/(3._wp*q_cons_vf(n_idx)%sf(j, k, l)**2._wp)
                 end do
             end do
         end do
@@ -108,10 +108,10 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            divu%sf(j, k, l) = 0d0
+                            divu%sf(j, k, l) = 0._wp
                             divu%sf(j, k, l) = &
-                                5d-1/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
-                                            q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                                5e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                               q_prim_vf(contxe + idir)%sf(j - 1, k, l))
 
                         end do
                     end do
@@ -125,8 +125,8 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5d-1/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
-                                                       q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                                           5e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                                          q_prim_vf(contxe + idir)%sf(j, k - 1, l))
 
                     end do
                 end do
@@ -139,8 +139,8 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu%sf(j, k, l) = divu%sf(j, k, l) + &
-                                           5d-1/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
-                                                       q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                                           5e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                                          q_prim_vf(contxe + idir)%sf(j, k, l - 1))
 
                     end do
                 end do
@@ -160,32 +160,33 @@ contains
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
-        real(kind(0d0)) :: rddot
-        real(kind(0d0)) :: pb, mv, vflux, pbdot
-        real(kind(0d0)) :: n_tait, B_tait
-        real(kind(0d0)), dimension(nb) :: Rtmp, Vtmp
-        real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(kind(0d0)), dimension(num_fluids) :: myalpha, myalpha_rho
-        real(kind(0d0)) :: nbub !< Bubble number density
+        real(wp) :: rddot
+        real(wp) :: pb, mv, vflux, pbdot
+        real(wp) :: n_tait, B_tait
+        real(wp), dimension(nb) :: Rtmp, Vtmp
+        real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
+        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        real(wp) :: nbub !< Bubble number density
+
         integer :: i, j, k, l, q, ii !< Loop variables
 
-        real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
-        real(kind(0d0)) :: t_new !< Updated time step size
-        real(kind(0d0)) :: h !< Time step size
-        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
+        real(wp) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
+        real(wp) :: t_new !< Updated time step size
+        real(wp) :: h !< Time step size
+        real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    bub_adv_src(j, k, l) = 0d0
+                    bub_adv_src(j, k, l) = 0._wp
 
                     !$acc loop seq
                     do q = 1, nb
-                        bub_r_src(j, k, l, q) = 0d0
-                        bub_v_src(j, k, l, q) = 0d0
-                        bub_p_src(j, k, l, q) = 0d0
-                        bub_m_src(j, k, l, q) = 0d0
+                        bub_r_src(j, k, l, q) = 0._wp
+                        bub_v_src(j, k, l, q) = 0._wp
+                        bub_p_src(j, k, l, q) = 0._wp
+                        bub_m_src(j, k, l, q) = 0._wp
                     end do
                 end do
             end do
@@ -205,25 +206,25 @@ contains
                             Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
                         end do
 
-                        R3 = 0d0
+                        R3 = 0._wp
 
                         !$acc loop seq
                         do q = 1, nb
-                            R3 = R3 + weight(q)*Rtmp(q)**3.d0
+                            R3 = R3 + weight(q)*Rtmp(q)**3._wp
                         end do
 
-                        nbub = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                        nbub = (3._wp/(4._wp*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
                     end if
 
                     if (.not. adap_dt) then
-                        R2Vav = 0d0
+                        R2Vav = 0._wp
 
                         !$acc loop seq
                         do q = 1, nb
-                            R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
+                            R2Vav = R2Vav + weight(q)*Rtmp(q)**2._wp*Vtmp(q)
                         end do
 
-                        bub_adv_src(j, k, l) = 4.d0*pi*nbub*R2Vav
+                        bub_adv_src(j, k, l) = 4._wp*pi*nbub*R2Vav
                     end if
 
                     !$acc loop seq
@@ -235,9 +236,9 @@ contains
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                         end do
 
-                        myRho = 0d0
-                        n_tait = 0d0
-                        B_tait = 0d0
+                        myRho = 0._wp
+                        n_tait = 0._wp
+                        B_tait = 0._wp
 
                         if (mpp_lim .and. (num_fluids > 2)) then
                             !$acc loop seq
@@ -259,7 +260,7 @@ contains
                             B_tait = pi_infs(1)/pi_fac
                         end if
 
-                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                        n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
@@ -276,9 +277,9 @@ contains
                             pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
                             bub_p_src(j, k, l, q) = nbub*pbdot
-                            bub_m_src(j, k, l, q) = nbub*vflux*4.d0*pi*(myR**2.d0)
+                            bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
                         else
-                            pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
+                            pb = 0._wp; mv = 0._wp; vflux = 0._wp; pbdot = 0._wp
                         end if
 
                         ! Adaptive time stepping
@@ -289,10 +290,10 @@ contains
                                                       bub_adv_src(j, k, l), divu%sf(j, k, l), h)
 
                             ! Advancing one step
-                            t_new = 0d0
+                            t_new = 0._wp
                             do while (.true.)
-                                if (t_new + h > 0.5d0*dt) then
-                                    h = 0.5d0*dt - t_new
+                                if (t_new + h > 0.5_wp*dt) then
+                                    h = 0.5_wp*dt - t_new
                                 end if
 
                                 ! Advancing one sub-step
@@ -306,26 +307,26 @@ contains
                                     ! Advance one sub-step by advancing two half steps
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
                                                            pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5_wp*h, &
                                                            myR_tmp2, myV_tmp2, err2)
 
                                     call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
                                                            pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5_wp*h, &
                                                            myR_tmp2, myV_tmp2, err3)
 
                                     err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
                                     err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
-                                    if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
+                                    if (abs(myV_tmp1(4)) < 1e-12_wp) err5 = 0._wp
 
                                     ! Determine acceptance/rejection and update step size
                                     !   Rule 1: err1, err2, err3 < tol
-                                    !   Rule 2: myR_tmp1(4) > 0d0
+                                    !   Rule 2: myR_tmp1(4) > 0._wp
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
-                                    if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                        .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
-                                        .and. myR_tmp1(4) > 0d0) then
+                                    if ((err1 <= 1e-4_wp) .and. (err2 <= 1e-4_wp) .and. (err3 <= 1e-4_wp) &
+                                        .and. (err4 < 1e-4_wp) .and. (err5 < 1e-4_wp) &
+                                        .and. myR_tmp1(4) > 0._wp) then
 
                                         ! Accepted. Finalize the sub-step
                                         t_new = t_new + h
@@ -335,22 +336,22 @@ contains
                                         myV = myV_tmp1(4)
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
+                                        h = h*min(2._wp, max(0.5_wp, (1e-4_wp/err1)**(1._wp/3._wp)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (err2 <= 1d-4) then
-                                            h = 0.5d0*h
+                                        if (err2 <= 1e-4_wp) then
+                                            h = 0.5_wp*h
                                         else
-                                            h = 0.25d0*h
+                                            h = 0.25_wp*h
                                         end if
 
                                     end if
                                 end do
 
                                 ! Exit the loop if the final time reached dt
-                                if (t_new == 0.5d0*dt) exit
+                                if (t_new == 0.5_wp*dt) exit
 
                             end do
 
@@ -365,13 +366,13 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        if (alf < 1.d-11) then
-                            bub_adv_src(j, k, l) = 0d0
-                            bub_r_src(j, k, l, q) = 0d0
-                            bub_v_src(j, k, l, q) = 0d0
+                        if (alf < 1.e-11_wp) then
+                            bub_adv_src(j, k, l) = 0._wp
+                            bub_r_src(j, k, l, q) = 0._wp
+                            bub_v_src(j, k, l, q) = 0._wp
                             if (.not. polytropic) then
-                                bub_p_src(j, k, l, q) = 0d0
-                                bub_m_src(j, k, l, q) = 0d0
+                                bub_p_src(j, k, l, q) = 0._wp
+                                bub_m_src(j, k, l, q) = 0._wp
                             end if
                         end if
                     end do
@@ -421,13 +422,13 @@ contains
     subroutine s_initialize_adap_dt(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                     fntait, fBtait, f_bub_adv_src, f_divu, h)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
-        real(kind(0d0)), intent(out) :: h
+        real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
+        real(wp), intent(out) :: h
 
-        real(kind(0d0)) :: h0, h1 !< Time step size
-        real(kind(0d0)) :: d0, d1, d2 !< norms
-        real(kind(0d0)), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
+        real(wp) :: h0, h1 !< Time step size
+        real(wp) :: d0, d1, d2 !< norms
+        real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
 
         ! Determine the starting time step
         ! Evaluate f(x0,y0)
@@ -438,12 +439,12 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
-        d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
-        d1 = DSQRT((myV_tmp(1)**2d0 + myA_tmp(1)**2d0)/2d0)
-        if (d0 < 1d-5 .or. d1 < 1d-5) then
-            h0 = 1d-6
+        d0 = sqrt((myR_tmp(1)**2._wp + myV_tmp(1)**2._wp)/2._wp)
+        d1 = sqrt((myV_tmp(1)**2._wp + myA_tmp(1)**2._wp)/2._wp)
+        if (d0 < 1e-5_wp .or. d1 < 1e-5_wp) then
+            h0 = 1e-6_wp
         else
-            h0 = 1d-2*(d0/d1)
+            h0 = 1e-2_wp*(d0/d1)
         end if
 
         ! Evaluate f(x0+h0,y0+h0*f(x0,y0))
@@ -454,18 +455,18 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
-        d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
+        d2 = sqrt(((myV_tmp(2) - myV_tmp(1))**2._wp + (myA_tmp(2) - myA_tmp(1))**2._wp)/2._wp)/h0
 
         ! Set h1 = (0.01/max(d1,d2))^{1/(p+1)}
-        !      if max(d1,d2) < 1e-15, h1 = max(1e-6, h0*1e-3)
-        if (max(d1, d2) < 1d-15) then
-            h1 = max(1d-6, h0*1d-3)
+        !      if max(d1,d2) < 1e-15_wp, h1 = max(1e-6_wp, h0*1e-3_wp)
+        if (max(d1, d2) < 1e-15_wp) then
+            h1 = max(1e-6_wp, h0*1e-3_wp)
         else
-            h1 = (1d-2/max(d1, d2))**(1d0/3d0)
+            h1 = (1e-2_wp/max(d1, d2))**(1._wp/3._wp)
         end if
 
         ! Set h = min(100*h0,h1)
-        h = min(100d0*h0, h1)
+        h = min(100._wp*h0, h1)
 
     end subroutine s_initialize_adap_dt
 
@@ -490,12 +491,12 @@ contains
                                  fntait, fBtait, f_bub_adv_src, f_divu, h, &
                                  myR_tmp, myV_tmp, err)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
-        real(kind(0d0)), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
-        real(kind(0d0)), dimension(4) :: myA_tmp
-        real(kind(0d0)), intent(OUT) :: err
-        real(kind(0d0)) :: err_R, err_V
+        real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
+        real(wp), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
+        real(wp), dimension(4) :: myA_tmp
+        real(wp), intent(OUT) :: err
+        real(wp) :: err_R, err_V
 
         ! Stage 0
         myR_tmp(1) = fR
@@ -512,25 +513,25 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Stage 2
-        myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
-        myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
+        myR_tmp(3) = myR_tmp(1) + (h/4._wp)*(myV_tmp(1) + myV_tmp(2))
+        myV_tmp(3) = myV_tmp(1) + (h/4._wp)*(myA_tmp(1) + myA_tmp(2))
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
 
         ! Stage 3
-        myR_tmp(4) = myR_tmp(1) + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4d0*myV_tmp(3))
-        myV_tmp(4) = myV_tmp(1) + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4d0*myA_tmp(3))
+        myR_tmp(4) = myR_tmp(1) + (h/6._wp)*(myV_tmp(1) + myV_tmp(2) + 4._wp*myV_tmp(3))
+        myV_tmp(4) = myV_tmp(1) + (h/6._wp)*(myA_tmp(1) + myA_tmp(2) + 4._wp*myA_tmp(3))
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
 
         ! Estimate error
-        err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
+        err_R = (-5._wp*h/24._wp)*(myV_tmp(2) + myV_tmp(3) - 2._wp*myV_tmp(4)) &
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
-        err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
+        err_V = (-5._wp*h/24._wp)*(myA_tmp(2) + myA_tmp(3) - 2._wp*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-        err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
+        err = sqrt((err_R**2._wp + err_V**2._wp)/2._wp)
 
     end subroutine s_advance_substep
 
@@ -549,11 +550,11 @@ contains
         !!  @param f_divu Divergence of velocity
     function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
         !$acc routine seq
-        real(kind(0d0)), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(kind(0d0)), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
+        real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
 
-        real(kind(0d0)) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
-        real(kind(0d0)) :: f_rddot
+        real(wp) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
+        real(wp) :: f_rddot
 
         if (bubble_model == 1) then
             ! Gilmore bubbles
@@ -568,7 +569,7 @@ contains
             ! Keller-Miksis bubbles
             fCpinf = fP
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            c_liquid = dsqrt(fntait*(fP + fBtait)/(fRho*(1.d0 - alf)))
+            c_liquid = sqrt(fntait*(fP + fBtait)/(fRho*(1._wp - alf)))
             f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles

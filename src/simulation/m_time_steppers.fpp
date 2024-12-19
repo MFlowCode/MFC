@@ -17,7 +17,7 @@ module m_time_steppers
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
+    use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
 
     use m_data_output          !< Run-time info & solution data output procedures
 
@@ -62,16 +62,19 @@ module m_time_steppers
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_pb
+    real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
+    type(scalar_field) :: q_T_sf !<
+    !! Cell-average temperature variables at the current time-stage
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: max_dt
+    real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_mv
+
+    real(wp), allocatable, dimension(:, :, :) :: max_dt
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,rhs_ts_rkck,q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
 contains
 
@@ -185,10 +188,10 @@ contains
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
-            @:ALLOCATE(q_prim_vf(T_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(q_prim_vf(T_idx))
+            @:ACC_SETUP_SFs(q_T_sf)
         end if
 
         @:ALLOCATE(pb_ts(1:2))
@@ -294,14 +297,14 @@ contains
     subroutine s_1st_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
 
         ! Stage 1 of 1 =====================================================
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -404,10 +407,10 @@ contains
     subroutine s_2nd_order_tvd_rk(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
         integer :: i, j, k, l, q!< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         ! Stage 1 of 2 =====================================================
 
@@ -415,7 +418,7 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -505,7 +508,7 @@ contains
 
         ! Stage 2 of 2 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
@@ -520,7 +523,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -536,7 +539,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/2d0
+                                     + dt*rhs_pb(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -554,7 +557,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/2d0
+                                     + dt*rhs_mv(j, k, l, q, i))/2._wp
                             end do
                         end do
                     end do
@@ -562,7 +565,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -592,10 +595,11 @@ contains
     subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
-        real(kind(0d0)), intent(INOUT) :: time_avg
+        real(wp), intent(INOUT) :: time_avg
 
         integer :: i, j, k, l, q !< Generic loop iterator
-        real(kind(0d0)) :: start, finish
+
+        real(wp) :: start, finish
 
         ! Stage 1 of 3 =====================================================
 
@@ -604,7 +608,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -694,7 +698,7 @@ contains
 
         ! Stage 2 of 3 =====================================================
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
@@ -707,9 +711,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                            (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -723,9 +727,9 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
-                                    (3d0*pb_ts(1)%sf(j, k, l, q, i) &
+                                    (3._wp*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -741,9 +745,9 @@ contains
                         do j = 0, m
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
-                                    (3d0*mv_ts(1)%sf(j, k, l, q, i) &
+                                    (3._wp*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4._wp
                             end do
                         end do
                     end do
@@ -751,7 +755,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -771,7 +775,7 @@ contains
         ! ==================================================================
 
         ! Stage 3 of 3 =====================================================
-        call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
@@ -785,8 +789,8 @@ contains
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -801,8 +805,8 @@ contains
                             do q = 1, nnode
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2._wp*pb_ts(2)%sf(j, k, l, q, i) &
+                                     + 2._wp*dt*rhs_pb(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -819,8 +823,8 @@ contains
                             do q = 1, nnode
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
-                                     + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2._wp*mv_ts(2)%sf(j, k, l, q, i) &
+                                     + 2._wp*dt*rhs_mv(j, k, l, q, i))/3._wp
                             end do
                         end do
                     end do
@@ -828,7 +832,7 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -863,9 +867,9 @@ contains
     subroutine s_strang_splitting(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(inout) :: time_avg
+        real(wp), intent(inout) :: time_avg
 
-        real(kind(0d0)) :: start, finish
+        real(wp) :: start, finish
 
         call cpu_time(start)
 
@@ -900,6 +904,7 @@ contains
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
+            q_T_sf, &
             q_prim_vf, &
             idwint, &
             gm_alpha_qp%vf)
@@ -912,22 +917,24 @@ contains
 
     subroutine s_compute_dt()
 
-        real(kind(0d0)) :: rho        !< Cell-avg. density
-        real(kind(0d0)), dimension(num_dims) :: vel        !< Cell-avg. velocity
-        real(kind(0d0)) :: vel_sum    !< Cell-avg. velocity sum
-        real(kind(0d0)) :: pres       !< Cell-avg. pressure
-        real(kind(0d0)), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(kind(0d0)) :: gamma      !< Cell-avg. sp. heat ratio
-        real(kind(0d0)) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(kind(0d0)) :: c          !< Cell-avg. sound speed
-        real(kind(0d0)) :: H          !< Cell-avg. enthalpy
-        real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
+        real(wp) :: rho        !< Cell-avg. density
+        real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
+        real(wp) :: vel_sum    !< Cell-avg. velocity sum
+        real(wp) :: pres       !< Cell-avg. pressure
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp) :: gamma      !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: c          !< Cell-avg. sound speed
+        real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
-        real(kind(0d0)) :: dt_local
+
+        real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
+            q_T_sf, &
             q_prim_vf, &
             idwint, &
             gm_alpha_qp%vf)
@@ -939,7 +946,7 @@ contains
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0d0, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
                 end do
@@ -968,7 +975,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf
 
-        real(kind(0d0)), intent(in) :: ldt !< local dt
+        real(wp), intent(in) :: ldt !< local dt
 
         integer :: i, j, k, l
 
@@ -1041,10 +1048,10 @@ contains
     subroutine s_4th_5th_order_rkck(t_step, time_avg)
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), intent(out) :: time_avg
+        real(wp), intent(out) :: time_avg
 
         logical :: restart_rkck_step, start_rkck_step
-        real(kind(0.d0)) :: lag_largestep, rkck_errmax, dt_did
+        real(wp) :: lag_largestep, rkck_errmax, dt_did
         integer :: RKstep
 
         mytime = mytime - dt
@@ -1065,10 +1072,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             ! SECOND TIME-STAGE
@@ -1079,10 +1086,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             ! THIRD TIME-STAGE
@@ -1093,10 +1100,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             ! FOURTH TIME-STAGE
@@ -1107,10 +1114,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 4th time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             ! FIFTH TIME-STAGE
@@ -1121,10 +1128,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 5th time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
             call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             ! SIXTH TIME-STAGE
@@ -1135,10 +1142,10 @@ contains
 #ifdef DEBUG
             if (proc_rank == 0) print *, 'RKCK 6th time-stage at', rkck_time_tmp
 #endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
             call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0.0d0) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
             if (restart_rkck_step) cycle
 
             dt_did = dt
