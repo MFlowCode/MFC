@@ -231,7 +231,6 @@ module m_global_parameters
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
     integer :: c_idx         ! Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    integer :: T_idx       !< Index of the temperature equation
     !> @}
 
     !$acc declare create(bub_idx)
@@ -287,7 +286,7 @@ module m_global_parameters
 
     integer :: startx, starty, startz
 
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, T_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -979,9 +978,6 @@ contains
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
-
-            T_idx = sys_size + 1
-            sys_size = T_idx
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -1093,7 +1089,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, T_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)
 

@@ -37,6 +37,12 @@ class Pack:
     def set(self, entry: PackEntry):
         self.entries[entry.filepath] = entry
 
+    def remove(self, filepath_or_entry: typing.Union[str, PackEntry]):
+        if isinstance(filepath_or_entry, str):
+            del self.entries[filepath_or_entry]
+        else:
+            del self.entries[filepath_or_entry.filepath]
+
     def save(self, filepath: str):
         if filepath.endswith(".py"):
             filepath = os.path.dirname(filepath)
