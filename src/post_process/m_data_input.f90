@@ -51,6 +51,9 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
+    type(scalar_field), public :: q_T_sf !<
+    !! Temperature field
+
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
@@ -1173,6 +1176,12 @@ contains
                                             -buff_size:p + buff_size))
                 end if
 
+                if (chemistry) then
+                    allocate (q_T_sf%sf(-buff_size:m + buff_size, &
+                                        -buff_size:n + buff_size, &
+                                        -buff_size:p + buff_size))
+                end if
+
                 ! Simulation is 2D
             else
 
@@ -1190,6 +1199,12 @@ contains
                                             -buff_size:n + buff_size, &
                                             0:0))
                 end if
+
+                if (chemistry) then
+                    allocate (q_T_sf%sf(-buff_size:m + buff_size, &
+                                        -buff_size:n + buff_size, &
+                                        0:0))
+                end if
             end if
 
             ! Simulation is 1D
@@ -1206,6 +1221,10 @@ contains
 
             if (ib) then
                 allocate (ib_markers%sf(-buff_size:m + buff_size, 0:0, 0:0))
+            end if
+
+            if (chemistry) then
+                allocate (q_T_sf%sf(-buff_size:m + buff_size, 0:0, 0:0))
             end if
 
         end if
@@ -1234,6 +1253,10 @@ contains
 
         if (ib) then
             deallocate (ib_markers%sf)
+        end if
+
+        if (chemistry) then
+            deallocate (q_T_sf%sf)
         end if
 
         s_read_data_files => null()

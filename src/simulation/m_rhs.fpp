@@ -608,9 +608,10 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
@@ -663,6 +664,7 @@ contains
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
+            q_T_sf, &
             q_prim_qp%vf, &
             idwint, &
             gm_alpha_qp%vf)
@@ -900,16 +902,10 @@ contains
             call nvtxEndRange
         end if
 
-        if (chemistry) then
-            !$acc kernels
-            rhs_vf(T_idx)%sf(:, :, :) = 0.0_wp
-            !$acc end kernels
-
-            if (chem_params%reactions) then
-                call nvtxStartRange("RHS-CHEM-REACTIONS")
-                call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_prim_qp%vf)
-                call nvtxEndRange
-            end if
+        if (chemistry .and. chem_params%reactions) then
+            call nvtxStartRange("RHS-CHEM-REACTIONS")
+            call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call nvtxEndRange
         end if
 
         ! END: Additional pphysics and source terms ============================

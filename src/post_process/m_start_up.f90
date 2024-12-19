@@ -39,6 +39,8 @@ module m_start_up
 
     use m_finite_differences
 
+    use m_chemistry
+
     ! ==========================================================================
 
     implicit none
@@ -179,8 +181,11 @@ contains
             call s_populate_conservative_variables_buffer_regions()
         end if
 
+        ! Initialize the Temperature cache.
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+
         ! Converting the conservative variables to the primitive ones
-        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwbuff)
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
 
     end subroutine s_perform_time_step
 
@@ -322,9 +327,9 @@ contains
             end do
 
             if (chem_wrt_T) then
-                q_sf = q_prim_vf(T_idx)%sf(-offset_x%beg:m + offset_x%end, &
-                                           -offset_y%beg:n + offset_y%end, &
-                                           -offset_z%beg:p + offset_z%end)
+                q_sf = q_T_sf%sf(-offset_x%beg:m + offset_x%end, &
+                                 -offset_y%beg:n + offset_y%end, &
+                                 -offset_z%beg:p + offset_z%end)
 
                 write (varname, '(A)') 'T'
                 call s_write_variable_to_formatted_database_file(varname, t_step)

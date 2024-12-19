@@ -135,7 +135,6 @@ module m_global_parameters
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    integer :: T_idx                               !< Index of temperature eqn.
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
@@ -678,13 +677,9 @@ contains
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
-
-            T_idx = sys_size + 1
-            sys_size = T_idx
         else
             species_idx%beg = 1
             species_idx%end = 1
-            T_idx = 1
         end if
 
         momxb = mom_idx%beg

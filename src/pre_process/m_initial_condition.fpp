@@ -36,6 +36,8 @@ module m_initial_condition
 
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
+    use m_chemistry
+
     ! ==========================================================================
     ! ==========================================================================
 
@@ -48,6 +50,8 @@ module m_initial_condition
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
+
+    type(scalar_field) :: q_T_sf !< Temperature field
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
     !! Bookkepping variable used to track the patch identities (id) associated
@@ -78,6 +82,10 @@ contains
             allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
+
+        if (chemistry) then
+            allocate (q_T_sf%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
@@ -128,10 +136,14 @@ contains
 
         character(len=10) :: iStr
 
+        ! First, compute the temperature field from the conservative variables.
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+                                                               q_T_sf, &
                                                                q_prim_vf, &
                                                                idwbuff)
         end if
@@ -335,6 +347,8 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
@@ -356,6 +370,10 @@ contains
 
         deallocate (q_prim_vf)
         deallocate (q_cons_vf)
+
+        if (chemistry) then
+            deallocate (q_T_sf%sf)
+        end if
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)

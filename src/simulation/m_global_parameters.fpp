@@ -238,8 +238,6 @@ module m_global_parameters
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
-    integer :: c_idx                                   !< Index of the color function
-    integer :: T_idx                                   !< Index of the temperature equation
     !> @}
 
     !$acc declare create(bub_idx)
@@ -294,8 +292,8 @@ module m_global_parameters
     !! to the next time-step.
 
     integer :: startx, starty, startz
-
-    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, T_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
+    
+    !$acc declare create(sys_size, buff_size, startx, starty, startz, E_idx, gamma_idx, pi_inf_idx, alf_idx, n_idx, stress_idx, b_size, tensor_size, xi_idx, species_idx)
 
     ! END: Simulation Algorithm Parameters =====================================
 
@@ -1026,9 +1024,6 @@ contains
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
             sys_size = species_idx%end
-
-            T_idx = sys_size + 1
-            sys_size = T_idx
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -1146,7 +1141,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, T_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
         !$acc update device(b_size, xibeg, xiend, tensor_size)
 
         !$acc update device(species_idx)

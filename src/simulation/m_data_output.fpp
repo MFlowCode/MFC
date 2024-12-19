@@ -78,11 +78,14 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    subroutine s_write_data_files(q_cons_vf, q_prim_vf, t_step)
+    subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
+
+        type(scalar_field), &
+            intent(inout) :: q_T_sf
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -91,10 +94,11 @@ contains
         integer, intent(in) :: t_step
 
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
         else
             call s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step)
         end if
+
     end subroutine s_write_data_files
 
     !>  The purpose of this subroutine is to open a new or pre-
@@ -381,9 +385,10 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, t_step)
+    subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
 
@@ -516,7 +521,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_prim_vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
@@ -993,7 +998,6 @@ contains
         ! The cell-averaged partial densities, density, velocity, pressure,
         ! volume fractions, specific heat ratio function, liquid stiffness
         ! function, and sound speed.
-
         real(wp) :: lit_gamma, nbub
         real(wp) :: rho
         real(wp), dimension(num_dims) :: vel
@@ -1017,7 +1021,7 @@ contains
         real(wp), dimension(2) :: Re
         real(wp), dimension(6) :: tau_e
         real(wp) :: G
-        real(wp) :: dyn_p, Temp
+        real(wp) :: dyn_p, T
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
@@ -1031,6 +1035,8 @@ contains
         logical :: trigger !< For integral quantities
 
         real(wp) :: rhoYks(1:num_species)
+
+        T = dflt_T_guess
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
@@ -1109,14 +1115,14 @@ contains
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp, &
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
                     else
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, Temp)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
                     end if
 
                     if (model_eqns == 4) then
@@ -1218,14 +1224,14 @@ contains
                                 dyn_p, pi_inf, gamma, rho, qv, &
                                 rhoYks, &
                                 pres, &
-                                Temp, &
+                                T, &
                                 q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                                 q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
                                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                                    rhoYks, pres, Temp)
+                                                    rhoYks, pres, T)
                         end if
 
                         if (model_eqns == 4) then
@@ -1307,14 +1313,14 @@ contains
                                     q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                     dyn_p, pi_inf, gamma, rho, qv, &
-                                    rhoYks, pres, Temp, &
+                                    rhoYks, pres, T, &
                                     q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
                                     q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
                                                         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
-                                                        rhoYks, pres, Temp)
+                                                        rhoYks, pres, T)
                             end if
 
                             ! Compute mixture sound speed

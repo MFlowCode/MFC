@@ -200,9 +200,13 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         golden = packer.load(golden_filepath)
 
         if ARG("add_new_variables"):
-            for pfilepath, pentry in pack.entries.items():
+            for pfilepath, pentry in list(pack.entries.items()):
                 if golden.find(pfilepath) is None:
                     golden.set(pentry)
+
+            for gfilepath, gentry in list(golden.entries.items()):
+                if pack.find(gfilepath) is None:
+                    golden.remove(gentry)
 
             golden.save(golden_filepath)
         else:

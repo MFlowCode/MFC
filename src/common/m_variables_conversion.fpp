@@ -128,13 +128,15 @@ contains
         real(wp), intent(in) :: energy, alf
         real(wp), intent(in) :: dyn_p
         real(wp), intent(in) :: pi_inf, gamma, rho, qv
-        real(wp), intent(out) :: pres, T
+        real(wp), intent(out) :: pres
+        real(wp), intent(inout) :: T
         real(wp), intent(in), optional :: stress, mom, G
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
         real(wp) :: E_e
         real(wp) :: e_Per_Kg, Pdyn_Per_Kg
+        real(wp) :: T_guess
         real(wp), dimension(1:num_species) :: Y_rs
 
         integer :: s !< Generic loop iterator
@@ -183,7 +185,9 @@ contains
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
 
-            call get_temperature(e_Per_Kg - Pdyn_Per_Kg, 1200._wp, Y_rs, .true., T)
+            T_guess = T
+
+            call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs, .true., T)
             call get_pressure(rho, T, Y_rs, pres)
 
         #:endif
@@ -815,11 +819,13 @@ contains
         !! @param iy Index bounds in second coordinate direction
         !! @param iz Index bounds in third coordinate direction
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
+                                                             q_T_sf, &
                                                              qK_prim_vf, &
                                                              ibounds, &
                                                              gm_alphaK_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
         type(scalar_field), &
@@ -846,11 +852,11 @@ contains
 
         real(wp) :: G_K
 
-        real(wp) :: pres, Yksum, T
+        real(wp) :: pres, Yksum
 
         integer :: i, j, k, l, q !< Generic loop iterators
 
-        real(wp) :: ntmp
+        real(wp) :: ntmp, T
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
@@ -923,8 +929,6 @@ contains
                         do i = chemxb, chemxe
                             qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
                         end do
-
-                        qK_prim_vf(T_idx)%sf(j, k, l) = qK_cons_vf(T_idx)%sf(j, k, l)
                     else
                         !$acc loop seq
                         do i = 1, contxe
@@ -954,15 +958,19 @@ contains
                         do i = 1, num_species
                             rhoYks(i) = qK_cons_vf(chemxb + i - 1)%sf(j, k, l)
                         end do
+
+                        T = q_T_sf%sf(j, k, l)
                     end if
 
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
-                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T)
+                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, &
+                                            qv_K, rhoYks, pres, T)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
+
                     if (chemistry) then
-                        qK_prim_vf(T_idx)%sf(j, k, l) = T
+                        q_T_sf%sf(j, k, l) = T
                     end if
 
                     if (bubbles) then
@@ -1129,8 +1137,6 @@ contains
 
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             dyn_pres + rho*e_mix
-
-                        q_cons_vf(T_idx)%sf(j, k, l) = q_prim_vf(T_idx)%sf(j, k, l)
                     else
                         ! Computing the energy from the pressure
                         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
