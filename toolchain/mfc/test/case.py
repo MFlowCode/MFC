@@ -93,7 +93,7 @@ BASE_CFG = {
 
     'bubbles_lagrange'                 : 'F',
     'rkck_adap_dt'                     : 'F',
-    'rkck_tolerance'                   : 1.0e-9,
+    'rkck_tolerance'                   : 5e-10,
     'lag_params%nBubs_glb'             : 1,
     'lag_params%solver_approach'       : 0,
     'lag_params%cluster_type'          : 2,
