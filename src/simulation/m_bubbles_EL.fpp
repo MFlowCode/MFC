@@ -1354,23 +1354,31 @@ contains
 
             if ((rkck_errmax > 1d0)) then   ! Truncation error too large, reduce dt and restart time step
                 restart_rkck_step = .true.
-                htemp = SAFETY*dt*((floor(rkck_errmax*RNDDEC)/RNDDEC)**PSHRNK)
+                htemp = SAFETY*dt*(rkck_errmax**PSHRNK)
                 dt = sign(max(abs(htemp), (1d0 - SAFETY)*abs(dt)), dt)  ! No more than a factor of 10.
-                if (proc_rank == 0) print *, '>>>>> WARNING: Truncation error found. Reducing dt and restaring time step, now dt: ', dt
             else                            ! Step succeeded. Compute size of next step.
                 if (rkck_errmax > ERRCON) then
-                    dt = SAFETY*dt*((floor(rkck_errmax*RNDDEC)/RNDDEC)**PGROW) ! No more than a factor of 5 increase.
+                    dt = SAFETY*dt*(rkck_errmax**PGROW) ! No more than a factor of 5 increase.
                 else
                     dt = (1d0/SHRNKDT)*dt ! Truncation error too small (< 1.89e-4), increase time step
                 end if
             end if
 
+            !dt precision accuracy is 16 digits
+            dt = (ceiling(dt*RNDDEC)*RNDDEC + ceiling(dt*(RNDDEC**2d0) - ceiling(dt*RNDDEC)*RNDDEC))/(RNDDEC**2d0)
             dt = min(dt, dt_max)
+
+            if (dt < 0) call s_mpi_abort('dt must not be negative')
             if (num_procs > 1) then
                 call s_mpi_allreduce_min(dt, aux_glb)
                 dt = aux_glb
             end if
             !$acc update device(dt)
+
+            if (restart_rkck_step) then
+                if (proc_rank == 0) print '("WARNING: Truncation error found. Restaring time step, and now dt = "ES16.6"")', &
+                    dt
+            end if
 
         end if
 

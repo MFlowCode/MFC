@@ -66,8 +66,7 @@ module m_constants
     ! Adaptive rkck constants
     real(kind(0d0)), parameter :: verysmall_dt = 1.d-14 !< Very small dt, stop stepper
     real(kind(0d0)), parameter :: SAFETY = 0.9d0 !< Next dt will be maximum 0.9*dt if truncation error is above tolerance.
-    real(kind(0d0)), parameter :: RNDDEC = 1.0d05 !< Need to round the relative truncation error (5th decimal) to avoid the inclusion of random decimals
-    ! after dividing calculated tolerance by a very small number (rkck_tolerance)
+    real(kind(0d0)), parameter :: RNDDEC = 1.0d8 !< Round calculated dt (16th digit) to avoid the inclusion of random decimals
     real(kind(0d0)), parameter :: PSHRNK = -0.25d0 !< Factor to reduce dt when truncation error above tolerance
     real(kind(0d0)), parameter :: SHRNKDT = 0.5d0 !< Factor to reduce dt due to negative bubble radius
     real(kind(0d0)), parameter :: ERRCON = 1.89d-4 !< Limit to slightly increase dt when truncation error is between ERRCON and 1
