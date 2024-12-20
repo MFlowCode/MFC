@@ -87,11 +87,11 @@ contains
             "n must be positive (2D or 3D) for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. (f_is_default(y_domain%beg) .or. f_is_default(y_domain%end)), &
             "y_domain%beg and y_domain%end must be set for n = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. (y_domain%beg /= 0d0 .or. y_domain%end <= 0d0), &
+        @:PROHIBIT(cyl_coord .and. (y_domain%beg /= 0._wp .or. y_domain%end <= 0._wp), &
             "y_domain%beg must be 0 and y_domain%end must be positive for cylindrical coordinates")
         @:PROHIBIT(cyl_coord .and. p == 0 .and. ((.not. f_is_default(z_domain%beg)) .or. (.not. f_is_default(z_domain%end))), &
             "z_domain%beg and z_domain%end are not supported for p = 0 (2D cylindrical coordinates)")
-        @:PROHIBIT(cyl_coord .and. p > 0 .and. (z_domain%beg /= 0d0 .or. z_domain%end /= 2d0*pi), &
+        @:PROHIBIT(cyl_coord .and. p > 0 .and. (z_domain%beg /= 0._wp .or. z_domain%end /= 2._wp*pi), &
             "z_domain%beg must be 0 and z_domain%end must be 2*pi for 3D cylindrical coordinates")
 
         @:PROHIBIT(num_patches < 0)
@@ -116,7 +116,6 @@ contains
 
         ! Common checks for all directions (stretch_x, stretch_y, and stretch_z)
         #:for X in ['x', 'y', 'z']
-            @:PROHIBIT(stretch_${X}$ .and. weno_order == 7, "weno_order = 7 does not support stretched grids")
             @:PROHIBIT(stretch_${X}$ .and. old_grid, "old_grid and stretch_${X}$ are incompatible")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(a_${X}$), "a_${X}$ must be set with stretch_${X}$ enabled")
             @:PROHIBIT(stretch_${X}$ .and. f_is_default(${X}$_a), "${X}$_a must be set with stretch_${X}$ enabled")
@@ -125,11 +124,11 @@ contains
             !&< Deactivate prettify
             @:PROHIBIT(stretch_${X}$ .and. (a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%beg - ${X}$_a))) &
                                                     + log(cosh(a_${X}$*(${X}$_domain%beg - ${X}$_b))) &
-                                                    - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0, &
+                                                    - 2._wp*log(cosh(0.5_wp*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0._wp, &
                 "${X}$_domain%beg is too close to ${X}$_a and ${X}$_b for the given a_${X}$")
             @:PROHIBIT(stretch_${X}$ .and. (a_${X}$ + log(cosh(a_${X}$*(${X}$_domain%end - ${X}$_a))) &
                                                     + log(cosh(a_${X}$*(${X}$_domain%end - ${X}$_b))) &
-                                                    - 2d0*log(cosh(0.5d0*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0d0, &
+                                                    - 2._wp*log(cosh(0.5_wp*a_${X}$*(${X}$_b - ${X}$_a)))) / a_${X}$ <= 0._wp, &
                 "${X}$_domain%end is too close to ${X}$_a and ${X}$_b for the given a_${X}$")
             !&>
         #:endfor
@@ -139,7 +138,7 @@ contains
         !! (qbmm, polydisperse, dist_type, rhoRV, and R0_type)
     subroutine s_check_inputs_qbmm_and_polydisperse
         @:PROHIBIT(qbmm .and. dist_type == dflt_int, "dist_type must be set if using QBMM")
-        @:PROHIBIT(qbmm .and. dist_type /= 1 .and. rhoRV > 0d0, "rhoRV cannot be used with dist_type != 1")
+        @:PROHIBIT(qbmm .and. dist_type /= 1 .and. rhoRV > 0._wp, "rhoRV cannot be used with dist_type != 1")
         @:PROHIBIT(polydisperse .and. R0_type == dflt_int, "R0 type must be set if using Polydisperse")
     end subroutine s_check_inputs_qbmm_and_polydisperse
 

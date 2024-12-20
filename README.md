@@ -37,17 +37,23 @@ MFC has high-level documentation, visualizations, and more on [its website](http
 ## An example
 
 We keep many examples.
-Here's one!
+Here are some of them!
 MFC can execute high-fidelity simulations of shock-droplet interaction (see `examples/3d_shockdroplet`)
 
 <p align="center">
     <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
 </p>
 
-Another example is the high-Mach flow over an airfoil, shown below.
+This one simulates high-Mach flow over an airfoil, shown below.
 
 <p align="center">
     <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+</p>
+
+This one simulates high amplitude acoustic wave through a circular orifice opening, shown below.
+
+<p align="center">
+    <img src="docs/res/orifice.png" alt="Orifice Example" width="700"/><br/>
 </p>
 
 
@@ -155,6 +161,7 @@ They are organized below. Just click the drop-downs!
 	* \>66K AMD GPUs on the first exascale computer, [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) (AMD MI250X-based)
 * Near compute roofline behavior
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
+* Optional single-precision computation and storage
 </details>
 
 <details>

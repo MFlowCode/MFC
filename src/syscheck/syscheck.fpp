@@ -53,7 +53,7 @@ program syscheck
 
     @:ACC(integer(acc_device_kind) :: devtype)
     @:ACC(integer :: i, num_devices)
-    @:ACC(real(kind(0d0)), allocatable, dimension(:) :: arr)
+    @:ACC(real(8), allocatable, dimension(:) :: arr)
     @:ACC(integer, parameter :: N = 100)
 
     @:MPIC(call mpi_init(ierr))

@@ -49,7 +49,7 @@ print(json.dumps({
     # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
-    'format'                       : 2,
+    'format'                       : 1,
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
     'rho_wrt'                      :'T',
