@@ -264,6 +264,10 @@ contains
                 elseif (patch_icpp(i)%geometry == 7) then
                     call s_2D_analytical(i, patch_id_fp, q_prim_vf)
 
+                    ! Spherical Harmonic Patch
+                elseif (patch_icpp(i)%geometry == 14) then
+                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+
                     ! Spiral patch
                 elseif (patch_icpp(i)%geometry == 17) then
                     call s_spiral(i, patch_id_fp, q_prim_vf)
@@ -341,8 +345,7 @@ contains
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
-        call s_convert_primitive_to_conservative_variables(q_prim_vf, &
-                                                           q_cons_vf)
+        call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
