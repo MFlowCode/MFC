@@ -27,36 +27,16 @@ module m_hyperelastic
  s_initialize_hyperelastic_module, &
  s_finalize_hyperelastic_module
 
-    !> @name Abstract interface for creating function pointers
-    !> @{
-    abstract interface
-
-        !> @name Abstract subroutine for the infinite relaxation solver
-        !> @{
-        subroutine s_abstract_hyperelastic_solver(btensor, q_prim_vf, G, j, k, l)
-            !!!!$acc routine seq
-            import :: scalar_field, sys_size, b_size
-            type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-            type(scalar_field), dimension(b_size), intent(inout) :: btensor
-            real(kind(0d0)), intent(in) :: G
-            integer, intent(in) :: j, k, l
-
-        end subroutine s_abstract_hyperelastic_solver
-        !> @}
-
-    end interface
-    !> @}
-
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
     type(vector_field) :: btensor !<
-!$acc declare create(btensor)
+    !$acc declare create(btensor)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_x
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_z
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z
     !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
-    real(kind(0d0)), allocatable, dimension(:) :: Gs
+    real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
 
 contains
@@ -123,14 +103,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
 
-        real(kind(0d0)), dimension(tensor_size) :: tensora, tensorb
-        real(kind(0d0)), dimension(num_fluids) :: alpha_k, alpha_rho_k
-        real(kind(0d0)), dimension(2) :: Re
-        real(kind(0d0)) :: rho, gamma, pi_inf, qv
-        real(kind(0d0)) :: G
+        real(wp), dimension(tensor_size) :: tensora, tensorb
+        real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
+        real(wp), dimension(2) :: Re
+        real(wp) :: rho, gamma, pi_inf, qv
+        real(wp) :: G
         integer :: j, k, l, i, r
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
+        !$acc parallel loop collapse(3) gang vector default(present) private(alpha_K, alpha_rho_K, &
+        !$acc rho, gamma, pi_inf, qv, G, Re, tensora, tensorb)
         do l = 0, p-2
             do k = 0, n-2
                 do j = 2, m-2
@@ -144,12 +125,12 @@ contains
                                                                     alpha_rho_k, Re, j, k, l, G, Gs)
                     rho = max(rho, sgm_eps)
                     G = max(G, sgm_eps)
-                    !if ( G <= verysmall ) G = 0d0
+                    !if ( G <= verysmall ) G_K = 0_wp
 
-                    if ( G > verysmall ) then
+                    if (G > verysmall) then
                         !$acc loop seq
                         do i = 1, tensor_size
-                            tensora(i) = 0d0
+                            tensora(i) = 0_wp
                         end do
                         ! STEP 1: computing the grad_xi tensor using finite differences
                         ! grad_xi definition / organization
@@ -196,9 +177,9 @@ contains
                             end do
 
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
-                            tensorb(tensor_size) = 1d0/tensorb(tensor_size)
+                            tensorb(tensor_size) = 1_wp/tensorb(tensor_size)
 
-                            ! STEP 3: computing F tranpose F
+                            ! STEP 3: computing F transpose F
                             tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
                             tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
                             tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
@@ -207,23 +188,24 @@ contains
                             tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
                             ! STEP 4: update the btensor, this is consistent with Riemann solvers
                             #:for BIJ, TXY in [(1,1),(2,2),(3,5),(4,3),(5,6),(6,9)]
-                               btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
+                                btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
                             #:endfor
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
-                            !if (hyper_model == 1) then
-                              call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
-                            !elseif (hyper_model == 2) then
-                            !  call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)        
-                            !end if
+                            if (hyper_model == 1) then
+                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                            elseif (hyper_model == 2) then
+                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G, j, k, l)
+                            end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - &
                                                            G*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             !$acc loop seq
                             do i = 1, b_size - 1
-                                q_cons_vf(strxb+i-1)%sf(j, k, l) = rho*q_prim_vf(strxb+i-1)%sf(j, k, l)
+                                q_cons_vf(strxb + i - 1)%sf(j, k, l) = &
+                                    rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
                             end do
                         end if
                     end if
@@ -245,11 +227,11 @@ contains
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
-        real(kind(0d0)), intent(in) :: G
+        real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
-        real(kind(0d0)) :: trace
-        real(kind(0d0)) :: f13 = 1d0/3d0
+        real(wp) :: trace
+        real(wp) :: f13 = 1_wp/3_wp
         integer :: i !< Generic loop iterators
 
         ! tensor is the symmetric tensor & calculate the trace of the tensor
@@ -257,10 +239,11 @@ contains
 
         ! calculate the deviatoric of the tensor
         #:for IJ in [1,3,6]
-           btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
+            btensor(${IJ}$)%sf(j, k, l) = btensor(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
         ! dividing by the jacobian for neo-Hookean model
-        ! setting the tensor to the stresses for Riemann solver
+        ! setting the tensor to the stresses for riemann solver
+
         !$acc loop seq
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = &
@@ -268,7 +251,7 @@ contains
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5d0*(trace - 3d0)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
@@ -284,11 +267,11 @@ contains
         !$acc routine seq
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(b_size), intent(inout) :: btensor
-        real(kind(0d0)), intent(in) :: G
+        real(wp), intent(in) :: G
         integer, intent(in) :: j, k, l
 
-        real(kind(0d0)) :: trace
-        real(kind(0d0)) :: f13 = 1d0/3d0
+        real(wp) :: trace
+        real(wp) :: f13 = 1_wp/3_wp
         integer :: i !< Generic loop iterators
 
         !TODO Make this 1D and 2D capable
@@ -309,7 +292,7 @@ contains
         end do
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = &
-            0.5d0*(trace - 3.0d0)/btensor(b_size)%sf(j, k, l)
+            0.5_wp*(trace - 3.0_wp)/btensor(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 

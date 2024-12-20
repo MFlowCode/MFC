@@ -141,38 +141,6 @@ contains
 
     end subroutine s_initialize_mpi_proxy_module
 
-    subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
-
-#ifdef MFC_MPI
-
-        implicit none
-        integer, intent(in) :: counts          ! Array of vector lengths for each process
-        real(kind(0d0)), intent(in), dimension(counts) :: my_vector   ! Input vector on each process
-        integer, intent(in) :: root               ! Rank of the root process
-        real(kind(0d0)), allocatable, intent(out) :: gathered_vector(:) ! Gathered vector on the root process
-
-        integer :: i, offset, ierr
-        integer, allocatable :: recounts(:), displs(:)
-
-        allocate (recounts(num_procs))
-
-        call MPI_GATHER(counts, 1, MPI_INTEGER, recounts, 1, MPI_INTEGER, root, &
-                        MPI_COMM_WORLD, ierr)
-
-        allocate (displs(size(recounts)))
-
-        displs(1) = 0
-
-        do i = 2, size(recounts)
-            displs(i) = displs(i - 1) + recounts(i - 1)
-        end do
-
-        allocate (gathered_vector(sum(recounts)))
-        call MPI_GATHERV(my_vector, counts, MPI_DOUBLE_PRECISION, gathered_vector, recounts, displs, MPI_DOUBLE_PRECISION, &
-                         root, MPI_COMM_WORLD, ierr)
-#endif
-    end subroutine s_mpi_gather_data
-
     !>  Since only processor with rank 0 is in charge of reading
         !!      and checking the consistency of the user provided inputs,
         !!      these are not available to the remaining processors. This

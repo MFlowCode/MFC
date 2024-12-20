@@ -192,8 +192,8 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
     type(bounds_info) :: x_domain, y_domain, z_domain
-    real(kind(0d0)) :: x_a, y_a, z_a
-    real(kind(0d0)) :: x_b, y_b, z_b
+    real(wp) :: x_a, y_a, z_a
+    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -238,8 +238,7 @@ module m_global_parameters
     integer :: b_size                                  !< Number of elements in the symmetric b tensor, plus one
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
-    integer :: c_idx                                   !< Index of the color function
-    integer :: T_idx                                   !< Index of the temperature equation
+    integer :: c_idx                                   !< Index of color function
     !> @}
 
     !$acc declare create(bub_idx)
@@ -530,6 +529,8 @@ contains
         hyperelasticity = .false.
         elasticity = .false.
         hyper_model = dflt_int
+        b_size = dflt_int
+        tensor_size = dflt_int
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
@@ -923,7 +924,7 @@ contains
                     sys_size = xi_idx%end + 1
                 end if
 
-                if (.not. f_is_default(sigma)) then
+                if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
@@ -1068,14 +1069,11 @@ contains
         ! the next one
         if (viscous) then
             buff_size = 2*weno_polyn + 2
-!        else if (elasticity) then !TODO: check if necessary
-!            buff_size = 2*weno_polyn + 2
         else
             buff_size = weno_polyn + 2
         end if
 
         if (elasticity) then
-            fd_order = 4
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
         end if

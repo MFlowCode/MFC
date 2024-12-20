@@ -342,6 +342,8 @@ contains
         hypoelasticity = .false.
         hyperelasticity = .false.
         elasticity = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

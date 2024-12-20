@@ -1010,7 +1010,7 @@ contains
                         end if
                     end if
 
-                    if (elasticity) then 
+                    if (elasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
@@ -1021,7 +1021,7 @@ contains
                         !$acc loop seq
                         do i = strxb, strxe
                             ! subtracting elastic contribution for pressure calculation
-                            if (G_K > verysmall) then !TODO: check if stable for >0
+                            if (G_K > verysmall) then
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
@@ -1065,7 +1065,6 @@ contains
             end do
         end do
         !$acc end parallel loop
-
 
     end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
@@ -1207,7 +1206,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then 
+                    if (elasticity) then
                         ! adding the elastic contribution
                         ! Multiply \tau to \rho \tau
                         do i = strxb, strxe
@@ -1431,6 +1430,7 @@ contains
 
         real(wp) :: blkmod1, blkmod2
         real(wp) :: Tolerance
+
         integer :: q
 
         if (chemistry) then

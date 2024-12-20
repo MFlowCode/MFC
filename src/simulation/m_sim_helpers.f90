@@ -45,7 +45,6 @@ contains
         real(wp), dimension(2) :: Re
         real(wp) :: G          !< Cell-avg. fluid shear modulus
         real(wp), dimension(num_fluids) :: Gs      !< Cell-avg. fluid shear moduli
-
         integer :: i, j, k, l
 
         !$acc loop seq
@@ -56,7 +55,7 @@ contains
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
-                                  alpha_rho, Re, j, k, l, G, Gs)
+                                                            alpha_rho, Re, j, k, l, G, Gs)
         elseif (bubbles) then
             call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
         else
@@ -80,7 +79,7 @@ contains
 
         ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
         if (hyperelasticity) then
-           E = E + G*q_prim_vf(xiend+1)%sf(j, k, l)
+            E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

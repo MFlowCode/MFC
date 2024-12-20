@@ -15,6 +15,7 @@ module m_hypoelastic
 
     use m_finite_differences
 
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -34,10 +35,10 @@ module m_hypoelastic
     real(wp), allocatable, dimension(:, :, :) :: rho_K_field, G_K_field
     !$acc declare create(rho_K_field, G_K_field)
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_x
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_y
-    real(kind(0d0)), allocatable, dimension(:, :) :: fd_coeff_z
-    !$acc declare create(fd_coeff_x,fd_coeff_y,fd_coeff_z)
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
+    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
 
 contains
 
@@ -61,27 +62,27 @@ contains
         end do
         !$acc update device(Gs)
 
-        @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
         if (n > 0) then
-            @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y_h(-fd_number:fd_number, 0:n))
         end if
         if (p > 0) then
-            @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z_h(-fd_number:fd_number, 0:p))
         end if
 
         ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
+        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
                                                       fd_number, fd_order)
-        !$acc update device(fd_coeff_x)
+        !$acc update device(fd_coeff_x_h)
         if (n > 0) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, &
+            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_y)
+            !$acc update device(fd_coeff_y_h)
         end if
         if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, &
+            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
                                                           fd_number, fd_order)
-            !$acc update device(fd_coeff_z)
+            !$acc update device(fd_coeff_z_h)
         end if
 
     end subroutine s_initialize_hypoelastic_module
@@ -112,7 +113,7 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        du_dx(k, l, q) = 0._wp; 
+                        du_dx(k, l, q) = 0._wp
                     end do
                 end do
             end do
@@ -125,7 +126,7 @@ contains
                         !$acc loop seq
                         do r = -fd_number, fd_number
                             du_dx(k, l, q) = du_dx(k, l, q) &
-                                             + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x(r, k)
+                                             + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                         end do
 
                     end do
@@ -138,7 +139,7 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dy(k, l, q) = 0d0; dv_dx(k, l, q) = 0d0; dv_dy(k, l, q) = 0d0; 
+                            du_dy(k, l, q) = 0._wp; dv_dx(k, l, q) = 0._wp; dv_dy(k, l, q) = 0._wp
                         end do
                     end do
                 end do
@@ -151,11 +152,11 @@ contains
                             !$acc loop seq
                             do r = -fd_number, fd_number
                                 du_dy(k, l, q) = du_dy(k, l, q) &
-                                                 + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y(r, l)
+                                                 + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                                 dv_dx(k, l, q) = dv_dx(k, l, q) &
-                                                 + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x(r, k)
+                                                 + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                                 dv_dy(k, l, q) = dv_dy(k, l, q) &
-                                                 + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y(r, l)
+                                                 + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                             end do
                         end do
                     end do
@@ -169,8 +170,8 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = 0d0; dv_dz(k, l, q) = 0d0; dw_dx(k, l, q) = 0d0; 
-                                dw_dy(k, l, q) = 0d0; dw_dz(k, l, q) = 0d0; 
+                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
+                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
                             end do
                         end do
                     end do
@@ -183,15 +184,15 @@ contains
                                 !$acc loop seq
                                 do r = -fd_number, fd_number
                                     du_dz(k, l, q) = du_dz(k, l, q) &
-                                                     + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z(r, q)
+                                                     + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                                     dv_dz(k, l, q) = dv_dz(k, l, q) &
-                                                     + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z(r, q)
+                                                     + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                                     dw_dx(k, l, q) = dw_dx(k, l, q) &
-                                                     + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x(r, k)
+                                                     + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                                     dw_dy(k, l, q) = dw_dy(k, l, q) &
-                                                     + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y(r, l)
+                                                     + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
                                     dw_dz(k, l, q) = dw_dz(k, l, q) &
-                                                     + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z(r, q)
+                                                     + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
                                 end do
                             end do
                         end do
@@ -343,13 +344,13 @@ contains
         @:DEALLOCATE(Gs)
         @:DEALLOCATE(rho_K_field, G_K_field)
         @:DEALLOCATE(du_dx)
-        @:DEALLOCATE(fd_coeff_x)
+        @:DEALLOCATE(fd_coeff_x_h)
         if (n > 0) then
             @:DEALLOCATE(du_dy,dv_dx,dv_dy)
-            @:DEALLOCATE(fd_coeff_y)
+            @:DEALLOCATE(fd_coeff_y_h)
             if (p > 0) then
                 @:DEALLOCATE(du_dz, dv_dz, dw_dx, dw_dy, dw_dz)
-                @:DEALLOCATE(fd_coeff_z)
+                @:DEALLOCATE(fd_coeff_z_h)
             end if
         end if
 

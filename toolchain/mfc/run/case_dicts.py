@@ -137,12 +137,15 @@ for p_id in range(1, 10+1):
                       ("smooth_patch_id", ParamType.INT), ("hcid", ParamType.INT)]:
         PRE_PROCESS[f"patch_icpp({p_id})%{attribute}"] = ty
 
-    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho", "a2",
-                      "a3", "a4", "a5", "a6", "a7","a8", "a9", "a10", "a11", "a12",  'non_axis_sym',
-                      "normal", "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                      "pi_inf", "r0", "v0", "p0", "m0", "cv", "qv", "qvp"]: 
-
+    for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
+                      'non_axis_sym', "normal", "smooth_coeff", "rho", "vel",
+                      "alpha", "gamma", "pi_inf", "r0", "v0", "p0", "m0", "cv",
+                      "qv", "qvp"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
+
+    for real_attr in range(2, 9+1):
+        PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
+
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
 
     for i in range(100):

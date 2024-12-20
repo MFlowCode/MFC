@@ -170,7 +170,13 @@ module m_derived_types
 
         type(ic_model_parameters) :: model !<
         real(wp) :: epsilon, beta !<
-        !! The spherical harmonics eccentricity parameters.
+        !! The isentropic vortex parameters for the amplitude of the disturbance and
+        !! domain of influence.
+
+        real(wp), dimension(2:9) :: a !<
+        !! The parameters needed for the spherical harmonic patch
+
+        logical :: non_axis_sym
 
         logical :: non_axis_sym
 
@@ -180,6 +186,7 @@ module m_derived_types
         real(wp), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
         !! through its x-, y- and z-components, respectively.
+
         logical, dimension(0:num_patches_max - 1) :: alter_patch !<
 
         !! List of permissions that indicate to the current patch which preceding
@@ -212,7 +219,7 @@ module m_derived_types
         !! the partial densities, density, velocity, pressure, volume fractions,
         !! specific heat ratio function and the liquid stiffness function.
 
-        real(wp), dimension(6) :: tau_e
+        real(wp), dimension(6) :: tau_e !<
         !! Elastic stresses added to primitive variables if hypoelasticity = True
 
         real(wp) :: R0 !< Bubble size

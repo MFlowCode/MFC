@@ -2,9 +2,7 @@
 
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
-
-    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
-    real(wp) :: intL
+    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
 
     eps = 1e-9_wp
 
@@ -69,7 +67,6 @@
         end if
 
         q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(E_idx)%sf(i, j, 0)**(1._wp/gam)
-
     case (204) ! Rayleigh-Taylor instability
         rhoH = 3._wp
         rhoL = 1._wp
@@ -105,7 +102,7 @@
     case (205) ! 2D lung wave interaction problem
         h = 0._wp           !non dim origin y
         lam = 1._wp         !non dim lambda
-        amp = patch_icpp(patch_id)%a2         !to be changed later!       !non dim amplitude
+        amp = patch_icpp(patch_id)%a(2)         !to be changed later!       !non dim amplitude
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
 
@@ -120,7 +117,7 @@
     case (206) ! 2D lung wave interaction problem - horizontal domain
         h = 0._wp           !non dim origin y
         lam = 1._wp         !non dim lambda
-        amp = patch_icpp(patch_id)%a2
+        amp = patch_icpp(patch_id)%a(2)
 
         intL = amp*sin(2*pi*y_cc(j)/lam - pi/2) + h
 

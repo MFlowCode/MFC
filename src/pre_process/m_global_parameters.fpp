@@ -318,6 +318,8 @@ contains
         hyperelasticity = .false.
         elasticity = .false.
         pre_stress = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -381,16 +383,14 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
-            patch_icpp(i)%a2 = dflt_real
-            patch_icpp(i)%a3 = dflt_real
-            patch_icpp(i)%a4 = dflt_real
-            patch_icpp(i)%a5 = dflt_real
-            patch_icpp(i)%a6 = dflt_real
-            patch_icpp(i)%a8 = dflt_real
-            patch_icpp(i)%a9 = dflt_real
-            patch_icpp(i)%a10 = dflt_real
-            patch_icpp(i)%a11 = dflt_real
-            patch_icpp(i)%a12 = dflt_real
+            patch_icpp(i)%a(2) = dflt_real
+            patch_icpp(i)%a(3) = dflt_real
+            patch_icpp(i)%a(4) = dflt_real
+            patch_icpp(i)%a(5) = dflt_real
+            patch_icpp(i)%a(6) = dflt_real
+            patch_icpp(i)%a(7) = dflt_real
+            patch_icpp(i)%a(8) = dflt_real
+            patch_icpp(i)%a(9) = dflt_real
             patch_icpp(i)%non_axis_sym = .false.
 
             !should get all of r0's and v0's

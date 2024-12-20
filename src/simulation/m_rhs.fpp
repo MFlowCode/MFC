@@ -661,7 +661,6 @@ contains
                 end do
             end do
         end if
-
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -676,10 +675,10 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
-           if (hyperelasticity) then 
-             call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+        if (hyperelasticity) then 
+            call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
              call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
-           end if
+        end if
         call nvtxEndRange
 
         if (cfl_dt) then

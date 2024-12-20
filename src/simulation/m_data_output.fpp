@@ -56,7 +56,6 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-
     !$acc declare create(icfl_sf, vcfl_sf, ccfl_sf, Rc_sf)
 
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
@@ -938,15 +937,15 @@ contains
     subroutine s_write_com_files(t_step, c_mass) ! -------------------
 
         integer, intent(in) :: t_step
-        real(kind(0d0)), dimension(num_fluids, 5), intent(in) :: c_mass
+        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass
         integer :: i, j !< Generic loop iterator
-        real(kind(0d0)) :: nondim_time !< Non-dimensional time
+        real(wp) :: nondim_time !< Non-dimensional time
 
         ! Non-dimensional time calculation
         if (t_step_old /= dflt_int) then
-            nondim_time = real(t_step + t_step_old, kind(0d0))*dt
+            nondim_time = real(t_step + t_step_old, wp)*dt
         else
-            nondim_time = real(t_step, kind(0d0))*dt
+            nondim_time = real(t_step, wp)*dt
         end if
 
         if (proc_rank == 0) then
@@ -979,6 +978,7 @@ contains
                 end do
             end if
         end if
+
     end subroutine s_write_com_files ! -------------------------------------
 
     !>  This writes a formatted data file for the flow probe information
@@ -1127,7 +1127,7 @@ contains
 
                     if (model_eqns == 4) then
                         lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
-                    else if (hypoelasticity) then
+                    else if (elasticity) then
                         tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1236,7 +1236,7 @@ contains
 
                         if (model_eqns == 4) then
                             lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
-                        else if (hypoelasticity) then
+                        else if (elasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1682,6 +1682,10 @@ contains
         @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
         icfl_max = 0._wp
 
+        if (probe_wrt) then
+            @:ALLOCATE(c_mass(num_fluids,5))
+        end if
+
         if (viscous) then
             @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
             @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
@@ -1695,7 +1699,10 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_data_output_module
 
-        !deallocate (c_mass)
+        if (probe_wrt) then
+            @:DEALLOCATE(c_mass)
+        end if
+
         ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
         @:DEALLOCATE(icfl_sf)
         if (viscous) then

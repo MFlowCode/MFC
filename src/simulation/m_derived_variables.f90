@@ -158,7 +158,10 @@ contains
             end do
             call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
 
+            call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
+
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
+
             call s_write_com_files(t_step, c_mass)
         end if
 
@@ -195,7 +198,6 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-
                         q_sf(j, k, l) = (11._wp*q_prim_vf0(mom_idx%beg)%sf(j, k, l) &
                                          - 18._wp*q_prim_vf1(mom_idx%beg)%sf(j, k, l) &
                                          + 9._wp*q_prim_vf2(mom_idx%beg)%sf(j, k, l) &
@@ -325,14 +327,14 @@ contains
     !!  @param c_m Mass,x-location,y-location,z-location
     subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
-        real(kind(0d0)), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
+        real(wp), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
         integer :: i, j, k, l !< Generic loop iterators
-        real(kind(0d0)) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
-        real(kind(0d0)) :: dV !< Discrete cell volume
+        real(wp) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
+        real(wp) :: dV !< Discrete cell volume
 
         do i = 1, num_fluids
             do j = 1, 5
-                c_m(i, j) = 0.0d0
+                c_m(i, j) = 0.0_wp
             end do
         end do
 
