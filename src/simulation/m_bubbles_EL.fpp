@@ -1636,8 +1636,8 @@ contains
     subroutine s_write_void_evol(qtime)
 
         real(wp) :: qtime, volcell, voltot
-        real(wp) :: lag_voidmax, lag_voidavg, lag_vol
-        real(wp) :: voidmax_glb, voidavg_glb, vol_glb
+        real(wp) :: lag_void_max, lag_void_avg, lag_vol
+        real(wp) :: void_max_glb, void_avg_glb, vol_glb
 
         integer :: i, j, k
         integer, dimension(3) :: cell
@@ -1659,21 +1659,21 @@ contains
             end if
         end if
 
-        lag_voidmax = 0._wp
-        lag_voidavg = 0._wp
+        lag_void_max = 0._wp
+        lag_void_avg = 0._wp
         lag_vol = 0._wp
-        !$acc parallel loop collapse(3) gang vector default(present) reduction(+:lag_vol,lag_voidavg) &
-        !$acc reduction(MAX:lag_voidmax) private(cell)
+        !$acc parallel loop collapse(3) gang vector default(present) reduction(+:lag_vol,lag_void_avg) &
+        !$acc reduction(MAX:lag_void_max) private(cell)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    lag_voidmax = max(lag_voidmax, 1._wp - q_beta%vf(1)%sf(i, j, k))
+                    lag_void_max = max(lag_void_max, 1._wp - q_beta%vf(1)%sf(i, j, k))
                     cell(1) = i
                     cell(2) = j
                     cell(3) = k
                     call s_get_char_vol(cell(1), cell(2), cell(3), volcell)
                     if ((1._wp - q_beta%vf(1)%sf(i, j, k)) > 5.0d-11) then
-                        lag_voidavg = lag_voidavg + (1._wp - q_beta%vf(1)%sf(i, j, k))*volcell
+                        lag_void_avg = lag_void_avg + (1._wp - q_beta%vf(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
                     end if
                 end do
@@ -1682,24 +1682,24 @@ contains
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
-            call s_mpi_allreduce_max(lag_voidmax, voidmax_glb)
-            lag_voidmax = voidmax_glb
+            call s_mpi_allreduce_max(lag_void_max, void_max_glb)
+            lag_void_max = void_max_glb
             call s_mpi_allreduce_sum(lag_vol, vol_glb)
             lag_vol = vol_glb
-            call s_mpi_allreduce_sum(lag_voidavg, voidavg_glb)
-            lag_voidavg = voidavg_glb
+            call s_mpi_allreduce_sum(lag_void_avg, void_avg_glb)
+            lag_void_avg = void_avg_glb
         end if
 #endif
-        voltot = lag_voidavg
+        voltot = lag_void_avg
         ! This voidavg value does not reflect the real void fraction in the cloud
         ! since the cell which does not have bubbles are not accounted
-        if (lag_vol > 0._wp) lag_voidavg = lag_voidavg/lag_vol
+        if (lag_vol > 0._wp) lag_void_avg = lag_void_avg/lag_vol
 
         if (proc_rank == 0) then
             write (12, '(6X,4e24.8)') &
                 qtime, &
-                lag_voidavg, &
-                lag_voidmax, &
+                lag_void_avg, &
+                lag_void_max, &
                 voltot
             close (12)
         end if
