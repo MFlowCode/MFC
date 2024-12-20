@@ -79,6 +79,7 @@ print(json.dumps({
 
                     # Turning on Hypoelasticity ================================
                     'hypoelasticity'               : 'T',
+                    'fd_order'                     : 4,
                     # ==========================================================
 
                     # Formatted Database Files Structure Parameters ============

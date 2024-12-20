@@ -25,11 +25,11 @@ module m_global_parameters
     implicit none
 
     ! Logistics ================================================================
-    integer :: num_procs                 !< Number of processors
-    character(LEN=path_len) :: case_dir  !< Case folder location
-    logical :: old_grid                  !< Use existing grid data
-    logical :: old_ic                    !< Use existing IC data
-    integer :: t_step_old, t_step_start  !< Existing IC/grid folder
+    integer :: num_procs            !< Number of processors
+    character(LEN=path_len) :: case_dir             !< Case folder location
+    logical :: old_grid             !< Use existing grid data
+    logical :: old_ic, non_axis_sym               !< Use existing IC data
+    integer :: t_step_old, t_step_start           !< Existing IC/grid folder
     ! ==========================================================================
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
@@ -90,6 +90,11 @@ module m_global_parameters
     integer :: sys_size              !< Number of unknowns in the system of equations
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
+    logical :: hyperelasticity       !< activate hyperelasticity
+    logical :: elasticity            !< elasticity modeling, true for hyper or hypo
+    integer :: b_size                !< Number of components in the b tensor
+    integer :: tensor_size           !< Number of components in the nonsymmetric tensor
+    logical :: pre_stress            !< activate pre_stressed domain
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -104,6 +109,7 @@ module m_global_parameters
     integer :: gamma_idx                           !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
+    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
     integer :: c_idx                               !< Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
 
@@ -240,6 +246,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
+    integer :: xibeg, xiend
     integer :: chemxb, chemxe
     !> @}
 
@@ -308,6 +315,11 @@ contains
         weno_order = dflt_int
 
         hypoelasticity = .false.
+        hyperelasticity = .false.
+        elasticity = .false.
+        pre_stress = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -371,6 +383,16 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
+            patch_icpp(i)%a(2) = dflt_real
+            patch_icpp(i)%a(3) = dflt_real
+            patch_icpp(i)%a(4) = dflt_real
+            patch_icpp(i)%a(5) = dflt_real
+            patch_icpp(i)%a(6) = dflt_real
+            patch_icpp(i)%a(7) = dflt_real
+            patch_icpp(i)%a(8) = dflt_real
+            patch_icpp(i)%a(9) = dflt_real
+            patch_icpp(i)%non_axis_sym = .false.
+
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
             patch_icpp(i)%v0 = dflt_real
@@ -619,11 +641,22 @@ contains
                 end if
             end if
 
-            if (hypoelasticity) then
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
                 sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
             end if
 
             if (surface_tension) then
@@ -649,6 +682,24 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
+                stress_idx%beg = sys_size + 1
+                stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
+                ! number of stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                sys_size = stress_idx%end
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric btensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                xi_idx%beg = sys_size + 1
+                xi_idx%end = sys_size + num_dims
+                ! adding three more equations for the \xi field and the elastic energy
+                sys_size = xi_idx%end + 1
+            end if
 
             if (surface_tension) then
                 c_idx = sys_size + 1
@@ -732,6 +783,8 @@ contains
         strxe = stress_idx%end
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
+        xibeg = xi_idx%beg
+        xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
