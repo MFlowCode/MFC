@@ -390,7 +390,7 @@ contains
 
         !< Compute characteristic distance
         chardist = sqrt(dx(cell(1))*dy(cell(2)))
-        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1./3.)
+        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
 
         !< Compute characteristic volume
         if (p > 0) then
