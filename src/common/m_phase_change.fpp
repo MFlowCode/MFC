@@ -1,13 +1,8 @@
-!>
-!! @file m_phase_change.fpp
-!! @brief Contains module m_phasechange
+!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
+!> procedure.
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to relax the model equations (6-eqn model)
-!> towards pressure and temperature (6-eqn to 4-eqn), and (if wanted) Gibbs free
-!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
-!> procedure.
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
@@ -90,11 +85,11 @@ contains
     subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0_wp)) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
-        real(kind(0.0_wp)) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
-        real(kind(0.0_wp)) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
-        real(kind(0.0_wp)) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
-        real(kind(0.0_wp)) :: TvF !< total volume fraction
+        real(wp) :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
+        real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
+        real(wp) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
+        real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
+        real(wp) :: TvF !< total volume fraction
 
         !$acc declare create(pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF)
 
@@ -300,13 +295,13 @@ contains
 
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
-        real(kind(0.0_wp)), intent(out) :: pS
-        real(kind(0.0_wp)), dimension(num_fluids), intent(out) :: p_infpT
-        real(kind(0.0_wp)), intent(in) :: rM
+        real(wp), intent(out) :: pS
+        real(wp), dimension(num_fluids), intent(out) :: p_infpT
+        real(wp), intent(in) :: rM
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0_wp)), intent(in) :: rhoe
-        real(kind(0.0_wp)), intent(out) :: TS
-        real(kind(0.0_wp)) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
+        real(wp), intent(in) :: rhoe
+        real(wp), intent(out) :: TS
+        real(wp) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
 
         integer :: i, ns !< generic loop iterators
 
@@ -404,17 +399,17 @@ contains
 #endif
 
         integer, intent(in) :: j, k, l
-        real(kind(0.0_wp)), intent(inout) :: pS
-        real(kind(0.0_wp)), dimension(num_fluids), intent(in) :: p_infpT
-        real(kind(0.0_wp)), intent(in) :: rhoe
+        real(wp), intent(inout) :: pS
+        real(wp), dimension(num_fluids), intent(in) :: p_infpT
+        real(wp), intent(in) :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0_wp)), intent(inout) :: TS
+        real(wp), intent(inout) :: TS
 
-        real(kind(0.0_wp)), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
-        real(kind(0.0_wp)), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
-        real(kind(0.0_wp)), dimension(2) :: R2D, DeltamP !< residual and correction array
-        real(kind(0.0_wp)) :: Om ! underrelaxation factor
-        real(kind(0.0_wp)) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
+        real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        real(wp), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
+        real(wp), dimension(2) :: R2D, DeltamP !< residual and correction array
+        real(wp) :: Om ! underrelaxation factor
+        real(wp) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
 
         !< Generic loop iterators
         integer :: i, ns
@@ -530,9 +525,9 @@ contains
 
         !> @name variables for the correction of the reacting partial densities
         !> @{
-        real(kind(0.0_wp)), intent(out) :: MCT
+        real(wp), intent(out) :: MCT
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0.0_wp)), intent(inout) :: rM
+        real(wp), intent(inout) :: rM
         integer, intent(in) :: j, k, l
         !> @}
         if (rM < 0.0_wp) then
@@ -591,15 +586,15 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: InvJac
+        real(wp), dimension(2, 2), intent(out) :: InvJac
         integer, intent(in) :: j
-        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: Jac
+        real(wp), dimension(2, 2), intent(out) :: Jac
         integer, intent(in) :: k, l
-        real(kind(0.0_wp)), intent(in) :: mCPD, mCVGP, mCVGP2, pS
+        real(wp), intent(in) :: mCPD, mCVGP, mCVGP2, pS
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0_wp)), dimension(2, 2), intent(out) :: TJac
+        real(wp), dimension(2, 2), intent(out) :: TJac
 
-        real(kind(0.0_wp)) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
+        real(wp) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
 
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -699,12 +694,12 @@ contains
 #endif
 
         integer, intent(in) :: j, k, l
-        real(kind(0.0_wp)), intent(in) :: mCPD, mCVGP, mQD
+        real(wp), intent(in) :: mCPD, mCVGP, mQD
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(kind(0.0_wp)), intent(in) :: pS, rhoe
-        real(kind(0.0_wp)), dimension(2), intent(out) :: R2D
+        real(wp), intent(in) :: pS, rhoe
+        real(wp), dimension(2), intent(out) :: R2D
 
-        real(kind(0.0_wp)) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
+        real(wp) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
 
         ! mass of the reacting liquid
         ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
@@ -749,11 +744,11 @@ contains
         !$acc routine seq
 #endif
 
-        real(kind(0.0_wp)), intent(in) :: pSat
-        real(kind(0.0_wp)), intent(out) :: TSat
-        real(kind(0.0_wp)), intent(in) :: TSIn
+        real(wp), intent(in) :: pSat
+        real(wp), intent(out) :: TSat
+        real(wp), intent(in) :: TSIn
 
-        real(kind(0.0_wp)) :: dFdT, FT, Om !< auxiliary variables
+        real(wp) :: dFdT, FT, Om !< auxiliary variables
 
         ! Generic loop iterators
         integer :: ns

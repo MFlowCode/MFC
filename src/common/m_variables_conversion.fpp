@@ -429,7 +429,6 @@ contains
             pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
             qv = qv + alpha_rho_K(i)*qvs(i)
         end do
-
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
         do i = 1, 2
@@ -522,6 +521,7 @@ contains
             G_K = 0._wp
             do i = 1, num_fluids
                 !TODO: change to use Gs directly here?
+                !TODO: Make this changes as well for GPUs
                 G_K = G_K + alpha_K(i)*G(i)
             end do
             G_K = max(0._wp, G_K)
@@ -680,7 +680,6 @@ contains
             do i = 1, nb
                 bubrs(i) = bub_idx%rs(i)
             end do
-
             !$acc update device(bubrs)
         end if
 
@@ -892,7 +891,7 @@ contains
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (hypoelasticity) then
+                        if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                                                             alpha_rho_K, Re_K, j, k, l, G_K, Gs)
                         else if (bubbles) then
@@ -904,7 +903,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (hypoelasticity) then
+                        if (elasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
                                                                 rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
                         else
@@ -1011,13 +1010,18 @@ contains
                         end if
                     end if
 
+                    if (elasticity) then
+                        !$acc loop seq
+                        do i = strxb, strxe
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                        end do
+                    end if
+
                     if (hypoelasticity) then
                         !$acc loop seq
                         do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /rho_K
                             ! subtracting elastic contribution for pressure calculation
-                            if (G_K > 1000) then !TODO: check if stable for >0
+                            if (G_K > verysmall) then
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
@@ -1028,6 +1032,13 @@ contains
                                                                     ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 end if
                             end if
+                        end do
+                    end if
+
+                    if (hyperelasticity) then
+                        !$acc loop seq
+                        do i = xibeg, xiend
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                         end do
                     end if
 
@@ -1045,7 +1056,9 @@ contains
         end do
         !$acc end parallel loop
 
-    end subroutine s_convert_conservative_to_primitive_variables
+        !print *, 'I got here AA'
+
+    end subroutine s_convert_conservative_to_primitive_variables ! ---------
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
@@ -1058,13 +1071,8 @@ contains
     subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                              q_cons_vf)
 
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(in) :: q_prim_vf
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
@@ -1190,11 +1198,18 @@ contains
                         end do
                     end if
 
-                    if (hypoelasticity) then
-                        do i = stress_idx%beg, stress_idx%end
+                    if (elasticity) then
+                        ! adding the elastic contribution
+                        ! Multiply \tau to \rho \tau
+                        do i = strxb, strxe
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
+                    if (hypoelasticity) then
+                        do i = strxb, strxe
                             ! adding elastic contribution
-                            if (G > 1000) then
+                            if (G > verysmall) then
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
                                 ! extra terms in 2 and 3D
@@ -1208,6 +1223,14 @@ contains
                         end do
                     end if
 
+                    ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
+                    if (hyperelasticity) then
+                        ! Multiply \xi to \rho \xi
+                        do i = xibeg, xiend
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
                     if (surface_tension) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
@@ -1215,7 +1238,6 @@ contains
                 end do
             end do
         end do
-
 #else
         if (proc_rank == 0) then
             call s_mpi_abort('Conversion from primitive to '// &
@@ -1223,7 +1245,6 @@ contains
                              'implemented. Exiting ...')
         end if
 #endif
-
     end subroutine s_convert_primitive_to_conservative_variables
 
     !>  The following subroutine handles the conversion between
@@ -1299,7 +1320,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, E_idx)
-                    if (hypoelasticity) then
+                    if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                         alpha_K, alpha_rho_K, Re_K, &
                                                                         j, k, l, G_K, Gs)
@@ -1357,10 +1378,11 @@ contains
             end do
         end do
 #endif
-
     end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module
+    subroutine s_finalize_variables_conversion_module() ! ------------------
+
+        integer :: i !< Generic loop iterators
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
@@ -1400,6 +1422,7 @@ contains
 
         real(wp) :: blkmod1, blkmod2
         real(wp) :: Tolerance
+
         integer :: q
 
         if (chemistry) then
