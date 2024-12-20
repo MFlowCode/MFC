@@ -176,7 +176,7 @@ print(json.dumps({
     # ==========================================================
     
     # Bubbles ==================================================
-    'bubbles'                      : 'T',
+    'bubbles_euler'                : 'T',
     'bubble_model'                 : 3,
     'polytropic'                   : 'T',
     'polydisperse'                 : 'F',
