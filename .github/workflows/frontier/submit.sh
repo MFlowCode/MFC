@@ -23,6 +23,7 @@ sbatch <<EOT
 #SBATCH -n 8                       # Number of cores required
 #SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
+#SBATCH -q debug                   # Use debug QOS - only one job per user allowed in queue!
 #SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
