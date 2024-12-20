@@ -5,7 +5,7 @@
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
 #SBATCH --ntasks-per-node=${tasks_per_node}
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=16
 #SBATCH --job-name="${name}"
 #SBATCH --time=${walltime}
 % if partition:
